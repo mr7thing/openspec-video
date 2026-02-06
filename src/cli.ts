@@ -4,7 +4,7 @@ import path from 'path';
 import { JobGenerator } from './automation/JobGenerator';
 
 const program = new Command();
-const TEMPLATE_DIR = path.join(__dirname, '../project-demo');
+const TEMPLATE_DIR = path.join(__dirname, '../templates');
 const PROPOSAL_TEMPLATE = path.join(__dirname, '../templates/proposal.md');
 
 program
@@ -24,11 +24,33 @@ program
 
         console.log(`Initializing project in ${targetDir}...`);
         try {
-            // Copy project-demo as template
-            // Exclude artifacts and queue to start fresh
-            await fs.copy(TEMPLATE_DIR, targetDir, {
-                filter: (src) => !src.includes('artifacts') && !src.includes('queue') && !src.includes('openspec')
-            });
+            await fs.ensureDir(targetDir);
+
+            // 1. Copy .agent (Skills) and .antigravity (Rules, Workflows)
+            await fs.copy(path.join(TEMPLATE_DIR, '.agent'), path.join(targetDir, '.agent'));
+            await fs.copy(path.join(TEMPLATE_DIR, '.antigravity'), path.join(targetDir, '.antigravity'));
+
+            // 2. Create videospec structure
+            const specDir = path.join(targetDir, 'videospec');
+            await fs.ensureDir(specDir);
+
+            // Project Config
+            await fs.copy(path.join(TEMPLATE_DIR, 'project/project.md'), path.join(specDir, 'project.md'));
+
+            // Assets
+            await fs.ensureDir(path.join(specDir, 'assets/characters'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'assets/character.md'), path.join(specDir, 'assets/characters/example.md'));
+
+            await fs.ensureDir(path.join(specDir, 'assets/scenes'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'assets/scene.md'), path.join(specDir, 'assets/scenes/example.md'));
+
+            // Stories
+            await fs.ensureDir(path.join(specDir, 'stories'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'stories/Script.md'), path.join(specDir, 'stories/Script.md'));
+
+            // Changes
+            await fs.ensureDir(path.join(specDir, 'changes'));
+
             console.log('Project structure created.');
             console.log('Run `cd ' + projectName + ' && opsv generate` to start.');
         } catch (err) {
