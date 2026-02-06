@@ -1,0 +1,12 @@
+id: "char_m"
+name: "M"
+role: "Client"
+description: "A mysterious and beautiful woman who approaches K with a strange midnight commission."
+visual_traits:
+  eye_color: "Enigmatic Violet"
+  hair_style: "Elegant Long Black Hair"
+  clothing: "Midnight Blue Silk Evening Gown"
+  distinctive_features:
+    - "Glowing neural lace on neck"
+    - "Aura of danger"
+reference_sheet: "assets/characters/m.png"

@@ -27,7 +27,7 @@ program
             // Copy project-demo as template
             // Exclude artifacts and queue to start fresh
             await fs.copy(TEMPLATE_DIR, targetDir, {
-                filter: (src) => !src.includes('artifacts') && !src.includes('queue')
+                filter: (src) => !src.includes('artifacts') && !src.includes('queue') && !src.includes('openspec')
             });
             console.log('Project structure created.');
             console.log('Run `cd ' + projectName + ' && opsv generate` to start.');

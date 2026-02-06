@@ -35,7 +35,7 @@ export class AssetManager {
     private locations: Map<string, Location> = new Map();
 
     constructor(projectRoot: string) {
-        this.assetsRoot = path.join(path.resolve(projectRoot), 'assets');
+        this.assetsRoot = path.join(path.resolve(projectRoot), 'videospec', 'assets');
     }
 
     async loadAssets(): Promise<void> {
@@ -47,15 +47,25 @@ export class AssetManager {
         const charDir = path.join(this.assetsRoot, 'characters');
         if (!fs.existsSync(charDir)) return;
 
-        const files = fs.readdirSync(charDir).filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
+        // Support both .yaml (legacy) and .md (new standard)
+        const files = fs.readdirSync(charDir).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
 
         for (const file of files) {
             const content = fs.readFileSync(path.join(charDir, file), 'utf-8');
             try {
-                const raw = yaml.load(content);
+                let raw: any;
+                if (file.endsWith('.md')) {
+                    const parts = content.split(/^---$/m);
+                    if (parts.length < 3) throw new Error('Invalid Markdown Frontmatter');
+                    raw = yaml.load(parts[1]);
+                    // Optional: You could append parts[2] (the body) to the description if needed.
+                } else {
+                    raw = yaml.load(content);
+                }
+
                 const asset = CharacterSchema.parse(raw);
                 this.characters.set(asset.id, asset);
-                console.log(`Loaded Character: ${asset.name} (${asset.id})`);
+                console.log(`Loaded Character: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {
                 console.warn(`Failed to validate character asset ${file}:`, err);
             }
@@ -66,15 +76,23 @@ export class AssetManager {
         const locDir = path.join(this.assetsRoot, 'locations');
         if (!fs.existsSync(locDir)) return;
 
-        const files = fs.readdirSync(locDir).filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
+        const files = fs.readdirSync(locDir).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
 
         for (const file of files) {
             const content = fs.readFileSync(path.join(locDir, file), 'utf-8');
             try {
-                const raw = yaml.load(content);
+                let raw: any;
+                if (file.endsWith('.md')) {
+                    const parts = content.split(/^---$/m);
+                    if (parts.length < 3) throw new Error('Invalid Markdown Frontmatter');
+                    raw = yaml.load(parts[1]);
+                } else {
+                    raw = yaml.load(content);
+                }
+
                 const asset = LocationSchema.parse(raw);
                 this.locations.set(asset.id, asset);
-                console.log(`Loaded Location: ${asset.name} (${asset.id})`);
+                console.log(`Loaded Location: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {
                 console.warn(`Failed to validate location asset ${file}:`, err);
             }
