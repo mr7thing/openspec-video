@@ -18,12 +18,18 @@ async function main() {
         const assetManager = new AssetManager(projectRoot);
         await assetManager.loadAssets();
 
-        const chars = assetManager.getAllCharacters();
-        console.log(`Loaded ${chars.length} characters.`);
-        if (chars.length > 0) {
-            console.log(`First Character: ${chars[0].name} - ${chars[0].description}`);
-        }
+        // Test JobGenerator
+        const { JobGenerator } = await import('./automation/JobGenerator');
+        const generator = new JobGenerator(projectRoot);
+        console.log("Generating jobs from Script.md...");
+        const jobs = await generator.generateJobs();
 
+        console.log(`Generated ${jobs.length} jobs.`);
+        if (jobs.length > 0) {
+            console.log("Sample Job Payload:");
+            console.log(JSON.stringify(jobs[0].payload, null, 2));
+            console.log("Assets:", jobs[0].assets);
+        }
     } catch (error) {
         console.error("Failed to parse project:", error);
     }
