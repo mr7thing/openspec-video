@@ -30,7 +30,7 @@ program
                 filter: (src) => !src.includes('artifacts') && !src.includes('queue')
             });
             console.log('Project structure created.');
-            console.log('Run `cd ' + projectName + ' && opsx generate` to start.');
+            console.log('Run `cd ' + projectName + ' && opsv generate` to start.');
         } catch (err) {
             console.error('Failed to initialize project:', err);
         }
@@ -40,10 +40,14 @@ program
     .command('proposal <title>')
     .description('Create a new change proposal')
     .action(async (title) => {
-        const changesDir = path.join(process.cwd(), 'videospec', 'changes');
+        let changesDir = path.join(process.cwd(), 'videospec', 'changes');
         if (!fs.existsSync(changesDir)) {
-            console.error('Error: Not in a valid OpenSpec project (videospec/changes not found).');
-            return;
+            // Fallback for system dev repo
+            changesDir = path.join(process.cwd(), 'openspec', 'changes');
+            if (!fs.existsSync(changesDir)) {
+                console.error('Error: Not in a valid OpenSpec project (videospec/changes or openspec/changes not found).');
+                return;
+            }
         }
 
         const safeTitle = title.toLowerCase().replace(/ /g, '-');

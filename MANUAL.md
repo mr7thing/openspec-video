@@ -1,134 +1,88 @@
-# OpenSpec-Video 自动化制作系统使用手册 V0.1.0
+# OpenSpec-Video: AI Director's Manual V0.1.0
 
-欢迎使用 **OpenSpec-Video** —— 一套基于“大脑（Logic）+ 手臂（Agent）”架构的 AI 视频自动化制作系统。本系统旨在将标准化的剧本（Markdown）自动转化为可执行的 AI 生成指令（Prompts），并指挥 Agent 完成从分镜绘制到视频合成的全过程。
-
----
-
-## 1. 核心概念
-
-系统由两部分组成：
-*   **OpenSpec (Videospec)**: 单一事实来源（Single Source of Truth）。所有的剧本、角色设定、场景描述都存储在标准化的 `videospec/` 目录中。
-*   **OpS V (Automation CLI)**: 自动化工具链。负责读取 Spec，验证逻辑一致性（如：检查剧本里的人名是否在设定集中存在），并生成机器可读的 `jobs.json` 任务队列。
-*   **Antigravity Agent**: 执行者。读取 `jobs.json`，模拟人类操作浏览器，调用 AI 工具（如 Gemini, Veo, Higgsfield）进行生产。
+欢迎使用 **OpenSpec-Video** —— 你的 AI 剧组自动化系统。
+本系统不写代码，只拍电影。它将你的**剧本**直接转化为**分镜**和**影片**。
 
 ---
 
-## 2. 环境准备与安装
+## 1. 核心理念 (The Philosophy)
+**"Image is the Source Code of Video."**
+（图像是视频的源代码。）
 
-### 前置要求
-*   **Node.js**: v18.0.0 或更高版本。
-*   **Antigravity IDE**: 用于运行 Agent 工作流。
-
-### 安装步骤
-
-1.  **克隆项目**
-    ```bash
-    git clone https://github.com/YourRepo/OpenSpec-Video.git
-    cd OpenSpec-Video
-    ```
-
-2.  **安装依赖**
-    ```bash
-    npm install
-    ```
-
-3.  **构建系统**
-    ```bash
-    npm run build
-    ```
+我们不直接生成视频。
+1.  先**写剧本** (Script)。
+2.  再**拍剧照** (Shoot Storyboard) —— 确认构图、光影、角色。
+3.  最后**动起来** (Action) —— 基于剧照生成视频。
 
 ---
 
-## 3. 标准制作流程 (Workflow)
+## 2. 导演工作流 (The Director's Workflow)
 
-### 第一步：初始化项目 (Init)
-不要从零开始建立文件夹。使用 `opsx init` 命令快速创建一个包含标准结构的视频项目。
+## 2. 导演工作流 (The Director's Workflow)
 
+### 第一步：建组 (Init)
+搭设你的数字片场。
 ```bash
-# 在根目录下运行
-npx opsx init my-cyberpunk-movie
+npx opsv init my-cyberpunk-movie
 cd my-cyberpunk-movie
 ```
 
-生成的目录结构如下：
-*   `videospec/project.md`: 项目总纲（风格、分辨率）。
-*   `videospec/assets/`: 存放角色 (`characters/`) 和场景 (`locations/`) 的 YAML 定义。
-*   `videospec/stories/`: 存放剧本 (`Script.md`)。
+### 第二步：写本 (Scripting)
+**故事第一**。在 `videospec/stories/Script.md` 里写下你的故事梗概或详细剧本。
+此时不需要考虑图片，只关注故事核。
 
-### 第二步：编写设定与剧本 (Write)
-
-**1. 定义资产 (Assets)**
-在 `videospec/assets/characters/` 下创建角色。例如 `K.yaml`:
-```yaml
-id: "char_k"
-name: "Detective K"
-visual_traits:
-  clothing: "Brown leather trench coat"
-reference_sheet: "assets/characters/detective_k.png" # 必须提供参考图路径
+```markdown
+# Act 1: The Arrival
+Detective K walks into the Void Bar. He is looking for a glitch in the matrix.
 ```
 
-**2. 编写剧本 (Script)**
-编辑 `videospec/stories/Script.md`。使用 `[资产ID]` 的方式引用角色或场景，系统会自动替换并关联参考图。
+### 第三步：人设 (Asset Definition)
+根据剧本，确定你需要哪些演员和场景。
+在 `videospec/assets/` 下建立 YAML 定义，用**文字**详细描述他们的样子。
+
+```yaml
+# K.yaml
+name: "Detective K"
+description: "A weary cybernetic detective, brown leather trench coat, glowing red eye."
+```
+
+### 第四步：定妆 (Visualization)
+让 AI 为你的角色生成“定妆照”。
+1.  启动 Antigravity Agent (或使用 Gemini Web)。
+2.  指令：“根据 `assets/characters/*.yaml` 的描述，为每个角色生成 4 张风格统一的设定图。”
+3.  **审定 (Review)**：挑选最满意的一张，保存到 `assets/characters/images/`，并在 YAML 中更新 `reference_sheet` 路径。
+
+### 第五步：分镜 (Storyboarding)
+现在你有了故事，也有了演员（图片）。
+回到 `Script.md`，开始设计具体的分镜（Shots），并引用你的演员。
 
 ```markdown
 # Scene 1
-## Shot 1
-**Subject**: [char_k] walks into [loc_void_bar].
-**Action**: Pushing through neon curtains.
-**Camera**: Low angle.
+**Shot 1**: [char_k] pushes through the neon curtain. Close up on his mechanical eye.
 ```
 
-### 第三步：生成任务队列 (Generate)
-当剧本写好后，让“大脑”工作，将其编译为 Agent 能看懂的 JSON 指令。
-
+### 第六步：开拍 (Shoot)
+执行自动化拍摄。
 ```bash
-npx opsx generate
+npx opsv generate
 ```
-*   **成功**：会提示 `Successfully generated X jobs`。
-*   **输出**：检查 `queue/jobs.json`，你将看到自然语言的 `[char_k]` 已经被替换为了详细的 Prompt，并且附带了 `assets` 图片路径。
-*   **失败**：如果剧本引用了不存在的 ID（如 `[char_ghost]`)，系统会报错提醒。
+Agent 将结合你的**分镜描述** + **定妆照**，使用 Nano Banana Pro (或其他工具) 生成高度一致的分镜画面。
 
-### 第四步：Agent 执行 (Execute)
-现在轮到“手臂”干活了。
-
-1.  打开 **Antigravity Agent** 面板。
-2.  加载工作流文件：`project-demo/.antigravity/workflows/generate_storyboard.md`。
-3.  告诉 Agent：“**请运行 Generate Storyboard**”。
-
-Agent 将会自动：
-1.  读取 `jobs.json`。
-2.  打开浏览器（如 Gemini Web 或 Higgsfield）。
-3.  自动填入 Prompt 和参考图。
-4.  点击生成并截图保存结果到 `artifacts/` 目录。
+### 第五步：动作 (Action)
+分镜满意了？让它动起来。
+启动 `workflows/generate_video.md`，Agent 会把你的分镜图扔进 Veo 或 Runway，生成最终的 4K 视频片段。
 
 ---
 
-## 4. 进阶功能
+## 3. 常见问题 (FAQ, for Directors)
 
-### 变更管理 (Proposals)
-当需要对项目进行重大修改（如“把主角风衣改成黑色”）时，不要直接改文件，建议先提一个提案：
+**Q: "演员长得不对？"**
+A: 检查 `assets/characters/` 里的参考图是否清晰。AI 是看图说话的。
 
-```bash
-npx opsx proposal "Change K coat to black"
-```
-系统会在 `videospec/changes/` 下生成一个带日期的 Markdown 提案模板，帮助你记录修改原因和影响范围。
-
-### 视频合成 (Video Generation)
-分镜图（Storyboard）生成满意后，可以升级为视频生成任务：
-1.  手动或编写脚本修改 `jobs.json`，将 `type` 改为 `video_generation`，并将 `assets` 指向生成的静态分镜图。
-2.  运行 `workflows/generate_video.md`，Agent 将会使用 Veo 或 Runway 进行 Image-to-Video 转换。
+**Q: "可以只重拍第3场吗？"**
+A: 可以。在剧本里注释掉其他场次，或者只保留 Scene 3，然后重新 Run `opsv generate`.
 
 ---
 
-## 5. 常见问题 (FAQ)
+*Directed by You. Powered by OpenSpec.*
 
-**Q: `opsx generate` 报错 "Character not found"?**
-A: 请检查 `Script.md` 中使用的ID（如 `[char_neo]`）是否在 `assets/characters/` 目录下有对应的 `.yaml` 文件，且文件内的 `id` 字段匹配。
-
-**Q: Agent 打开浏览器失败?**
-A: 确保 Antigravity 环境配置了必要的环境变量（如 `$HOME`）。如果是本地运行，请确保网络通畅且已登录目标 AI 工具的账号。
-
----
-
-*OpenSpec-Video Team*
-*Designed for Creators, Powered by Code.*
