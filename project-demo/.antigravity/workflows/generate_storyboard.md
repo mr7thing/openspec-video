@@ -7,7 +7,7 @@ This workflow orchestrates the end-to-end process of generating a storyboard fro
 ### 1. Build Job Queue
 Launch the terminal and run the generation command to parse the latest scripts.
 ```bash
-npx opsx generate
+npx opsv generate
 ```
 > **Verify**: Check that `project-demo/queue/jobs.json` is created or updated.
 

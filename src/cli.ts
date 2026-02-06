@@ -8,7 +8,7 @@ const TEMPLATE_DIR = path.join(__dirname, '../project-demo');
 const PROPOSAL_TEMPLATE = path.join(__dirname, '../templates/proposal.md');
 
 program
-    .name('opsx')
+    .name('opsv')
     .description('OpenSpec-Video Automation CLI')
     .version('0.1.0');
 

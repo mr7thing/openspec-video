@@ -13,7 +13,7 @@ This workflow orchestrates the creation of video clips from existing storyboards
 2. If images are missing, run the **Generate Storyboard** workflow first.
 
 ### 2. Job Configuration
-*Note: Currently `opsx generate` defaults to image jobs. For video, we manually verify or update the queue.*
+*Note: Currently `opsv generate` defaults to image jobs. For video, we manually verify or update the queue.*
 
 1. Open `project-demo/queue/jobs.json`.
 2. **Action**: Convert `image_generation` jobs to `video_generation` for the shots you want to animate.
