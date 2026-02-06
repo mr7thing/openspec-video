@@ -18,7 +18,7 @@ const CharacterSchema = z.object({
     reference_sheet: z.string().optional() // Path to the reference image
 });
 
-const LocationSchema = z.object({
+const SceneSchema = z.object({
     id: z.string(),
     name: z.string(),
     description: z.string(),
@@ -27,12 +27,12 @@ const LocationSchema = z.object({
 });
 
 export type Character = z.infer<typeof CharacterSchema>;
-export type Location = z.infer<typeof LocationSchema>;
+export type Scene = z.infer<typeof SceneSchema>;
 
 export class AssetManager {
     private assetsRoot: string;
     private characters: Map<string, Character> = new Map();
-    private locations: Map<string, Location> = new Map();
+    private scenes: Map<string, Scene> = new Map();
 
     constructor(projectRoot: string) {
         this.assetsRoot = path.join(path.resolve(projectRoot), 'videospec', 'assets');
@@ -40,7 +40,7 @@ export class AssetManager {
 
     async loadAssets(): Promise<void> {
         await this.loadCharacters();
-        await this.loadLocations();
+        await this.loadScenes();
     }
 
     private async loadCharacters() {
@@ -72,14 +72,14 @@ export class AssetManager {
         }
     }
 
-    private async loadLocations() {
-        const locDir = path.join(this.assetsRoot, 'locations');
-        if (!fs.existsSync(locDir)) return;
+    private async loadScenes() {
+        const sceneDir = path.join(this.assetsRoot, 'scenes');
+        if (!fs.existsSync(sceneDir)) return;
 
-        const files = fs.readdirSync(locDir).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
+        const files = fs.readdirSync(sceneDir).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
 
         for (const file of files) {
-            const content = fs.readFileSync(path.join(locDir, file), 'utf-8');
+            const content = fs.readFileSync(path.join(sceneDir, file), 'utf-8');
             try {
                 let raw: any;
                 if (file.endsWith('.md')) {
@@ -90,11 +90,11 @@ export class AssetManager {
                     raw = yaml.load(content);
                 }
 
-                const asset = LocationSchema.parse(raw);
-                this.locations.set(asset.id, asset);
-                console.log(`Loaded Location: ${asset.name} (${asset.id}) via ${file}`);
+                const asset = SceneSchema.parse(raw);
+                this.scenes.set(asset.id, asset);
+                console.log(`Loaded Scene: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {
-                console.warn(`Failed to validate location asset ${file}:`, err);
+                console.warn(`Failed to validate scene asset ${file}:`, err);
             }
         }
     }
@@ -103,8 +103,13 @@ export class AssetManager {
         return this.characters.get(id);
     }
 
-    getLocation(id: string): Location | undefined {
-        return this.locations.get(id);
+    getScene(id: string): Scene | undefined {
+        return this.scenes.get(id);
+    }
+
+    // Deprecated alias
+    getLocation(id: string): Scene | undefined {
+        return this.getScene(id);
     }
 
     getAllCharacters(): Character[] {

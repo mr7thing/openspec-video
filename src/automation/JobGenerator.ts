@@ -87,7 +87,7 @@ export class JobGenerator {
                 }
             }
 
-            const loc = this.assetManager.getLocation(refId);
+            const loc = this.assetManager.getScene(refId);
             if (loc) {
                 subjectDesc = subjectDesc.replace(refMatch[0], `${loc.name}`);
             }

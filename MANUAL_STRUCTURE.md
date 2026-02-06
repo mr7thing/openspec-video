@@ -32,7 +32,7 @@ A dark noir detective story...
   ---
   ![Reference](./k_ref.png)
   ```
-- **`locations/*.md`**: Set definitions.
+- **`scenes/*.md`**: Set definitions.
 
 ### 3. `stories/`
 - **`Script.md`**: The screenplay.

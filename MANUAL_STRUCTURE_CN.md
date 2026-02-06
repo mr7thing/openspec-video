@@ -32,7 +32,7 @@ A dark noir detective story...
   ---
   ![Reference](./k_ref.png)
   ```
-- **`locations/*.md`**: 场景/布景定义。
+- **`scenes/*.md`**: 场景/布景定义。
 
 ### 3. `stories/`
 - **`Script.md`**: 剧本。
