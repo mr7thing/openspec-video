@@ -1,2 +1,6 @@
 .agent/
 .opencode/
+node_modules/
+dist/
+project-demo/artifacts/
+project-demo/queue/
