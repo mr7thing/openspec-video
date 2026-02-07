@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
@@ -13,16 +14,27 @@ program
     .version('0.1.0');
 
 program
-    .command('init <projectName>')
+    .command('init [projectName]')
     .description('Initialize a new OpenSpec-Video project')
     .action(async (projectName) => {
-        const targetDir = path.resolve(process.cwd(), projectName);
-        if (fs.existsSync(targetDir)) {
+        let targetDir = process.cwd();
+        if (projectName && projectName !== '.') {
+            targetDir = path.resolve(process.cwd(), projectName);
+        }
+
+        if (projectName && projectName !== '.' && fs.existsSync(targetDir)) {
             console.error(`Error: Directory ${projectName} already exists.`);
             return;
         }
 
         console.log(`Initializing project in ${targetDir}...`);
+
+        if (!fs.existsSync(TEMPLATE_DIR)) {
+            console.error(`CRITICAL ERROR: Template directory not found at ${TEMPLATE_DIR}`);
+            console.error('Please check your installation or package structure.');
+            return;
+        }
+
         try {
             await fs.ensureDir(targetDir);
 
@@ -52,7 +64,7 @@ program
             await fs.ensureDir(path.join(specDir, 'changes'));
 
             console.log('Project structure created.');
-            console.log('Run `cd ' + projectName + ' && opsv generate` to start.');
+            console.log('Run `opsv generate` to start.');
         } catch (err) {
             console.error('Failed to initialize project:', err);
         }

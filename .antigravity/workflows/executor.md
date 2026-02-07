@@ -3,13 +3,13 @@
 This workflow guides the Agent to execute video/image generation tasks defined in the `queue/jobs.json`.
 
 ## Prerequisites
-- The `queue/jobs.json` file must be generated via `npm start`.
+- The `queue/jobs.json` file must be generated via `npx opsv generate`.
 - The Agent must have access to `browser_subagent`.
 
 ## Execution Steps
 
 ### 1. Load Job Queue
-1. Read the file `project-demo/queue/jobs.json`.
+1. Read the file `queue/jobs.json`.
 2. Parse the JSON content to get a list of jobs.
 3. Identify jobs where `output_path` does not exist (Pending Jobs).
 

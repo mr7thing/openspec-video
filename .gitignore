@@ -1,6 +1,25 @@
-.agent/
-.opencode/
+# System Files
+.DS_Store
+Thumbs.db
+
+# Dependencies & Build
 node_modules/
 dist/
-project-demo/artifacts/
-project-demo/queue/
+*.tgz
+
+# Runtime Data & Artifacts
+.agent/
+.opencode/
+artifacts/
+queue/
+videospec/
+
+# Test Projects & Demos
+project-demo/
+Project-*/
+mv-*/
+
+# References & Docs
+.ref/
+MANUAL_STRUCTURE*.md
+
