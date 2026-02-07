@@ -2,7 +2,8 @@
 description: Standard workflow for creating new visual assets
 ---
 
-# OpsV Workflow: Asset Creation
+# OpsV Workflow: Asset Production (Legacy/Quick)
+*(Use `concept_design.md` for major characters)*
 
 1.  **Define**:
     - Create the markdown file (`videospec/assets/characters/[id].md`).
