@@ -55,16 +55,63 @@ opsv init MyNewMovie
 
 ---
 
-## 3. Chrome 插件安装与配置
+## 3. Chrome 插件 (OpsV Companion) 使用指南
 
-OpsV 配套了一个强大的浏览器插件，用于自动化 Gemini 操作。
+OpsV Companion 是连接本地文件系统与云端 AI (Gemini) 的桥梁。
 
-### 安装步骤
-1.  打开 Chrome 浏览器，访问 `chrome://extensions/`。
-2.  开启右上角的 **"开发者模式" (Developer mode)**。
-3.  点击 **"加载已解压的扩展程序" (Load unpacked)**。
-4.  选择项目目录下的 `extension/` 文件夹。
-5.  插件安装成功后，点击浏览器工具栏的侧边栏图标，选择 "OpsV Companion"。
+### 3.1 安装插件 (初次使用)
+由于这是一个开发者工具，目前需要通过"加载已解压扩展"的方式安装。
+
+1.  **找到插件目录**: 确认你的项目目录中包含 `extension/` 文件夹 (例如 `C:\Gemini\mv-momo\extension`).
+2.  **打开扩展管理页**: 在 Chrome 地址栏输入 `chrome://extensions/` 并回车。
+3.  **开启开发者模式**: 点击页面右上角的 **"开发者模式" (Developer mode)** 开关，使其变蓝。
+4.  **加载扩展**:
+    - 点击左上角的 **"加载已解压的扩展程序" (Load unpacked)** 按钮。
+    - 在弹出的文件选择框中，导航并选中项目的 `extension/` 文件夹。
+5.  **固定图标**: 安装后，点击浏览器右上角的"拼图"图标，找到 "OpenSpec-Video Companion" 并点击"图钉"📌将其固定在工具栏，方便使用。
+
+### 3.2 启动与连接
+插件需要配合本地 `opsv` 服务才能工作。
+
+1.  **启动本地服务**:
+    在终端中运行生成命令（会自动启动服务）：
+    ```bash
+    opsv generate
+    ```
+    或者手动启动：
+    ```bash
+    opsv start
+    ```
+    *成功标志: 终端显示 `✅ OpsV Server is RUNNING`*
+
+2.  **打开侧边栏**:
+    - 点击浏览器工具栏上的 OpsV 图标，或使用快捷键打开侧边栏。
+    - 在侧边栏的下拉菜单中选择 "OpenSpec-Video Companion"。
+
+3.  **检查连接状态**:
+    - 观察侧边栏顶部的 **状态指示灯**：
+        - 🟢 **绿色 (Connected)**: 连接成功！你可以开始执行任务。
+        - 🔴 **红色 (Disconnected)**: 连接断开。请检查 `opsv start` 是否运行，或点击 "Refresh" 按钮重试。
+
+### 3.3 执行批量生成
+1.  **准备环境**: 在 Chrome 中打开 [Gemini (gemini.google.com)](https://gemini.google.com)。
+2.  **接收任务**: 侧边栏会自动显示来自 `jobs.json` 的任务列表 (例如 "Generate Character: Neo")。
+3.  **开始生成**:
+    - 点击任务条目右侧的 **"Run"** 按钮。
+    - **自动化过程**:
+        1.  插件自动将 Prompt 填入 Gemini 对话框。
+        2.  自动点击发送。
+        3.  等待图片生成完毕。
+        4.  **自动抓取**: 插件检测到生成的图片后，会自动将其发送回本地服务器。
+    - *观察终端*: 你会看到 `[OpsV Daemon] Saved asset: videospec/assets/characters/neo.png` 的提示。
+
+### 3.4 故障排查
+- **连不上 (红色状态)**:
+    - 运行 `opsv status` 检查服务是否存活。
+    - 确保端口 `3000` 未被占用。
+- **不填入 Prompt**:
+    - 确保当前标签页是 `gemini.google.com`。
+    - 刷新页面后重试。
 
 ---
 
