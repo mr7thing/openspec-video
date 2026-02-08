@@ -44,9 +44,31 @@ opsv init MyNewMovie
     4. 生成 `queue/jobs.json`。
 - **产物**: `queue/jobs.json` 是浏览器自动化 Agent (Executor) 的直接输入源。
 
+### `opsv serve` (或 `start`)
+启动后台自动化服务 (Daemon)。
+- **作用**: 
+    - 启动 WebSocket 服务器 (默认端口 3000)。
+    - 监听 Chrome 插件的连接。
+    - 接收插件回传的图片/视频并自动归档。
+- **状态检查**: `opsv status`
+- **停止**: `opsv stop`
+
 ---
 
-## 3. V2 迭代式工作流指南
+## 3. Chrome 插件安装与配置
+
+OpsV 配套了一个强大的浏览器插件，用于自动化 Gemini 操作。
+
+### 安装步骤
+1.  打开 Chrome 浏览器，访问 `chrome://extensions/`。
+2.  开启右上角的 **"开发者模式" (Developer mode)**。
+3.  点击 **"加载已解压的扩展程序" (Load unpacked)**。
+4.  选择项目目录下的 `extension/` 文件夹。
+5.  插件安装成功后，点击浏览器工具栏的侧边栏图标，选择 "OpsV Companion"。
+
+---
+
+## 4. V2 迭代式工作流指南
 
 我们推荐采用 **"概念先行 -> 逐步细化"** 的创作模式。
 
@@ -78,14 +100,19 @@ opsv init MyNewMovie
     ```bash
     opsv generate
     ```
-2.  **执行拍摄 (Executor)**:
-    *   启动 Browser Agent (如 Nano Banana Pro)。
-    *   加载 `.antigravity/workflows/executor.md`。
-    *   Agent 将自动读取 `queue/jobs.json`，控制视频生成模型 (如 Veo/Sora) 进行拍摄。
+    *系统会自动检查并启动后台服务 (OpsV Server)。*
+
+2.  **执行拍摄 (Browser Companion)**:
+    - 打开 Gemini (gemini.google.com)。
+    - 打开 Chrome 侧边栏 (OpsV Companion)。
+    - **连接状态**: 确认指示灯为 🟢 (Green)。
+    - **执行**: 点击任务列表中的 "Run" 按钮。
+    - **自动归档**: 观察插件自动填入 Prompt -> 生成 -> 回传。
+    - *控制台*: 你会在 CLI 看到 `[OpsV Daemon] Saved asset: ...` 的日志。
 
 ---
 
-## 4. 目录结构参考
+## 5. 目录结构参考
 
 ```text
 /

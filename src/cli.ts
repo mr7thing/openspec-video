@@ -2,16 +2,101 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
+import { spawn } from 'child_process';
 import { JobGenerator } from './automation/JobGenerator';
 
 const program = new Command();
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
 const PROPOSAL_TEMPLATE = path.join(__dirname, '../templates/proposal.md');
+const PID_FILE = path.join(process.cwd(), '.opsv', 'daemon.pid');
+const DAEMON_SCRIPT = path.join(__dirname, 'server', 'daemon.js');
+
+function isDaemonRunning(): boolean {
+    if (!fs.existsSync(PID_FILE)) return false;
+    try {
+        const pid = parseInt(fs.readFileSync(PID_FILE, 'utf-8'));
+        process.kill(pid, 0); // Check if process exists
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function startDaemon() {
+    if (isDaemonRunning()) {
+        console.log('Server is already running.');
+        return;
+    }
+
+    console.log('Starting OpsV Server...');
+    const subprocess = spawn('node', [DAEMON_SCRIPT], {
+        detached: true,
+        stdio: 'ignore', // 'ignore' for true background, or open file for logs
+        cwd: process.cwd(),
+        env: process.env
+    });
+
+    subprocess.unref();
+    console.log(`Server started. (PID: ${subprocess.pid})`);
+    // Note: The daemon itself writes the PID file, but we can't wait for it easily in detached mode.
+    // We trust it starts.
+}
+
+function stopDaemon() {
+    if (!fs.existsSync(PID_FILE)) {
+        console.log('Server is not running.');
+        return;
+    }
+
+    try {
+        const pid = parseInt(fs.readFileSync(PID_FILE, 'utf-8'));
+        process.kill(pid);
+        fs.unlinkSync(PID_FILE);
+        console.log(`Server stopped (PID: ${pid}).`);
+    } catch (e) {
+        console.error('Failed to stop server:', e);
+    }
+}
+
 
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.1.0');
+    .version('0.1.1');
+
+program
+    .command('serve')
+    .description('Start the OpsV background server')
+    .action(() => {
+        startDaemon();
+    });
+
+program
+    .command('start')
+    .description('Alias for serve')
+    .action(() => {
+        startDaemon();
+    });
+
+program
+    .command('stop')
+    .description('Stop the OpsV background server')
+    .action(() => {
+        stopDaemon();
+    });
+
+program
+    .command('status')
+    .description('Check OpsV Server status')
+    .action(() => {
+        if (isDaemonRunning()) {
+            const pid = fs.readFileSync(PID_FILE, 'utf-8');
+            console.log(`✅ OpsV Server is RUNNING (PID: ${pid})`);
+            console.log(`   Listening on: ws://localhost:3000`);
+        } else {
+            console.log('🔴 OpsV Server is STOPPED');
+        }
+    });
 
 program
     .command('init [projectName]')
@@ -114,6 +199,14 @@ program
             const jobs = await generator.generateJobs();
 
             console.log(`Successfully generated ${jobs.length} jobs in queue/jobs.json`);
+
+            // Auto-start server if needed
+            if (!isDaemonRunning()) {
+                console.log('Auto-starting OpsV Server for processing...');
+                startDaemon();
+            } else {
+                console.log('OpsV Server is already running. Ready for browser extension.');
+            }
         } catch (err) {
             console.error('Generation failed:', err);
         }
