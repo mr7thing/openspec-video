@@ -62,7 +62,7 @@ function stopDaemon() {
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.1.1');
+    .version('0.1.2');
 
 program
     .command('serve')

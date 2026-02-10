@@ -1,6 +1,6 @@
 {
   "name": "openspec-video",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "OpenSpec-Video Automation System",
   "main": "dist/index.js",
   "bin": {
@@ -16,6 +16,7 @@
   "files": [
     "dist",
     "templates",
+    "extension",
     "README.md"
   ],
   "keywords": [
