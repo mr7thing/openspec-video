@@ -20,7 +20,8 @@ export const PromptPayloadSchema = z.object({
         type: z.string().optional(),
         focus: z.string().optional(),
         motion: z.string().optional() // For video generation
-    })
+    }),
+    prompt: z.string().optional() // Raw prompt override
 });
 
 export type PromptPayload = z.infer<typeof PromptPayloadSchema>;

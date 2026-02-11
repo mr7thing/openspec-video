@@ -11,10 +11,14 @@
     ],
     "host_permissions": [
         "https://gemini.google.com/*",
-        "ws://localhost:3000/*"
+        "ws://localhost:3000/*",
+        "<all_urls>"
     ],
     "background": {
         "service_worker": "background.js"
+    },
+    "action": {
+        "default_title": "OpenSpec-Video Companion"
     },
     "side_panel": {
         "default_path": "sidepanel.html"
@@ -29,10 +33,5 @@
             ],
             "run_at": "document_idle"
         }
-    ],
-    "icons": {
-        "16": "icons/icon16.png",
-        "48": "icons/icon48.png",
-        "128": "icons/icon128.png"
-    }
+    ]
 }

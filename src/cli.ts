@@ -137,6 +137,9 @@ program
             // Assets
             await fs.ensureDir(path.join(specDir, 'assets/characters'));
             await fs.copy(path.join(TEMPLATE_DIR, 'assets/character.md'), path.join(specDir, 'assets/characters/example.md'));
+            if (fs.existsSync(path.join(TEMPLATE_DIR, 'assets/ref.png'))) {
+                await fs.copy(path.join(TEMPLATE_DIR, 'assets/ref.png'), path.join(specDir, 'assets/characters/ref.png'));
+            }
 
             await fs.ensureDir(path.join(specDir, 'assets/scenes'));
             await fs.copy(path.join(TEMPLATE_DIR, 'assets/scene.md'), path.join(specDir, 'assets/scenes/example.md'));
@@ -144,6 +147,14 @@ program
             // Stories
             await fs.ensureDir(path.join(specDir, 'stories'));
             await fs.copy(path.join(TEMPLATE_DIR, 'stories/Script.md'), path.join(specDir, 'stories/Script.md'));
+
+            // Workflow Config
+            if (fs.existsSync(path.join(TEMPLATE_DIR, 'workflow.json'))) {
+                await fs.copy(
+                    path.join(TEMPLATE_DIR, 'workflow.json'),
+                    path.join(specDir, 'workflow.json')
+                );
+            }
 
             // Changes
             await fs.ensureDir(path.join(specDir, 'changes'));
@@ -189,14 +200,15 @@ program
 
 program
     .command('generate')
-    .description('Generate jobs from videospec/stories')
-    .action(async () => {
+    .description('Generate jobs from videospec assets or stories')
+    .option('-m, --mode <type>', 'Generation mode: characters, scenes, or story', 'story')
+    .action(async (options) => {
         try {
             const projectRoot = process.cwd();
-            console.log(`Generating jobs for project at ${projectRoot}...`);
+            console.log(`Generating jobs (${options.mode}) for project at ${projectRoot}...`);
 
             const generator = new JobGenerator(projectRoot);
-            const jobs = await generator.generateJobs();
+            const jobs = await generator.generateJobs(options.mode);
 
             console.log(`Successfully generated ${jobs.length} jobs in queue/jobs.json`);
 

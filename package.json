@@ -10,6 +10,8 @@
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "start": "ts-node src/index.ts",
+    "daemon": "ts-node src/server/daemon.ts",
+    "daemon:restart": "npx kill-port 3000 && npm run daemon",
     "test": "jest",
     "lint": "eslint src/**/*.ts"
   },

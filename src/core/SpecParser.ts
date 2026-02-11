@@ -14,6 +14,7 @@ const ProjectSchema = z.object({
     context: z.object({
         narrative: z.string(),
         style: z.object({
+            visual_style: z.string().optional(),
             genre: z.string().optional(),
             palette: z.string().optional(),
             aspect_ratio: z.string().default("16:9"),
@@ -53,6 +54,7 @@ export class SpecParser {
         // combined with YAML frontmatter if present.
 
         const config = this.extractSections(content);
+        console.log("DEBUG: SpecParser Config:", JSON.stringify(config, null, 2));
         return ProjectSchema.parse(config);
     }
 
@@ -69,13 +71,13 @@ export class SpecParser {
         let currentSection = '';
 
         for (const line of lines) {
-            if (line.startsWith('## 1. Core Narrative')) {
+            if (line.startsWith('## 1. Core Narrative') || line.startsWith('## Context')) {
                 currentSection = 'narrative';
                 continue;
-            } else if (line.startsWith('## 2. Visual Style')) {
+            } else if (line.startsWith('## 2. Visual Style') || line.startsWith('## Style')) {
                 currentSection = 'style';
                 continue;
-            } else if (line.startsWith('## 3. Technical Constraints')) {
+            } else if (line.startsWith('## 3. Technical Constraints') || line.startsWith('## Production Config')) {
                 currentSection = 'constraints';
                 continue;
             }
@@ -85,6 +87,7 @@ export class SpecParser {
             }
 
             if (currentSection === 'style') {
+                if (line.includes('**Visual Style**:')) config.context.style.visual_style = line.split('**Visual Style**:')[1].trim();
                 if (line.includes('**Aspect Ratio**:')) config.context.style.aspect_ratio = line.split('**Aspect Ratio**:')[1].trim();
                 if (line.includes('**Resolution**:')) config.context.style.resolution = line.split('**Resolution**:')[1].trim();
             }

@@ -90,8 +90,56 @@ async function handleGetJobs(ws: WebSocket) {
     }
 }
 
+interface AssetRequestPayload {
+    path: string;
+    assetId: string;
+}
+
+async function handleGetAsset(ws: WebSocket, payload: AssetRequestPayload) {
+    if (!payload.path) {
+        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Missing path for GET_ASSET' }));
+        return;
+    }
+
+    // Security check: simple path traversal prevention
+    const fullPath = path.join(WORKSPACE_ROOT, payload.path);
+    const relative = path.relative(WORKSPACE_ROOT, fullPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        console.error('[OpsV Daemon] Security Block: Attempted path traversal', payload.path);
+        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Access denied: Path outside project root' }));
+        return;
+    }
+
+    try {
+        if (fs.existsSync(fullPath)) {
+            const fileData = await fs.readFile(fullPath);
+            const base64Data = fileData.toString('base64');
+            const ext = path.extname(fullPath).substring(1); // e.g. png
+            const mimeType = ext === 'png' ? 'image/png' : (ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/octet-stream');
+
+            console.log(`[OpsV Daemon] Serving asset: ${relative}`);
+            ws.send(JSON.stringify({
+                type: 'ASSET_DATA',
+                payload: {
+                    assetId: payload.assetId,
+                    data: `data:${mimeType};base64,${base64Data}`,
+                    path: payload.path
+                }
+            }));
+        } else {
+            console.error('[OpsV Daemon] Asset not found:', fullPath);
+            ws.send(JSON.stringify({ type: 'ERROR', payload: `Asset not found: ${payload.path}` }));
+        }
+    } catch (err) {
+        console.error('[OpsV Daemon] Failed to read asset:', err);
+        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Failed to read asset file' }));
+    }
+}
+
 async function handleSaveAsset(ws: WebSocket, payload: AssetPayload) {
     if (!payload.path || !payload.data) {
+        console.error('[OpsV Daemon] Save failed: Missing path or data', { path: payload.path, dataLength: payload.data ? payload.data.length : 0 });
+        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Missing path or data' }));
         return;
     }
 

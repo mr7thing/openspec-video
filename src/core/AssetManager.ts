@@ -58,10 +58,57 @@ export class AssetManager {
                     const parts = content.split(/^---$/m);
                     if (parts.length < 3) throw new Error('Invalid Markdown Frontmatter');
                     raw = yaml.load(parts[1]);
-                    // Optional: You could append parts[2] (the body) to the description if needed.
+
+                    // Parse Markdown Body for additional fields
+                    const body = parts.slice(2).join('---');
+
+                    // 1. Extract Description (all text that isn't a header or key-value pair)
+                    // Simple heuristic: Take the first paragraph that doesn't start with # or *
+                    const descriptionMatch = body.match(/^(?![#*])\s*(\S.*)/m);
+                    if (!raw.description && descriptionMatch) {
+                        raw.description = descriptionMatch[1].trim();
+                    } else if (!raw.description) {
+                        raw.description = "Imported from Markdown";
+                    }
+
+                    // 2. Extract Visual Traits from **Key**: Value
+                    if (!raw.visual_traits) raw.visual_traits = {};
+
+                    const traitMap: Record<string, string> = {
+                        'Eye Color': 'eye_color',
+                        'Eyes': 'eye_color',
+                        'Hair': 'hair_style',
+                        'Hair Style': 'hair_style',
+                        'Clothing': 'clothing',
+                        'Outfit': 'clothing',
+                        'Distinctive Features': 'distinctive_features'
+                    };
+
+                    const regex = /\*\*(.*?)\*\*:\s*(.*)/g;
+                    let match;
+                    while ((match = regex.exec(body)) !== null) {
+                        const key = match[1].trim();
+                        const value = match[2].trim();
+                        const schemaKey = traitMap[key];
+
+                        if (schemaKey) {
+                            if (schemaKey === 'distinctive_features') {
+                                raw.visual_traits[schemaKey] = [value];
+                            } else {
+                                raw.visual_traits[schemaKey] = value;
+                            }
+                        }
+                    }
+
+                    // Fallback for name if missing
+                    if (!raw.name) raw.name = raw.id;
+
                 } else {
                     raw = yaml.load(content);
                 }
+
+                // Ensure visual_traits exists to pass schema
+                if (!raw.visual_traits) raw.visual_traits = {};
 
                 const asset = CharacterSchema.parse(raw);
                 this.characters.set(asset.id, asset);
@@ -86,6 +133,35 @@ export class AssetManager {
                     const parts = content.split(/^---$/m);
                     if (parts.length < 3) throw new Error('Invalid Markdown Frontmatter');
                     raw = yaml.load(parts[1]);
+
+                    // Parse Markdown Body
+                    const body = parts.slice(2).join('---');
+                    // 1. Extract Description
+                    const descriptionMatch = body.match(/^(?![#*])\s*(\S.*)/m);
+                    if (!raw.description && descriptionMatch) {
+                        raw.description = descriptionMatch[1].trim();
+                    } else if (!raw.description) {
+                        raw.description = "Imported from Markdown";
+                    }
+                    console.log(`DEBUG: ${file} parsed description: "${raw.description}"`);
+
+                    // 2. Extract Atmosphere/Lighting
+                    const traitMap: Record<string, string> = {
+                        'Lighting': 'lighting',
+                        'Atmosphere': 'atmosphere'
+                    };
+
+                    const regex = /\*\*(.*?)\*\*:\s*(.*)/g;
+                    let match;
+                    while ((match = regex.exec(body)) !== null) {
+                        const key = match[1].trim();
+                        const value = match[2].trim();
+                        const schemaKey = traitMap[key];
+                        if (schemaKey) raw[schemaKey] = value;
+                    }
+
+                    if (!raw.name) raw.name = raw.id;
+
                 } else {
                     raw = yaml.load(content);
                 }
