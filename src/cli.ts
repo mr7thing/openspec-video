@@ -216,11 +216,23 @@ program
             if (!isDaemonRunning()) {
                 console.log('Auto-starting OpsV Server for processing...');
                 startDaemon();
-            } else {
                 console.log('OpsV Server is already running. Ready for browser extension.');
             }
         } catch (err) {
             console.error('Generation failed:', err);
+        }
+    });
+
+program
+    .command('review <type>')
+    .description('Interactive review of generated artifacts (characters, scenes)')
+    .action(async (type) => {
+        try {
+            const { Reviewer } = require('./automation/Reviewer'); // Lazy load
+            const reviewer = new Reviewer(process.cwd());
+            await reviewer.review(type);
+        } catch (err) {
+            console.error('Review failed:', err);
         }
     });
 

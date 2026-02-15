@@ -123,3 +123,124 @@ Server 负责**"应然"**（有哪些任务需要做），Extension 负责**"实
 *   **不动了？** 看 Sidepanel Console，是不是还没发指令。
 *   **没反应？** 看 Gemini Console，是不是找不到按钮 (报错 `OpsV Error`)。
 *   **没存图？** 看 Terminal，是不是文件权限或路径问题。
+
+---
+
+## 6. 核心工作流详解 (Core Workflow Explained)
+
+OpsV 已经从简单的 Prompt 搬运工进化为**配置驱动 (Configuration-Driven)** 的自动化导演系统。
+
+### A. 大脑：workflow.json
+
+你的项目现在有一个 `videospec/workflow.json` 文件，它是整个生成的指挥棒。它定义了三个核心阶段：
+
+1.  **Characters (角色设计)**
+    *   **输入**：扫描 `videospec/assets/characters/*.md`。
+    *   **动作**：读取 MarkDown，提取 `id`, `name`, `description`，以及**Markdown 图片链接**。
+    *   **输出**：生成角色三视图，存入 `artifacts/characters/`。
+2.  **Scenes (场景设计)**
+    *   **输入**：扫描 `videospec/assets/scenes/*.md`。
+    *   **输出**：生成环境概念图，存入 `artifacts/scenes/`。
+3.  **Story (分镜绘制)**
+    *   **输入**：读取 `videospec/stories/Script.md`。
+    *   **智能关联**：当脚本里写 `[Momo]` 时，系统会自动去 `artifacts/characters/` 找有没有已生成的 `momo.png`。如果有，它会**把这张图作为参考图（Reference Image）上传给 Gemini**，并告诉它 "Draw this character via uploaded reference"。
+
+### B. 执行命令 (CLI Modes)
+
+不再是无脑生成，而是分阶段执行：
+
+```bash
+# 1. 先搞定角色
+opsv generate --mode characters
+
+# 2. 再搞定场景
+opsv generate --mode scenes
+
+# 3. 最后画分镜 (此时系统会自动引用前两步生成的图)
+opsv generate --mode story
+```
+
+### C. 参考图机制 (Reference Injection)
+
+这是最酷的部分。你可以在 `.md` 文件里直接贴本地图片链接：
+
+```markdown
+# assets/characters/momo.md
+name: Momo
+...
+![参考图](./ref_images/momo_sketch.png) 
+<-- 系统会自动识别这个链接，读取文件，并在生成时上传给 Gemini！
+```
+
+**Prompt 变化：**
+一旦检测到图片，发给 Gemini 的 Prompt 会自动追加：
+> **Reference Images**: 1 images provided. Please use them in order as visual references.
+
+配合插件的自动上传功能，Gemini 就能看着你给的参考图（或者是上一轮生成的角色图）来画分镜，从而最大限度保持角色一致性。
+
+---
+
+## 7. 命令行完全手册 (CLI Reference)
+
+以下是 OpsV 提供的所有命令及其详细说明。
+
+### 核心命令
+
+#### `opsv init [projectName]`
+**功能**：初始化一个新的视频策划项目。
+*   **用法**：`opsv init MyNewMovie`
+*   **作用**：
+    *   创建标准目录结构 (`videospec/`, `assets/`, `stories/`)。
+    *   复制默认的 `workflow.json` 配置文件。
+    *   提供示例角色 (`example.md`) 和场景 (`scene.md`) 模板。
+
+#### `opsv generate [options]`
+**功能**：读取项目配置，生成 AI 任务队列。
+*   **参数**：
+    *   `-m, --mode <type>`: 指定生成模式。可选值：
+        *   `characters`: 批量生成角色设计图。
+        *   `scenes`: 批量生成场景概念图。
+        *   `story`: (默认) 生成分镜脚本。
+*   **用法**：
+    *   `opsv generate --mode characters` -> 跑角色
+    *   `opsv generate` -> 跑故事
+*   **副作用**：
+    *   生成 `queue/jobs.json` 文件。
+    *   如果后台服务没开，会自动启动它。
+#### `opsv review <type>` (New)
+**功能**：交互式审阅并归档生成的资产。
+*   **参数**：
+    *   `<type>`: `characters` 或 `scenes`。
+*   **交互流程**：
+    1.  系统列出 `Project-mv/artifacts/<type>/` 下所有未归档的图片。
+    2.  对于每一张图，询问：
+        *   `✅ Approve`: 将图片移动到 `videospec/assets/<type>/<id>_ref.png`，并自动更新对应的 markdown 文件，插入引用链接。
+        *   `❌ Discard`: 删除该图片。
+        *   `⏭️ Skip`: 跳过不处理。
+*   **用途**：这是连接"生成"与"使用"的关键一步。通过 Review 的图片会自动成为后续生成的参考图。
+
+### 服务管理命令
+
+OpsV 依赖一个后台服务 (`Daemon`) 来处理文件读写和浏览器通信。
+
+#### `opsv serve` (别名 `opsv start`)
+**功能**：启动后台服务。
+*   **说明**：通常不需要手动运行，`opsv generate` 会自动拉起它。但如果你想确保持续运行，可以手动执行。
+*   **日志**：服务启动后会在后台运行，不会阻塞当前终端。
+
+#### `opsv stop`
+**功能**：停止后台服务。
+*   **说明**：当你不需要再生成图片，或者需要重启服务（例如更新了代码）时使用。
+
+#### `opsv status`
+**功能**：检查后台服务状态。
+*   **输出示例**：
+    *   `✅ OpsV Server is RUNNING (PID: 12345)`
+    *   `🔴 OpsV Server is STOPPED`
+
+### 辅助命令
+
+#### `opsv proposal <title>`
+**功能**：创建一个新的变更提案 (RFC)。
+*   **用法**：`opsv proposal "Add New Character"`
+*   **作用**：在 `videospec/changes/` 下创建一个带日期的 Markdown 文件，用于记录设计变更思路。这是"代码即文档"理念的体现。

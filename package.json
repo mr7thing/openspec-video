@@ -31,9 +31,11 @@
   "license": "MIT",
   "dependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^8.1.3",
     "chalk": "^5.0.0",
     "commander": "^13.1.0",
     "fs-extra": "^11.3.3",
+    "inquirer": "^8.0.0",
     "js-yaml": "^4.1.1",
     "openspec-video": "file:openspec-video-0.1.0.tgz",
     "remark-frontmatter": "^5.0.0",
