@@ -215,15 +215,57 @@ name: Momo
     1.  系统列出 `Project-mv/artifacts/<type>/` 下所有未归档的图片。
     2.  对于每一张图，询问：
         *   `✅ Approve`: 将图片移动到 `videospec/assets/<type>/<id>_ref.png`，并自动更新对应的 markdown 文件，插入引用链接。
+        *   `📝 Feedback`: 输入简短的修改意见。意见会被追加到 `videospec/changes/YYYY-MM-DD-Review-Feedback.md`，用于后续迭代。
         *   `❌ Discard`: 删除该图片。
         *   `⏭️ Skip`: 跳过不处理。
 *   **用途**：这是连接"生成"与"使用"的关键一步。通过 Review 的图片会自动成为后续生成的参考图。
 
-### 服务管理命令
+### F. AI 智能引擎 (Agent AI) (Updated)
 
-OpsV 依赖一个后台服务 (`Daemon`) 来处理文件读写和浏览器通信。
+OpsV 2.0 采用 **Skill-Driven** 架构。CLI 工具保持纯粹，复杂的思考和决策交由您的 AI Agent（如 Antigravity, Gemini Code Assist）通过 "Skills" 来完成。
 
-#### `opsv serve` (别名 `opsv start`)
+**核心理念**：
+*   **不依赖 API Key**：`opsv` binary 不需要内置 API Key。
+*   **Agent 驱动**：AI Agent 读取 `SKILL.md`，根据您的指令（如 "生成预览"），分析剧本，然后调用 `opsv generate --shots "1,5,10"`。
+
+**功能实现**：
+1.  **AI 编剧 (Skill: `opsv-director`)**：Agent 根据您的 Logline，直接编辑 `stories/Script.md`。
+2.  **AI 选片 (Skill: `opsv-producer`)**：Agent 分析剧本，挑选关键镜头，运行 `opsv generate --shots`。
+
+### D. 预览模式 (Preview Mode) (Updated)
+
+您可以手动指定要生成的镜头，或者让 Agent 帮您选：
+
+```bash
+# 手动生成 Shot 1, 5, 10
+opsv generate --shots 1,5,10
+```
+
+或者直接告诉 Agent："帮我生成几个预览镜头。" (Agent 会自动分析并执行上述命令)。
+
+如果你不想一次性生成所有图片，或者想快速查看效果，可以使用自动预览模式：
+
+```bash
+opsv generate --preview
+```
+
+**功能**：
+*   **角色/场景**：每个 Asset 只生成 1 张图（通常是 Character Sheet）。
+*   **故事**：只生成每场戏的第一个镜头 (Key Shot)。
+
+### E. 智能引用 (@Reference) (New)
+
+在 Script 中，现在支持更灵活的引用方式：
+
+```markdown
+**Shot 1**: @Momo walks into the @Kitchen.
+```
+
+系统会自动：
+1.  解析 `@Momo` -> 找到 `assets/characters/momo.md`。
+2.  查找 `momo_ref.png` (已审核的参考图)。
+3.  如果没有审核图，尝试找 `Project-mv/artifacts/characters/momo.png` (刚生成的草图)。
+4.  将找到的图片作为 Reference Image 注入 Prompt。
 **功能**：启动后台服务。
 *   **说明**：通常不需要手动运行，`opsv generate` 会自动拉起它。但如果你想确保持续运行，可以手动执行。
 *   **日志**：服务启动后会在后台运行，不会阻塞当前终端。

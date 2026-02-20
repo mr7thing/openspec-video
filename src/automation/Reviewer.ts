@@ -54,6 +54,7 @@ export class Reviewer {
                     message: 'What do you want to do with this image?',
                     choices: [
                         { name: '✅ Approve (Move to Assets & Link)', value: 'approve' },
+                        { name: '📝 Feedback (Request Changes)', value: 'feedback' },
                         { name: '❌ Discard (Delete)', value: 'discard' },
                         { name: '⏭️  Skip', value: 'skip' }
                     ]
@@ -62,6 +63,8 @@ export class Reviewer {
 
             if (answers.action === 'approve') {
                 await this.approveArtifact(artifactPath, type, assetName);
+            } else if (answers.action === 'feedback') {
+                await this.addFeedback(file, assetName, type);
             } else if (answers.action === 'discard') {
                 fs.unlinkSync(artifactPath);
                 console.log(`Deleted ${file}`);
@@ -139,5 +142,25 @@ export class Reviewer {
 
         fs.writeFileSync(mdPath, content, 'utf-8');
         console.log(`✅ Asset Spec updated!`);
+    }
+    private async addFeedback(fileName: string, name: string, type: string) {
+        const answers = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'notes',
+                message: 'Enter your feedback/changes required:'
+            }
+        ]);
+
+        const feedbackDir = path.join(this.projectRoot, 'videospec/changes');
+        fs.ensureDirSync(feedbackDir);
+
+        const date = new Date().toISOString().split('T')[0];
+        const feedbackFile = path.join(feedbackDir, `${date}-Review-Feedback.md`);
+
+        const entry = `\n- [ ] **${type}/${name}**: ${answers.notes}\n  - Artifact: ${fileName}\n`;
+
+        fs.appendFileSync(feedbackFile, entry);
+        console.log(`📝 Feedback recorded in ${feedbackFile}`);
     }
 }

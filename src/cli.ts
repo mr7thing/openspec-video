@@ -167,48 +167,73 @@ program
     });
 
 program
-    .command('proposal <title>')
-    .description('Create a new change proposal')
-    .action(async (title) => {
-        let changesDir = path.join(process.cwd(), 'videospec', 'changes');
-        if (!fs.existsSync(changesDir)) {
-            // Fallback for system dev repo
-            changesDir = path.join(process.cwd(), 'openspec', 'changes');
-            if (!fs.existsSync(changesDir)) {
-                console.error('Error: Not in a valid OpenSpec project (videospec/changes or openspec/changes not found).');
-                return;
-            }
-        }
-
-        const safeTitle = title.toLowerCase().replace(/ /g, '-');
-        const filename = `${new Date().toISOString().split('T')[0]}-${safeTitle}.md`;
-        const targetPath = path.join(changesDir, filename);
-
+    .command('new [type] [name]')
+    .description('Interactive wizard to create Story, Character, or Scene')
+    .action(async (type, name) => {
         try {
-            let content = fs.existsSync(PROPOSAL_TEMPLATE)
-                ? fs.readFileSync(PROPOSAL_TEMPLATE, 'utf-8')
-                : '# Proposal: ' + title + '\n\nAdd content here.';
-
-            content = content.replace('[Title]', title).replace('[Date]', new Date().toISOString().split('T')[0]);
-
-            fs.writeFileSync(targetPath, content);
-            console.log(`Created proposal: ${targetPath}`);
+            const { Director } = require('./cli/Director');
+            const director = new Director(process.cwd());
+            await director.createNew(type, name);
         } catch (err) {
-            console.error('Failed to create proposal:', err);
+            console.error('Director failed:', err);
         }
+    });
+
+program
+    .command('change')
+    .description('Manage project changes and consistency (Agent Driven)')
+    .action(async () => {
+        console.log(`
+🤖 **OpsV Change Manager**
+---------------------------------------------------
+In OpsV 2.0, changes are managed by your AI Agent (Skill: opsv-consistency).
+
+**How to use:**
+Simply tell your Agent what you want to change or check.
+
+**Examples:**
+- "Rename character 'Momo' to 'Baozi'."
+- "I updated the visual style, please check for consistency."
+- "Audit the project for broken links."
+
+The Agent will:
+1. Scan the project.
+2. Identify affected files.
+3. Perform the edits.
+4. Suggest regeneration commands.
+---------------------------------------------------
+`);
+    });
+
+program
+    .command('apply <changeFile>')
+    .description('Apply a change request to the project')
+    .action(async (changeFile) => {
+        console.log(`Applying change: ${changeFile}`);
+        console.log('🚧 Implementation pending: Use `opsv-apply` skill for now.');
+        // In future: Read markdown task list, regex match assets/stories, apply edits.
     });
 
 program
     .command('generate')
     .description('Generate jobs from videospec assets or stories')
     .option('-m, --mode <type>', 'Generation mode: characters, scenes, or story', 'story')
+    .option('-p, --preview', 'Generate preview only (key shots / single char sheet)', false)
+    .option('-s, --shots <list>', 'Comma-separated list of shot IDs (e.g. 1,5,12)', (val) => val.split(','))
     .action(async (options) => {
         try {
             const projectRoot = process.cwd();
             console.log(`Generating jobs (${options.mode}) for project at ${projectRoot}...`);
+            if (options.preview) console.log('👀 Preview Mode Active');
+            if (options.shots) console.log(`🎯 Generating specific shots: ${options.shots.join(', ')}`);
 
             const generator = new JobGenerator(projectRoot);
-            const jobs = await generator.generateJobs(options.mode);
+
+            // Pass options (preview, shots) to generator
+            const jobs = await generator.generateJobs(options.mode, {
+                preview: options.preview,
+                shots: options.shots
+            });
 
             console.log(`Successfully generated ${jobs.length} jobs in queue/jobs.json`);
 
