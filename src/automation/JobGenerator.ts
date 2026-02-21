@@ -3,6 +3,7 @@ import path from 'path';
 import { z } from 'zod';
 import { AssetManager } from '../core/AssetManager';
 import { SpecParser } from '../core/SpecParser';
+import { ShotManager } from '../core/ShotManager';
 import { Job, JobSchema } from '../types/PromptSchema';
 
 export class JobGenerator {
@@ -19,6 +20,7 @@ export class JobGenerator {
     async generateJobs(mode: string = 'story', options: { preview?: boolean, shots?: string[] } = {}): Promise<Job[]> {
         await this.assetManager.loadAssets();
         const projectConfig = await this.specParser.parseProjectConfig();
+        const shotManager = new ShotManager(this.projectRoot);
 
         // Load Workflow Config
         const workflowPath = path.join(this.projectRoot, 'videospec/workflow.json');
@@ -38,7 +40,7 @@ export class JobGenerator {
         const activeWorkflow = workflows[mode];
         if (!activeWorkflow) {
             console.warn(`Workflow mode '${mode}' not found in workflow.json. Falling back to default story mode.`);
-            if (mode === 'story') return this.generateStory(projectConfig, {}, options);
+            if (mode === 'story') return this.generateStory(projectConfig, {}, options, shotManager);
             return [];
         }
 
@@ -48,7 +50,7 @@ export class JobGenerator {
         if (activeWorkflow.type === 'asset_batch') {
             jobs = await this.generateBatchAssets(activeWorkflow, projectConfig);
         } else if (activeWorkflow.type === 'storyboard') {
-            jobs = await this.generateStory(projectConfig, activeWorkflow, options);
+            jobs = await this.generateStory(projectConfig, activeWorkflow, options, shotManager);
         }
 
         // Save to queue
@@ -138,7 +140,7 @@ export class JobGenerator {
         return jobs;
     }
 
-    private async generateStory(config: any, workflow?: any, options: { preview?: boolean, shots?: string[] } = {}): Promise<Job[]> {
+    private async generateStory(config: any, workflow?: any, options: { preview?: boolean, shots?: string[] } = {}, shotManager?: ShotManager): Promise<Job[]> {
         const scriptPath = path.join(this.projectRoot, 'videospec/stories/Script.md');
         if (!fs.existsSync(scriptPath)) {
             throw new Error("Script file not found.");
@@ -169,6 +171,13 @@ export class JobGenerator {
             }
 
             if (!shouldGenerate) continue;
+
+            // Update Shot List Status to 'Draft' instantly (or Pending Generation)
+            if (shotManager) {
+                // We mark it as 'Draft' because it's being sent to the queue. 
+                // Ideally, the Server would mark it 'Draft' when done, but CLI manages state here.
+                shotManager.updateShotStatus(shotId, 'Draft');
+            }
 
             const location = match[2].trim();
             const shotBody = match[3].trim();

@@ -2,11 +2,15 @@ import fs from 'fs-extra';
 import path from 'path';
 import inquirer from 'inquirer';
 
+import { ShotManager } from '../core/ShotManager';
+
 export class Director {
     private projectRoot: string;
+    private shotManager: ShotManager;
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
+        this.shotManager = new ShotManager(this.projectRoot);
     }
 
     async createNew(type: string, name?: string) {
@@ -72,6 +76,10 @@ export class Director {
 
         fs.ensureDirSync(path.dirname(targetPath));
         fs.writeFileSync(targetPath, content);
+
+        // Initialize Shots List if missing
+        this.shotManager.initShotsList();
+
         console.log(`✅ Story draft created at: ${targetPath}`);
     }
 
