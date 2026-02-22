@@ -169,11 +169,13 @@ program
 program
     .command('new [type] [name]')
     .description('Interactive wizard to create Story, Character, or Scene')
-    .action(async (type, name) => {
+    .option('-f, --from <file>', 'Reference document (e.g., project.md)')
+    .option('-v, --variants <number>', 'Number of variants to generate', '1')
+    .action(async (type, name, options) => {
         try {
             const { Director } = require('./cli/Director');
             const director = new Director(process.cwd());
-            await director.createNew(type, name);
+            await director.createNew(type, name, { from: options.from, variants: parseInt(options.variants) });
         } catch (err) {
             console.error('Director failed:', err);
         }

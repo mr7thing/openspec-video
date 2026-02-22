@@ -13,34 +13,64 @@ export class Director {
         this.shotManager = new ShotManager(this.projectRoot);
     }
 
-    async createNew(type: string, name?: string) {
-        if (type === 'story') {
-            await this.createStory(name);
-        } else if (type === 'character') {
-            await this.createAsset('characters', name);
-        } else if (type === 'scene') {
-            await this.createAsset('scenes', name);
-        } else {
+    async createNew(type: string, name?: string, options?: { from?: string, variants?: number }) {
+        if (!type || !['story', 'character', 'scene', 'shot'].includes(type)) {
             console.log('🎬 Welcome to OpenSpec-Video Director Mode');
             const answers = await inquirer.prompt([
                 {
                     type: 'list',
-                    name: 'action',
+                    name: 'type',
                     message: 'What would you like to create?',
                     choices: [
                         { name: '📖 New Story Script', value: 'story' },
                         { name: '👤 New Character Asset', value: 'character' },
                         { name: '🏞️  New Scene Asset', value: 'scene' },
+                        { name: '🎥 New Shot Script', value: 'shot' },
                         new inquirer.Separator(),
                         { name: '❌ Cancel', value: 'cancel' }
                     ]
                 }
             ]);
+            if (answers.type === 'cancel') return;
+            type = answers.type;
+        }
 
-            if (answers.action !== 'cancel') {
-                await this.createNew(answers.action);
+        if (options?.from || (options?.variants && options.variants > 1)) {
+            // Document-Driven Agent Scaffold
+            this.scaffoldAgentTask(type, name, options);
+        } else {
+            // Legacy Interactive fallback
+            if (type === 'story') {
+                await this.createStory(name);
+            } else if (type === 'character' || type === 'scene') {
+                await this.createAsset(type as 'characters' | 'scenes', name);
+            } else if (type === 'shot') {
+                console.log("Shot creation via legacy mode not supported yet. Use --from.");
             }
         }
+    }
+
+    private scaffoldAgentTask(type: string, name?: string, options?: { from?: string, variants?: number }) {
+        const title = name || `New ${type}`;
+        const variants = options?.variants || 1;
+        const fromDoc = options?.from ? `using "${options.from}" as reference` : "using standard generation";
+
+        console.log(`\n🤖 **OpsV Director Agent Task Scaffolded**`);
+        console.log(`---------------------------------------------------`);
+        console.log(`I am your AI Director. You have requested to generate a **${type}** titled "${title}".`);
+        console.log(`*   **Reference**: ${fromDoc}`);
+        console.log(`*   **Variants**: Generate ${variants} different proposals.`);
+        console.log(`\n**Agent Instructions:**`);
+        console.log(`1. Read the reference document: \`${options?.from || 'project.md'}\`.`);
+        console.log(`2. Generate ${variants} drafted options. Do NOT write the final file yet.`);
+        console.log(`3. Present the options to the user and ask them to pick one.`);
+        console.log(`4. Once confirmed, expand the chosen option into the final markdown file.`);
+        if (type === 'story') {
+            console.log(`5. After creating the story script, remember to initialize the shot list.`);
+            // Auto-init shotslist.md just in case
+            this.shotManager.initShotsList();
+        }
+        console.log(`---------------------------------------------------\n`);
     }
 
     private async createStory(name?: string) {
