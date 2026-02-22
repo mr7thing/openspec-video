@@ -132,21 +132,21 @@ program
             await fs.ensureDir(specDir);
 
             // Project Config
-            await fs.copy(path.join(TEMPLATE_DIR, 'project/project.md'), path.join(specDir, 'project.md'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'project/project_sample.md'), path.join(specDir, 'project_sample.md'));
 
             // Assets
             await fs.ensureDir(path.join(specDir, 'assets/characters'));
-            await fs.copy(path.join(TEMPLATE_DIR, 'assets/character.md'), path.join(specDir, 'assets/characters/example.md'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'assets/character_sample.md'), path.join(specDir, 'assets/characters/example_character_sample.md'));
             if (fs.existsSync(path.join(TEMPLATE_DIR, 'assets/ref.png'))) {
-                await fs.copy(path.join(TEMPLATE_DIR, 'assets/ref.png'), path.join(specDir, 'assets/characters/ref.png'));
+                await fs.copy(path.join(TEMPLATE_DIR, 'assets/ref.png'), path.join(specDir, 'assets/characters/ref_sample.png'));
             }
 
             await fs.ensureDir(path.join(specDir, 'assets/scenes'));
-            await fs.copy(path.join(TEMPLATE_DIR, 'assets/scene.md'), path.join(specDir, 'assets/scenes/example.md'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'assets/scene_sample.md'), path.join(specDir, 'assets/scenes/example_scene_sample.md'));
 
             // Stories
             await fs.ensureDir(path.join(specDir, 'stories'));
-            await fs.copy(path.join(TEMPLATE_DIR, 'stories/Script.md'), path.join(specDir, 'stories/Script.md'));
+            await fs.copy(path.join(TEMPLATE_DIR, 'stories/STORY_sample.md'), path.join(specDir, 'stories/STORY_sample.md'));
 
             // Workflow Config
             if (fs.existsSync(path.join(TEMPLATE_DIR, 'workflow.json'))) {
@@ -156,11 +156,13 @@ program
                 );
             }
 
-            // Changes
+            // Changes & Shots
             await fs.ensureDir(path.join(specDir, 'changes'));
+            await fs.ensureDir(path.join(specDir, 'assets/shots'));
 
-            console.log('Project structure created.');
-            console.log('Run `opsv generate` to start.');
+            console.log('Project structure created with _sample templates.');
+            console.log('1. Rename and fill out project_sample.md to project.md');
+            console.log('2. Ask Agent: "opsv new --target STORY.md --from project.md" to begin.');
         } catch (err) {
             console.error('Failed to initialize project:', err);
         }
@@ -170,12 +172,17 @@ program
     .command('new [type] [name]')
     .description('Interactive wizard to create Story, Character, or Scene')
     .option('-f, --from <file>', 'Reference document (e.g., project.md)')
+    .option('-t, --target <file>', 'Target standard file to generate (e.g., STORY.md, shotslist.md)')
     .option('-v, --variants <number>', 'Number of variants to generate', '1')
     .action(async (type, name, options) => {
         try {
             const { Director } = require('./cli/Director');
             const director = new Director(process.cwd());
-            await director.createNew(type, name, { from: options.from, variants: parseInt(options.variants) });
+            await director.createNew(type, name, {
+                from: options.from,
+                target: options.target,
+                variants: parseInt(options.variants)
+            });
         } catch (err) {
             console.error('Director failed:', err);
         }

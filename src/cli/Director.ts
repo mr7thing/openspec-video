@@ -13,7 +13,7 @@ export class Director {
         this.shotManager = new ShotManager(this.projectRoot);
     }
 
-    async createNew(type: string, name?: string, options?: { from?: string, variants?: number }) {
+    async createNew(type: string, name?: string, options?: { from?: string, target?: string, variants?: number }) {
         if (!type || !['story', 'character', 'scene', 'shot'].includes(type)) {
             console.log('🎬 Welcome to OpenSpec-Video Director Mode');
             const answers = await inquirer.prompt([
@@ -50,23 +50,33 @@ export class Director {
         }
     }
 
-    private scaffoldAgentTask(type: string, name?: string, options?: { from?: string, variants?: number }) {
+    private scaffoldAgentTask(type: string, name?: string, options?: { from?: string, target?: string, variants?: number }) {
         const title = name || `New ${type}`;
         const variants = options?.variants || 1;
         const fromDoc = options?.from ? `using "${options.from}" as reference` : "using standard generation";
+        const targetOutput = options?.target ? options.target : `Standard ${type} file`;
 
         console.log(`\n🤖 **OpsV Director Agent Task Scaffolded**`);
         console.log(`---------------------------------------------------`);
         console.log(`I am your AI Director. You have requested to generate a **${type}** titled "${title}".`);
         console.log(`*   **Reference**: ${fromDoc}`);
+        console.log(`*   **Target Output**: ${targetOutput}`);
         console.log(`*   **Variants**: Generate ${variants} different proposals.`);
         console.log(`\n**Agent Instructions:**`);
-        console.log(`1. Read the reference document: \`${options?.from || 'project.md'}\`.`);
-        console.log(`2. Generate ${variants} drafted options. Do NOT write the final file yet.`);
-        console.log(`3. Present the options to the user and ask them to pick one.`);
-        console.log(`4. Once confirmed, expand the chosen option into the final markdown file.`);
-        if (type === 'story') {
-            console.log(`5. After creating the story script, remember to initialize the shot list.`);
+
+        let step = 1;
+        console.log(`${step++}. Check the \`artifacts/scripts/${type}/\` directory to see if a drafted version of this task already exists. If yes, ask the user if they want to resume/modify it.`);
+        if (options?.from) {
+            console.log(`${step++}. Read the reference document: \`${options.from}\` (and any other files it references).`);
+        }
+
+        console.log(`${step++}. Generate ${variants} drafted options for \`${targetOutput}\`. Do NOT write the final file yet.`);
+        console.log(`${step++}. Save each draft to \`artifacts/scripts/${type}/<date>-variant-[n].md\`.`);
+        console.log(`${step++}. Present the options to the user and ask them to pick one or provide feedback.`);
+        console.log(`${step++}. Once confirmed, promote the chosen option into \`${targetOutput}\` in the project directory.`);
+
+        if (options?.target === 'shotslist.md' || type === 'story') {
+            console.log(`${step++}. After generating the story/shots, ensure the shot list status is updated / initialized.`);
             // Auto-init shotslist.md just in case
             this.shotManager.initShotsList();
         }
