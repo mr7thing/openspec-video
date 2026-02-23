@@ -126,6 +126,9 @@ program
             // 1. Copy .agent (Skills) and .antigravity (Rules, Workflows)
             await fs.copy(path.join(TEMPLATE_DIR, '.agent'), path.join(targetDir, '.agent'));
             await fs.copy(path.join(TEMPLATE_DIR, '.antigravity'), path.join(targetDir, '.antigravity'));
+            if (fs.existsSync(path.join(TEMPLATE_DIR, 'AGENT.md'))) {
+                await fs.copy(path.join(TEMPLATE_DIR, 'AGENT.md'), path.join(targetDir, 'AGENT.md'));
+            }
 
             // 2. Create videospec structure
             const specDir = path.join(targetDir, 'videospec');
