@@ -168,60 +168,6 @@ program
         }
     });
 
-program
-    .command('new [type] [name]')
-    .description('Interactive wizard to create Story, Character, or Scene')
-    .option('-f, --from <file>', 'Reference document (e.g., project.md)')
-    .option('-t, --target <file>', 'Target standard file to generate (e.g., STORY.md, shotslist.md)')
-    .option('-v, --variants <number>', 'Number of variants to generate', '1')
-    .action(async (type, name, options) => {
-        try {
-            const { Director } = require('./cli/Director');
-            const director = new Director(process.cwd());
-            await director.createNew(type, name, {
-                from: options.from,
-                target: options.target,
-                variants: parseInt(options.variants)
-            });
-        } catch (err) {
-            console.error('Director failed:', err);
-        }
-    });
-
-program
-    .command('change')
-    .description('Manage project changes and consistency (Agent Driven)')
-    .action(async () => {
-        console.log(`
-🤖 **OpsV Change Manager**
----------------------------------------------------
-In OpsV 2.0, changes are managed by your AI Agent (Skill: opsv-consistency).
-
-**How to use:**
-Simply tell your Agent what you want to change or check.
-
-**Examples:**
-- "Rename character 'Momo' to 'Baozi'."
-- "I updated the visual style, please check for consistency."
-- "Audit the project for broken links."
-
-The Agent will:
-1. Scan the project.
-2. Identify affected files.
-3. Perform the edits.
-4. Suggest regeneration commands.
----------------------------------------------------
-`);
-    });
-
-program
-    .command('apply <changeFile>')
-    .description('Apply a change request to the project')
-    .action(async (changeFile) => {
-        console.log(`Applying change: ${changeFile}`);
-        console.log('🚧 Implementation pending: Use `opsv-apply` skill for now.');
-        // In future: Read markdown task list, regex match assets/stories, apply edits.
-    });
 
 program
     .command('generate')
@@ -267,17 +213,5 @@ program
         }
     });
 
-program
-    .command('review <type>')
-    .description('Interactive review of generated artifacts (characters, scenes)')
-    .action(async (type) => {
-        try {
-            const { Reviewer } = require('./automation/Reviewer'); // Lazy load
-            const reviewer = new Reviewer(process.cwd());
-            await reviewer.review(type);
-        } catch (err) {
-            console.error('Review failed:', err);
-        }
-    });
 
 program.parse(process.argv);

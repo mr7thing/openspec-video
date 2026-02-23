@@ -192,15 +192,6 @@ name: Momo
     *   创建标准目录结构 (`videospec/`, `artifacts/`)。
     *   提供以 `_sample.md` 结尾的模板文件（如 `project_sample.md`）。这强制要求您在修改确认后重命名为正式标准文件。
 
-#### `opsv new <type> [name] [options]`
-**功能**：AI 驱动的文档起草向导。
-*   **参数**：
-    *   `-f, --from <file>`: 指定背景文档（例如 `--from videospec/project.md`）。
-    *   `-t, --target <file>`: 指定要生成的最终输出文件路径（例如 `--target videospec/shotslist.md`）。
-    *   `-v, --variants <number>`: 生成的候选方案数量，默认是 1。
-*   **工作流 (Document-Driven Pipeline)**：
-    当带上这些参数时，CLI 会给您的 Agent（Director）发布起草任务。Agent 会先将所有 `<n>` 份草图写在 `artifacts/scripts/` 隔离区。等您在聊天中确认了其中一个方案，Agent 才会正式把它 Promote（晋升）到指定的 `--target` 路径。
-
 #### `opsv generate [options]`
 **功能**：读取项目配置，生成 AI 生图/生视频任务队列。
 *   **快捷参数**（不再需要手写原先啰嗦的 `--mode`）：
@@ -213,20 +204,20 @@ name: Momo
     *   分镜生图生成的产物，现在会**被强制放入隔离区** `artifacts/assets/shots/<ShotID>/`。
     *   您可以在这里查看这三个文件：`prompt.txt`、`ref.png`、`output.mp4`。如果满意，可以将其剪切到正式区 `videospec/assets/shots/<ShotID>/` 永久保存。
     *   生成任务会自动唤醒后台 Server，您直接去浏览器点插件即可。
-#### `opsv review <type>` (New)
-**功能**：交互式审阅并归档生成的资产。
-*   **参数**：
-    *   `<type>`: `characters` 或 `scenes`。
-*   **交互流程**：
-    1.  系统列出 `Project-mv/artifacts/<type>/` 下所有未归档的图片。
-    2.  对于每一张图，询问：
-        *   `✅ Approve`: 将图片移动到 `videospec/assets/<type>/<id>_ref.png`，并自动更新对应的 markdown 文件，插入引用链接。
-        *   `📝 Feedback`: 输入简短的修改意见。意见会被追加到 `videospec/changes/YYYY-MM-DD-Review-Feedback.md`，用于后续迭代。
-        *   `❌ Discard`: 删除该图片。
-        *   `⏭️ Skip`: 跳过不处理。
-*   **用途**：这是连接"生成"与"使用"的关键一步。通过 Review 的图片会自动成为后续生成的参考图。
+### E. AI 智能引擎 (Agile Agent Architecture) (New)
 
-### F. AI 智能引擎 (Agent AI) (Updated)
+OpsV 2.0 彻底贯彻了 **Agile Agent Architecture (敏捷智能体架构)**。
+CLI 工具 (`opsv`) 退化为一个纯粹的、绝对确定性的**底层编译器**（只负责脚手架初始化 `init`、将 Markdown 编译为任务 JSON 的 `generate`、以及提供后台环境的 `serve`）。
+
+所有具备**创造性、推断性、起草性**的任务，全部交还给右侧聊天框的 AI Agent（通过加载独立的 Skills 控制）。
+
+**不再需要记忆繁琐的命令选项，直接对 Agent 下达指令：**
+
+1.  **AI 起草 (替代原 `opsv new`)**：直接告诉 Agent "帮我起草一份分镜表，参考 project.md"，Agent 会自动抓取资料、在隔离区 `artifacts/` 撰写草稿，等您同意后再正式写入 `videospec/`。
+2.  **AI 变更/重构 (替代原 `opsv change` / `opsv proposal`)**：直接告诉 Agent "将角色 Momo 改名为 Baozi，并检查所有关联文件是否遗漏"，Agent 会进行代码级别的审查并替换文本。
+3.  **AI 审阅 (替代原 `opsv review`)**：直接告诉 Agent "帮我整理 artifacts/ 里的草图，挑选好的设为参考图"，Agent 会引导您完成评审。
+
+**核心理念**：让创造力的归 Agent 聊天框，让确定性的归 CLI 编译器。
 
 OpsV 2.0 采用 **Skill-Driven** 架构。CLI 工具保持纯粹，复杂的思考和决策交由您的 AI Agent（如 Antigravity, Gemini Code Assist）通过 "Skills" 来完成。
 
