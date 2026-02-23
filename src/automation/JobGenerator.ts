@@ -39,7 +39,7 @@ export class JobGenerator {
         // Fallback or override logic if config missing
         const activeWorkflow = workflows[mode];
         if (!activeWorkflow) {
-            console.warn(`Workflow mode '${mode}' not found in workflow.json. Falling back to default story mode.`);
+            console.warn(`Workflow mode '${mode}' not found in workflow.json.Falling back to default story mode.`);
             if (mode === 'story') return this.generateStory(projectConfig, {}, options, shotManager);
             return [];
         }
@@ -74,7 +74,7 @@ export class JobGenerator {
         const dir = path.resolve(this.projectRoot, relDir);
 
         if (!fs.existsSync(dir)) {
-            console.warn(`Workflow source directory not found: ${dir}`);
+            console.warn(`Workflow source directory not found: ${dir} `);
             return [];
         }
 
@@ -97,7 +97,7 @@ export class JobGenerator {
             if (idMatch && nameMatch) {
                 const id = idMatch[2].trim();
                 const name = nameMatch[2].trim();
-                console.log(`  Found Asset: ${id} - ${name}`);
+                console.log(`  Found Asset: ${id} - ${name} `);
 
                 // Robust body extraction (everything after frontmatter)
                 const parts = content.split('---');
@@ -114,7 +114,7 @@ export class JobGenerator {
 
                 // Add asset hints to prompt if needed
                 if (assets.length > 0) {
-                    prompt += `\n\n**Reference Images**: ${assets.length} images provided. Please use them in order as visual references.`;
+                    prompt += `\n\n ** Reference Images **: ${assets.length} images provided.Please use them in order as visual references.`;
                 }
 
                 // Resolve Output Path (Ensure dir exists)
@@ -122,21 +122,33 @@ export class JobGenerator {
                 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
                 jobs.push({
-                    id: `${id}`,
+                    id: `${id} `,
                     type: 'image_generation',
                     target_tool: 'nano_banana_pro',
                     payload: {
                         prompt: prompt,
-                        global_settings: workflow.settings || { aspect_ratio: "1:1", quality: "4K" },
+                        global_settings: workflow.settings || { aspect_ratio: "16:9", quality: "2K" },
                         subject: { description: body }, // Fill required fields with dummy data
                         environment: { details: [] },
                         camera: {}
                     } as any, // Cast to avoid strict schema check on partials if strictly typed
                     assets: assets,
-                    output_path: path.join(outputDir, `${id}.png`)
-                });
+                    output_path: path.join(outputDir, `${id}.png`),
+                    _meta: {
+                        project: config.project.title || path.basename(this.projectRoot),
+                        timestamp: new Date().toISOString(),
+                        mode: 'Batch Assets'
+                    }
+                } as any);
             }
         }
+
+        if (jobs.length === 0) {
+            console.warn(`WARNING: No jobs generated.Please check if you have confirmed assets in ${dir}.`);
+        } else {
+            console.log(`Report: Generated ${jobs.length} asset jobs.`);
+        }
+
         return jobs;
     }
 
@@ -158,7 +170,7 @@ export class JobGenerator {
 
         while ((match = shotRegex.exec(content)) !== null) {
             const shotNum = match[1];
-            const shotId = `shot_${shotNum}`;
+            const shotId = `shot_${shotNum} `;
 
             let shouldGenerate = true;
 
@@ -208,7 +220,7 @@ export class JobGenerator {
                 // 1. Look for Generated Concept Art (Highest Priority if use_references is true)
                 if (workflow && workflow.use_references) {
                     // Try to find APPROVED reference first (from assets/characters/id_ref.png)
-                    const approvedRef = path.join(this.projectRoot, `videospec/assets/characters/${char.id}_ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec / assets / characters / ${char.id} _ref.png`);
 
                     if (fs.existsSync(approvedRef)) {
                         assetRefs.push(path.relative(this.projectRoot, approvedRef));
@@ -227,7 +239,7 @@ export class JobGenerator {
             if (scene) {
                 subjectDesc = subjectDesc.split(`[${refId}]`).join(scene.name);
                 if (workflow && workflow.use_references) {
-                    const approvedRef = path.join(this.projectRoot, `videospec/assets/scenes/${scene.id}_ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec / assets / scenes / ${scene.id} _ref.png`);
                     if (fs.existsSync(approvedRef)) {
                         assetRefs.push(path.relative(this.projectRoot, approvedRef));
                     } else {
@@ -253,12 +265,12 @@ export class JobGenerator {
                 // Reuse logic
                 const char = this.assetManager.getCharacter(id);
                 if (char) {
-                    const approvedRef = path.join(this.projectRoot, `videospec/assets/characters/${char.id}_ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec / assets / characters / ${char.id} _ref.png`);
                     if (fs.existsSync(approvedRef)) assetRefs.push(path.relative(this.projectRoot, approvedRef));
                 }
                 const scene = this.assetManager.getScene(id);
                 if (scene) {
-                    const approvedRef = path.join(this.projectRoot, `videospec/assets/scenes/${scene.id}_ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec / assets / scenes / ${scene.id} _ref.png`);
                     if (fs.existsSync(approvedRef)) assetRefs.push(path.relative(this.projectRoot, approvedRef));
                 }
             }
@@ -271,12 +283,12 @@ export class JobGenerator {
             .trim();
 
         const fullPrompt = `
-**Task**: Generate an Image
-**Style**: ${config.context.style.visual_style}
-**Camera**: ${body.match(/(Tracking Shot|Close Up|Wide Shot)/i)?.[0] || "Cinematic"}
-**Location**: ${location}
+    ** Task **: Generate an Image
+        ** Style **: ${config.context.style.visual_style}
+** Camera **: ${body.match(/(Tracking Shot|Close Up|Wide Shot)/i)?.[0] || "Cinematic"}
+** Location **: ${location}
 
-**Description**:
+** Description **:
 ${cleanDesc}
 `.trim();
 
@@ -284,15 +296,24 @@ ${cleanDesc}
             prompt: fullPrompt,
             global_settings: workflow?.settings || {
                 aspect_ratio: config.context.style.aspect_ratio || "16:9",
-                quality: config.context.style.resolution || "4K"
+                quality: config.context.style.resolution || "2K"
             },
             subject: { description: subjectDesc },
             environment: { location: location, description: location, details: [] },
             camera: { type: body.match(/(Tracking Shot|Close Up|Wide Shot)/i)?.[0] || "Cinematic" }
         };
 
-        const outputDir = path.join(this.projectRoot, workflow?.output_dir || 'queue');
-        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+        // Phase 6: Route shot generations to artifacts directory first for user review
+        const artifactsShotDir = path.join(this.projectRoot, 'artifacts/assets/shots', id);
+        if (!fs.existsSync(artifactsShotDir)) fs.mkdirSync(artifactsShotDir, { recursive: true });
+
+        // Save the generated prompt trace for reference
+        const promptLogPath = path.join(artifactsShotDir, 'prompt.txt');
+        fs.writeFileSync(promptLogPath, fullPrompt);
+
+        if (assetRefs.length === 0 && (refs.size > 0 || (atRefs && atRefs.length > 0))) {
+            console.warn(`WARNING: Shot ${id} requested references but no approved / draft images were found.Generating blindly.`);
+        }
 
         return {
             id,
@@ -300,7 +321,12 @@ ${cleanDesc}
             target_tool: 'nano_banana_pro',
             payload: payload as any,
             assets: assetRefs,
-            output_path: path.join(outputDir, `${id}.png`)
+            output_path: path.join(artifactsShotDir, `${id}.png`),
+            _meta: {
+                project: config.project?.title || path.basename(this.projectRoot),
+                timestamp: new Date().toISOString(),
+                mode: 'Storyboard Resolution'
+            }
         };
     }
 
@@ -311,23 +337,23 @@ ${cleanDesc}
         let match;
         while ((match = regex.exec(content)) !== null) {
             let relativePath = match[1];
-            console.log(`Debug Asset: Found link ${relativePath}`);
+            console.log(`Debug Asset: Found link ${relativePath} `);
 
             // Handle ./ manually if needed, but path.resolve handles it
             try {
                 const absolutePath = path.resolve(baseDir, relativePath);
-                console.log(`Debug Asset: Resolved to ${absolutePath}`);
+                console.log(`Debug Asset: Resolved to ${absolutePath} `);
 
                 if (fs.existsSync(absolutePath)) {
                     // Convert back to project relative for consistency in jobs.json
                     const projectRelative = path.relative(this.projectRoot, absolutePath);
                     assets.push(projectRelative);
-                    console.log(`Debug Asset: Added ${projectRelative}`);
+                    console.log(`Debug Asset: Added ${projectRelative} `);
                 } else {
-                    console.warn(`Warning: Asset file not found: ${absolutePath}`);
+                    console.warn(`Warning: Asset file not found: ${absolutePath} `);
                 }
             } catch (e) {
-                console.warn(`Warning: Could not resolve asset path: ${relativePath}`);
+                console.warn(`Warning: Could not resolve asset path: ${relativePath} `);
             }
         }
         return assets;

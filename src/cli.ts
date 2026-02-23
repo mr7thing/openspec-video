@@ -227,19 +227,29 @@ program
     .command('generate')
     .description('Generate jobs from videospec assets or stories')
     .option('-m, --mode <type>', 'Generation mode: characters, scenes, or story', 'story')
+    .option('-c, --charactor', 'Shortcut for --mode characters')
+    .option('-s, --scene', 'Shortcut for --mode scenes')
+    .option('-S, --shotlist', 'Shortcut for --mode story')
     .option('-p, --preview', 'Generate preview only (key shots / single char sheet)', false)
-    .option('-s, --shots <list>', 'Comma-separated list of shot IDs (e.g. 1,5,12)', (val) => val.split(','))
+    .option('--shots <list>', 'Comma-separated list of shot IDs (e.g. 1,5,12)', (val) => val.split(','))
     .action(async (options) => {
         try {
             const projectRoot = process.cwd();
-            console.log(`Generating jobs (${options.mode}) for project at ${projectRoot}...`);
+
+            // Resolve shortcuts
+            let activeMode = options.mode;
+            if (options.charactor) activeMode = 'characters';
+            if (options.scene) activeMode = 'scenes';
+            if (options.shotlist) activeMode = 'story';
+
+            console.log(`Generating jobs (${activeMode}) for project at ${projectRoot}...`);
             if (options.preview) console.log('👀 Preview Mode Active');
             if (options.shots) console.log(`🎯 Generating specific shots: ${options.shots.join(', ')}`);
 
             const generator = new JobGenerator(projectRoot);
 
             // Pass options (preview, shots) to generator
-            const jobs = await generator.generateJobs(options.mode, {
+            const jobs = await generator.generateJobs(activeMode, {
                 preview: options.preview,
                 shots: options.shots
             });

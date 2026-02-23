@@ -32,7 +32,12 @@ export const JobSchema = z.object({
     target_tool: z.enum(['nano_banana_pro', 'veo_3_1']),
     payload: PromptPayloadSchema,
     assets: z.array(z.string()), // Absolute paths to references
-    output_path: z.string()
+    output_path: z.string(),
+    _meta: z.object({
+        project: z.string(),
+        timestamp: z.string(),
+        mode: z.string()
+    }).optional()
 });
 
 export type Job = z.infer<typeof JobSchema>;

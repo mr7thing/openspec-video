@@ -188,25 +188,31 @@ name: Momo
 
 #### `opsv init [projectName]`
 **功能**：初始化一个新的视频策划项目。
-*   **用法**：`opsv init MyNewMovie`
 *   **作用**：
-    *   创建标准目录结构 (`videospec/`, `assets/`, `stories/`)。
-    *   复制默认的 `workflow.json` 配置文件。
-    *   提供示例角色 (`example.md`) 和场景 (`scene.md`) 模板。
+    *   创建标准目录结构 (`videospec/`, `artifacts/`)。
+    *   提供以 `_sample.md` 结尾的模板文件（如 `project_sample.md`）。这强制要求您在修改确认后重命名为正式标准文件。
+
+#### `opsv new <type> [name] [options]`
+**功能**：AI 驱动的文档起草向导。
+*   **参数**：
+    *   `-f, --from <file>`: 指定背景文档（例如 `--from videospec/project.md`）。
+    *   `-t, --target <file>`: 指定要生成的最终输出文件路径（例如 `--target videospec/shotslist.md`）。
+    *   `-v, --variants <number>`: 生成的候选方案数量，默认是 1。
+*   **工作流 (Document-Driven Pipeline)**：
+    当带上这些参数时，CLI 会给您的 Agent（Director）发布起草任务。Agent 会先将所有 `<n>` 份草图写在 `artifacts/scripts/` 隔离区。等您在聊天中确认了其中一个方案，Agent 才会正式把它 Promote（晋升）到指定的 `--target` 路径。
 
 #### `opsv generate [options]`
-**功能**：读取项目配置，生成 AI 任务队列。
-*   **参数**：
-    *   `-m, --mode <type>`: 指定生成模式。可选值：
-        *   `characters`: 批量生成角色设计图。
-        *   `scenes`: 批量生成场景概念图。
-        *   `story`: (默认) 生成分镜脚本。
-*   **用法**：
-    *   `opsv generate --mode characters` -> 跑角色
-    *   `opsv generate` -> 跑故事
+**功能**：读取项目配置，生成 AI 生图/生视频任务队列。
+*   **快捷参数**（不再需要手写原先啰嗦的 `--mode`）：
+    *   `-c, --charactor`: 批量生成所有角色概念图。
+    *   `-s, --scene`: 批量生成所有场景概念图。
+    *   `-S, --shotlist`: 读取剧本和分镜表，生成分镜任务。
+    *   `-p, --preview`: 预览模式（只挑重点生成）。
+    *   `--shots <list>`: 精确生成指点镜头（比如 `--shots 1,5,10`）。
 *   **副作用**：
-    *   生成 `queue/jobs.json` 文件。
-    *   如果后台服务没开，会自动启动它。
+    *   分镜生图生成的产物，现在会**被强制放入隔离区** `artifacts/assets/shots/<ShotID>/`。
+    *   您可以在这里查看这三个文件：`prompt.txt`、`ref.png`、`output.mp4`。如果满意，可以将其剪切到正式区 `videospec/assets/shots/<ShotID>/` 永久保存。
+    *   生成任务会自动唤醒后台 Server，您直接去浏览器点插件即可。
 #### `opsv review <type>` (New)
 **功能**：交互式审阅并归档生成的资产。
 *   **参数**：
