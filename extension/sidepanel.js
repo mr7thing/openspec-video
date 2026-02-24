@@ -2,7 +2,7 @@
 
 let socket = null;
 let jobs = [];
-const SERVER_URL = 'ws://localhost:3061';
+const SERVER_URL = 'ws://127.0.0.1:3061';
 
 const statusEl = document.getElementById('status-indicator');
 const jobListEl = document.getElementById('job-list');
@@ -78,7 +78,22 @@ function handleMessage(msg) {
     switch (msg.type) {
         case 'JOBS_LIST':
             jobs = msg.payload;
-            renderJobs();
+            const currentQueueSignature = jobs.length > 0 && jobs[0]._meta ? jobs[0]._meta.timestamp : null;
+
+            // If the queue has changed (different timestamp/generation), reset progress
+            chrome.storage.local.get(['queueState'], (result) => {
+                if (result.queueState && result.queueState.queueSignature !== currentQueueSignature) {
+                    currentJobIndex = 0;
+                    isRunningAll = false;
+                    saveState(currentQueueSignature);
+                } else if (currentJobIndex >= jobs.length) {
+                    currentJobIndex = 0;
+                    isRunningAll = false;
+                    saveState(currentQueueSignature);
+                }
+                updateControls();
+                renderJobs();
+            });
             break;
         case 'ASSET_SAVED':
             console.log('Asset saved:', msg.payload.path);
@@ -345,10 +360,11 @@ function updateControls() {
 }
 
 // Persistence Logic
-function saveState() {
+function saveState(signature = null) {
     const state = {
         isRunningAll,
         currentJobIndex,
+        queueSignature: signature || (jobs.length > 0 && jobs[0]._meta ? jobs[0]._meta.timestamp : null),
         timestamp: Date.now()
     };
     chrome.storage.local.set({ queueState: state });
@@ -401,37 +417,7 @@ function checkRecovery() {
     });
 }
 
-// Persistence Logic
-function saveState() {
-    chrome.storage.local.set({
-        queueState: {
-            isRunningAll,
-            currentJobIndex,
-            timestamp: Date.now()
-        }
-    });
-}
-
-function restoreState() {
-    chrome.storage.local.get(['queueState'], (result) => {
-        if (result.queueState) {
-            const state = result.queueState;
-            // Only restore if less than 24h old
-            if (Date.now() - state.timestamp < 24 * 60 * 60 * 1000) {
-                console.log('Restoring queue state:', state);
-                isRunningAll = state.isRunningAll;
-                currentJobIndex = state.currentJobIndex;
-                updateControls();
-
-                if (isRunningAll) {
-                    // If we were running, we might need to kick connection or check status
-                    console.log('Resuming queue at index:', currentJobIndex);
-                    // Create a "Resume" visual cue or auto-check
-                }
-            }
-        }
-    });
-}
+// Duplicate state definitions removed
 
 // Hook into state changes
 const originalRunAll = runAllBtn.onclick; // Note: we used addEventListener, so this is just for logic flow comment

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const PromptPayloadSchema = z.object({
     global_settings: z.object({
         aspect_ratio: z.string(),
-        quality: z.string().default("4K")
+        quality: z.string().default("2K")
     }),
     subject: z.object({
         identity_ref: z.string().optional(), // ID reference to character asset

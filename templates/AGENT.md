@@ -7,16 +7,18 @@
 </cognitive_architecture>
 
 <pipeline_philosophy>
-1. **Asset-First (资产先行)**：在生成分镜之前，必须先有独立的元素（角色、道具、服装）资产和场景资产。
+1. **Auto-Scaffold Configuration**: 当你在首次起草任何项目结构（比如第一版的大纲草案）时，你必须主动检查工作区是否存在 `videospec/project.md`。如果不存在，你**必须**首先为其生成一个基础版配置文件。该文件仅需包含项目名称(Name)、整体风格(Visual Style: 默认为 **Cinematic Realism 电影写实**，除非用户明确要求其他风格)、画面比例(Aspect Ratio) 和默认分辨率(Resolution: 2K) 以及一句话概述(Logline)，请剔除任何模型渲染参数。
+2. **Asset-First (资产先行)**：在生成分镜之前，必须先有独立的元素（角色、道具、服装）资产和场景资产。
     - **隔离原则**：只要一个元素或角色在**多个镜头 (Shot)** 中出现，它就**绝不可以**被偷懒地写在分镜描述里。它必须在 `videospec/elements/` 下拥有一个独立的档案（如 `gun_prop.md`, `boss_char.md`）。
-2. **Draft, then Promote (先起草再晋升)**：任何时候用户让你“新建”、“修改”、“扩写”，你必须先将内容保存在隔离区 `artifacts/`（如 `artifacts/scripts/`）。只有在用户明确说出“这是定稿”、“没问题”之后，你才能将其写入正式规范区 `videospec/`。
+3. **Draft, then Promote (先起草再晋升)**：任何时候用户让你“新建”、“修改”、“扩写”，你必须先将内容保存在隔离区 `artifacts/`（如 `artifacts/scripts/`）。只有在用户明确说出“这是定稿”、“没问题”之后，你才能将其写入正式规范区 `videospec/`。
 3. **Strict Naming & Structure (绝对路径与命名规范)**：
     - `videospec/stories/`：只存放 `story.md` 故事大纲与关键资产清单。绝对不准在这里写 `[Shot 1]`。
     - `videospec/elements/`：存放所有独立角色 `_char.md`、道具 `_prop.md`、服装 `_costume.md`。
     - `videospec/scenes/`：存放所有场景 `_scene.md`。
-    - `videospec/shots/`：存放真正的分镜脚本文档，里面的段落格式必须是 `**Shot X**: [Location] Description`。在这里使用 `@` 引用元素。
-4. **Cinematic Timing (严苛的时长控制)**：每一个 Shot 的设计时长标准为 **3~5秒**，绝对上限为 **15秒**。永远不要设计冗长、试图一个镜头讲完一个世纪的机位。
-5. **No Premature Execution (绝对防幻觉与越权死刑)**：
+    - `videospec/shots/`：存放真正的分镜脚本文档，里面的段落格式必须严格遵循 `**Shot X**: [Location] Description` 或带有前置时长的 `**Shot X (5s)**: [Location] Description`。其中加粗的星号 `**` 和冒号 `:` 是不可省略的解析标识。在这里使用 `@` 引用元素。
+4. **Explicit Format Over Regex (显式格式优于正则)**: Meticulously follow the syntactic templates provided in the Skills. The OpsV Compiler relies on strict Markdown sectioning and frontmatter (like `id:` and `# Name`). Never assume the Compiler's Regex will "just figure out" natural language. All structurally important data must be explicitly formatted according to the `.md` templates.
+5. **Cinematic Timing (严苛的时长控制)**：每一个 Shot 的设计时长标准为 **3~5秒**，绝对上限为 **15秒**。永远不要设计冗长、试图一个镜头讲完一个世纪的机位。
+6. **No Premature Execution (绝对防幻觉与越权死刑)**：
     - 你的工作到**写出 Markdown 文档**就彻底结束了。
     - **绝不允许**你私自调用任何生图、生视频模型 API 进行渲染。
     - 图像和视频的编译渲染（Compiler）是命令行 `opsv generate` 的专职工作，你不可以越权。

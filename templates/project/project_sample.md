@@ -11,10 +11,6 @@ version: "0.1.0"
 **Logline**: A one-sentence summary of the video.
 
 ## Style
-**Visual Style**: Cinematic, High Contrast, Neo-Noir
+**Visual Style**: Cinematic Realism
 **Aspect Ratio**: 16:9
-**Resolution**: 4K
-
-## Production Config
-**Model**: "gemini-2.0-flash-exp"
-**FPS**: 24
+**Resolution**: 2K

@@ -29,7 +29,10 @@ export class JobGenerator {
             targets = [
                 path.join(this.projectRoot, 'videospec/elements'),
                 path.join(this.projectRoot, 'videospec/scenes'),
-                path.join(this.projectRoot, 'videospec/shots')
+                path.join(this.projectRoot, 'videospec/shots'),
+                path.join(this.projectRoot, 'artifacts/elements'),
+                path.join(this.projectRoot, 'artifacts/scenes'),
+                path.join(this.projectRoot, 'artifacts/shots')
             ];
         }
 
@@ -89,9 +92,16 @@ export class JobGenerator {
         const idMatch = content.match(/id:\s*(["']?)(.*?)\1\s*$/m);
         const nameMatch = content.match(/name:\s*(["']?)(.*?)\1\s*$/m);
 
-        if (idMatch && nameMatch) {
-            const id = idMatch[2].trim();
-            const name = nameMatch[2].trim();
+        // Robust recovery if frontmatter was missed by the Agent
+        const id = idMatch ? idMatch[2].trim() : path.parse(filePath).name;
+
+        let name = nameMatch ? nameMatch[2].trim() : null;
+        if (!name) {
+            const h1Match = content.match(/^#\s+(.*)$/m);
+            name = h1Match ? h1Match[1].trim() : id;
+        }
+
+        if (id && name) {
             console.log(`  Found Asset: ${id} - ${name}`);
 
             const parts = content.split('---');
@@ -99,7 +109,7 @@ export class JobGenerator {
 
             const assets = this.extractAssetsFromMarkdown(body, dir);
 
-            let prompt = `**Task**: Generate Concept Art\n**Style**: ${config.context.style.visual_style}\n**Name**: ${name}\n**Description**:\n${body}`;
+            let prompt = `**Task**: Generate Concept Art\n**Style**: ${config.context.style.visual_style || 'Not specified (derive from description)'}\n**Name**: ${name}\n**Description**:\n${body}`;
 
             if (assets.length > 0) {
                 prompt += `\n\n**Reference Images**: ${assets.length} images provided. Please use them in order as visual references.`;
@@ -134,7 +144,7 @@ export class JobGenerator {
     private async processShotFile(filePath: string, content: string, config: any, options: { preview?: boolean, shots?: string[] }, shotManager: ShotManager): Promise<Job[]> {
         const jobs: Job[] = [];
 
-        const shotRegex = /\*\*Shot (\d+)\*\*: \[(.*?)\]([\s\S]*?)(?=\*\*Shot \d+\*\*:|$)/g;
+        const shotRegex = /\*\*Shot\s+(\d+)[^\*]*\*\*:\s*\[(.*?)\]([\s\S]*?)(?=\*\*Shot\s+\d+[^\*]*\*\*:|$)/gi;
         let match;
         let matchFound = false;
 
@@ -261,8 +271,8 @@ export class JobGenerator {
 
         const fullPrompt = `
     ** Task **: Generate an Image
-        ** Style **: ${config.context.style.visual_style}
-** Camera **: ${body.match(/(Tracking Shot|Close Up|Wide Shot)/i)?.[0] || "Cinematic"}
+        ** Style **: ${config.context.style.visual_style || 'Not specified (derive from description)'}
+** Camera **: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "Standard"}
 ** Location **: ${location}
 
 ** Description **:
@@ -277,7 +287,7 @@ ${cleanDesc}
             },
             subject: { description: subjectDesc },
             environment: { location: location, description: location, details: [] },
-            camera: { type: body.match(/(Tracking Shot|Close Up|Wide Shot)/i)?.[0] || "Cinematic" }
+            camera: { type: body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "Standard" }
         };
 
         // Phase 6: Route shot generations to artifacts directory first for user review

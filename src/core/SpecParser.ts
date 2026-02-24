@@ -18,7 +18,7 @@ const ProjectSchema = z.object({
             genre: z.string().optional(),
             palette: z.string().optional(),
             aspect_ratio: z.string().default("16:9"),
-            resolution: z.string().default("4K")
+            resolution: z.string().default("2K")
         }),
         constraints: z.record(z.string(), z.any()).optional()
     })
@@ -44,7 +44,17 @@ export class SpecParser {
         const projectPath = path.join(this.videospecRoot, 'project.md');
 
         if (!fs.existsSync(projectPath)) {
-            throw new Error(`Project configuration file not found at: ${projectPath}`);
+            console.warn(`[SpecParser] project.md not found at ${projectPath}. Using default configuration.`);
+            return ProjectSchema.parse({
+                name: "Untitled Project",
+                context: {
+                    narrative: "Undefined narrative context.",
+                    style: {
+                        aspect_ratio: "16:9",
+                        resolution: "2K"
+                    }
+                }
+            });
         }
 
         const content = fs.readFileSync(projectPath, 'utf-8');
@@ -71,26 +81,17 @@ export class SpecParser {
         let currentSection = '';
 
         for (const line of lines) {
-            if (line.startsWith('## 1. Core Narrative') || line.startsWith('## Context')) {
-                currentSection = 'narrative';
-                continue;
-            } else if (line.startsWith('## 2. Visual Style') || line.startsWith('## Style')) {
-                currentSection = 'style';
-                continue;
-            } else if (line.startsWith('## 3. Technical Constraints') || line.startsWith('## Production Config')) {
-                currentSection = 'constraints';
-                continue;
-            }
+            const logMatch = line.match(/(?:\*\*\s*)?Logline(?:\s*\*\*)?:\s*(.*)/i) || line.match(/-\s*Logline:\s*(.*)/i);
+            if (logMatch && !config.context.narrative) config.context.narrative = logMatch[1].trim();
 
-            if (currentSection === 'narrative') {
-                if (line.trim().startsWith('**Logline**:')) config.context.narrative = line.split('**Logline**:')[1].trim();
-            }
+            const vsMatch = line.match(/(?:\*\*\s*)?(?:Visual Style|Style)(?:\s*\*\*)?:\s*(.*)/i) || line.match(/-\s*Visual Style:\s*(.*)/i);
+            if (vsMatch && !config.context.style.visual_style) config.context.style.visual_style = vsMatch[1].trim();
 
-            if (currentSection === 'style') {
-                if (line.includes('**Visual Style**:')) config.context.style.visual_style = line.split('**Visual Style**:')[1].trim();
-                if (line.includes('**Aspect Ratio**:')) config.context.style.aspect_ratio = line.split('**Aspect Ratio**:')[1].trim();
-                if (line.includes('**Resolution**:')) config.context.style.resolution = line.split('**Resolution**:')[1].trim();
-            }
+            const arMatch = line.match(/(?:\*\*\s*)?Aspect Ratio(?:\s*\*\*)?:\s*(.*)/i) || line.match(/-\s*Aspect Ratio:\s*(.*)/i);
+            if (arMatch && !config.context.style.aspect_ratio) config.context.style.aspect_ratio = arMatch[1].trim();
+
+            const resMatch = line.match(/(?:\*\*\s*)?Resolution(?:\s*\*\*)?:\s*(.*)/i) || line.match(/-\s*Resolution:\s*(.*)/i);
+            if (resMatch && !config.context.style.resolution) config.context.style.resolution = resMatch[1].trim();
         }
 
         // Fallback defaults if not found

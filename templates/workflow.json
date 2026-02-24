@@ -7,7 +7,7 @@
             "prompt_template": "**Task**: Character Design Sheet\n**Style**: ${style}\n**Character**: ${name}\n**Description**:\n${description}\n\n**Output**: Three views (Front, Side, Back) and facial expressions.",
             "settings": {
                 "aspect_ratio": "1:1",
-                "quality": "4K"
+                "quality": "2K"
             }
         },
         "scenes": {
@@ -17,7 +17,7 @@
             "prompt_template": "**Task**: Environment Concept Art\n**Style**: ${style}\n**Location**: ${name}\n**Description**:\n${description}",
             "settings": {
                 "aspect_ratio": "16:9",
-                "quality": "4K"
+                "quality": "2K"
             }
         },
         "story": {
@@ -27,7 +27,7 @@
             "use_references": true,
             "settings": {
                 "aspect_ratio": "16:9",
-                "quality": "4K"
+                "quality": "2K"
             }
         }
     }

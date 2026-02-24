@@ -60,24 +60,60 @@ function stopDaemon() {
     }
 }
 
+function registerProject(projectRoot: string) {
+    const ws = new WebSocket('ws://127.0.0.1:3061');
+    ws.on('open', () => {
+        const payload = JSON.stringify({
+            type: 'REGISTER_PROJECT',
+            payload: {
+                name: path.basename(projectRoot),
+                root: projectRoot,
+                jobsPath: path.join(projectRoot, 'queue', 'jobs.json')
+            }
+        });
+        ws.send(payload, (err) => {
+            if (err) console.error('Failed to register project:', err);
+            else console.log(`Project '${path.basename(projectRoot)}' registered with Global Daemon.`);
+
+            // Give Node time to flush the TCP buffer before killing the socket
+            setTimeout(() => ws.close(), 100);
+        });
+    });
+    ws.on('error', (err) => {
+        console.warn(`Failed to connect to Global Daemon at 3061: ${err.message}. Ensure it is running to use the extension.`);
+    });
+}
+
 
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.1.4');
+    .version('0.1.17');
 
 program
     .command('serve')
     .description('Start the OpsV background server')
-    .action(() => {
-        startDaemon();
+    .action(async () => {
+        if (!isDaemonRunning()) {
+            startDaemon();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+            console.log('Server is already running.');
+        }
+        registerProject(process.cwd());
     });
 
 program
     .command('start')
     .description('Alias for serve')
-    .action(() => {
-        startDaemon();
+    .action(async () => {
+        if (!isDaemonRunning()) {
+            startDaemon();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+            console.log('Server is already running.');
+        }
+        registerProject(process.cwd());
     });
 
 program
@@ -94,7 +130,7 @@ program
         if (isDaemonRunning()) {
             const pid = fs.readFileSync(PID_FILE, 'utf-8');
             console.log(`✅ OpsV Server is RUNNING (PID: ${pid})`);
-            console.log(`   Listening on: ws://localhost:3061`);
+            console.log(`   Listening on: ws://127.0.0.1:3061`);
         } else {
             console.log('🔴 OpsV Server is STOPPED');
         }
@@ -190,22 +226,7 @@ program
             }
 
             // Register Project with Global Daemon
-            const ws = new WebSocket('ws://localhost:3061');
-            ws.on('open', () => {
-                ws.send(JSON.stringify({
-                    type: 'REGISTER_PROJECT',
-                    payload: {
-                        name: path.basename(projectRoot),
-                        root: projectRoot,
-                        jobsPath: path.join(projectRoot, 'queue', 'jobs.json')
-                    }
-                }));
-                console.log(`Project '${path.basename(projectRoot)}' registered with Global Daemon.`);
-                ws.close();
-            });
-            ws.on('error', (err) => {
-                console.warn(`Failed to connect to Global Daemon at 3061: ${err.message}. Ensure it is running to use the extension.`);
-            });
+            registerProject(projectRoot);
 
         } catch (err) {
             console.error('Generation failed:', err);

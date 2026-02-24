@@ -39,10 +39,10 @@ try {
 }
 
 // 2. Start WebSocket Server
-const wss = new WebSocketServer({ port: PORT });
+const wss = new WebSocketServer({ host: '127.0.0.1', port: PORT });
 
 wss.on('listening', () => {
-    console.log(`[OpsV Global Daemon] Listening on ws://localhost:${PORT}`);
+    console.log(`[OpsV Global Daemon] Listening on ws://127.0.0.1:${PORT}`);
 });
 
 let connectedClients: WebSocket[] = [];
@@ -97,6 +97,8 @@ async function handleMessage(ws: WebSocket, msg: ClientMessage) {
         case 'REGISTER_PROJECT':
             const regPayload = msg.payload;
             if (regPayload && regPayload.root && regPayload.jobsPath) {
+                // Clear previous queue so extension only sees current project
+                activeProjects.clear();
                 activeProjects.set(regPayload.root, {
                     name: regPayload.name || path.basename(regPayload.root),
                     root: regPayload.root,

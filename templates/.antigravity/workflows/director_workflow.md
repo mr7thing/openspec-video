@@ -10,10 +10,11 @@ Follow these steps faithfully to go from concept to renderer.
 
 ---
 
-### Step 1: Draft the Story Outline
-Begin by writing the high-level story outline.
+### Step 1: Initialize Project & Draft the Story Outline
+Before diving into the story, establishing the overall project context is critical.
+- **Rule**: When creating the first draft of the story outline, **always** check if `videospec/project.md` exists. If it does not exist, you must create a standard `project.md` file outlining the project's Name, Context (Logline), and Style (Visual Style defaults to **Cinematic Realism**, Aspect Ratio, Resolution defaults to 2K). User requests override the default.
 - **Rule**: `videospec/stories/story.md` is ONLY for outlines and asset checklists. **No shot descriptions are allowed here.**
-- **Action**: Ask the Agent to "Draft a story outline for [my idea], covering the plot and the main characters we will need."
+- **Action**: Ask the Agent to "Initialize the project configurations and draft a story outline for [my idea], covering the plot and the main characters we will need."
 
 ### Step 2: Establish the Elements (Asset-First)
 Before a character or a prop can appear in multiple shots, it MUST be registered.
@@ -28,14 +29,15 @@ Set the stage for your shots.
 ### Step 4: Break down the Shots
 Now, and ONLY now, do you draft the actual shot-by-shot script.
 - **Rule**: Shots go into `videospec/shots/` as Markdown documents. 
-- **Rule**: Shot paragraphs must start with `**Shot X**: [Location] Description`.
+- **Rule**: Shot paragraphs must start strictly with `**Shot X**: [Location] Description` or `**Shot X (5s)**: [Location] Description`. The Double asterisks `**` and the Colon `:` are mandatory for compiler parsing.
 - **Rule**: Use `@` to reference registered elements (e.g., "The @hero picks up the @gun.").
 - **Rule**: Cinematic timing must be strict. **3~5 seconds per shot, max 15s.**
 - **Action**: Ask the Agent: "Write the shotlist for Act 1 into `shots/shotlist_1.md`. Make sure to use `@` for references."
 
 ### Step 5: Compile & Render
-Translate your Markdown into JSON rendering jobs for the visual pipeline.
-- **Rule**: **The Agent cannot run generative models. You must compile the directory yourself.**
+1. **Strict Output Formatting**: The OpsV compiler parses your output. It is legally mandated that you use the exact formatting guidelines specified in your Skills. Never rely on the compiler guessing your intent via Regex. Always provide `id:`, `name:`, and `**Shot X:**` syntax properly as outlined in the templates.
+2. **Read Document Context**: If generating shots based on `STORY.md`, first read the relevant documents.
+3. **Execute Job Generator**: After finalizing assets and shots, run `opsv generate`. Ensure the console output acknowledges all expected jobs.
 - **Action**: Open your terminal and run the compiler:
     ```bash
     opsv generate

@@ -1,7 +1,6 @@
 {
   "name": "openspec-video",
-  "version": "0.1.4",
-  "description": "OpenSpec-Video Automation System",
+  "version": "0.1.17",
   "main": "dist/index.js",
   "bin": {
     "opsv": "dist/cli.js"
