@@ -17,40 +17,41 @@ export class JobGenerator {
         this.specParser = new SpecParser(projectRoot);
     }
 
-    async generateJobs(mode: string = 'story', options: { preview?: boolean, shots?: string[] } = {}): Promise<Job[]> {
+    async generateJobs(targets: string[], options: { preview?: boolean, shots?: string[] } = {}): Promise<Job[]> {
         await this.assetManager.loadAssets();
         const projectConfig = await this.specParser.parseProjectConfig();
         const shotManager = new ShotManager(this.projectRoot);
 
-        // Load Workflow Config
-        const workflowPath = path.join(this.projectRoot, 'videospec/workflow.json');
-        let workflows: any = {};
-
-        if (fs.existsSync(workflowPath)) {
-            try {
-                const wfConfig = JSON.parse(fs.readFileSync(workflowPath, 'utf-8'));
-                workflows = wfConfig.workflows || {};
-                console.log("DEBUG: Loaded workflow.json");
-            } catch (e) {
-                console.error("Failed to parse workflow.json", e);
-            }
-        }
-
-        // Fallback or override logic if config missing
-        const activeWorkflow = workflows[mode];
-        if (!activeWorkflow) {
-            console.warn(`Workflow mode '${mode}' not found in workflow.json.Falling back to default story mode.`);
-            if (mode === 'story') return this.generateStory(projectConfig, {}, options, shotManager);
-            return [];
-        }
-
-        console.log(`Executing workflow: ${mode} (${activeWorkflow.type})`);
-
         let jobs: Job[] = [];
-        if (activeWorkflow.type === 'asset_batch') {
-            jobs = await this.generateBatchAssets(activeWorkflow, projectConfig);
-        } else if (activeWorkflow.type === 'storyboard') {
-            jobs = await this.generateStory(projectConfig, activeWorkflow, options, shotManager);
+
+        // If no targets provided, default to scanning all normative folders
+        if (!targets || targets.length === 0) {
+            targets = [
+                path.join(this.projectRoot, 'videospec/elements'),
+                path.join(this.projectRoot, 'videospec/scenes'),
+                path.join(this.projectRoot, 'videospec/shots')
+            ];
+        }
+
+        for (const target of targets) {
+            const targetPath = path.resolve(this.projectRoot, target);
+            if (!fs.existsSync(targetPath)) {
+                console.warn(`Warning: Target path not found: ${targetPath}`);
+                continue;
+            }
+
+            const stats = fs.statSync(targetPath);
+            if (stats.isDirectory()) {
+                const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
+                for (const file of files) {
+                    const filePath = path.join(targetPath, file);
+                    const fileJobs = await this.processFile(filePath, projectConfig, options, shotManager);
+                    jobs = jobs.concat(fileJobs);
+                }
+            } else if (stats.isFile() && targetPath.endsWith('.md')) {
+                const fileJobs = await this.processFile(targetPath, projectConfig, options, shotManager);
+                jobs = jobs.concat(fileJobs);
+            }
         }
 
         // Save to queue
@@ -65,138 +66,114 @@ export class JobGenerator {
         return jobs;
     }
 
-    private async generateBatchAssets(workflow: any, config: any): Promise<Job[]> {
-        // glob pattern matching (basic simulation)
-        // expects source like "videospec/assets/characters/*.md"
-        const sourcePattern = workflow.source;
-        // Simple directory resolution 
-        const relDir = path.dirname(sourcePattern);
-        const dir = path.resolve(this.projectRoot, relDir);
+    private async processFile(filePath: string, config: any, options: { preview?: boolean, shots?: string[] }, shotManager: ShotManager): Promise<Job[]> {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const fileName = path.basename(filePath);
+        // Normalize slashes for robust path checking
+        const normalizedPath = filePath.replace(/\\/g, '/');
 
-        if (!fs.existsSync(dir)) {
-            console.warn(`Workflow source directory not found: ${dir} `);
-            return [];
+        if (normalizedPath.includes('/elements/') || normalizedPath.includes('/scenes/')) {
+            return this.processAssetFile(filePath, content, config);
+        } else if (normalizedPath.includes('/shots/')) {
+            return this.processShotFile(filePath, content, config, options, shotManager);
         }
 
-        const allFiles = fs.readdirSync(dir);
-        const files = allFiles.filter(f => f.endsWith('.md'));
+        console.warn(`Warning: File ${fileName} is not in a normative directory (elements, scenes, shots). Skipping generation for this file.`);
+        return [];
+    }
 
+    private async processAssetFile(filePath: string, content: string, config: any): Promise<Job[]> {
         const jobs: Job[] = [];
+        const dir = path.dirname(filePath);
 
-        for (const file of files) {
-            const filePath = path.join(dir, file);
-            const content = fs.readFileSync(filePath, 'utf-8');
+        const idMatch = content.match(/id:\s*(["']?)(.*?)\1\s*$/m);
+        const nameMatch = content.match(/name:\s*(["']?)(.*?)\1\s*$/m);
 
-            console.log(`Processing file: ${file}`);
+        if (idMatch && nameMatch) {
+            const id = idMatch[2].trim();
+            const name = nameMatch[2].trim();
+            console.log(`  Found Asset: ${id} - ${name}`);
 
-            // Extract Metadata - Support quotes or no quotes
-            // Match id: value until end of line, trimming quotes
-            const idMatch = content.match(/id:\s*(["']?)(.*?)\1\s*$/m);
-            const nameMatch = content.match(/name:\s*(["']?)(.*?)\1\s*$/m);
+            const parts = content.split('---');
+            const body = parts.length > 2 ? parts.slice(2).join('---').trim() : content;
 
-            if (idMatch && nameMatch) {
-                const id = idMatch[2].trim();
-                const name = nameMatch[2].trim();
-                console.log(`  Found Asset: ${id} - ${name} `);
+            const assets = this.extractAssetsFromMarkdown(body, dir);
 
-                // Robust body extraction (everything after frontmatter)
-                const parts = content.split('---');
-                const body = parts.length > 2 ? parts.slice(2).join('---').trim() : content;
+            let prompt = `**Task**: Generate Concept Art\n**Style**: ${config.context.style.visual_style}\n**Name**: ${name}\n**Description**:\n${body}`;
 
-                // Extract Assets from Markdown
-                const assets = this.extractAssetsFromMarkdown(body, dir);
-
-                // Template Replacement
-                let prompt = workflow.prompt_template
-                    .replace('${style}', config.context.style.visual_style)
-                    .replace('${name}', name)
-                    .replace('${description}', body);
-
-                // Add asset hints to prompt if needed
-                if (assets.length > 0) {
-                    prompt += `\n\n ** Reference Images **: ${assets.length} images provided.Please use them in order as visual references.`;
-                }
-
-                // Resolve Output Path (Ensure dir exists)
-                const outputDir = path.join(this.projectRoot, workflow.output_dir || 'queue');
-                if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-
-                jobs.push({
-                    id: `${id} `,
-                    type: 'image_generation',
-                    target_tool: 'nano_banana_pro',
-                    payload: {
-                        prompt: prompt,
-                        global_settings: workflow.settings || { aspect_ratio: "16:9", quality: "2K" },
-                        subject: { description: body }, // Fill required fields with dummy data
-                        environment: { details: [] },
-                        camera: {}
-                    } as any, // Cast to avoid strict schema check on partials if strictly typed
-                    assets: assets,
-                    output_path: path.join(outputDir, `${id}.png`),
-                    _meta: {
-                        project: config.project.title || path.basename(this.projectRoot),
-                        timestamp: new Date().toISOString(),
-                        mode: 'Batch Assets'
-                    }
-                } as any);
+            if (assets.length > 0) {
+                prompt += `\n\n**Reference Images**: ${assets.length} images provided. Please use them in order as visual references.`;
             }
-        }
 
-        if (jobs.length === 0) {
-            console.warn(`WARNING: No jobs generated.Please check if you have confirmed assets in ${dir}.`);
-        } else {
-            console.log(`Report: Generated ${jobs.length} asset jobs.`);
-        }
+            const outputDir = path.join(this.projectRoot, 'queue');
+            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
+            jobs.push({
+                id: `${id}`,
+                type: 'image_generation',
+                target_tool: 'nano_banana_pro',
+                payload: {
+                    prompt: prompt,
+                    global_settings: { aspect_ratio: "16:9", quality: "2K" },
+                    subject: { description: body },
+                    environment: { details: [] },
+                    camera: {}
+                } as any,
+                assets: assets,
+                output_path: path.join(outputDir, `${id}.png`),
+                _meta: {
+                    project: config.project?.title || path.basename(this.projectRoot),
+                    timestamp: new Date().toISOString(),
+                    mode: 'Asset Generation'
+                }
+            } as any);
+        }
         return jobs;
     }
 
-    private async generateStory(config: any, workflow?: any, options: { preview?: boolean, shots?: string[] } = {}, shotManager?: ShotManager): Promise<Job[]> {
-        const scriptPath = path.join(this.projectRoot, 'videospec/stories/Script.md');
-        if (!fs.existsSync(scriptPath)) {
-            throw new Error("Script file not found.");
-        }
-
-        const content = fs.readFileSync(scriptPath, 'utf-8');
+    private async processShotFile(filePath: string, content: string, config: any, options: { preview?: boolean, shots?: string[] }, shotManager: ShotManager): Promise<Job[]> {
         const jobs: Job[] = [];
-
-        // Manual Filtering (Agent Driven)
-        // If options.shots is passed (e.g. from CLI --shots "1,5"), use that.
-        // If --preview is passed, default to first shot of each act (Agent can override this logic via Skill).
 
         const shotRegex = /\*\*Shot (\d+)\*\*: \[(.*?)\]([\s\S]*?)(?=\*\*Shot \d+\*\*:|$)/g;
         let match;
+        let matchFound = false;
 
         while ((match = shotRegex.exec(content)) !== null) {
+            matchFound = true;
             const shotNum = match[1];
-            const shotId = `shot_${shotNum} `;
+            const shotId = `shot_${shotNum}`;
 
             let shouldGenerate = true;
-
             if (options.shots && options.shots.length > 0) {
-                // Strict check: Must match ID or Number
                 shouldGenerate = options.shots.includes(shotId) || options.shots.includes(shotNum);
             } else if (options.preview) {
-                // Heuristic Preview: Just Shot 1
                 shouldGenerate = (shotNum === '1');
             }
 
             if (!shouldGenerate) continue;
-
-            // Update Shot List Status to 'Draft' instantly (or Pending Generation)
-            if (shotManager) {
-                // We mark it as 'Draft' because it's being sent to the queue. 
-                // Ideally, the Server would mark it 'Draft' when done, but CLI manages state here.
-                shotManager.updateShotStatus(shotId, 'Draft');
-            }
+            if (shotManager) shotManager.updateShotStatus(shotId, 'Draft');
 
             const location = match[2].trim();
             const shotBody = match[3].trim();
 
-            const job = this.parseShotToJob(shotId, location, shotBody, config, workflow);
+            const job = this.parseShotToJob(shotId, location, shotBody, config, null);
             if (job) jobs.push(job);
         }
+
+        if (!matchFound) {
+            // Support single plain markdown files as a single shot
+            const shotId = path.parse(filePath).name;
+            let shouldGenerate = true;
+            if (options.shots && options.shots.length > 0) {
+                shouldGenerate = options.shots.includes(shotId);
+            }
+            if (!shouldGenerate) return jobs;
+
+            if (shotManager) shotManager.updateShotStatus(shotId, 'Draft');
+            const job = this.parseShotToJob(shotId, 'Unknown Location', content, config, null);
+            if (job) jobs.push(job);
+        }
+
         return jobs;
     }
 
@@ -212,21 +189,21 @@ export class JobGenerator {
         }
 
         for (const refId of refs) {
-            // Check Characters
-            const char = this.assetManager.getCharacter(refId);
+            // Check Elements (Characters/Props/Costumes)
+            const char = this.assetManager.getElement(refId);
             if (char) {
                 subjectDesc = subjectDesc.split(`[${refId}]`).join(char.name);
 
                 // 1. Look for Generated Concept Art (Highest Priority if use_references is true)
                 if (workflow && workflow.use_references) {
-                    // Try to find APPROVED reference first (from assets/characters/id_ref.png)
-                    const approvedRef = path.join(this.projectRoot, `videospec / assets / characters / ${char.id} _ref.png`);
+                    // Try to find APPROVED reference first (from videospec/elements/id_ref.png)
+                    const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
 
                     if (fs.existsSync(approvedRef)) {
                         assetRefs.push(path.relative(this.projectRoot, approvedRef));
                     } else {
                         // Fallback to Artifacts
-                        const generatedRef = path.join(this.projectRoot, 'Project-mv/artifacts/characters', `${char.id}.png`);
+                        const generatedRef = path.join(this.projectRoot, 'artifacts/elements', `${char.id}.png`);
                         if (fs.existsSync(generatedRef)) {
                             assetRefs.push(path.relative(this.projectRoot, generatedRef));
                         }
@@ -239,11 +216,11 @@ export class JobGenerator {
             if (scene) {
                 subjectDesc = subjectDesc.split(`[${refId}]`).join(scene.name);
                 if (workflow && workflow.use_references) {
-                    const approvedRef = path.join(this.projectRoot, `videospec / assets / scenes / ${scene.id} _ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
                     if (fs.existsSync(approvedRef)) {
                         assetRefs.push(path.relative(this.projectRoot, approvedRef));
                     } else {
-                        const sceneRef = path.join(this.projectRoot, 'Project-mv/artifacts/scenes', `${scene.id}.png`);
+                        const sceneRef = path.join(this.projectRoot, 'artifacts/scenes', `${scene.id}.png`);
                         if (fs.existsSync(sceneRef)) {
                             assetRefs.push(path.relative(this.projectRoot, sceneRef));
                         }
@@ -263,14 +240,14 @@ export class JobGenerator {
                 const id = name.toLowerCase();
 
                 // Reuse logic
-                const char = this.assetManager.getCharacter(id);
+                const char = this.assetManager.getElement(id);
                 if (char) {
-                    const approvedRef = path.join(this.projectRoot, `videospec / assets / characters / ${char.id} _ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
                     if (fs.existsSync(approvedRef)) assetRefs.push(path.relative(this.projectRoot, approvedRef));
                 }
                 const scene = this.assetManager.getScene(id);
                 if (scene) {
-                    const approvedRef = path.join(this.projectRoot, `videospec / assets / scenes / ${scene.id} _ref.png`);
+                    const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
                     if (fs.existsSync(approvedRef)) assetRefs.push(path.relative(this.projectRoot, approvedRef));
                 }
             }

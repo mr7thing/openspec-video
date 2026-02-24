@@ -26,32 +26,33 @@ const SceneSchema = z.object({
     atmosphere: z.string().optional()
 });
 
-export type Character = z.infer<typeof CharacterSchema>;
+export type Element = z.infer<typeof CharacterSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 
 export class AssetManager {
-    private assetsRoot: string;
-    private characters: Map<string, Character> = new Map();
+    private elementsRoot: string;
+    private scenesRoot: string;
+    private elements: Map<string, Element> = new Map();
     private scenes: Map<string, Scene> = new Map();
 
     constructor(projectRoot: string) {
-        this.assetsRoot = path.join(path.resolve(projectRoot), 'videospec', 'assets');
+        this.elementsRoot = path.join(path.resolve(projectRoot), 'videospec', 'elements');
+        this.scenesRoot = path.join(path.resolve(projectRoot), 'videospec', 'scenes');
     }
 
     async loadAssets(): Promise<void> {
-        await this.loadCharacters();
+        await this.loadElements();
         await this.loadScenes();
     }
 
-    private async loadCharacters() {
-        const charDir = path.join(this.assetsRoot, 'characters');
-        if (!fs.existsSync(charDir)) return;
+    private async loadElements() {
+        if (!fs.existsSync(this.elementsRoot)) return;
 
         // Support both .yaml (legacy) and .md (new standard)
-        const files = fs.readdirSync(charDir).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
+        const files = fs.readdirSync(this.elementsRoot).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
 
         for (const file of files) {
-            const content = fs.readFileSync(path.join(charDir, file), 'utf-8');
+            const content = fs.readFileSync(path.join(this.elementsRoot, file), 'utf-8');
             try {
                 let raw: any;
                 if (file.endsWith('.md')) {
@@ -111,8 +112,8 @@ export class AssetManager {
                 if (!raw.visual_traits) raw.visual_traits = {};
 
                 const asset = CharacterSchema.parse(raw);
-                this.characters.set(asset.id, asset);
-                console.log(`Loaded Character: ${asset.name} (${asset.id}) via ${file}`);
+                this.elements.set(asset.id, asset);
+                console.log(`Loaded Element: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {
                 console.warn(`Failed to validate character asset ${file}:`, err);
             }
@@ -120,13 +121,12 @@ export class AssetManager {
     }
 
     private async loadScenes() {
-        const sceneDir = path.join(this.assetsRoot, 'scenes');
-        if (!fs.existsSync(sceneDir)) return;
+        if (!fs.existsSync(this.scenesRoot)) return;
 
-        const files = fs.readdirSync(sceneDir).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
+        const files = fs.readdirSync(this.scenesRoot).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
 
         for (const file of files) {
-            const content = fs.readFileSync(path.join(sceneDir, file), 'utf-8');
+            const content = fs.readFileSync(path.join(this.scenesRoot, file), 'utf-8');
             try {
                 let raw: any;
                 if (file.endsWith('.md')) {
@@ -175,8 +175,8 @@ export class AssetManager {
         }
     }
 
-    getCharacter(id: string): Character | undefined {
-        return this.characters.get(id);
+    getElement(id: string): Element | undefined {
+        return this.elements.get(id);
     }
 
     getScene(id: string): Scene | undefined {
@@ -188,7 +188,7 @@ export class AssetManager {
         return this.getScene(id);
     }
 
-    getAllCharacters(): Character[] {
-        return Array.from(this.characters.values());
+    getAllElements(): Element[] {
+        return Array.from(this.elements.values());
     }
 }

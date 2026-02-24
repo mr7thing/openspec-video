@@ -130,42 +130,24 @@ program
                 await fs.copy(path.join(TEMPLATE_DIR, 'AGENT.md'), path.join(targetDir, 'AGENT.md'));
             }
 
-            // 2. Create videospec structure
+            // 2. Create normative videospec structure (Empty by default)
             const specDir = path.join(targetDir, 'videospec');
             await fs.ensureDir(specDir);
+            await fs.ensureDir(path.join(specDir, 'stories'));     // For story.md (outlines only)
+            await fs.ensureDir(path.join(specDir, 'elements'));    // For characters, props, costumes
+            await fs.ensureDir(path.join(specDir, 'scenes'));      // For scene descriptions
+            await fs.ensureDir(path.join(specDir, 'shots'));       // For shotlist rendering blocks
 
-            // Project Config
-            await fs.copy(path.join(TEMPLATE_DIR, 'project/project_sample.md'), path.join(specDir, 'project_sample.md'));
+            // 3. Create operational directories
+            await fs.ensureDir(path.join(targetDir, 'artifacts')); // Agent drafting sandbox
+            await fs.ensureDir(path.join(targetDir, 'queue'));     // Queue processing
 
-            // Assets
-            await fs.ensureDir(path.join(specDir, 'assets/characters'));
-            await fs.copy(path.join(TEMPLATE_DIR, 'assets/character_sample.md'), path.join(specDir, 'assets/characters/example_character_sample.md'));
-            if (fs.existsSync(path.join(TEMPLATE_DIR, 'assets/ref.png'))) {
-                await fs.copy(path.join(TEMPLATE_DIR, 'assets/ref.png'), path.join(specDir, 'assets/characters/ref_sample.png'));
-            }
-
-            await fs.ensureDir(path.join(specDir, 'assets/scenes'));
-            await fs.copy(path.join(TEMPLATE_DIR, 'assets/scene_sample.md'), path.join(specDir, 'assets/scenes/example_scene_sample.md'));
-
-            // Stories
-            await fs.ensureDir(path.join(specDir, 'stories'));
-            await fs.copy(path.join(TEMPLATE_DIR, 'stories/STORY_sample.md'), path.join(specDir, 'stories/STORY_sample.md'));
-
-            // Workflow Config
-            if (fs.existsSync(path.join(TEMPLATE_DIR, 'workflow.json'))) {
-                await fs.copy(
-                    path.join(TEMPLATE_DIR, 'workflow.json'),
-                    path.join(specDir, 'workflow.json')
-                );
-            }
-
-            // Changes & Shots
-            await fs.ensureDir(path.join(specDir, 'changes'));
-            await fs.ensureDir(path.join(specDir, 'assets/shots'));
-
-            console.log('Project structure created with _sample templates.');
-            console.log('1. Rename and fill out project_sample.md to project.md');
-            console.log('2. Ask Agent: "opsv new --target STORY.md --from project.md" to begin.');
+            console.log('Project structure created successfully.');
+            console.log('- videospec/stories/: Store your story.md outlines here.');
+            console.log('- videospec/elements/: Store characters, props, and costumes here.');
+            console.log('- videospec/scenes/: Store scene descriptions here.');
+            console.log('- videospec/shots/: Store individual shot markdowns here.');
+            console.log('\nAsk Agent: "Draft a story outline for..." to begin.');
         } catch (err) {
             console.error('Failed to initialize project:', err);
         }
@@ -173,32 +155,22 @@ program
 
 
 program
-    .command('generate')
-    .description('Generate jobs from videospec assets or stories')
-    .option('-m, --mode <type>', 'Generation mode: characters, scenes, or story', 'story')
-    .option('-c, --charactor', 'Shortcut for --mode characters')
-    .option('-s, --scene', 'Shortcut for --mode scenes')
-    .option('-S, --shotlist', 'Shortcut for --mode story')
+    .command('generate [targets...]')
+    .description('Generate jobs from specific files, directories, or all normative folders by default')
     .option('-p, --preview', 'Generate preview only (key shots / single char sheet)', false)
     .option('--shots <list>', 'Comma-separated list of shot IDs (e.g. 1,5,12)', (val) => val.split(','))
-    .action(async (options) => {
+    .action(async (targets, options) => {
         try {
             const projectRoot = process.cwd();
 
-            // Resolve shortcuts
-            let activeMode = options.mode;
-            if (options.charactor) activeMode = 'characters';
-            if (options.scene) activeMode = 'scenes';
-            if (options.shotlist) activeMode = 'story';
-
-            console.log(`Generating jobs (${activeMode}) for project at ${projectRoot}...`);
+            console.log(`Generating jobs for targets: ${targets && targets.length > 0 ? targets.join(', ') : 'All normative folders'}...`);
             if (options.preview) console.log('👀 Preview Mode Active');
             if (options.shots) console.log(`🎯 Generating specific shots: ${options.shots.join(', ')}`);
 
             const generator = new JobGenerator(projectRoot);
 
-            // Pass options (preview, shots) to generator
-            const jobs = await generator.generateJobs(activeMode, {
+            // Pass targets and options (preview, shots) to generator
+            const jobs = await generator.generateJobs(targets, {
                 preview: options.preview,
                 shots: options.shots
             });
