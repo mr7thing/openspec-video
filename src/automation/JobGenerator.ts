@@ -109,14 +109,25 @@ export class JobGenerator {
 
             const assets = this.extractAssetsFromMarkdown(body, dir);
 
-            let prompt = `**Task**: Generate Concept Art\n**Style**: ${config.context.style.visual_style || 'Not specified (derive from description)'}\n**Name**: ${name}\n**Description**:\n${body}`;
+            const ar = config.context.style.aspect_ratio || "16:9";
+            const res = config.context.style.resolution || "2K";
+
+            let prompt = `**Task**: Generate Concept Art\n**Style**: ${config.context.style.visual_style || 'Not specified (derive from description)'}\n**Aspect Ratio**: ${ar}\n**Resolution**: ${res}\n**Name**: ${name}\n**Description**:\n${body}`;
 
             if (assets.length > 0) {
                 prompt += `\n\n**Reference Images**: ${assets.length} images provided. Please use them in order as visual references.`;
             }
 
-            const outputDir = path.join(this.projectRoot, 'queue');
-            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+            const outputDir = dir; // Output next to the markdown source (e.g., artifacts/elements)
+
+            let baseName = id;
+            let ext = '.png';
+            let finalOutputPath = path.join(outputDir, `${baseName}${ext}`);
+            let counter = 1;
+            while (fs.existsSync(finalOutputPath)) {
+                finalOutputPath = path.join(outputDir, `${baseName}_${counter}${ext}`);
+                counter++;
+            }
 
             jobs.push({
                 id: `${id}`,
@@ -124,13 +135,13 @@ export class JobGenerator {
                 target_tool: 'nano_banana_pro',
                 payload: {
                     prompt: prompt,
-                    global_settings: { aspect_ratio: "16:9", quality: "2K" },
+                    global_settings: { aspect_ratio: ar, quality: res },
                     subject: { description: body },
                     environment: { details: [] },
                     camera: {}
                 } as any,
                 assets: assets,
-                output_path: path.join(outputDir, `${id}.png`),
+                output_path: finalOutputPath,
                 _meta: {
                     project: config.project?.title || path.basename(this.projectRoot),
                     timestamp: new Date().toISOString(),
@@ -269,9 +280,14 @@ export class JobGenerator {
             .replace(/^\*\(Lyrics:.*\)\*$/gm, '')
             .trim();
 
+        const ar = config.context.style.aspect_ratio || "16:9";
+        const res = config.context.style.resolution || "2K";
+
         const fullPrompt = `
-    ** Task **: Generate an Image
-        ** Style **: ${config.context.style.visual_style || 'Not specified (derive from description)'}
+** Task **: Generate an Image
+** Style **: ${config.context.style.visual_style || 'Not specified (derive from description)'}
+** Aspect Ratio **: ${ar}
+** Resolution **: ${res}
 ** Camera **: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "Standard"}
 ** Location **: ${location}
 
@@ -291,8 +307,18 @@ ${cleanDesc}
         };
 
         // Phase 6: Route shot generations to artifacts directory first for user review
-        const artifactsShotDir = path.join(this.projectRoot, 'artifacts/assets/shots', id);
+        const artifactsShotDir = path.join(this.projectRoot, 'artifacts/shots', id);
         if (!fs.existsSync(artifactsShotDir)) fs.mkdirSync(artifactsShotDir, { recursive: true });
+
+        // Non-destructive filename logic
+        let baseName = id;
+        let ext = '.png';
+        let finalOutputPath = path.join(artifactsShotDir, `${baseName}${ext}`);
+        let counter = 1;
+        while (fs.existsSync(finalOutputPath)) {
+            finalOutputPath = path.join(artifactsShotDir, `${baseName}_${counter}${ext}`);
+            counter++;
+        }
 
         // Save the generated prompt trace for reference
         const promptLogPath = path.join(artifactsShotDir, 'prompt.txt');
@@ -308,7 +334,7 @@ ${cleanDesc}
             target_tool: 'nano_banana_pro',
             payload: payload as any,
             assets: assetRefs,
-            output_path: path.join(artifactsShotDir, `${id}.png`),
+            output_path: finalOutputPath,
             _meta: {
                 project: config.project?.title || path.basename(this.projectRoot),
                 timestamp: new Date().toISOString(),
