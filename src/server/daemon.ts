@@ -1,32 +1,40 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'fs-extra';
 import path from 'path';
+import os from 'os';
 
-const PORT = 3000;
-const WORKSPACE_ROOT = process.cwd(); // Daemon is spawned in project root
-const PID_FILE = path.join(WORKSPACE_ROOT, '.opsv', 'daemon.pid');
-const QUEUE_FILE = path.join(WORKSPACE_ROOT, 'queue', 'jobs.json');
+const PORT = 3061;
+const PID_FILE = path.join(os.homedir(), '.opsv', 'daemon.pid');
+
+// Registry of active projects
+interface ProjectState {
+    name: string;
+    root: string;
+    jobsPath: string;
+    lastActive: number;
+}
+const activeProjects = new Map<string, ProjectState>();
 
 // Interface for messages
 interface ClientMessage {
-    type: 'GET_JOBS' | 'SAVE_ASSET' | 'UPDATE_JOB_STATUS' | 'HEARTBEAT';
+    type: 'GET_JOBS' | 'SAVE_ASSET' | 'UPDATE_JOB_STATUS' | 'HEARTBEAT' | 'REGISTER_PROJECT';
     payload?: any;
 }
 
 interface AssetPayload {
-    path: string; // Relative to project root, e.g. "videospec/assets/characters/hero.png"
+    path: string; // Absolute path now
     data: string; // Base64 encoded string
 }
 
-console.log(`[OpsV Daemon] Starting in ${WORKSPACE_ROOT}...`);
+console.log(`[OpsV Global Daemon] Starting...`);
 
-// 1. Setup PID file
+// 1. Setup global PID file
 try {
     fs.ensureDirSync(path.dirname(PID_FILE));
     fs.writeFileSync(PID_FILE, process.pid.toString());
-    console.log(`[OpsV Daemon] PID ${process.pid} written to ${PID_FILE}`);
+    console.log(`[OpsV Global Daemon] PID ${process.pid} written to ${PID_FILE}`);
 } catch (error) {
-    console.error('[OpsV Daemon] Failed to write PID file:', error);
+    console.error('[OpsV Global Daemon] Failed to write PID file:', error);
     process.exit(1);
 }
 
@@ -34,34 +42,73 @@ try {
 const wss = new WebSocketServer({ port: PORT });
 
 wss.on('listening', () => {
-    console.log(`[OpsV Daemon] Listening on ws://localhost:${PORT}`);
+    console.log(`[OpsV Global Daemon] Listening on ws://localhost:${PORT}`);
 });
 
+let connectedClients: WebSocket[] = [];
+
 wss.on('connection', (ws) => {
-    console.log('[OpsV Daemon] Client connected');
+    console.log('[OpsV Global Daemon] Client connected');
+    connectedClients.push(ws);
 
     ws.on('message', async (message: string) => {
         try {
             const msg: ClientMessage = JSON.parse(message.toString());
             handleMessage(ws, msg);
         } catch (err) {
-            console.error('[OpsV Daemon] Invalid message:', err);
+            console.error('[OpsV Global Daemon] Invalid message:', err);
         }
     });
 
     ws.on('close', () => {
-        console.log('[OpsV Daemon] Client disconnected');
+        console.log('[OpsV Global Daemon] Client disconnected');
+        connectedClients = connectedClients.filter(client => client !== ws);
     });
 
     // Send initial status
-    ws.send(JSON.stringify({ type: 'WELCOME', payload: { status: 'connected', version: '0.1.1' } }));
+    ws.send(JSON.stringify({ type: 'WELCOME', payload: { status: 'connected', version: '0.1.2' } }));
 });
+
+// Broadcast jobs to all connected clients
+async function broadcastJobs() {
+    let allJobs: any[] = [];
+    for (const [projectRoot, state] of activeProjects.entries()) {
+        if (fs.existsSync(state.jobsPath)) {
+            try {
+                const jobs = fs.readJsonSync(state.jobsPath);
+                allJobs = allJobs.concat(jobs);
+            } catch (err) {
+                console.error(`[OpsV Global Daemon] Error reading queue for project ${state.name}:`, err);
+            }
+        }
+    }
+    const payload = JSON.stringify({ type: 'JOBS_LIST', payload: allJobs });
+    for (const client of connectedClients) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(payload);
+        }
+    }
+    console.log(`[OpsV Global Daemon] Broadcasted ${allJobs.length} total jobs`);
+}
 
 // 3. Message Handlers
 async function handleMessage(ws: WebSocket, msg: ClientMessage) {
     switch (msg.type) {
+        case 'REGISTER_PROJECT':
+            const regPayload = msg.payload;
+            if (regPayload && regPayload.root && regPayload.jobsPath) {
+                activeProjects.set(regPayload.root, {
+                    name: regPayload.name || path.basename(regPayload.root),
+                    root: regPayload.root,
+                    jobsPath: regPayload.jobsPath,
+                    lastActive: Date.now()
+                });
+                console.log(`[OpsV Global Daemon] Registered project: ${regPayload.name}`);
+                await broadcastJobs();
+            }
+            break;
         case 'GET_JOBS':
-            await handleGetJobs(ws);
+            await broadcastJobs(); // This will send to all clients, which is fine, or we can just send to 'ws'
             break;
         case 'SAVE_ASSET':
             await handleSaveAsset(ws, msg.payload as AssetPayload);
@@ -70,86 +117,36 @@ async function handleMessage(ws: WebSocket, msg: ClientMessage) {
             ws.send(JSON.stringify({ type: 'HEARTBEAT_ACK' }));
             break;
         default:
-            console.warn(`[OpsV Daemon] Unknown message type: ${msg.type}`);
-    }
-}
-
-async function handleGetJobs(ws: WebSocket) {
-    if (fs.existsSync(QUEUE_FILE)) {
-        try {
-            const jobs = fs.readJsonSync(QUEUE_FILE);
-            ws.send(JSON.stringify({ type: 'JOBS_LIST', payload: jobs }));
-            console.log(`[OpsV Daemon] Sent ${jobs.length} jobs to client`);
-        } catch (err) {
-            console.error('[OpsV Daemon] Error reading queue:', err);
-            ws.send(JSON.stringify({ type: 'ERROR', payload: 'Failed to read job queue' }));
-        }
-    } else {
-        ws.send(JSON.stringify({ type: 'JOBS_LIST', payload: [] }));
-        console.log('[OpsV Daemon] Queue file not found, sending empty list');
-    }
-}
-
-interface AssetRequestPayload {
-    path: string;
-    assetId: string;
-}
-
-async function handleGetAsset(ws: WebSocket, payload: AssetRequestPayload) {
-    if (!payload.path) {
-        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Missing path for GET_ASSET' }));
-        return;
-    }
-
-    // Security check: simple path traversal prevention
-    const fullPath = path.join(WORKSPACE_ROOT, payload.path);
-    const relative = path.relative(WORKSPACE_ROOT, fullPath);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
-        console.error('[OpsV Daemon] Security Block: Attempted path traversal', payload.path);
-        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Access denied: Path outside project root' }));
-        return;
-    }
-
-    try {
-        if (fs.existsSync(fullPath)) {
-            const fileData = await fs.readFile(fullPath);
-            const base64Data = fileData.toString('base64');
-            const ext = path.extname(fullPath).substring(1); // e.g. png
-            const mimeType = ext === 'png' ? 'image/png' : (ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/octet-stream');
-
-            console.log(`[OpsV Daemon] Serving asset: ${relative}`);
-            ws.send(JSON.stringify({
-                type: 'ASSET_DATA',
-                payload: {
-                    assetId: payload.assetId,
-                    data: `data:${mimeType};base64,${base64Data}`,
-                    path: payload.path
-                }
-            }));
-        } else {
-            console.error('[OpsV Daemon] Asset not found:', fullPath);
-            ws.send(JSON.stringify({ type: 'ERROR', payload: `Asset not found: ${payload.path}` }));
-        }
-    } catch (err) {
-        console.error('[OpsV Daemon] Failed to read asset:', err);
-        ws.send(JSON.stringify({ type: 'ERROR', payload: 'Failed to read asset file' }));
+            console.warn(`[OpsV Global Daemon] Unknown message type: ${msg.type}`);
     }
 }
 
 async function handleSaveAsset(ws: WebSocket, payload: AssetPayload) {
     if (!payload.path || !payload.data) {
-        console.error('[OpsV Daemon] Save failed: Missing path or data', { path: payload.path, dataLength: payload.data ? payload.data.length : 0 });
+        console.error('[OpsV Global Daemon] Save failed: Missing path or data');
         ws.send(JSON.stringify({ type: 'ERROR', payload: 'Missing path or data' }));
         return;
     }
 
     try {
-        const fullPath = path.join(WORKSPACE_ROOT, payload.path);
+        const fullPath = payload.path; // Received path is now expected to be absolute
 
-        // Ensure security: prevent directory traversal
-        const relative = path.relative(WORKSPACE_ROOT, fullPath);
-        if (relative.startsWith('..') || path.isAbsolute(relative)) {
-            throw new Error('Invalid path: External access denied');
+        // Security check: must be absolute and not point to sensitive system dirs
+        if (!path.isAbsolute(fullPath)) {
+            throw new Error('Invalid path: Must be absolute path');
+        }
+
+        // Optional: Check if the path belongs to any registered project, but for now absolute path is trusted enough since it is local daemon.
+        let belongsToProject = false;
+        for (const root of activeProjects.keys()) {
+            if (fullPath.startsWith(root) || fullPath.replace(/\\/g, '/').startsWith(root.replace(/\\/g, '/'))) {
+                belongsToProject = true;
+                break;
+            }
+        }
+
+        if (activeProjects.size > 0 && !belongsToProject) {
+            console.warn(`[OpsV Global Daemon] Warning: Saving asset to ${fullPath} which is outside registered projects.`);
         }
 
         // Decode Base64
@@ -162,11 +159,11 @@ async function handleSaveAsset(ws: WebSocket, payload: AssetPayload) {
         await fs.ensureDir(path.dirname(fullPath));
         await fs.writeFile(fullPath, buffer);
 
-        console.log(`[OpsV Daemon] Saved asset: ${relative}`);
-        ws.send(JSON.stringify({ type: 'ASSET_SAVED', payload: { path: relative } }));
+        console.log(`[OpsV Global Daemon] Saved asset: ${fullPath}`);
+        ws.send(JSON.stringify({ type: 'ASSET_SAVED', payload: { path: fullPath } }));
 
     } catch (err: any) {
-        console.error('[OpsV Daemon] Save failed:', err);
+        console.error('[OpsV Global Daemon] Save failed:', err);
         ws.send(JSON.stringify({ type: 'ERROR', payload: `Save failed: ${err.message}` }));
     }
 }
@@ -176,7 +173,7 @@ process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 
 function cleanup() {
-    console.log('[OpsV Daemon] Shutting down...');
+    console.log('[OpsV Global Daemon] Shutting down...');
     if (fs.existsSync(PID_FILE)) {
         fs.unlinkSync(PID_FILE);
     }

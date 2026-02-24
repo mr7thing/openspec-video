@@ -2,13 +2,15 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
+import os from 'os';
+import WebSocket from 'ws';
 import { spawn } from 'child_process';
 import { JobGenerator } from './automation/JobGenerator';
 
 const program = new Command();
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
 const PROPOSAL_TEMPLATE = path.join(__dirname, '../templates/proposal.md');
-const PID_FILE = path.join(process.cwd(), '.opsv', 'daemon.pid');
+const PID_FILE = path.join(os.homedir(), '.opsv', 'daemon.pid');
 const DAEMON_SCRIPT = path.join(__dirname, 'server', 'daemon.js');
 
 function isDaemonRunning(): boolean {
@@ -62,7 +64,7 @@ function stopDaemon() {
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.1.2');
+    .version('0.1.4');
 
 program
     .command('serve')
@@ -92,7 +94,7 @@ program
         if (isDaemonRunning()) {
             const pid = fs.readFileSync(PID_FILE, 'utf-8');
             console.log(`✅ OpsV Server is RUNNING (PID: ${pid})`);
-            console.log(`   Listening on: ws://localhost:3000`);
+            console.log(`   Listening on: ws://localhost:3061`);
         } else {
             console.log('🔴 OpsV Server is STOPPED');
         }
@@ -179,10 +181,32 @@ program
 
             // Auto-start server if needed
             if (!isDaemonRunning()) {
-                console.log('Auto-starting OpsV Server for processing...');
+                console.log('Auto-starting OpsV Global Server for processing...');
                 startDaemon();
-                console.log('OpsV Server is already running. Ready for browser extension.');
+                // Wait briefly for daemon to start
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            } else {
+                console.log('OpsV Global Server is already running. Ready for browser extension.');
             }
+
+            // Register Project with Global Daemon
+            const ws = new WebSocket('ws://localhost:3061');
+            ws.on('open', () => {
+                ws.send(JSON.stringify({
+                    type: 'REGISTER_PROJECT',
+                    payload: {
+                        name: path.basename(projectRoot),
+                        root: projectRoot,
+                        jobsPath: path.join(projectRoot, 'queue', 'jobs.json')
+                    }
+                }));
+                console.log(`Project '${path.basename(projectRoot)}' registered with Global Daemon.`);
+                ws.close();
+            });
+            ws.on('error', (err) => {
+                console.warn(`Failed to connect to Global Daemon at 3061: ${err.message}. Ensure it is running to use the extension.`);
+            });
+
         } catch (err) {
             console.error('Generation failed:', err);
         }

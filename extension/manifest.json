@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "OpenSpec-Video Companion",
-    "version": "0.1.2",
+    "version": "0.1.4",
     "description": "Browser automation companion for OpenSpec-Video",
     "permissions": [
         "sidePanel",
@@ -11,7 +11,7 @@
     ],
     "host_permissions": [
         "https://gemini.google.com/*",
-        "ws://localhost:3000/*",
+        "ws://localhost:3061/*",
         "<all_urls>"
     ],
     "background": {

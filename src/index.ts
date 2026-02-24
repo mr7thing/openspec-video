@@ -22,7 +22,7 @@ async function main() {
         const { JobGenerator } = await import('./automation/JobGenerator');
         const generator = new JobGenerator(projectRoot);
         console.log("Generating jobs from Script.md...");
-        const jobs = await generator.generateJobs();
+        const jobs = await generator.generateJobs([]);
 
         console.log(`Generated ${jobs.length} jobs.`);
         if (jobs.length > 0) {

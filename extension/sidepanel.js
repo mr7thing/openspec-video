@@ -2,7 +2,7 @@
 
 let socket = null;
 let jobs = [];
-const SERVER_URL = 'ws://localhost:3000';
+const SERVER_URL = 'ws://localhost:3061';
 
 const statusEl = document.getElementById('status-indicator');
 const jobListEl = document.getElementById('job-list');
