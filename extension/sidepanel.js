@@ -98,16 +98,31 @@ function handleMessage(msg) {
         case 'ASSET_SAVED':
             console.log('Asset saved:', msg.payload.path);
 
-            // Mark current job as done visually (optional, for now just simple feedback)
+            // Update UI status to 'Saved'
+            const savedJob = jobs.find(j => j.output_path === msg.payload.path);
+            if (savedJob) {
+                const statusEl = document.getElementById(`status-${savedJob.id}`);
+                if (statusEl) {
+                    statusEl.innerHTML = `<span style="color:#4caf50; font-weight:bold;">✔ Saved (${new Date().toLocaleTimeString()})</span>`;
+                }
+            }
+
             // If running sequence, trigger next
             if (isRunningAll) {
                 currentJobIndex++;
                 saveState();
+                // Skip disabled jobs
+                while (currentJobIndex < jobs.length && jobs[currentJobIndex]._skip) {
+                    currentJobIndex++;
+                }
+
                 if (currentJobIndex < jobs.length) {
-                    // Small delay to be safe
+                    // Add recommended 2.5s - 5s random delay to bypass Gemini frequency detection
+                    const delay = 2500 + Math.random() * 2500;
+                    console.log(`OpsV: Delaying next job for ${Math.round(delay)}ms...`);
                     setTimeout(() => {
                         if (isRunningAll) window.runJob(currentJobIndex);
-                    }, 1500);
+                    }, delay);
                 } else {
                     stopRunAll();
                     // Optional: Notification
@@ -144,13 +159,97 @@ function renderJobs() {
             <div class="job-info">
                 <strong>${job.type}</strong>
                 <div class="job-desc-short" title="${fullPrompt}">${shortDesc}</div>
+                <div id="status-${job.id}" style="font-size: 0.85em; margin-top: 6px;"></div>
                 <details class="job-details">
                     <summary>Show Full Prompt</summary>
                     <pre style="white-space: pre-wrap; font-size: 0.8em; color: #555;">${fullPrompt}</pre>
                 </details>
             </div>
-            <button class="btn btn-action" onclick="runJob(${index})">Run</button>
         `;
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'job-actions';
+        actionsDiv.style.display = 'flex';
+        actionsDiv.style.gap = '5px';
+        actionsDiv.style.marginTop = '8px';
+
+        const runBtn = document.createElement('button');
+        runBtn.className = 'btn btn-action';
+        runBtn.textContent = 'Run';
+        runBtn.addEventListener('click', () => {
+            currentJobIndex = index;
+            window.runJob(index);
+        });
+
+        const skipBtn = document.createElement('button');
+        skipBtn.className = 'btn';
+        skipBtn.textContent = job._skip ? 'Enable' : 'Skip';
+        skipBtn.style.flex = '1';
+        skipBtn.style.padding = '8px';
+        skipBtn.style.backgroundColor = job._skip ? '#4caf50' : '#ff9800';
+        skipBtn.style.color = 'white';
+        skipBtn.style.border = 'none';
+        skipBtn.style.borderRadius = '4px';
+        skipBtn.style.cursor = 'pointer';
+        skipBtn.addEventListener('click', () => {
+            job._skip = !job._skip;
+            renderJobs(); // Re-render to update UI
+        });
+
+        actionsDiv.appendChild(runBtn);
+        actionsDiv.appendChild(skipBtn);
+        item.appendChild(actionsDiv);
+
+        // --- DRAG AND DROP BINDING ---
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            item.style.backgroundColor = 'rgba(76, 175, 80, 0.1)';
+            item.style.border = '1px dashed #4caf50';
+        });
+
+        item.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            item.style.backgroundColor = '';
+            item.style.border = '';
+        });
+
+        item.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            item.style.backgroundColor = '';
+            item.style.border = '';
+
+            console.log('OpsV Drop Event Detected');
+            const dataTransfer = e.dataTransfer;
+
+            // Try to extract image URL (Gemini usually lets you drag the image)
+            let imageUrl = dataTransfer.getData('text/uri-list') || dataTransfer.getData('text/plain');
+
+            if (imageUrl && imageUrl.startsWith('http')) {
+                console.log('OpsV dropped image URL:', imageUrl);
+
+                let highResUrl = imageUrl;
+                // If it's a googleusercontent url, try to get the highest res in JPG
+                if (imageUrl.includes('googleusercontent.com')) {
+                    highResUrl = imageUrl.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s4096-rj');
+                }
+
+                // Signal as ASSET_FOUND for manual binding
+                chrome.runtime.sendMessage({
+                    type: 'ASSET_FOUND',
+                    data: highResUrl,
+                    fallbackData: imageUrl,
+                    job: job
+                });
+
+                // Visual feedback
+                const origBg = item.style.backgroundColor;
+                item.style.backgroundColor = '#d4edda';
+                setTimeout(() => item.style.backgroundColor = origBg, 1000);
+            } else {
+                console.warn('OpsV: Dropped item is not a valid URL URL.', dataTransfer.types);
+            }
+        });
+
         jobListEl.appendChild(item);
     });
 }
@@ -281,19 +380,45 @@ window.runJob = async (index) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'ASSET_FOUND') {
         const processAndSend = async () => {
+            const statusEl = document.getElementById(`status-${request.job.id}`);
+            if (statusEl) {
+                statusEl.innerHTML = `<span style="color:#ff9800; font-weight:bold;">⬇ Downloading High-Res Image... (Please wait)</span>`;
+            }
+
             try {
                 let finalData = request.data;
                 // If it's a URL (http...), fetch it here to avoid CORS in content script
                 if (typeof request.data === 'string' && request.data.startsWith('http')) {
                     console.log('Fetching image from URL in sidepanel...', request.data.substring(0, 30));
-                    const response = await fetch(request.data);
-                    const blob = await response.blob();
-                    finalData = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                    console.log('Image fetched and converted to Base64');
+                    try {
+                        const response = await fetch(request.data);
+                        if (!response.ok) throw new Error('HTTP status ' + response.status);
+                        const blob = await response.blob();
+                        if (blob.size < 5000) throw new Error('Image blob too small or empty'); // Force fallback if empty
+
+                        finalData = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                        console.log('High-res image fetched and converted to Base64');
+                    } catch (fetchErr) {
+                        console.warn('OpsV: High-res fetch failed, trying fallback url...', fetchErr);
+                        if (request.fallbackData) {
+                            if (statusEl) statusEl.innerHTML = `<span style="color:#f44336;">⚠ High-Res failed, fetching Preview...</span>`;
+                            const fbRes = await fetch(request.fallbackData);
+                            const fbBlob = await fbRes.blob();
+                            if (fbBlob.size < 1000) throw new Error('Fallback blob too small');
+
+                            finalData = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.readAsDataURL(fbBlob);
+                            });
+                        } else {
+                            throw fetchErr; // Re-throw if no fallback
+                        }
+                    }
                 }
 
                 const payload = {
@@ -313,6 +438,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
             } catch (e) {
                 console.error('Sidepanel: Failed to process asset', e);
+                const statusEl = document.getElementById(`status-${request.job.id}`);
+                if (statusEl) {
+                    statusEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">✖ Fetch Failed</span>`;
+                }
             }
         };
 
@@ -338,10 +467,30 @@ refreshBtn.addEventListener('click', () => {
 runAllBtn.addEventListener('click', () => {
     if (jobs.length === 0) return;
     isRunningAll = true;
-    currentJobIndex = 0;
+
+    // Find first non-skipped job if current is skipped
+    if (jobs[currentJobIndex] && jobs[currentJobIndex]._skip) {
+        while (currentJobIndex < jobs.length && jobs[currentJobIndex]._skip) {
+            currentJobIndex++;
+        }
+    }
+
+    if (currentJobIndex >= jobs.length) {
+        currentJobIndex = 0;
+        // Make one more pass to find an unskipped job
+        while (currentJobIndex < jobs.length && jobs[currentJobIndex]._skip) {
+            currentJobIndex++;
+        }
+        if (currentJobIndex >= jobs.length) {
+            alert("No runnable jobs found in the queue.");
+            isRunningAll = false;
+            return;
+        }
+    }
+
     saveState();
     updateControls();
-    window.runJob(0);
+    window.runJob(currentJobIndex);
 });
 
 stopBtn.addEventListener('click', stopRunAll);

@@ -102,19 +102,18 @@ function checkForResult(job) {
 
             if (downloadLink) {
                 remoteLog('OpsV: Found High-Res Download Link:', downloadLink);
-                fetchAndSend(downloadLink, job);
+                fetchAndSend(downloadLink, img.src, job);
             } else {
-                // Heuristic: Upgrade Google Image URL to full size
+                // Heuristic: Upgrade Google Image URL to full size and force JPG
                 let finalUrl = img.src;
                 if (finalUrl.includes('googleusercontent.com')) {
-                    // Replace params (e.g. =w123-h456...) with =s0 for full size
-                    // Regex looks for =w... or =h... at the end or mid-string
-                    finalUrl = finalUrl.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s0');
-                    remoteLog('OpsV: Upgraded Google Image URL to High-Res (=s0):', finalUrl);
+                    // Replace params (e.g. =w123-h456...) with =s4096-rj for full size JPG
+                    finalUrl = finalUrl.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s4096-rj');
+                    remoteLog('OpsV: Upgraded Google Image URL to High-Res (=s4096-rj):', finalUrl);
                 } else {
                     remoteLog('OpsV: Falling back to img.src (not a Google URL):', finalUrl);
                 }
-                fetchAndSend(finalUrl, job);
+                fetchAndSend(finalUrl, img.src, job);
             }
             return;
         }
@@ -127,7 +126,11 @@ function checkForResult(job) {
             currentImg.onload = () => {
                 remoteLog('OpsV: Candidate loaded:', currentImg.naturalWidth);
                 if (currentImg.naturalWidth > 200) {
-                    fetchAndSend(currentImg.src, job);
+                    let finalUrl = currentImg.src;
+                    if (finalUrl.includes('googleusercontent.com')) {
+                        finalUrl = finalUrl.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s4096-rj');
+                    }
+                    fetchAndSend(finalUrl, currentImg.src, job);
                 }
             };
             // Depending on how many we want to "watch".
@@ -193,104 +196,104 @@ async function runJob(job) {
 
     // 2. Clear & Inject Prompt
     inputBox.focus();
-    // Use execCommand for better compatibility with React/DraftJS editors
+    // 3. To bypass Gemini's anti-automation: simulate typing character by character
+    console.log('OpsV: Starting human-like typing simulation...');
+    const text = job.payload.prompt;
+
+    // Clear first
     document.execCommand('selectAll', false, null);
     document.execCommand('delete', false, null);
+    inputBox.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
 
-    // Slight delay to let UI react
-    await new Promise(r => setTimeout(r, 100));
-
-    // 2a. Inject Assets (Images) if available
-    if (job.assetsData && job.assetsData.length > 0) {
-        console.log(`OpsV: Uploading ${job.assetsData.length} reference images...`);
-
-        for (const dataUrl of job.assetsData) {
-            try {
-                // Convert DataURL to Blob/File
-                const res = await fetch(dataUrl);
-                const blob = await res.blob();
-                const file = new File([blob], "reference.png", { type: "image/png" });
-
-                // Construct DataTransfer/ClipboardEvent
-                const dt = new DataTransfer();
-                dt.items.add(file);
-
-                const pasteEvent = new ClipboardEvent('paste', {
-                    bubbles: true,
-                    cancelable: true,
-                    clipboardData: dt
-                });
-
-                // Dispatch input
-                inputBox.dispatchEvent(pasteEvent);
-
-                console.log('OpsV: Dispatched paste event for image.');
-
-                // Wait specifically for valid image preview to appear
-                // Gemini typically adds a div with class 'image-preview' or similar inside the container
-                // or somewhere in the DOM.
-
-                // Wait a bit between uploads
-                await new Promise(r => setTimeout(r, 1500));
-
-            } catch (e) {
-                console.error('OpsV Error: Failed to paste image', e);
-            }
-        }
+    // Type character by character
+    for (const char of text) {
+        // Focus multiple times just in case
+        document.execCommand('insertText', false, char);
+        inputBox.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        // Random short delay
+        await new Promise(r => setTimeout(r, 10 + Math.random() * 20));
     }
+    inputBox.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 
-    document.execCommand('insertText', false, job.payload.prompt);
+    // Simulate a human adding a space at the end
+    await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
+    document.execCommand('insertText', false, ' ');
+    inputBox.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    inputBox.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    inputBox.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true }));
 
-    // 3. Click Send
-    setTimeout(() => {
-        const sendSelectors = [
-            '.send-button', // Primary class-based selector
-            'button[aria-label="Send message"]', // English fallback
-            'button[aria-label="Send"]',
-            'button[aria-label="发送"]', // Chinese fallback
-            'button > span.mat-button-wrapper > mat-icon' // Old angular style fallback
-        ];
+    // 4. Wait for Send button to become enabled
+    console.log('OpsV: Waiting for Send button to become ready...');
+    let sendBtn = null;
+    let t = 0;
+    const sendSelectors = [
+        '.send-button',
+        'button[aria-label="Send message"]',
+        'button[aria-label="发送消息"]',
+        'button[aria-label="Send"]',
+        'button[aria-label="发送"]',
+        'button > span.mat-button-wrapper > mat-icon'
+    ];
 
-        let sendBtn = null;
+    while (!sendBtn && t < 20) {
         for (const sel of sendSelectors) {
-            // Find button that isn't disabled
             const btn = document.querySelector(sel);
-            if (btn && !btn.disabled) {
+            if (btn && !btn.disabled && btn.offsetParent !== null) {
                 sendBtn = btn;
                 break;
             }
         }
-
-        // If no specific send button, try finding the button next to input
         if (!sendBtn && inputBox) {
-            // Traverse up and look for button
-            const parent = inputBox.closest('.input-area') || inputBox.parentElement.parentElement;
-            if (parent) sendBtn = parent.querySelector('button');
+            const parent = inputBox.closest('.input-area') || inputBox.parentElement?.parentElement;
+            if (parent) {
+                const btn = parent.querySelector('button');
+                if (btn && !btn.disabled && btn.offsetParent !== null) sendBtn = btn;
+            }
         }
+        if (!sendBtn) {
+            await new Promise(r => setTimeout(r, 200));
+            t++;
+        }
+    }
 
-        if (sendBtn) {
-            console.log('OpsV: Clicking send button');
-            sendBtn.click();
-            monitorGeneration(job);
-        } else {
-            console.error('OpsV: Send button not found');
-            alert('OpsV Error: Send button not found. Please click Send manually.');
-            // Monitor anyway in case user clicks
-            monitorGeneration(job);
-        }
-    }, 800);
+    // If no specific send button, try finding the button next to input
+    if (!sendBtn && inputBox) {
+        // Traverse up and look for button
+        const parent = inputBox.closest('.input-area') || inputBox.parentElement.parentElement;
+        if (parent) sendBtn = parent.querySelector('button');
+    }
+
+    if (sendBtn) {
+        console.log('OpsV: Dispatching human-like click to send button');
+        // Small hesitation
+        await new Promise(r => setTimeout(r, 600 + Math.random() * 800));
+
+        const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window });
+        const up = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window });
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+
+        sendBtn.dispatchEvent(down);
+        await new Promise(r => setTimeout(r, 50 + Math.random() * 50));
+        sendBtn.dispatchEvent(up);
+        sendBtn.dispatchEvent(click);
+
+        // Wait for generation to start
+        await new Promise(r => setTimeout(r, 1000));
+        monitorGeneration(job);
+    } else {
+        console.error('OpsV: Send button not found or not enabled');
+        alert('OpsV Error: Send button not found. Please click Send manually.');
+        monitorGeneration(job);
+    }
 }
 
 function monitorGeneration(job) {
     console.log('Monitoring generation...');
 
-    // Simple strategy: Observer for new images (img tag)
-    // tailored for Gemini's current DOM structure.
+    // Snapshot existing images to avoid triggering on old results
+    const initialImages = new Set(Array.from(document.querySelectorAll('img')).map(img => img.src));
+    console.log(`OpsV: Checkpoint - ${initialImages.size} existing images.`);
 
-    // We track "valid" images we've already seen to avoid duplicates?
-    // Actually, just looking for "The New One".
-
-    let initialImgCount = document.querySelectorAll('img').length;
     let found = false;
 
     const observer = new MutationObserver((mutations) => {
@@ -299,30 +302,28 @@ function monitorGeneration(job) {
         // Check for new images or changes
         const imgs = Array.from(document.querySelectorAll('img'));
 
-        // Filter for "Result" candidates: Large images
-        // Note: naturalWidth might be 0 if not loaded yet.
-        // We look for images that are likely the generation.
+        // Filter for "Result" candidates: Large images that are NEW
         const candidates = imgs.filter(img => {
-            // Check if it's a large image (heuristic)
-            // If checking immediately, width might be 0.
-            // But usually Gemini generated images have specific classes or containers.
-            // Let's rely on src present and size if metadata available, or just index position (newly at bottom).
-
-            // Heuristic 1: It wasn't there before (index >= initialImgCount)
-            // Heuristic 2: It is large (width > 200) - if loaded.
-
-            return img.src && img.src.startsWith('http');
+            return img.src && img.src.startsWith('http') && !initialImages.has(img.src);
         });
 
         // We specifically look for the *last* candidate that meets criteria
         if (candidates.length > 0) {
             const lastImg = candidates[candidates.length - 1];
 
+            // Helper to upgrade resolution and force JPG
+            const getHighResUrl = (url) => {
+                if (url.includes('googleusercontent.com')) {
+                    return url.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s4096-rj');
+                }
+                return url;
+            };
+
             // Check if it's "ready" (has dimensions)
             if (lastImg.complete && lastImg.naturalWidth > 200) {
                 console.log('New valid image detected:', lastImg.src, lastImg.naturalWidth);
                 found = true;
-                fetchAndSend(lastImg.src, job);
+                fetchAndSend(getHighResUrl(lastImg.src), lastImg.src, job);
                 observer.disconnect();
             } else if (!lastImg.complete) {
                 // If not complete, add a load listener to it
@@ -332,7 +333,7 @@ function monitorGeneration(job) {
                         if (lastImg.naturalWidth > 200 && !found) {
                             console.log('Image loaded and valid:', lastImg.src);
                             found = true;
-                            fetchAndSend(lastImg.src, job);
+                            fetchAndSend(getHighResUrl(lastImg.src), lastImg.src, job);
                             observer.disconnect();
                         }
                     };
@@ -360,7 +361,7 @@ function monitorGeneration(job) {
     }, 60000);
 }
 
-async function fetchAndSend(url, job) {
+async function fetchAndSend(url, fallbackUrl, job) {
     // Just send the URL to the sidepanel/background to handle fetching
     // This avoids CORS issues in content script and leverages extension permissions
     remoteLog('OpsV: Sending image URL to extension:', url.substring(0, 50) + '...');
@@ -368,7 +369,8 @@ async function fetchAndSend(url, job) {
         chrome.runtime.sendMessage({
             type: 'ASSET_FOUND',
             job: job,
-            data: url // Send URL instead of base64
+            data: url,
+            fallbackData: fallbackUrl // Include fallback data safely via parameter
         });
     } catch (e) {
         remoteLog('OpsV Error: Failed to send message:', e.message);

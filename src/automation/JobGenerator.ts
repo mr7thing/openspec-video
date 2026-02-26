@@ -112,10 +112,15 @@ export class JobGenerator {
             const ar = config.context.style.aspect_ratio || "16:9";
             const res = config.context.style.resolution || "2K";
 
-            let prompt = `**Task**: Generate Concept Art\n**Style**: ${config.context.style.visual_style || 'Not specified (derive from description)'}\n**Aspect Ratio**: ${ar}\n**Resolution**: ${res}\n**Name**: ${name}\n**Description**:\n${body}`;
+            let prompt = "";
+            if (jobs.length === 0) {
+                prompt += `【项目上下文】我们正在制作概念视频，需要你生成分镜和人设图片。以下是第一条需求：\n\n`;
+            }
+
+            prompt += `[角色/物品设定]\n风格: ${config.context.style.visual_style || '默认风格'}\n比例: ${ar} (分辨率: ${res})\n名称: ${name}\n务必生成明确、具体的画面，拒绝含糊其辞的场景描述。\n描述: ${body}`;
 
             if (assets.length > 0) {
-                prompt += `\n\n**Reference Images**: ${assets.length} images provided. Please use them in order as visual references.`;
+                prompt += `\n参考图: 共 ${assets.length} 张(见附件)，请尽量保持一致。`;
             }
 
             const outputDir = dir; // Output next to the markdown source (e.g., artifacts/elements)
@@ -283,17 +288,16 @@ export class JobGenerator {
         const ar = config.context.style.aspect_ratio || "16:9";
         const res = config.context.style.resolution || "2K";
 
-        const fullPrompt = `
-** Task **: Generate an Image
-** Style **: ${config.context.style.visual_style || 'Not specified (derive from description)'}
-** Aspect Ratio **: ${ar}
-** Resolution **: ${res}
-** Camera **: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "Standard"}
-** Location **: ${location}
+        let fullPrompt = "";
 
-** Description **:
-${cleanDesc}
-`.trim();
+        // This is a bit hacky to check if it's the first shot job overall, 
+        // but typically JobGenerator creates them in order. 
+        // We'll just rely on a global-ish tracker or skip it if it's hard to track here.
+        // For simplicity, we'll format the shot explicitly without the context if not available.
+        // Wait, parseShotToJob doesn't know the index. Let's just make the format extremely concise.
+
+        fullPrompt = `[视频分镜图]\n风格: ${config.context.style.visual_style || '默认设定'}\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n务必生成明确、具体的画面，拒绝含糊其辞的场景描述。\n描述: ${cleanDesc}`;
+
 
         const payload = {
             prompt: fullPrompt,
