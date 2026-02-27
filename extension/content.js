@@ -75,44 +75,39 @@ function checkForResult(job) {
             remoteLog('OpsV: Found preview image:', info);
 
             // Search for high-res link nearby
-            // Traverse up to find a container that might hold the download button
             let container = img.parentElement;
             let downloadLink = null;
 
-            // Search up to 5 levels
-            for (let k = 0; k < 5; k++) {
+            // Search up to 8 levels for the closest download anchor
+            for (let k = 0; k < 8; k++) {
                 if (!container) break;
 
-                // Look for anchor with download attribute or convincing href
-                const anchors = Array.from(container.querySelectorAll('a[href], button[aria-label*="Download"], button[aria-label*="下载"]'));
+                // Look for anchor with download attribute or convincing href inside the container
+                // Gemini tends to use specific tooltips or aria-labels for the download button.
+                const anchors = Array.from(container.querySelectorAll('a[href]'));
+                const realLink = anchors.find(a => {
+                    const label = (a.getAttribute('aria-label') || '').toLowerCase();
+                    const tooltip = (a.getAttribute('data-tooltip') || '').toLowerCase();
+                    return a.hasAttribute('download') || label.includes('download') || label.includes('下载') || tooltip.includes('download') || tooltip.includes('下载');
+                });
 
-                if (anchors.length > 0) {
-                    remoteLog(`OpsV debug: Found ${anchors.length} candidates in parent level ${k}`);
-                    anchors.forEach(a => remoteLog('Candidate:', a.tagName, a.href, a.ariaLabel, a.innerHTML.substring(0, 20)));
-
-                    // Prioritize standard download anchors
-                    const realLink = anchors.find(a => a.tagName === 'A' && (a.hasAttribute('download') || a.href.includes('googleusercontent')));
-                    if (realLink) {
-                        downloadLink = realLink.href;
-                        break;
-                    }
+                if (realLink) {
+                    downloadLink = realLink.href;
+                    break;
                 }
                 container = container.parentElement;
             }
 
-            if (downloadLink) {
-                remoteLog('OpsV: Found High-Res Download Link:', downloadLink);
-                fetchAndSend(downloadLink, img.src, job);
+            if (downloadLink && !downloadLink.startsWith('javascript:')) {
+                remoteLog('OpsV: Found Native High-Res Download Link in DOM:', downloadLink.substring(0, 60));
+                fetchAndSend(downloadLink, downloadLink, job);
             } else {
-                // Heuristic: Upgrade Google Image URL to full size and force JPG
+                // Heuristic fallback
                 let finalUrl = img.src;
                 if (finalUrl.includes('googleusercontent.com')) {
-                    // Replace params (e.g. =w123-h456...) with =s4096-rj for full size JPG
                     finalUrl = finalUrl.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s4096-rj');
-                    remoteLog('OpsV: Upgraded Google Image URL to High-Res (=s4096-rj):', finalUrl);
-                } else {
-                    remoteLog('OpsV: Falling back to img.src (not a Google URL):', finalUrl);
                 }
+                remoteLog('OpsV: Falling back to heuristic src expansion:', finalUrl.substring(0, 60));
                 fetchAndSend(finalUrl, img.src, job);
             }
             return;
@@ -323,7 +318,29 @@ function monitorGeneration(job) {
             if (lastImg.complete && lastImg.naturalWidth > 200) {
                 console.log('New valid image detected:', lastImg.src, lastImg.naturalWidth);
                 found = true;
-                fetchAndSend(getHighResUrl(lastImg.src), lastImg.src, job);
+
+                // Advanced search for native download button near this specific image
+                let container = lastImg.parentElement;
+                let downloadLink = null;
+                for (let k = 0; k < 8; k++) {
+                    if (!container) break;
+                    const anchors = Array.from(container.querySelectorAll('a[href]'));
+                    const realLink = anchors.find(a => {
+                        const label = (a.getAttribute('aria-label') || '').toLowerCase();
+                        const tooltip = (a.getAttribute('data-tooltip') || '').toLowerCase();
+                        return a.hasAttribute('download') || label.includes('download') || label.includes('下载') || tooltip.includes('download') || tooltip.includes('下载');
+                    });
+                    if (realLink) { downloadLink = realLink.href; break; }
+                    container = container.parentElement;
+                }
+
+                if (downloadLink && !downloadLink.startsWith('javascript:')) {
+                    remoteLog('OpsV: MutationObserver Found Native Download Link:', downloadLink.substring(0, 60));
+                    fetchAndSend(downloadLink, downloadLink, job);
+                } else {
+                    fetchAndSend(getHighResUrl(lastImg.src), lastImg.src, job);
+                }
+
                 observer.disconnect();
             } else if (!lastImg.complete) {
                 // If not complete, add a load listener to it

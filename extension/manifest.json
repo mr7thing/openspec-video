@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "OpenSpec-Video Companion",
-    "version": "0.1.23",
+    "version": "0.1.26",
     "description": "Browser automation companion for OpenSpec-Video",
     "permissions": [
         "sidePanel",

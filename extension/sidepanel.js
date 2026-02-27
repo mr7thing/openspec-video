@@ -156,22 +156,25 @@ function renderJobs() {
         const shortDesc = fullPrompt.substring(0, 60) + (fullPrompt.length > 60 ? '...' : '');
 
         item.innerHTML = `
-            <div class="job-info">
-                <strong>${job.type}</strong>
-                <div class="job-desc-short" title="${fullPrompt}">${shortDesc}</div>
-                <div id="status-${job.id}" style="font-size: 0.85em; margin-top: 6px;"></div>
-                <details class="job-details">
-                    <summary>Show Full Prompt</summary>
-                    <pre style="white-space: pre-wrap; font-size: 0.8em; color: #555;">${fullPrompt}</pre>
-                </details>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; width: 100%;">
+                <div class="job-info" style="flex: 1; margin-right: 15px; overflow: hidden;">
+                    <strong style="display:block; margin-bottom:4px;">${job.type}</strong>
+                    <div class="job-desc-short" title="${fullPrompt}" style="font-size: 12px; color: #333; line-height: 1.4;">${shortDesc}</div>
+                    <details class="job-details" style="margin-top: 6px;">
+                        <summary style="font-size: 11px; cursor: pointer; color: #0066cc;">Show Full Prompt</summary>
+                        <pre style="white-space: pre-wrap; font-size: 11px; color: #555; background: #fdfdfd; padding: 4px; border-radius: 4px; margin-top:4px;">${fullPrompt}</pre>
+                    </details>
+                </div>
+                <div class="job-actions" id="actions-${job.id}" style="display: flex; flex-direction: column; gap: 6px; min-width: 60px; flex-shrink: 0;">
+                </div>
+            </div>
+            <div id="status-${job.id}" style="font-size: 11px; padding: 0 6px; border-radius: 4px; color: #666; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; min-height: 18px;">
+            </div>
+            <div id="previews-${job.id}" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">
             </div>
         `;
 
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'job-actions';
-        actionsDiv.style.display = 'flex';
-        actionsDiv.style.gap = '5px';
-        actionsDiv.style.marginTop = '8px';
+        const actionsDiv = item.querySelector(`#actions-${job.id}`);
 
         const runBtn = document.createElement('button');
         runBtn.className = 'btn btn-action';
@@ -198,7 +201,6 @@ function renderJobs() {
 
         actionsDiv.appendChild(runBtn);
         actionsDiv.appendChild(skipBtn);
-        item.appendChild(actionsDiv);
 
         // --- DRAG AND DROP BINDING ---
         item.addEventListener('dragover', (e) => {
@@ -221,30 +223,97 @@ function renderJobs() {
             console.log('OpsV Drop Event Detected');
             const dataTransfer = e.dataTransfer;
 
-            // Try to extract image URL (Gemini usually lets you drag the image)
             let imageUrl = dataTransfer.getData('text/uri-list') || dataTransfer.getData('text/plain');
 
             if (imageUrl && imageUrl.startsWith('http')) {
                 console.log('OpsV dropped image URL:', imageUrl);
 
                 let highResUrl = imageUrl;
-                // If it's a googleusercontent url, try to get the highest res in JPG
                 if (imageUrl.includes('googleusercontent.com')) {
                     highResUrl = imageUrl.replace(/=(w|h|s|c)[0-9a-zA-Z\-_]+.*/, '=s4096-rj');
                 }
 
-                // Signal as ASSET_FOUND for manual binding
-                chrome.runtime.sendMessage({
-                    type: 'ASSET_FOUND',
-                    data: highResUrl,
-                    fallbackData: imageUrl,
-                    job: job
-                });
-
-                // Visual feedback
+                // Visual feedback immediate
                 const origBg = item.style.backgroundColor;
                 item.style.backgroundColor = '#d4edda';
                 setTimeout(() => item.style.backgroundColor = origBg, 1000);
+
+                // Inline processing to fix context messaging bug
+                const statusEl = document.getElementById(`status-${job.id}`);
+                if (statusEl) {
+                    statusEl.innerHTML = `<span style="color:#ff9800; font-weight:bold;">⬇ Dragged: Fetching...</span>
+                                          <a href="${highResUrl}" target="_blank" title="Copy Link" style="font-size:10px; color:#2196f3; text-decoration:none;">🔗 Link</a>`;
+                }
+
+                try {
+                    let finalData = highResUrl;
+
+                    const response = await fetch(highResUrl);
+                    if (!response.ok) throw new Error('HTTP status ' + response.status);
+                    const blob = await response.blob();
+
+                    finalData = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+
+                    // Construct payload
+                    const payload = {
+                        type: 'SAVE_ASSET',
+                        payload: {
+                            path: job.output_path,
+                            data: finalData
+                        }
+                    };
+
+                    // Dispatch to daemon
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify(payload));
+                        console.log('Dropped Asset forwarded to server');
+                    } else {
+                        console.log('Socket not ready, queuing dropped asset...');
+                        messageQueue.push(payload);
+                    }
+
+                    // Add to previews UI
+                    const previewsContainer = document.getElementById(`previews-${job.id}`);
+                    if (previewsContainer) {
+                        const previewWrapper = document.createElement('div');
+                        previewWrapper.style.position = 'relative';
+                        previewWrapper.style.width = '80px';
+                        previewWrapper.style.height = '45px';
+                        previewWrapper.style.borderRadius = '4px';
+                        previewWrapper.style.overflow = 'hidden';
+                        previewWrapper.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+
+                        const img = document.createElement('img');
+                        img.src = finalData;
+                        img.style.width = '100%';
+                        img.style.height = '100%';
+                        img.style.objectFit = 'cover';
+
+                        const link = document.createElement('a');
+                        link.href = highResUrl;
+                        link.target = "_blank";
+                        link.style.position = 'absolute';
+                        link.style.top = '0';
+                        link.style.left = '0';
+                        link.style.right = '0';
+                        link.style.bottom = '0';
+                        link.title = 'Open Original Image URL';
+
+                        previewWrapper.appendChild(img);
+                        previewWrapper.appendChild(link);
+                        previewsContainer.appendChild(previewWrapper);
+                    }
+
+                } catch (e) {
+                    console.error('OpsV Dropped Fetch Failed:', e);
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">✖ Fetch Failed</span>`;
+                    }
+                }
             } else {
                 console.warn('OpsV: Dropped item is not a valid URL URL.', dataTransfer.types);
             }
@@ -382,7 +451,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const processAndSend = async () => {
             const statusEl = document.getElementById(`status-${request.job.id}`);
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:#ff9800; font-weight:bold;">⬇ Downloading High-Res Image... (Please wait)</span>`;
+                statusEl.innerHTML = `<span style="color:#ff9800; font-weight:bold;">⬇ Downloading High-Res Image...</span>
+                                      <a href="${request.data}" target="_blank" title="Copy Link" style="font-size:10px; color:#2196f3; text-decoration:none;">🔗 Link</a>`;
             }
 
             try {
@@ -436,6 +506,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.log('Socket not ready, queuing asset...');
                     messageQueue.push(payload);
                 }
+
+                // Add to previews UI
+                const previewsContainer = document.getElementById(`previews-${request.job.id}`);
+                if (previewsContainer) {
+                    const previewWrapper = document.createElement('div');
+                    previewWrapper.style.position = 'relative';
+                    previewWrapper.style.width = '80px';
+                    previewWrapper.style.height = '45px';
+                    previewWrapper.style.borderRadius = '4px';
+                    previewWrapper.style.overflow = 'hidden';
+                    previewWrapper.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+
+                    const img = document.createElement('img');
+                    img.src = finalData;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+
+                    const link = document.createElement('a');
+                    link.href = request.data;
+                    link.target = "_blank";
+                    link.style.position = 'absolute';
+                    link.style.top = '0';
+                    link.style.left = '0';
+                    link.style.right = '0';
+                    link.style.bottom = '0';
+                    link.title = 'Open Original Image URL';
+
+                    previewWrapper.appendChild(img);
+                    previewWrapper.appendChild(link);
+                    previewsContainer.appendChild(previewWrapper);
+                }
+
             } catch (e) {
                 console.error('Sidepanel: Failed to process asset', e);
                 const statusEl = document.getElementById(`status-${request.job.id}`);
