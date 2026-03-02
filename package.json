@@ -1,6 +1,6 @@
 {
   "name": "openspec-video",
-  "version": "0.1.26",
+  "version": "0.2.1",
   "main": "dist/index.js",
   "bin": {
     "opsv": "dist/cli.js"

@@ -88,7 +88,7 @@ function registerProject(projectRoot: string) {
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.1.26');
+    .version('0.2.1');
 
 program
     .command('serve')
