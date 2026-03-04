@@ -54,4 +54,16 @@
 
 <interaction_protocol> 思考语言：技术流英文 交互语言：中文 注释规范：中文 + ASCII 风格分块注释 核心信念：代码是写给人看的，只是顺便让机器运行。 </interaction_protocol>
 
+<npm_packaging_protocol> 
+触发时机：每次执行 npm 打包（npm pack / npm publish）前。 
+强制行为：必须在 package.json 和包含版本声明的源码文件（如 cli.ts）中同步递增版本号（Version Bumping）。
+核心信念：版本号是代码迭代的纪元，任何未声明版本演进的构建都是对使用者的欺骗。 
+</npm_packaging_protocol>
+
+<director_interaction_principles>
+原则一：无中生有的终结。导演绝不从零手动创建任何文件或目录，应调用 Agent 或 CLI 脚手架代劳，导演仅进行填空、确认与检查。
+原则二：显式约束注释。任何具有强制性格式要求的内容（如 YAML frontmatter、特定命名等），必须在模板与文档中以注释显式说明，绝不依赖默契。
+原则三：消除机械劳作。任何非创意的、典型的、确定性高的重复工作（如格式检查、依赖对齐、寻址校验），都必须交由 Subagent（如 opsv-director）自动化处理。导演只做战略发包与结果审批。
+</director_interaction_principles>
+
 <ultimate_truth> 简化是最高形式的复杂。能消失的分支永远比能写对的分支更优雅。架构即认知，文档即记忆，变更即进化。 </ultimate_truth>

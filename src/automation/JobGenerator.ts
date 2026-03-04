@@ -4,23 +4,30 @@ import { z } from 'zod';
 import { AssetManager } from '../core/AssetManager';
 import { SpecParser } from '../core/SpecParser';
 import { ShotManager } from '../core/ShotManager';
+import { AssetCompiler, CompiledIntent } from '../core/AssetCompiler';
 import { Job, JobSchema } from '../types/PromptSchema';
 
 export class JobGenerator {
     private projectRoot: string;
     private assetManager: AssetManager;
     private specParser: SpecParser;
+    private assetCompiler: AssetCompiler;
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
         this.assetManager = new AssetManager(projectRoot);
         this.specParser = new SpecParser(projectRoot);
+        this.assetCompiler = new AssetCompiler(projectRoot);
     }
 
     async generateJobs(targets: string[], options: { preview?: boolean, shots?: string[] } = {}): Promise<Job[]> {
         await this.assetManager.loadAssets();
         const projectConfig = await this.specParser.parseProjectConfig();
         const shotManager = new ShotManager(this.projectRoot);
+
+        // Load 0.2 AssetCompiler and global configurations
+        this.assetCompiler.loadProjectConfig();
+        this.assetCompiler.indexAssets();
 
         let jobs: Job[] = [];
 
@@ -285,8 +292,9 @@ export class JobGenerator {
             .replace(/^\*\(Lyrics:.*\)\*$/gm, '')
             .trim();
 
-        const ar = config.context.style.aspect_ratio || "16:9";
-        const res = config.context.style.resolution || "2K";
+        const globalConfig = this.assetCompiler.getProjectConfig();
+        const ar = globalConfig.aspect_ratio || config.context?.style?.aspect_ratio || "16:9";
+        const res = globalConfig.resolution || config.context?.style?.resolution || "2K";
 
         let fullPrompt = "";
 
@@ -296,7 +304,18 @@ export class JobGenerator {
         // For simplicity, we'll format the shot explicitly without the context if not available.
         // Wait, parseShotToJob doesn't know the index. Let's just make the format extremely concise.
 
-        fullPrompt = `[视频分镜图]\n风格: ${config.context.style.visual_style || '默认设定'}\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n务必生成明确、具体的画面，拒绝含糊其辞的场景描述。\n描述: ${cleanDesc}`;
+        fullPrompt = `[视频分镜图]
+比例: ${ar} (分辨率: ${res})
+运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}
+场景: ${location}
+描述: ${cleanDesc}`;
+
+        // Append 0.2 global style postfix if defined in project.md
+        if (globalConfig.global_style_postfix) {
+            fullPrompt += `\n全局风格: ${globalConfig.global_style_postfix}`;
+        } else if (config.context?.style?.visual_style) {
+            fullPrompt += `\n风格: ${config.context.style.visual_style}`;
+        }
 
 
         const payload = {

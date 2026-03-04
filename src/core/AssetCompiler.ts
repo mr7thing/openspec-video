@@ -3,6 +3,13 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { z } from 'zod';
 
+export interface ProjectConfig {
+    aspect_ratio?: string;
+    engine?: string;
+    global_style_postfix?: string;
+    resolution?: string;
+}
+
 export interface AssetRef {
     id: string; // The @ tag (e.g., @role_K)
     type: 'character' | 'scene' | 'prop' | 'other';
@@ -19,9 +26,35 @@ export interface CompiledIntent {
 export class AssetCompiler {
     private projectRoot: string;
     private assetsMapping: Map<string, AssetRef> = new Map();
+    private projectConfig: ProjectConfig = {};
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
+    }
+
+    /**
+     * Loads the global project configuration from videospec/project.md
+     */
+    public loadProjectConfig() {
+        const projectFilePath = path.join(this.projectRoot, 'videospec', 'project.md');
+        if (fs.existsSync(projectFilePath)) {
+            try {
+                const content = fs.readFileSync(projectFilePath, 'utf-8');
+                const parts = content.split(/^---$/m);
+                if (parts.length >= 3) {
+                    const rawMeta: any = yaml.load(parts[1]);
+                    this.projectConfig = {
+                        aspect_ratio: rawMeta.aspect_ratio,
+                        engine: rawMeta.engine,
+                        global_style_postfix: rawMeta.global_style_postfix,
+                        resolution: rawMeta.resolution
+                    };
+                    // console.log(`[AssetCompiler] Loaded Project Config:`, this.projectConfig);
+                }
+            } catch (e) {
+                console.error(`[AssetCompiler] Failed to parse project.md:`, e);
+            }
+        }
     }
 
     /**
@@ -97,11 +130,16 @@ export class AssetCompiler {
 
     /**
      * Resolves the physical paths based on the Agent's REQUIRED_ASSETS queue
-     * and constructs the final prompt with sequential [imageN] tags.
+     * and constructs the final prompt with sequential [imageN] tags and global styles.
      */
     public assembleFinalPayload(compiledIntent: CompiledIntent): { prompt: string, attachments: string[] } {
         const attachments: string[] = [];
         let finalPrompt = compiledIntent.PROMPT_INTENT;
+
+        // Append global style postfix if it exists
+        if (this.projectConfig.global_style_postfix) {
+            finalPrompt += `, ${this.projectConfig.global_style_postfix}`;
+        }
 
         // Ensure we only process unique required assets
         const uniqueRequired = [...new Set(compiledIntent.REQUIRED_ASSETS)];
@@ -129,5 +167,9 @@ export class AssetCompiler {
 
     public getAsset(id: string): AssetRef | undefined {
         return this.assetsMapping.get(id);
+    }
+
+    public getProjectConfig(): ProjectConfig {
+        return this.projectConfig;
     }
 }
