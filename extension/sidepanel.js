@@ -9,6 +9,59 @@ const jobListEl = document.getElementById('job-list');
 const refreshBtn = document.getElementById('refresh-btn');
 
 let messageQueue = [];
+let watermarkEngine = null;
+
+const removeWatermarkCb = document.getElementById('remove-watermark-cb');
+if (removeWatermarkCb) {
+    chrome.storage.local.get(['removeWatermark'], (res) => {
+        if (res.removeWatermark !== undefined) {
+            removeWatermarkCb.checked = res.removeWatermark;
+        }
+    });
+    removeWatermarkCb.addEventListener('change', (e) => {
+        chrome.storage.local.set({ removeWatermark: e.target.checked });
+    });
+}
+
+async function processWatermarkIfEnabled(blob, statusEl) {
+    if (!removeWatermarkCb || !removeWatermarkCb.checked) return blob;
+
+    // Save original HTML in case we overwrite links, but actually we'll just append status visually 
+    // or rely on caller to restore links if needed.
+    let originalHtml = "";
+    if (statusEl) {
+        originalHtml = statusEl.innerHTML;
+        statusEl.innerHTML += `<span style="color:#9c27b0; font-weight:bold; margin-left:8px;">✨ 去水印...</span>`;
+    }
+
+    try {
+        if (!watermarkEngine) {
+            watermarkEngine = await window.WatermarkEngine.create();
+        }
+
+        const img = new Image();
+        const imgUrl = URL.createObjectURL(blob);
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imgUrl;
+        });
+
+        const canvas = await watermarkEngine.removeWatermarkFromImage(img, { adaptiveMode: "always" });
+        URL.revokeObjectURL(imgUrl);
+
+        const processedBlob = await window.canvasToBlob(canvas, blob.type || 'image/png');
+        if (statusEl) {
+            statusEl.innerHTML = originalHtml; // restore links
+            statusEl.innerHTML += `<span style="color:#4caf50; font-weight:bold; margin-left:8px;">✔ 已去印</span>`;
+        }
+        return processedBlob;
+    } catch (e) {
+        console.error('OpsV: Failed to remove watermark', e);
+        if (statusEl) statusEl.innerHTML = originalHtml;
+        return blob;
+    }
+}
 
 function connect() {
     socket = new WebSocket(SERVER_URL);
@@ -250,7 +303,9 @@ function renderJobs() {
 
                     const response = await fetch(highResUrl);
                     if (!response.ok) throw new Error('HTTP status ' + response.status);
-                    const blob = await response.blob();
+                    let blob = await response.blob();
+
+                    blob = await processWatermarkIfEnabled(blob, statusEl);
 
                     finalData = await new Promise((resolve) => {
                         const reader = new FileReader();
@@ -463,8 +518,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     try {
                         const response = await fetch(request.data);
                         if (!response.ok) throw new Error('HTTP status ' + response.status);
-                        const blob = await response.blob();
+                        let blob = await response.blob();
                         if (blob.size < 5000) throw new Error('Image blob too small or empty'); // Force fallback if empty
+
+                        blob = await processWatermarkIfEnabled(blob, statusEl);
 
                         finalData = await new Promise((resolve) => {
                             const reader = new FileReader();
@@ -477,8 +534,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         if (request.fallbackData) {
                             if (statusEl) statusEl.innerHTML = `<span style="color:#f44336;">⚠ High-Res failed, fetching Preview...</span>`;
                             const fbRes = await fetch(request.fallbackData);
-                            const fbBlob = await fbRes.blob();
+                            let fbBlob = await fbRes.blob();
                             if (fbBlob.size < 1000) throw new Error('Fallback blob too small');
+
+                            fbBlob = await processWatermarkIfEnabled(fbBlob, statusEl);
 
                             finalData = await new Promise((resolve) => {
                                 const reader = new FileReader();
