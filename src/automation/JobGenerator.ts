@@ -193,50 +193,65 @@ export class JobGenerator {
     private async processShotFile(filePath: string, content: string, config: any, options: { preview?: boolean, shots?: string[] }, shotManager: ShotManager): Promise<Job[]> {
         const jobs: Job[] = [];
 
-        const shotRegex = /\*\*Shot\s+(\d+)[^\*]*\*\*:\s*\[(.*?)\]([\s\S]*?)(?=\*\*Shot\s+\d+[^\*]*\*\*:|$)/gi;
-        let match;
-        let matchFound = false;
+        // ---- Phase 1: Parse YAML frontmatter ----
+        const parts = content.split(/^---$/m);
+        if (parts.length < 3) return jobs;
 
-        while ((match = shotRegex.exec(content)) !== null) {
-            matchFound = true;
-            const shotNum = match[1];
-            const shotId = `shot_${shotNum}`;
+        let frontmatter: any;
+        try {
+            const yaml = require('js-yaml');
+            frontmatter = yaml.load(parts[1]);
+        } catch (e) {
+            console.error(`  Failed to parse YAML in shot file: ${filePath}`);
+            return jobs;
+        }
+
+        const shots = frontmatter.shots;
+        if (!shots || !Array.isArray(shots)) {
+            console.error(`  No 'shots' array found in YAML frontmatter for: ${filePath}`);
+            return jobs;
+        }
+
+        // ---- Phase 2: Process each shot ----
+        for (const shot of shots) {
+            const shotId = shot.id;
+            const shotNumStr = shotId.replace('shot_', '');
 
             let shouldGenerate = true;
             if (options.shots && options.shots.length > 0) {
-                shouldGenerate = options.shots.includes(shotId) || options.shots.includes(shotNum);
+                shouldGenerate = options.shots.includes(shotId) || options.shots.includes(shotNumStr);
             } else if (options.preview) {
-                shouldGenerate = (shotNum === '1');
+                shouldGenerate = (shotNumStr === '1');
             }
 
             if (!shouldGenerate) continue;
             if (shotManager) shotManager.updateShotStatus(shotId, 'Draft');
 
-            const location = match[2].trim();
-            const shotBody = match[3].trim();
+            // Format location/environment
+            const location = shot.environment ? shot.environment.trim() : 'Unknown Location';
 
-            const job = this.parseShotToJob(shotId, location, shotBody, config, null);
-            if (job) jobs.push(job);
-        }
+            // Build the body description out of camera + subject + environment
+            const cameraPart = shot.camera ? `Camera: ${shot.camera}\n` : '';
+            const envPart = shot.environment ? `Environment: ${shot.environment}\n` : '';
+            const subjectPart = shot.subject ? `Subject: ${shot.subject}` : '';
+            const compiledBody = `${cameraPart}${envPart}${subjectPart}`.trim();
 
-        if (!matchFound) {
-            // Support single plain markdown files as a single shot
-            const shotId = path.parse(filePath).name;
-            let shouldGenerate = true;
-            if (options.shots && options.shots.length > 0) {
-                shouldGenerate = options.shots.includes(shotId);
-            }
-            if (!shouldGenerate) return jobs;
+            const job = this.parseShotToJob(
+                shotId,
+                location,
+                compiledBody,
+                config,
+                null,
+                shot.prompt_en // Pass English prompt forward
+            );
 
-            if (shotManager) shotManager.updateShotStatus(shotId, 'Draft');
-            const job = this.parseShotToJob(shotId, 'Unknown Location', content, config, null);
             if (job) jobs.push(job);
         }
 
         return jobs;
     }
 
-    private parseShotToJob(id: string, location: string, body: string, config: any, workflow?: any): Job | null {
+    private parseShotToJob(id: string, location: string, body: string, config: any, workflow?: any, promptEn?: string): Job | null {
         let subjectDesc = body;
         const assetRefs: string[] = [];
         const refRegex = /\[(.*?)\]/g;
@@ -343,11 +358,7 @@ export class JobGenerator {
 
         this.jobCount++;
 
-        fullPrompt += `[视频分镜设定]
-比例: ${ar} (分辨率: ${res})
-运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}
-场景: ${location}
-描述: ${cleanDesc}`;
+        fullPrompt += `[视频分镜设定]\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n描述: ${cleanDesc}`;
 
         // Append 0.2 global style postfix if defined in project.md
         if (globalConfig.global_style_postfix) {
@@ -368,7 +379,7 @@ export class JobGenerator {
         };
 
         if (location && location !== 'Unknown Location') {
-            payload.environment = { location: location, description: location };
+            payload.environment = { description: location };
         }
 
         if (cameraMatch) {
@@ -400,10 +411,11 @@ export class JobGenerator {
         return {
             id,
             type: 'image_generation',
+            prompt_en: promptEn || undefined,
             payload: payload,
             reference_images: assetRefs, // Absolute paths array for Comfy UI
             output_path: finalOutputPath
-        };
+        } as any;
     }
 
     private extractAssetsFromMarkdown(content: string, baseDir: string): string[] {
