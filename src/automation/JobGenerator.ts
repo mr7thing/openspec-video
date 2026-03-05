@@ -12,6 +12,7 @@ export class JobGenerator {
     private assetManager: AssetManager;
     private specParser: SpecParser;
     private assetCompiler: AssetCompiler;
+    private jobCount: number = 0;
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
@@ -28,6 +29,7 @@ export class JobGenerator {
         // Load 0.2 AssetCompiler and global configurations
         this.assetCompiler.loadProjectConfig();
         this.assetCompiler.indexAssets();
+        this.jobCount = 0;
 
         let jobs: Job[] = [];
 
@@ -94,73 +96,97 @@ export class JobGenerator {
 
     private async processAssetFile(filePath: string, content: string, config: any): Promise<Job[]> {
         const jobs: Job[] = [];
-        const dir = path.dirname(filePath);
 
-        const idMatch = content.match(/id:\s*(["']?)(.*?)\1\s*$/m);
-        const nameMatch = content.match(/name:\s*(["']?)(.*?)\1\s*$/m);
+        // ---- Phase 1: Parse YAML frontmatter ----
+        const parts = content.split(/^---$/m);
+        if (parts.length < 3) return jobs;
 
-        // Robust recovery if frontmatter was missed by the Agent
-        const id = idMatch ? idMatch[2].trim() : path.parse(filePath).name;
+        let frontmatter: any;
+        try {
+            const yaml = require('js-yaml');
+            frontmatter = yaml.load(parts[1]);
+        } catch { return jobs; }
 
-        let name = nameMatch ? nameMatch[2].trim() : null;
-        if (!name) {
-            const h1Match = content.match(/^#\s+(.*)$/m);
-            name = h1Match ? h1Match[1].trim() : id;
+        const id = frontmatter.name?.replace(/^@/, '') || path.parse(filePath).name;
+        const name = frontmatter.name || id;
+        const hasImage = frontmatter.has_image === true;
+
+        // Read descriptions directly from YAML (no regex hacking)
+        const detailedDesc = frontmatter.detailed_description || '';
+        const briefDesc = frontmatter.brief_description || '';
+        const promptEn = frontmatter.prompt_en || '';
+
+        // Use brief desc if reference confirmed, otherwise detailed
+        const description = hasImage ? briefDesc : detailedDesc;
+
+        console.log(`  Found Asset: ${id} - ${name}`);
+
+        // ---- Phase 2: Parse markdown body for payload sections ----
+        const body = parts.slice(2).join('---');
+        const subjectMatch = body.match(/^## subject\s*\n([\s\S]*?)(?=\n## |\n$)/im);
+        const envMatch = body.match(/^## environment\s*\n([\s\S]*?)(?=\n## |\n$)/im);
+        const cameraMatch = body.match(/^## camera\s*\n([\s\S]*?)(?=\n## |\n$)/im);
+
+        const subjectDesc = subjectMatch ? subjectMatch[1].trim() : description;
+        const envDesc = envMatch ? envMatch[1].trim() : '';
+        const cameraDesc = cameraMatch ? cameraMatch[1].trim() : '';
+
+        // ---- Phase 3: Extract reference images ----
+        const referenceImages: string[] = [];
+        const refImgMatch = body.match(/\[.*?\]\((.*?)\)/);
+        if (refImgMatch && refImgMatch[1] && fs.existsSync(refImgMatch[1])) {
+            referenceImages.push(refImgMatch[1]);
         }
 
-        if (id && name) {
-            console.log(`  Found Asset: ${id} - ${name}`);
+        // ---- Phase 4: Build payload.prompt (中文叙事) ----
+        const ar = config.context?.style?.aspect_ratio || "16:9";
+        const res = config.context?.style?.resolution || "2K";
 
-            const parts = content.split('---');
-            const body = parts.length > 2 ? parts.slice(2).join('---').trim() : content;
-
-            const assets = this.extractAssetsFromMarkdown(body, dir);
-
-            const ar = config.context.style.aspect_ratio || "16:9";
-            const res = config.context.style.resolution || "2K";
-
-            let prompt = "";
-            if (jobs.length === 0) {
-                prompt += `【项目上下文】我们正在制作概念视频，需要你生成分镜和人设图片。以下是第一条需求：\n\n`;
-            }
-
-            prompt += `[角色/物品设定]\n风格: ${config.context.style.visual_style || '默认风格'}\n比例: ${ar} (分辨率: ${res})\n名称: ${name}\n务必生成明确、具体的画面，拒绝含糊其辞的场景描述。\n描述: ${body}`;
-
-            if (assets.length > 0) {
-                prompt += `\n参考图: 共 ${assets.length} 张(见附件)，请尽量保持一致。`;
-            }
-
-            const outputDir = dir; // Output next to the markdown source (e.g., artifacts/elements)
-
-            let baseName = id;
-            let ext = '.png';
-            let finalOutputPath = path.join(outputDir, `${baseName}${ext}`);
-            let counter = 1;
-            while (fs.existsSync(finalOutputPath)) {
-                finalOutputPath = path.join(outputDir, `${baseName}_${counter}${ext}`);
-                counter++;
-            }
-
-            jobs.push({
-                id: `${id}`,
-                type: 'image_generation',
-                target_tool: 'nano_banana_pro',
-                payload: {
-                    prompt: prompt,
-                    global_settings: { aspect_ratio: ar, quality: res },
-                    subject: { description: body },
-                    environment: { details: [] },
-                    camera: {}
-                } as any,
-                assets: assets,
-                output_path: finalOutputPath,
-                _meta: {
-                    project: config.project?.title || path.basename(this.projectRoot),
-                    timestamp: new Date().toISOString(),
-                    mode: 'Asset Generation'
-                }
-            } as any);
+        let payloadPrompt = "";
+        if (this.jobCount === 0) {
+            const vision = this.assetCompiler.getProjectConfig().vision;
+            if (vision) payloadPrompt += `${vision} `;
+            payloadPrompt += `请帮我生成以下角色/物品设定图片：\n\n`;
         }
+        this.jobCount++;
+        payloadPrompt += description;
+
+        if (referenceImages.length > 0) {
+            payloadPrompt += `\n参考图：`;
+            referenceImages.forEach((_, idx) => { payloadPrompt += `[image${idx + 1}] `; });
+        }
+
+        // ---- Phase 5: Assemble output path ----
+        const outputDir = path.join(this.projectRoot, 'artifacts', 'drafts');
+        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+        let baseName = id;
+        let ext = '.png';
+        let finalOutputPath = path.join(outputDir, `${baseName}${ext}`);
+        let counter = 1;
+        while (fs.existsSync(finalOutputPath)) {
+            finalOutputPath = path.join(outputDir, `${baseName}_${counter}${ext}`);
+            counter++;
+        }
+
+        // ---- Phase 6: Build the Job object (dual-channel) ----
+        const payload: any = {
+            prompt: payloadPrompt,
+            global_settings: { aspect_ratio: ar, quality: res },
+            subject: { description: subjectDesc }
+        };
+        if (envDesc) payload.environment = { description: envDesc };
+        if (cameraDesc) payload.camera = { type: cameraDesc };
+
+        jobs.push({
+            id,
+            type: 'image_generation',
+            prompt_en: promptEn || undefined,
+            payload,
+            reference_images: referenceImages.length > 0 ? referenceImages : undefined,
+            output_path: finalOutputPath
+        } as any);
+
         return jobs;
     }
 
@@ -225,63 +251,71 @@ export class JobGenerator {
             // Check Elements (Characters/Props/Costumes)
             const char = this.assetManager.getElement(refId);
             if (char) {
-                subjectDesc = subjectDesc.split(`[${refId}]`).join(char.name);
-
+                let foundRef = false;
                 // 1. Look for Generated Concept Art (Highest Priority if use_references is true)
                 if (workflow && workflow.use_references) {
-                    // Try to find APPROVED reference first (from videospec/elements/id_ref.png)
                     const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-
                     if (fs.existsSync(approvedRef)) {
-                        assetRefs.push(path.relative(this.projectRoot, approvedRef));
+                        assetRefs.push(approvedRef);
+                        foundRef = true;
                     } else {
-                        // Fallback to Artifacts
                         const generatedRef = path.join(this.projectRoot, 'artifacts/elements', `${char.id}.png`);
                         if (fs.existsSync(generatedRef)) {
-                            assetRefs.push(path.relative(this.projectRoot, generatedRef));
+                            assetRefs.push(generatedRef);
+                            foundRef = true;
                         }
                     }
+                }
+
+                if (foundRef) {
+                    subjectDesc = subjectDesc.split(`[${refId}]`).join(`${char.name} [image${assetRefs.length}]`);
+                } else {
+                    subjectDesc = subjectDesc.split(`[${refId}]`).join(char.name);
                 }
             }
 
             // Check Scenes
             const scene = this.assetManager.getScene(refId);
             if (scene) {
-                subjectDesc = subjectDesc.split(`[${refId}]`).join(scene.name);
+                let foundRef = false;
                 if (workflow && workflow.use_references) {
                     const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
                     if (fs.existsSync(approvedRef)) {
-                        assetRefs.push(path.relative(this.projectRoot, approvedRef));
+                        assetRefs.push(approvedRef);
+                        foundRef = true;
                     } else {
                         const sceneRef = path.join(this.projectRoot, 'artifacts/scenes', `${scene.id}.png`);
                         if (fs.existsSync(sceneRef)) {
-                            assetRefs.push(path.relative(this.projectRoot, sceneRef));
+                            assetRefs.push(sceneRef);
+                            foundRef = true;
                         }
                     }
+                }
+
+                if (foundRef) {
+                    subjectDesc = subjectDesc.split(`[${refId}]`).join(`${scene.name} [image${assetRefs.length}]`);
+                } else {
+                    subjectDesc = subjectDesc.split(`[${refId}]`).join(scene.name);
                 }
             }
         }
 
-        // Support @Ref syntax (e.g. @Momo)
-        // Matches @Word
+        // Support @Ref syntax (e.g. @Momo) without brackets
         const atRefs = body.match(/@(\w+)/g);
         if (atRefs) {
             for (const atRef of atRefs) {
-                const name = atRef.substring(1); // Remove @
-                // Try to find char/scene by Name (not ID)
-                // AssetManager currently keyed by ID. We might need a loose lookup or convention ID=lower(name)
+                const name = atRef.substring(1);
                 const id = name.toLowerCase();
 
-                // Reuse logic
                 const char = this.assetManager.getElement(id);
                 if (char) {
                     const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-                    if (fs.existsSync(approvedRef)) assetRefs.push(path.relative(this.projectRoot, approvedRef));
+                    if (fs.existsSync(approvedRef)) assetRefs.push(approvedRef);
                 }
                 const scene = this.assetManager.getScene(id);
                 if (scene) {
                     const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
-                    if (fs.existsSync(approvedRef)) assetRefs.push(path.relative(this.projectRoot, approvedRef));
+                    if (fs.existsSync(approvedRef)) assetRefs.push(approvedRef);
                 }
             }
         }
@@ -298,13 +332,18 @@ export class JobGenerator {
 
         let fullPrompt = "";
 
-        // This is a bit hacky to check if it's the first shot job overall, 
-        // but typically JobGenerator creates them in order. 
-        // We'll just rely on a global-ish tracker or skip it if it's hard to track here.
-        // For simplicity, we'll format the shot explicitly without the context if not available.
-        // Wait, parseShotToJob doesn't know the index. Let's just make the format extremely concise.
+        if (this.jobCount === 0) {
+            const vision = this.assetCompiler.getProjectConfig().vision;
+            if (vision) {
+                fullPrompt += `${vision} 请帮我生成MV的分镜图片，第一条需求如下：\n\n`;
+            } else {
+                fullPrompt += `请帮我生成MV的分镜图片，第一条需求如下：\n\n`;
+            }
+        }
 
-        fullPrompt = `[视频分镜图]
+        this.jobCount++;
+
+        fullPrompt += `[视频分镜设定]
 比例: ${ar} (分辨率: ${res})
 运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}
 场景: ${location}
@@ -318,33 +357,40 @@ export class JobGenerator {
         }
 
 
-        const payload = {
+        const cameraMatch = body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0];
+        const payload: any = {
             prompt: fullPrompt,
             global_settings: workflow?.settings || {
                 aspect_ratio: config.context.style.aspect_ratio || "16:9",
                 quality: config.context.style.resolution || "2K"
             },
-            subject: { description: subjectDesc },
-            environment: { location: location, description: location, details: [] },
-            camera: { type: body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "Standard" }
+            subject: { description: cleanDesc }
         };
 
-        // Phase 6: Route shot generations to artifacts directory first for user review
-        const artifactsShotDir = path.join(this.projectRoot, 'artifacts/shots', id);
-        if (!fs.existsSync(artifactsShotDir)) fs.mkdirSync(artifactsShotDir, { recursive: true });
+        if (location && location !== 'Unknown Location') {
+            payload.environment = { location: location, description: location };
+        }
+
+        if (cameraMatch) {
+            payload.camera = { type: cameraMatch };
+        }
+
+        // Phase 6: Route all generation drafts to a unified folder to simplify extensions and integrations
+        const artifactsDraftDir = path.join(this.projectRoot, 'artifacts/drafts');
+        if (!fs.existsSync(artifactsDraftDir)) fs.mkdirSync(artifactsDraftDir, { recursive: true });
 
         // Non-destructive filename logic
         let baseName = id;
         let ext = '.png';
-        let finalOutputPath = path.join(artifactsShotDir, `${baseName}${ext}`);
+        let finalOutputPath = path.join(artifactsDraftDir, `${baseName}${ext}`);
         let counter = 1;
         while (fs.existsSync(finalOutputPath)) {
-            finalOutputPath = path.join(artifactsShotDir, `${baseName}_${counter}${ext}`);
+            finalOutputPath = path.join(artifactsDraftDir, `${baseName}_${counter}${ext}`);
             counter++;
         }
 
         // Save the generated prompt trace for reference
-        const promptLogPath = path.join(artifactsShotDir, 'prompt.txt');
+        const promptLogPath = path.join(artifactsDraftDir, `${baseName}_prompt.txt`);
         fs.writeFileSync(promptLogPath, fullPrompt);
 
         if (assetRefs.length === 0 && (refs.size > 0 || (atRefs && atRefs.length > 0))) {
@@ -354,15 +400,9 @@ export class JobGenerator {
         return {
             id,
             type: 'image_generation',
-            target_tool: 'nano_banana_pro',
-            payload: payload as any,
-            assets: assetRefs,
-            output_path: finalOutputPath,
-            _meta: {
-                project: config.project?.title || path.basename(this.projectRoot),
-                timestamp: new Date().toISOString(),
-                mode: 'Storyboard Resolution'
-            }
+            payload: payload,
+            reference_images: assetRefs, // Absolute paths array for Comfy UI
+            output_path: finalOutputPath
         };
     }
 

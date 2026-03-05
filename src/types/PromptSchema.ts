@@ -1,43 +1,38 @@
 import { z } from 'zod';
 
+// ---- Payload 结构：给 Banana / Veo 等多模态大模型 ----
 export const PromptPayloadSchema = z.object({
+    // 纯中文叙事提示词（第一个任务会拼接 vision）
+    prompt: z.string().optional(),
     global_settings: z.object({
         aspect_ratio: z.string(),
         quality: z.string().default("2K")
     }),
     subject: z.object({
-        identity_ref: z.string().optional(), // ID reference to character asset
-        description: z.string(),
-        action: z.string().optional(),
-        clothing: z.string().optional()
-    }),
+        description: z.string().optional()
+    }).optional(),
     environment: z.object({
-        location: z.string().optional(),
-        lighting: z.string().optional(),
-        details: z.array(z.string()).optional()
-    }),
+        description: z.string().optional()
+    }).optional(),
     camera: z.object({
         type: z.string().optional(),
-        focus: z.string().optional(),
-        motion: z.string().optional() // For video generation
-    }),
-    prompt: z.string().optional() // Raw prompt override
+        motion: z.string().optional()
+    }).optional()
 });
 
 export type PromptPayload = z.infer<typeof PromptPayloadSchema>;
 
+// ---- Job 根结构：双通道隔离 ----
 export const JobSchema = z.object({
-    id: z.string(), // shot_id
+    id: z.string(),
     type: z.enum(['image_generation', 'video_generation']),
-    target_tool: z.enum(['nano_banana_pro', 'veo_3_1']),
+    // 纯英文渲染指令（给 SD / Flux / ComfyUI CLIP）
+    prompt_en: z.string().optional(),
+    // 结构化 payload（给 Banana / Veo）
     payload: PromptPayloadSchema,
-    assets: z.array(z.string()), // Absolute paths to references
-    output_path: z.string(),
-    _meta: z.object({
-        project: z.string(),
-        timestamp: z.string(),
-        mode: z.string()
-    }).optional()
+    // 参考图绝对路径数组（给 ComfyUI Load Image 节点）
+    reference_images: z.array(z.string()).optional(),
+    output_path: z.string()
 });
 
 export type Job = z.infer<typeof JobSchema>;

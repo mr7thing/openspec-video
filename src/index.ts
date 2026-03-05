@@ -28,7 +28,7 @@ async function main() {
         if (jobs.length > 0) {
             console.log("Sample Job Payload:");
             console.log(JSON.stringify(jobs[0].payload, null, 2));
-            console.log("Assets:", jobs[0].assets);
+            console.log("Assets:", jobs[0].reference_images);
         }
     } catch (error) {
         console.error("Failed to parse project:", error);

@@ -5,26 +5,30 @@ import { z } from 'zod';
 
 // Define Schemas for Assets
 const CharacterSchema = z.object({
-    id: z.string(),
-    name: z.string(),
+    id: z.string().optional(),
+    name: z.string().optional(),
+    type: z.string().optional(),
+    has_image: z.boolean().optional(),
     role: z.string().optional(),
-    description: z.string(),
+    description: z.string().optional(),
     visual_traits: z.object({
         eye_color: z.string().optional(),
         hair_style: z.string().optional(),
         clothing: z.string().optional(),
         distinctive_features: z.array(z.string()).optional()
-    }),
+    }).optional(),
     reference_sheet: z.string().optional() // Path to the reference image
-});
+}).passthrough(); // Allow unknown keys
 
 const SceneSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string(),
+    id: z.string().optional(),
+    name: z.string().optional(),
+    type: z.string().optional(),
+    has_image: z.boolean().optional(),
+    description: z.string().optional(),
     lighting: z.string().optional(),
     atmosphere: z.string().optional()
-});
+}).passthrough();
 
 export type Element = z.infer<typeof CharacterSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
@@ -112,6 +116,7 @@ export class AssetManager {
                 if (!raw.visual_traits) raw.visual_traits = {};
 
                 const asset = CharacterSchema.parse(raw);
+                if (!asset.id) asset.id = file.replace(/\.(md|yaml|yml)$/, '');
                 this.elements.set(asset.id, asset);
                 console.log(`Loaded Element: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {
@@ -167,6 +172,7 @@ export class AssetManager {
                 }
 
                 const asset = SceneSchema.parse(raw);
+                if (!asset.id) asset.id = file.replace(/\.(md|yaml|yml)$/, '');
                 this.scenes.set(asset.id, asset);
                 console.log(`Loaded Scene: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {

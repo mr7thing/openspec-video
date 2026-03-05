@@ -8,6 +8,7 @@ export interface ProjectConfig {
     engine?: string;
     global_style_postfix?: string;
     resolution?: string;
+    vision?: string;
 }
 
 export interface AssetRef {
@@ -47,7 +48,8 @@ export class AssetCompiler {
                         aspect_ratio: rawMeta.aspect_ratio,
                         engine: rawMeta.engine,
                         global_style_postfix: rawMeta.global_style_postfix,
-                        resolution: rawMeta.resolution
+                        resolution: rawMeta.resolution,
+                        vision: rawMeta.vision
                     };
                     // console.log(`[AssetCompiler] Loaded Project Config:`, this.projectConfig);
                 }
@@ -107,10 +109,22 @@ export class AssetCompiler {
                         }
                     }
 
-                    // Extract the primary description text (skip headers and the image link itself)
-                    const cleanDesc = body.replace(/!\[.*?\]\((.*?)\)/g, '')
-                        .replace(/^#.*$/gm, '')
-                        .trim();
+                    // Logic to extract detailed vs simplified description
+                    let cleanDesc = "";
+                    const detailedMatch = body.match(/#\s*(?:详细描述|Detailed Description|Subject Description)[^\n]*\n([\s\S]*?)(?=\n#|$)/i);
+                    const simplifiedMatch = body.match(/#\s*(?:简略描述|Simplified Description)[^\n]*\n([\s\S]*?)(?=\n#|$)/i);
+
+                    if (rawMeta.has_image === true && simplifiedMatch) {
+                        cleanDesc = simplifiedMatch[1].trim();
+                    } else if (rawMeta.has_image === false && detailedMatch) {
+                        cleanDesc = detailedMatch[1].trim();
+                    } else {
+                        // Fallback behavior
+                        cleanDesc = body.replace(/!\[.*?\]\((.*?)\)/g, '')
+                            .replace(/^#.*$/gm, '')
+                            .replace(/<!--[\s\S]*?-->/g, '') // strip HTML comments
+                            .trim();
+                    }
 
                     this.assetsMapping.set(rawMeta.name, {
                         id: rawMeta.name,
