@@ -13,6 +13,7 @@ export class JobGenerator {
     private specParser: SpecParser;
     private assetCompiler: AssetCompiler;
     private jobCount: number = 0;
+    private currentDraftDir: string = '';
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
@@ -32,6 +33,14 @@ export class JobGenerator {
         this.jobCount = 0;
 
         let jobs: Job[] = [];
+
+        // 1. Calculate dynamic batched drafts directory
+        let batchIndex = 1;
+        while (fs.existsSync(path.join(this.projectRoot, `artifacts/drafts_${batchIndex}`))) {
+            batchIndex++;
+        }
+        this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${batchIndex}`);
+        fs.mkdirSync(this.currentDraftDir, { recursive: true });
 
         // If no targets provided, default to scanning all normative folders
         if (!targets || targets.length === 0) {
@@ -66,12 +75,18 @@ export class JobGenerator {
             }
         }
 
-        // Save to queue
+        // Save to primary queue for daemon processing
         const queueDir = path.join(this.projectRoot, 'queue');
         if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
 
         fs.writeFileSync(
             path.join(queueDir, 'jobs.json'),
+            JSON.stringify(jobs, null, 2)
+        );
+
+        // Save a historical backup to the specific batch directory for ComfyUI reuse
+        fs.writeFileSync(
+            path.join(this.currentDraftDir, 'jobs.json'),
             JSON.stringify(jobs, null, 2)
         );
 
@@ -114,7 +129,7 @@ export class JobGenerator {
         // Read descriptions directly from YAML (no regex hacking)
         const detailedDesc = frontmatter.detailed_description || '';
         const briefDesc = frontmatter.brief_description || '';
-        const promptEn = frontmatter.prompt_en || '';
+        let promptEn = frontmatter.prompt_en || '';
 
         // Use brief desc if reference confirmed, otherwise detailed
         const description = hasImage ? briefDesc : detailedDesc;
@@ -142,9 +157,15 @@ export class JobGenerator {
         const ar = config.context?.style?.aspect_ratio || "16:9";
         const res = config.context?.style?.resolution || "2K";
 
+        const globalConfig = this.assetCompiler.getProjectConfig();
+        const stylePostfix = globalConfig.global_style_postfix || config.context?.style?.visual_style;
+        if (stylePostfix && promptEn) {
+            promptEn = `${promptEn}, ${stylePostfix}`;
+        }
+
         let payloadPrompt = "";
         if (this.jobCount === 0) {
-            const vision = this.assetCompiler.getProjectConfig().vision;
+            const vision = globalConfig.vision;
             if (vision) payloadPrompt += `${vision} `;
             payloadPrompt += `请帮我生成以下角色/物品设定图片：\n\n`;
         }
@@ -157,8 +178,11 @@ export class JobGenerator {
         }
 
         // ---- Phase 5: Assemble output path ----
-        const outputDir = path.join(this.projectRoot, 'artifacts', 'drafts');
-        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+        if (!this.currentDraftDir) {
+            this.currentDraftDir = path.join(this.projectRoot, 'artifacts', 'drafts_1');
+            if (!fs.existsSync(this.currentDraftDir)) fs.mkdirSync(this.currentDraftDir, { recursive: true });
+        }
+        const outputDir = this.currentDraftDir;
 
         let baseName = id;
         let ext = '.png';
@@ -316,21 +340,69 @@ export class JobGenerator {
         }
 
         // Support @Ref syntax (e.g. @Momo) without brackets
-        const atRefs = body.match(/@(\w+)/g);
+        const atRefs = body.match(/@([a-zA-Z0-9_-]+)/g);
         if (atRefs) {
             for (const atRef of atRefs) {
                 const name = atRef.substring(1);
-                const id = name.toLowerCase();
 
-                const char = this.assetManager.getElement(id);
-                if (char) {
-                    const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-                    if (fs.existsSync(approvedRef)) assetRefs.push(approvedRef);
+                // Case-insensitive lookup
+                let char = this.assetManager.getElement(name);
+                if (!char) {
+                    char = this.assetManager.getAllElements().find(e => e.id?.toLowerCase() === name.toLowerCase() || e.name?.toLowerCase() === name.toLowerCase());
                 }
-                const scene = this.assetManager.getScene(id);
+
+                if (char) {
+                    let foundRef = false;
+                    if (workflow && workflow.use_references) {
+                        const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
+                        if (fs.existsSync(approvedRef)) {
+                            assetRefs.push(approvedRef);
+                            foundRef = true;
+                        } else {
+                            const generatedRef = path.join(this.projectRoot, 'artifacts/elements', `${char.id}.png`);
+                            if (fs.existsSync(generatedRef)) {
+                                assetRefs.push(generatedRef);
+                                foundRef = true;
+                            }
+                        }
+                    }
+
+                    const replacementText = foundRef ? `${char.name} [image${assetRefs.length}]` : char.name;
+                    subjectDesc = subjectDesc.split(atRef).join(replacementText);
+                    if (promptEn) promptEn = promptEn.split(atRef).join(char.name || name); // Strip @ for english prompt
+                    continue; // Skip checking scenes if it's a character
+                }
+
+                let scene = this.assetManager.getScene(name);
+                if (!scene) {
+                    // We need a helper for getting all scenes, but since it's not exposed, 
+                    // we'll try lowercase/uppercase fallback, or we can just hope ID matches.
+                    scene = this.assetManager.getScene(name) || this.assetManager.getScene(name.charAt(0).toUpperCase() + name.slice(1));
+                }
+
                 if (scene) {
-                    const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
-                    if (fs.existsSync(approvedRef)) assetRefs.push(approvedRef);
+                    let foundRef = false;
+                    if (workflow && workflow.use_references) {
+                        const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
+                        if (fs.existsSync(approvedRef)) {
+                            assetRefs.push(approvedRef);
+                            foundRef = true;
+                        } else {
+                            const sceneRef = path.join(this.projectRoot, 'artifacts/scenes', `${scene.id}.png`);
+                            if (fs.existsSync(sceneRef)) {
+                                assetRefs.push(sceneRef);
+                                foundRef = true;
+                            }
+                        }
+                    }
+
+                    const replacementText = foundRef ? `${scene.name} [image${assetRefs.length}]` : scene.name;
+                    subjectDesc = subjectDesc.split(atRef).join(replacementText);
+                    if (promptEn) promptEn = promptEn.split(atRef).join(scene.name || name);
+                } else {
+                    // Replace anyway to remove @ if not found
+                    subjectDesc = subjectDesc.split(atRef).join(name);
+                    if (promptEn) promptEn = promptEn.split(atRef).join(name);
                 }
             }
         }
@@ -360,11 +432,9 @@ export class JobGenerator {
 
         fullPrompt += `[视频分镜设定]\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n描述: ${cleanDesc}`;
 
-        // Append 0.2 global style postfix if defined in project.md
-        if (globalConfig.global_style_postfix) {
-            fullPrompt += `\n全局风格: ${globalConfig.global_style_postfix}`;
-        } else if (config.context?.style?.visual_style) {
-            fullPrompt += `\n风格: ${config.context.style.visual_style}`;
+        const stylePostfix = globalConfig.global_style_postfix || config.context?.style?.visual_style;
+        if (stylePostfix && promptEn) {
+            promptEn = `${promptEn}, ${stylePostfix}`;
         }
 
 
@@ -387,8 +457,11 @@ export class JobGenerator {
         }
 
         // Phase 6: Route all generation drafts to a unified folder to simplify extensions and integrations
-        const artifactsDraftDir = path.join(this.projectRoot, 'artifacts/drafts');
-        if (!fs.existsSync(artifactsDraftDir)) fs.mkdirSync(artifactsDraftDir, { recursive: true });
+        if (!this.currentDraftDir) {
+            this.currentDraftDir = path.join(this.projectRoot, 'artifacts', 'drafts_1');
+            if (!fs.existsSync(this.currentDraftDir)) fs.mkdirSync(this.currentDraftDir, { recursive: true });
+        }
+        const artifactsDraftDir = this.currentDraftDir;
 
         // Non-destructive filename logic
         let baseName = id;
