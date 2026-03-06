@@ -15,6 +15,33 @@ export class JobGenerator {
     private jobCount: number = 0;
     private currentDraftDir: string = '';
 
+    private findGeneratedRef(baseName: string): string | null {
+        const artifactsDir = path.join(this.projectRoot, 'artifacts');
+        if (!fs.existsSync(artifactsDir)) return null;
+
+        const folders = fs.readdirSync(artifactsDir)
+            .filter(f => f.startsWith('drafts_'))
+            .sort((a, b) => {
+                const numA = parseInt(a.replace('drafts_', ''), 10);
+                const numB = parseInt(b.replace('drafts_', ''), 10);
+                return numB - numA;
+            });
+
+        for (const folder of folders) {
+            const p = path.join(artifactsDir, folder, `${baseName}.png`);
+            if (fs.existsSync(p)) return p;
+        }
+
+        // Fallback
+        const elemPath = path.join(artifactsDir, 'elements', `${baseName}.png`);
+        if (fs.existsSync(elemPath)) return elemPath;
+
+        const scenePath = path.join(artifactsDir, 'scenes', `${baseName}.png`);
+        if (fs.existsSync(scenePath)) return scenePath;
+
+        return null;
+    }
+
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
         this.assetManager = new AssetManager(projectRoot);
@@ -47,10 +74,7 @@ export class JobGenerator {
             targets = [
                 path.join(this.projectRoot, 'videospec/elements'),
                 path.join(this.projectRoot, 'videospec/scenes'),
-                path.join(this.projectRoot, 'videospec/shots'),
-                path.join(this.projectRoot, 'artifacts/elements'),
-                path.join(this.projectRoot, 'artifacts/scenes'),
-                path.join(this.projectRoot, 'artifacts/shots')
+                path.join(this.projectRoot, 'videospec/shots')
             ];
         }
 
@@ -170,7 +194,7 @@ export class JobGenerator {
             payloadPrompt += `请帮我生成以下角色/物品设定图片：\n\n`;
         }
         this.jobCount++;
-        payloadPrompt += description;
+        payloadPrompt += `[角色/场景设定: @${id}]\n${description}`;
 
         if (referenceImages.length > 0) {
             payloadPrompt += `\n参考图：`;
@@ -298,8 +322,8 @@ export class JobGenerator {
                         assetRefs.push(approvedRef);
                         foundRef = true;
                     } else {
-                        const generatedRef = path.join(this.projectRoot, 'artifacts/elements', `${char.id}.png`);
-                        if (fs.existsSync(generatedRef)) {
+                        const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef((char as any).name || '');
+                        if (generatedRef) {
                             assetRefs.push(generatedRef);
                             foundRef = true;
                         }
@@ -323,8 +347,8 @@ export class JobGenerator {
                         assetRefs.push(approvedRef);
                         foundRef = true;
                     } else {
-                        const sceneRef = path.join(this.projectRoot, 'artifacts/scenes', `${scene.id}.png`);
-                        if (fs.existsSync(sceneRef)) {
+                        const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef((scene as any).name || '');
+                        if (sceneRef) {
                             assetRefs.push(sceneRef);
                             foundRef = true;
                         }
@@ -359,8 +383,8 @@ export class JobGenerator {
                             assetRefs.push(approvedRef);
                             foundRef = true;
                         } else {
-                            const generatedRef = path.join(this.projectRoot, 'artifacts/elements', `${char.id}.png`);
-                            if (fs.existsSync(generatedRef)) {
+                            const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef(char.name || '');
+                            if (generatedRef) {
                                 assetRefs.push(generatedRef);
                                 foundRef = true;
                             }
@@ -388,8 +412,8 @@ export class JobGenerator {
                             assetRefs.push(approvedRef);
                             foundRef = true;
                         } else {
-                            const sceneRef = path.join(this.projectRoot, 'artifacts/scenes', `${scene.id}.png`);
-                            if (fs.existsSync(sceneRef)) {
+                            const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef(scene.name || '');
+                            if (sceneRef) {
                                 assetRefs.push(sceneRef);
                                 foundRef = true;
                             }
@@ -430,7 +454,7 @@ export class JobGenerator {
 
         this.jobCount++;
 
-        fullPrompt += `[视频分镜设定]\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n描述: ${cleanDesc}`;
+        fullPrompt += `[视频分镜设定: ${id}]\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n描述: ${cleanDesc}`;
 
         const stylePostfix = globalConfig.global_style_postfix || config.context?.style?.visual_style;
         if (stylePostfix && promptEn) {
