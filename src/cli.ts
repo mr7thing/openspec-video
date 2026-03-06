@@ -6,6 +6,7 @@ import os from 'os';
 import WebSocket from 'ws';
 import { spawn } from 'child_process';
 import { JobGenerator } from './automation/JobGenerator';
+import { Reviewer } from './automation/Reviewer';
 
 const program = new Command();
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
@@ -88,7 +89,7 @@ function registerProject(projectRoot: string) {
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.2.25');
+    .version('0.2.26');
 
 program
     .command('serve')
@@ -233,5 +234,25 @@ program
         }
     });
 
+program
+    .command('review [target]')
+    .description('Automatically append generated drafts into target markdown documents as reference links')
+    .option('--alldrafts', 'Include all historical drafts instead of just the latest one')
+    .action(async (target, options) => {
+        try {
+            const projectRoot = process.cwd();
+            const reviewer = new Reviewer(projectRoot);
+
+            if (target) {
+                console.log(`Running review for target: ${target}`);
+                await reviewer.reviewTarget(target, { allDrafts: options.alldrafts });
+            } else {
+                console.log(`Running global review across all elements, scenes, and shots...`);
+                await reviewer.reviewAll({ allDrafts: options.alldrafts });
+            }
+        } catch (err) {
+            console.error('Review failed:', err);
+        }
+    });
 
 program.parse(process.argv);

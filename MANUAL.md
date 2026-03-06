@@ -39,10 +39,18 @@ opsv init MyNewMovie
 **核心核心**: 将 `stories/Script.md` 编译为自动化任务队列。
 - **作用**: 
     1. 读取 `videospec/project.md` (全局配置)。
-    2. 解析 `videospec/stories/Script.md` (剧本)。
-    3. 验证 `videospec/assets` 中的角色/场景引用。
-    4. 生成 `queue/jobs.json`。
+    2. 检查 `videospec/elements` 和 `videospec/scenes` 中的文档结构。
+    3. 解析 `videospec/shots` (分镜文档)。
+    4. 只有资产文档中通过 `![Draft](path)` 挂载过且真实存在的图片，才会被当作最终合规的 `reference_images`。
+    5. 生成 `queue/jobs.json` 和对应的历史备份 `artifacts/drafts_X/`。
 - **产物**: `queue/jobs.json` 是浏览器自动化 Agent (Executor) 的直接输入源。
+
+### `opsv review [target.md]`
+这是一个基于“文档驱动 (Document-Driven)”的参考图确认工具。你的文档将成为受控图集的唯一真理域 (Source of Truth)。
+- **作用**: 它会自动向 Markdown 文档底部的正文区域，写入指向生成草图的引用图片语法 `![Draft](...)`。当且仅当文档中保留的链接，在后续的 `generate` 时才会被视为参考图送给图像模型。你可以肉眼确认并在 Markdown 里删撤掉不想要的变体链接。
+- **模式 1 (默认追加最新)**: `opsv review`，自动扫描所有资产与分镜，为其在 `drafts_N` 中自动检索最新的一次生成图片，并写入到对应的 `.md` 中。
+- **模式 2 (全量草稿挂载)**: `opsv review --alldrafts`，把历史生成的 `drafts_1`..`drafts_15` 里的同名切图，一股脑按降序写入到 `.md` 作为备选池，供导演手动删减。
+- **模式 3 (聚焦单文件)**: `opsv review videospec/elements/Momo.md [--alldrafts]`，只对指定的单一角色或分镜文档进行上述刷写操作。
 
 ### `opsv serve` (或 `start`)
 启动后台自动化服务 (Daemon)。

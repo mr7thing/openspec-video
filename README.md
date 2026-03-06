@@ -26,11 +26,16 @@ npm install -g openspec-video
     - Edit `videospec/assets/characters/` and `videospec/assets/scenes/`.
 3.  **Write Your Script**:
     - Edit `videospec/stories/Script.md`.
-4.  **Shoot**:
+4.  **Review / Select Reference Images**:
+    ```bash
+    opsv review
+    ```
+    (This appends generated artist drafts into your markdown for visual approval)
+5.  **Shoot**:
     ```bash
     opsv generate
     ```
-    (This creates `queue/jobs.json`)
+    (This creates `queue/jobs.json` based strictly on approved references)
 
 ## Architecture
 - **`.agent/`**: Contains skills (`opsv-director`, etc.) and rules for the AI Agent.

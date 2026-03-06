@@ -17,7 +17,7 @@ const CharacterSchema = z.object({
         clothing: z.string().optional(),
         distinctive_features: z.array(z.string()).optional()
     }).optional(),
-    reference_sheet: z.string().optional() // Path to the reference image
+    reference_images: z.array(z.string()).optional() // Replaces reference_sheet
 }).passthrough(); // Allow unknown keys
 
 const SceneSchema = z.object({
@@ -27,7 +27,8 @@ const SceneSchema = z.object({
     has_image: z.boolean().optional(),
     description: z.string().optional(),
     lighting: z.string().optional(),
-    atmosphere: z.string().optional()
+    atmosphere: z.string().optional(),
+    reference_images: z.array(z.string()).optional()
 }).passthrough();
 
 export type Element = z.infer<typeof CharacterSchema>;
@@ -115,6 +116,23 @@ export class AssetManager {
                 // Ensure visual_traits exists to pass schema
                 if (!raw.visual_traits) raw.visual_traits = {};
 
+                // Extract reference images from markdown links ![...](path)
+                if (file.endsWith('.md')) {
+                    const body = content.split(/^---$/m).slice(2).join('---');
+                    const imgRegex = /!\[.*?\]\((.*?)\)/g;
+                    const images = [];
+                    let imgMatch;
+                    while ((imgMatch = imgRegex.exec(body)) !== null) {
+                        try {
+                            const absPath = path.resolve(this.elementsRoot, imgMatch[1]);
+                            if (fs.existsSync(absPath)) images.push(absPath);
+                        } catch (e) {
+                            // ignore invalid paths
+                        }
+                    }
+                    if (images.length > 0) raw.reference_images = images;
+                }
+
                 const asset = CharacterSchema.parse(raw);
                 if (!asset.id) asset.id = file.replace(/\.(md|yaml|yml)$/, '');
                 this.elements.set(asset.id, asset);
@@ -166,6 +184,20 @@ export class AssetManager {
                     }
 
                     if (!raw.name) raw.name = raw.id;
+
+                    // Extract reference images from markdown links ![...](path)
+                    const imgRegex = /!\[.*?\]\((.*?)\)/g;
+                    const images = [];
+                    let imgMatch;
+                    while ((imgMatch = imgRegex.exec(body)) !== null) {
+                        try {
+                            const absPath = path.resolve(this.scenesRoot, imgMatch[1]);
+                            if (fs.existsSync(absPath)) images.push(absPath);
+                        } catch (e) {
+                            // ignore invalid paths
+                        }
+                    }
+                    if (images.length > 0) raw.reference_images = images;
 
                 } else {
                     raw = yaml.load(content);
