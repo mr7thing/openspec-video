@@ -59,7 +59,7 @@ export class Reviewer {
     }
 
     private async processFile(filePath: string, allDrafts: boolean = false): Promise<void> {
-        const content = fs.readFileSync(filePath, 'utf-8');
+        let content = fs.readFileSync(filePath, 'utf-8');
         const fileName = path.basename(filePath);
         const parts = content.split(/^---$/m);
 
@@ -72,54 +72,116 @@ export class Reviewer {
             return;
         }
 
-        const id = frontmatter.name?.replace(/^@/, '') || path.parse(filePath).name;
-        const bodyContent = parts.slice(2).join('---');
+        let bodyContent = parts.slice(2).join('---');
 
-        // Find reference drafts
-        const drafts = this.findAllDrafts(id);
-        if (drafts.length === 0) return;
-
-        let newContent = content;
+        // --- 1. LEGACY LINK FIXING ---
         let modified = false;
-
-        const draftsToProcess = allDrafts ? drafts : [drafts[0]]; // index 0 is the newest due to sorting
-
-        let appendedLinks = "";
-
-        for (const draft of draftsToProcess) {
-            // Check if this specific draft is already in the file
-            // Make the check robust against relative path resolutions
-            const draftBasename = path.basename(draft.path);
-            const draftDirName = path.basename(path.dirname(draft.path));
-
-            // Just checking if "drafts_N/ID.png" exists in the text
-            const searchStr = `${draftDirName}/${draftBasename}`;
-
-            if (!content.includes(searchStr)) {
-                // Determine relative path from the markdown file to the image
-                const relativePath = path.relative(path.dirname(filePath), draft.path).replace(/\\/g, '/');
-                appendedLinks += `\n\n![Draft ${draft.batchIndex}](${relativePath})`;
-                modified = true;
-                console.log(`  Added reference image [Draft ${draft.batchIndex}] to ${fileName}`);
-            }
+        // Fix markdown links that are missing the '!' prefix (e.g. [name](path) -> ![name](path))
+        // But only if they link to .png/.jpg/.jpeg/.webp in our artifacts folders
+        const legacyLinkRegex = /(?<!\!)\[(.*?)\]\((.*?artifacts[\\/].*?\.(?:png|jpg|jpeg|webp))\)/gi;
+        if (legacyLinkRegex.test(bodyContent)) {
+            bodyContent = bodyContent.replace(legacyLinkRegex, '![$1]($2)');
+            modified = true;
+            console.log(`  [Fix] Converted plain text links to image links in body of ${fileName}`);
         }
 
-        if (modified) {
-            newContent += appendedLinks;
+        // Convert backslashes to forward slashes inside image parentheses for better markdown preview compatibility
+        const backslashRegex = /(!\[.*?\])\((.*?\\.*?)\)/g;
+        if (backslashRegex.test(bodyContent)) {
+            bodyContent = bodyContent.replace(backslashRegex, (match, p1, p2) => {
+                return `${p1}(${p2.replace(/\\/g, '/')})`;
+            });
+            modified = true;
+            console.log(`  [Fix] Normalized path slashes for image links in body of ${fileName}`);
+        }
 
-            // Update has_image in frontmatter if it's an element/scene
-            if (filePath.includes('/elements/') || filePath.includes('/scenes/')) {
-                if (frontmatter.has_image !== true) {
-                    frontmatter.has_image = true;
-                    // Reconstruct content
-                    console.log(`  Set has_image to true for ${fileName}`);
+        // --- 2. EXTRACT IDs TO PROCESS ---
+        const idsToProcess: { id: string, type: 'asset' | 'shot' }[] = [];
 
-                    const newFrontmatterStr = yaml.dump(frontmatter).trim();
-                    newContent = `---\n${newFrontmatterStr}\n---${newContent.substring(parts[0].length + parts[1].length + 6)}`;
+        if (frontmatter.shots && Array.isArray(frontmatter.shots)) {
+            for (const shot of frontmatter.shots) {
+                if (shot.id) idsToProcess.push({ id: shot.id, type: 'shot' });
+            }
+        } else {
+            const id = frontmatter.name?.replace(/^@/, '') || path.parse(filePath).name;
+            idsToProcess.push({ id, type: 'asset' });
+        }
+
+        // --- 3. PROCESS EACH ID ---
+        for (const target of idsToProcess) {
+            const drafts = this.findAllDrafts(target.id);
+            if (drafts.length === 0) continue;
+
+            const draftsToProcess = allDrafts ? drafts : [drafts[0]]; // index 0 is newest
+
+            let appendedLinks = "";
+            let linksAddedCount = 0;
+
+            for (const draft of draftsToProcess) {
+                const draftBasename = path.basename(draft.path);
+                const draftDirName = path.basename(path.dirname(draft.path));
+
+                // Just checking if "drafts_N/ID.png" exists in the text
+                const searchStr = `${draftDirName}/${draftBasename}`;
+
+                if (!bodyContent.includes(searchStr)) {
+                    // Determine relative path from the markdown file to the image, ensure forward slashes
+                    const relativePath = path.relative(path.dirname(filePath), draft.path).replace(/\\/g, '/');
+                    appendedLinks += `\n![Draft ${draft.batchIndex}](${relativePath})`;
+                    linksAddedCount++;
+                    console.log(`  [Add] Attached reference image [Draft ${draft.batchIndex}] for ${target.id} in ${fileName}`);
                 }
             }
 
-            fs.writeFileSync(filePath, newContent, 'utf-8');
+            if (linksAddedCount > 0) {
+                modified = true;
+
+                if (target.type === 'asset') {
+                    // Assets: Try to inject under "## 参考图"
+                    const refHeaderRegex = /##\s*参考图\s*\n/i;
+                    if (refHeaderRegex.test(bodyContent)) {
+                        bodyContent = bodyContent.replace(refHeaderRegex, `$&${appendedLinks}\n`);
+                    } else {
+                        // Append to bottom if heading missing
+                        bodyContent += `\n\n## 参考图\n${appendedLinks}\n`;
+                    }
+                } else if (target.type === 'shot') {
+                    // Shots: Try to inject under the shot bullet point
+                    const normalizedNum = target.id.replace(/shot_?/i, '');
+                    const lines = bodyContent.split('\n');
+                    let injected = false;
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (/^[-*#]/.test(line.trim()) && (line.toLowerCase().includes(`shot ${normalizedNum}`) || line.toLowerCase().includes(`shot_${normalizedNum}`))) {
+                            // Inject below this line
+                            lines.splice(i + 1, 0, `  ${appendedLinks.replace(/\n/g, '\n  ')}`);
+                            bodyContent = lines.join('\n');
+                            injected = true;
+                            break;
+                        }
+                    }
+                    if (!injected) {
+                        bodyContent += `\n\n<!-- ${target.id} References -->${appendedLinks}\n`;
+                    }
+                }
+            }
+        }
+
+        // --- 4. UPDATE FRONTMATTER IF NEEDED ---
+        let finalContent = content; // fallback if modifying only the overall structure fails elsewhere
+        if (modified) {
+            if (filePath.includes('/elements/') || filePath.includes('/scenes/')) {
+                if (frontmatter.has_image !== true) {
+                    const hasAnyImgLink = /!\[.*?\]\(.*?\)/.test(bodyContent);
+                    if (hasAnyImgLink) {
+                        frontmatter.has_image = true;
+                        console.log(`  [Update] Set has_image to true for ${fileName}`);
+                    }
+                }
+            }
+            const newFrontmatterStr = yaml.dump(frontmatter).trim();
+            finalContent = `---\n${newFrontmatterStr}\n---${bodyContent}`;
+            fs.writeFileSync(filePath, finalContent, 'utf-8');
         }
     }
 

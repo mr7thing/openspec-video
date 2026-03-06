@@ -284,13 +284,29 @@ export class JobGenerator {
             const subjectPart = shot.subject ? `Subject: ${shot.subject}` : '';
             const compiledBody = `${cameraPart}${envPart}${subjectPart}`.trim();
 
+            // Extract the shot's approved reference image from the markdown body
+            const shotRefs: string[] = [];
+            // Regex matches ![...](...shotId.png) or ![...](...shotId_1.png)
+            const shotImgRegex = new RegExp(`!\\[.*?\\]\\((.*?${shotId}(?:_\\d+)?\\.(?:png|jpg|jpeg|webp))\\)`, 'gi');
+            let match;
+            while ((match = shotImgRegex.exec(content)) !== null) {
+                const relativePath = match[1];
+                try {
+                    const absPath = path.resolve(path.dirname(filePath), relativePath);
+                    if (fs.existsSync(absPath)) {
+                        shotRefs.push(absPath);
+                    }
+                } catch (e) { }
+            }
+
             const job = this.parseShotToJob(
                 shotId,
                 location,
                 compiledBody,
                 config,
                 null,
-                shot.prompt_en // Pass English prompt forward
+                shot.prompt_en,
+                shotRefs
             );
 
             if (job) jobs.push(job);
@@ -299,9 +315,9 @@ export class JobGenerator {
         return jobs;
     }
 
-    private parseShotToJob(id: string, location: string, body: string, config: any, workflow?: any, promptEn?: string): Job | null {
+    private parseShotToJob(id: string, location: string, body: string, config: any, workflow?: any, promptEn?: string, shotRefs: string[] = []): Job | null {
         let subjectDesc = body;
-        const assetRefs: string[] = [];
+        const assetRefs: string[] = [...shotRefs];
         const refRegex = /\[(.*?)\]/g;
         let refMatch;
         const refs = new Set<string>();
@@ -316,22 +332,20 @@ export class JobGenerator {
             if (char) {
                 let foundRef = false;
                 // 1. Look for Document-Driven References (Highest Priority)
-                if (workflow && workflow.use_references) {
-                    if (char.reference_images && char.reference_images.length > 0) {
-                        assetRefs.push(char.reference_images[0]); // Pick first registered reference
+                if (char.reference_images && char.reference_images.length > 0) {
+                    assetRefs.push(char.reference_images[0]); // Pick first registered reference
+                    foundRef = true;
+                } else {
+                    const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
+                    if (fs.existsSync(approvedRef)) {
+                        assetRefs.push(approvedRef);
                         foundRef = true;
                     } else {
-                        const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-                        if (fs.existsSync(approvedRef)) {
-                            assetRefs.push(approvedRef);
+                        const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef((char as any).name || '');
+                        if (generatedRef) {
+                            console.warn(`[WARN] Relying on unverified auto-fallback for @${char.id}. Please run 'opsv review' to append references to documentation.`);
+                            assetRefs.push(generatedRef);
                             foundRef = true;
-                        } else {
-                            const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef((char as any).name || '');
-                            if (generatedRef) {
-                                console.warn(`[WARN] Relying on unverified auto-fallback for @${char.id}. Please run 'opsv review' to append references to documentation.`);
-                                assetRefs.push(generatedRef);
-                                foundRef = true;
-                            }
                         }
                     }
                 }
@@ -347,22 +361,20 @@ export class JobGenerator {
             const scene = this.assetManager.getScene(refId);
             if (scene) {
                 let foundRef = false;
-                if (workflow && workflow.use_references) {
-                    if (scene.reference_images && scene.reference_images.length > 0) {
-                        assetRefs.push(scene.reference_images[0]);
+                if (scene.reference_images && scene.reference_images.length > 0) {
+                    assetRefs.push(scene.reference_images[0]);
+                    foundRef = true;
+                } else {
+                    const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
+                    if (fs.existsSync(approvedRef)) {
+                        assetRefs.push(approvedRef);
                         foundRef = true;
                     } else {
-                        const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
-                        if (fs.existsSync(approvedRef)) {
-                            assetRefs.push(approvedRef);
+                        const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef((scene as any).name || '');
+                        if (sceneRef) {
+                            console.warn(`[WARN] Relying on unverified auto-fallback for @${scene.id}. Please run 'opsv review' to append references to documentation.`);
+                            assetRefs.push(sceneRef);
                             foundRef = true;
-                        } else {
-                            const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef((scene as any).name || '');
-                            if (sceneRef) {
-                                console.warn(`[WARN] Relying on unverified auto-fallback for @${scene.id}. Please run 'opsv review' to append references to documentation.`);
-                                assetRefs.push(sceneRef);
-                                foundRef = true;
-                            }
                         }
                     }
                 }
@@ -389,22 +401,20 @@ export class JobGenerator {
 
                 if (char) {
                     let foundRef = false;
-                    if (workflow && workflow.use_references) {
-                        if (char.reference_images && char.reference_images.length > 0) {
-                            assetRefs.push(char.reference_images[0]);
+                    if (char.reference_images && char.reference_images.length > 0) {
+                        assetRefs.push(char.reference_images[0]);
+                        foundRef = true;
+                    } else {
+                        const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
+                        if (fs.existsSync(approvedRef)) {
+                            assetRefs.push(approvedRef);
                             foundRef = true;
                         } else {
-                            const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-                            if (fs.existsSync(approvedRef)) {
-                                assetRefs.push(approvedRef);
+                            const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef(char.name || '');
+                            if (generatedRef) {
+                                console.warn(`[WARN] Relying on unverified auto-fallback for @${char.id}. Please run 'opsv review' to append references to documentation.`);
+                                assetRefs.push(generatedRef);
                                 foundRef = true;
-                            } else {
-                                const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef(char.name || '');
-                                if (generatedRef) {
-                                    console.warn(`[WARN] Relying on unverified auto-fallback for @${char.id}. Please run 'opsv review' to append references to documentation.`);
-                                    assetRefs.push(generatedRef);
-                                    foundRef = true;
-                                }
                             }
                         }
                     }
@@ -424,22 +434,20 @@ export class JobGenerator {
 
                 if (scene) {
                     let foundRef = false;
-                    if (workflow && workflow.use_references) {
-                        if (scene.reference_images && scene.reference_images.length > 0) {
-                            assetRefs.push(scene.reference_images[0]);
+                    if (scene.reference_images && scene.reference_images.length > 0) {
+                        assetRefs.push(scene.reference_images[0]);
+                        foundRef = true;
+                    } else {
+                        const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
+                        if (fs.existsSync(approvedRef)) {
+                            assetRefs.push(approvedRef);
                             foundRef = true;
                         } else {
-                            const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
-                            if (fs.existsSync(approvedRef)) {
-                                assetRefs.push(approvedRef);
+                            const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef(scene.name || '');
+                            if (sceneRef) {
+                                console.warn(`[WARN] Relying on unverified auto-fallback for @${scene.id}. Please run 'opsv review' to append references to documentation.`);
+                                assetRefs.push(sceneRef);
                                 foundRef = true;
-                            } else {
-                                const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef(scene.name || '');
-                                if (sceneRef) {
-                                    console.warn(`[WARN] Relying on unverified auto-fallback for @${scene.id}. Please run 'opsv review' to append references to documentation.`);
-                                    assetRefs.push(sceneRef);
-                                    foundRef = true;
-                                }
                             }
                         }
                     }

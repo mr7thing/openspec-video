@@ -158,11 +158,23 @@ async function handleSaveAsset(ws: WebSocket, payload: AssetPayload) {
         }
         const buffer = Buffer.from(matches[2], 'base64');
 
-        await fs.ensureDir(path.dirname(fullPath));
-        await fs.writeFile(fullPath, buffer);
+        // Handle incremental naming if the file already exists
+        let finalPath = fullPath;
+        let counter = 1;
+        const ext = path.extname(fullPath);
+        const base = path.basename(fullPath, ext);
+        const dir = path.dirname(fullPath);
 
-        console.log(`[OpsV Global Daemon] Saved asset: ${fullPath}`);
-        ws.send(JSON.stringify({ type: 'ASSET_SAVED', payload: { path: fullPath } }));
+        while (fs.existsSync(finalPath)) {
+            finalPath = path.join(dir, `${base}_${counter}${ext}`);
+            counter++;
+        }
+
+        await fs.ensureDir(path.dirname(finalPath));
+        await fs.writeFile(finalPath, buffer);
+
+        console.log(`[OpsV Global Daemon] Saved asset: ${finalPath}`);
+        ws.send(JSON.stringify({ type: 'ASSET_SAVED', payload: { path: finalPath } }));
 
     } catch (err: any) {
         console.error('[OpsV Global Daemon] Save failed:', err);

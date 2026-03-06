@@ -7,6 +7,7 @@ import WebSocket from 'ws';
 import { spawn } from 'child_process';
 import { JobGenerator } from './automation/JobGenerator';
 import { Reviewer } from './automation/Reviewer';
+import { AnimateGenerator } from './automation/AnimateGenerator';
 
 const program = new Command();
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
@@ -89,7 +90,7 @@ function registerProject(projectRoot: string) {
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.2.26');
+    .version('0.2.27');
 
 program
     .command('serve')
@@ -252,6 +253,31 @@ program
             }
         } catch (err) {
             console.error('Review failed:', err);
+        }
+    });
+
+program
+    .command('animate')
+    .description('Generate video animation jobs from Shotlist.md')
+    .action(async () => {
+        try {
+            const projectRoot = process.cwd();
+            const generator = new AnimateGenerator(projectRoot);
+
+            console.log('Compiling video jobs from Shotlist.md...');
+            const jobs = await generator.generateAnimationJobs();
+
+            if (jobs.length > 0) {
+                if (!isDaemonRunning()) {
+                    console.log('Auto-starting OpsV Global Server for video processing...');
+                    startDaemon();
+                } else {
+                    console.log('OpsV Global Server is already running. Ready for browser extension.');
+                }
+                registerProject(projectRoot);
+            }
+        } catch (err) {
+            console.error('Animation job generation failed:', err);
         }
     });
 
