@@ -47,12 +47,16 @@ opsv init
     - `--alldrafts`: 注入所有历史版本的草稿链接。
 
 ### `opsv animate`
-**动态编译**: 将 `shots/Shotlist.md` 编译为视频生成队列。
-- **产物**: `queue/video_jobs.json`。
+**动态编译**: 将 `shots/Shotlist.md` 编译为视频生成队列 `video_jobs.json`。此时引擎还会把包含的所有图片路径转化为绝对环境路径。
+
+### `opsv execute`
+**模型调度与视频闭环** (0.3 核心): 将编译好的 JSON 交给多模型调度器执行。
+- **作用**: 与配置在 `.env` 中的大模型接口（如 SiliconFlow）建连，基于设定的图生视频引擎（如 `wan2.2-i2v`）提交流水线，自动挂起并在云端渲染完毕后落盘至 `artifacts/videos`。
+- **配置依赖**: 确保您在项目根目录下正确编写了包含 `SILICONFLOW_API_KEY=xxx` 的 `.env`。
 
 ### `opsv serve`
 启动本地 WebSocket 守护进程。
-- **默认端口**: `3061` (注意：V0.2 已改为 3061 以避免冲突)。
+- **默认端口**: `3061`
 - **作用**: 接收浏览器插件产生的图片并存入 `artifacts/` 目录。
 
 ---

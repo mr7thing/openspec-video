@@ -17,6 +17,13 @@ export const PromptPayloadSchema = z.object({
     camera: z.object({
         type: z.string().optional(),
         motion: z.string().optional()
+    }).optional(),
+    duration: z.string().optional(),
+    schema_0_3: z.object({
+        first_image: z.string().optional(),
+        middle_image: z.string().optional(),
+        last_image: z.string().optional(),
+        reference_images: z.array(z.string()).optional()
     }).optional()
 });
 

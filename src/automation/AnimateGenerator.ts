@@ -4,6 +4,9 @@ import yaml from 'js-yaml';
 import { Job } from '../types/PromptSchema';
 import { AssetCompiler } from '../core/AssetCompiler';
 
+// 拓展原有的 Job 接口适配 0.3 的动态数据透传，或在此直接添加任何自定义 Payload 给下游使用
+
+
 export class AnimateGenerator {
     private projectRoot: string;
     private assetCompiler: AssetCompiler;
@@ -58,41 +61,70 @@ export class AnimateGenerator {
         }
 
         for (const shot of shots) {
-            if (!shot.id) continue;
+            if (!shot.id && !shot.shot) continue;
+            
+            // 兼容旧版 shot.id 或新版 shot: 1
+            const shotId = shot.id || `shot_${shot.shot}`;
 
-            const refImage = shot.reference_image;
-            if (!refImage || refImage.trim() === "") {
-                console.warn(`⚠️ Warning: Shot ${shot.id} is missing a reference_image. Skipping animation job.`);
-                continue;
-            }
-
-            const absRefPath = path.resolve(path.dirname(shotlistPath), refImage);
-            if (!fs.existsSync(absRefPath)) {
-                console.error(`❌ Error: Reference image not found for ${shot.id} at ${absRefPath}. Skipping.`);
-                continue;
-            }
-
-            const motionPrompt = shot.motion_prompt_en || '';
-            if (motionPrompt.trim() === '') {
-                console.warn(`⚠️ Warning: Shot ${shot.id} has an empty motion_prompt_en.`);
-            }
-
-            const payload = {
-                prompt: `[视频动态生成: ${shot.id}]\nMotion: ${motionPrompt}`,
-                global_settings: { aspect_ratio: ar, quality: res },
-                camera: { motion: motionPrompt }
+            // --- 0.3 Schema 解析图像锚点 ---
+            const resolvePath = (p: string | undefined): string | undefined => {
+                if (!p || p.trim() === "") return undefined;
+                return path.resolve(this.projectRoot, p);
             };
 
-            const outputPath = path.join(videoOutDir, `${shot.id}.mp4`);
+            const absFirstImage = resolvePath(shot.first_image || shot.reference_image);
+            const absMiddleImage = resolvePath(shot.middle_image);
+            const absLastImage = resolvePath(shot.last_image);
+            
+            const referenceImages = Array.isArray(shot.reference_images) 
+                ? shot.reference_images.map(resolvePath).filter((p): p is string => !!p)
+                : [];
+
+            if (!absFirstImage) {
+                console.warn(`⚠️ Warning: Shot ${shotId} is missing a first_image. Skipping animation job.`);
+                continue;
+            }
+
+            if (!fs.existsSync(absFirstImage)) {
+                console.error(`❌ Error: First image not found for ${shotId} at ${absFirstImage}. Skipping.`);
+                continue;
+            }
+
+            // --- 0.3 Schema 解析文本 ---
+            const motionPrompt = shot.motion_prompt_en || '';
+            const motionPromptZh = shot.motion_prompt_zh || '';
+            
+            if (motionPrompt.trim() === '') {
+                console.warn(`⚠️ Warning: Shot ${shotId} has an empty motion_prompt_en.`);
+            }
+
+            // duration
+            const durationLiteral = shot.duration || '5s';
+
+            const payload = {
+                prompt: `[视频动态生成: ${shotId}]\n动作意图: ${motionPromptZh}\nMotion: ${motionPrompt}`,
+                global_settings: { aspect_ratio: ar, quality: res },
+                camera: { motion: motionPrompt },
+                duration: durationLiteral, // 提供给下游 API
+                schema_0_3: {
+                    first_image: absFirstImage,
+                    middle_image: absMiddleImage,
+                    last_image: absLastImage,
+                    reference_images: referenceImages
+                }
+            };
+
+            const outputPath = path.join(videoOutDir, `${shotId}.mp4`);
 
             jobs.push({
-                id: shot.id,
+                id: shotId,
                 type: 'video_generation',
                 prompt_en: motionPrompt,
                 payload: payload,
-                reference_images: [absRefPath],
-                output_path: outputPath
-            });
+                // 为了向后兼容，我们将最重要的 first_image 塞入老字段，让不支持 0.3 的老生态不报错
+                reference_images: [absFirstImage]
+                // 新的 API Client 应当越过 reference_images，直接去 payload.schema_0_3 里读取组装好的 0.3 绝对路径对象
+            } as any); // 类型断言通过新增的冗余属性
         }
 
         if (jobs.length > 0) {
