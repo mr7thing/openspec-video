@@ -30,8 +30,11 @@ MANUAL_STRUCTURE*.md
 forMr7th.md
 FOR_Uncle7.md
 
-# Debug Scripts
+# Debug & Logs
 debug_gen.ts
 regex_test.ts
 test_new_cli.js
 src/test_gen.ts
+*.log
+npm-debug.log*
+npm-publish-*.log
