@@ -131,7 +131,26 @@ npm install -g videospec
 | `opsv animate`                 | 编译 `Shotlist.md` 为 `queue/video_jobs.json`（动态视频）          |
 | `opsv serve`                   | 手动启动全局 WebSocket 守护进程（通常自动启动）                    |
 
-### 3.3 Agent 技能速查
+### 3.3 多 AI 工具支持 (Multi-Tool Support)
+
+OpsV 0.2.28+ 支持多种 AI 助手，您可以在 `opsv init` 时进行选择：
+
+#### 1. Gemini (Legacy)
+- **配置文件**: `GEMINI.md`
+- **特点**: 最早支持的工具，规则与人格直接定义在根目录。
+
+#### 2. OpenCode
+- **配置文件**: `AGENTS.md` + `.opencode/`
+- **特点**: 深度集成，自动识别 `.opencode` 目录下的指令。
+
+#### 3. Trae
+- **配置文件**: `AGENTS.md` + `.trae/rules/`
+- **使用说明**: 
+    - 由于 Trae 的机制限制，`opsv init` 虽会生成配置文件，但仍需用户**手动创建智能体**。
+    - **操作步骤**: 请复制项目根目录下 `AGENTS.md` 的全部内容，在 Trae 的智能体创建界面中作为“自定指令”或“人格设定”粘贴进去。
+    - **规则生效**: 创建后，Trae 会自动索引 `.trae/rules/` 下的 `opsv_core.md` 和 `opsv_workflow.md`。
+
+### 3.4 Agent 技能速查
 
 | 技能                   | 触发方式           | 输入                 | 输出                             |
 | ---------------------- | ------------------ | -------------------- | -------------------------------- |
@@ -142,7 +161,7 @@ npm install -g videospec
 | `/opsv-animator`       | 对话调用           | 确认过的 `Script.md` | `shots/Shotlist.md`（动态台本）  |
 | `/opsv-director`       | 对话调用 `opsv-qa` | 整个项目             | 红绿灯质检报告                   |
 
-### 3.4 典型工作流
+### 3.5 典型工作流
 
 ```
 1. opsv init HappyAsImmortal

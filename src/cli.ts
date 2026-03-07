@@ -90,7 +90,7 @@ function registerProject(projectRoot: string) {
 program
     .name('opsv')
     .description('OpenSpec-Video Automation CLI')
-    .version('0.2.27');
+    .version('0.2.28');
 
 program
     .command('serve')
@@ -138,6 +138,10 @@ program
         }
     });
 
+import inquirer from 'inquirer';
+
+// ... (existing imports and constants)
+
 program
     .command('init [projectName]')
     .description('Initialize a new OpenSpec-Video project')
@@ -152,42 +156,79 @@ program
             return;
         }
 
-        console.log(`Initializing project in ${targetDir}...`);
-
         if (!fs.existsSync(TEMPLATE_DIR)) {
             console.error(`CRITICAL ERROR: Template directory not found at ${TEMPLATE_DIR}`);
-            console.error('Please check your installation or package structure.');
             return;
         }
+
+        const { tools } = await inquirer.prompt([
+            {
+                type: 'checkbox',
+                name: 'tools',
+                message: 'Select the AI assistants you want to support:',
+                choices: [
+                    { name: 'Gemini (Legacy - GEMINI.md)', value: 'gemini', checked: true },
+                    { name: 'OpenCode (AGENTS.md + .opencode)', value: 'opencode' },
+                    { name: 'Trae (AGENTS.md + .trae)', value: 'trae' }
+                ]
+            }
+        ]);
+
+        console.log(`Initializing project in ${targetDir}...`);
 
         try {
             await fs.ensureDir(targetDir);
 
-            // 1. Copy .agent (Skills) and .antigravity (Rules, Workflows)
+            // 1. Copy mandatory base templates (.agent skills and .antigravity workflows)
             await fs.copy(path.join(TEMPLATE_DIR, '.agent'), path.join(targetDir, '.agent'));
             await fs.copy(path.join(TEMPLATE_DIR, '.antigravity'), path.join(targetDir, '.antigravity'));
-            if (fs.existsSync(path.join(TEMPLATE_DIR, 'GEMINI.md'))) {
-                await fs.copy(path.join(TEMPLATE_DIR, 'GEMINI.md'), path.join(targetDir, 'GEMINI.md'));
+
+            // 2. Selective copy based on tools
+            if (tools.includes('gemini')) {
+                if (fs.existsSync(path.join(TEMPLATE_DIR, 'GEMINI.md'))) {
+                    await fs.copy(path.join(TEMPLATE_DIR, 'GEMINI.md'), path.join(targetDir, 'GEMINI.md'));
+                }
             }
 
-            // 2. Create normative videospec structure (Empty by default)
+            if (tools.includes('opencode') || tools.includes('trae')) {
+                // Both use AGENTS.md as the primary instruction file
+                if (fs.existsSync(path.join(TEMPLATE_DIR, 'AGENTS.md'))) {
+                    await fs.copy(path.join(TEMPLATE_DIR, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
+                }
+            }
+
+            if (tools.includes('opencode')) {
+                const opencodeDir = path.join(TEMPLATE_DIR, '.opencode');
+                if (fs.existsSync(opencodeDir)) {
+                    await fs.copy(opencodeDir, path.join(targetDir, '.opencode'));
+                } else {
+                    await fs.ensureDir(path.join(targetDir, '.opencode'));
+                }
+            }
+
+            if (tools.includes('trae')) {
+                const traeDir = path.join(TEMPLATE_DIR, '.trae');
+                if (fs.existsSync(traeDir)) {
+                    await fs.copy(traeDir, path.join(targetDir, '.trae'));
+                } else {
+                    await fs.ensureDir(path.join(targetDir, '.trae'));
+                }
+            }
+
+            // 3. Create normative videospec structure
             const specDir = path.join(targetDir, 'videospec');
             await fs.ensureDir(specDir);
-            await fs.ensureDir(path.join(specDir, 'stories'));     // For story.md (outlines only)
-            await fs.ensureDir(path.join(specDir, 'elements'));    // For characters, props, costumes
-            await fs.ensureDir(path.join(specDir, 'scenes'));      // For scene descriptions
-            await fs.ensureDir(path.join(specDir, 'shots'));       // For shotlist rendering blocks
+            await fs.ensureDir(path.join(specDir, 'stories'));
+            await fs.ensureDir(path.join(specDir, 'elements'));
+            await fs.ensureDir(path.join(specDir, 'scenes'));
+            await fs.ensureDir(path.join(specDir, 'shots'));
 
-            // 3. Create operational directories
-            await fs.ensureDir(path.join(targetDir, 'artifacts')); // Agent drafting sandbox
-            await fs.ensureDir(path.join(targetDir, 'queue'));     // Queue processing
+            // 4. Create operational directories
+            await fs.ensureDir(path.join(targetDir, 'artifacts'));
+            await fs.ensureDir(path.join(targetDir, 'queue'));
 
             console.log('Project structure created successfully.');
-            console.log('- videospec/stories/: Store your story.md outlines here.');
-            console.log('- videospec/elements/: Store characters, props, and costumes here.');
-            console.log('- videospec/scenes/: Store scene descriptions here.');
-            console.log('- videospec/shots/: Store individual shot markdowns here.');
-            console.log('\nAsk Agent: "Draft a story outline for..." to begin.');
+            console.log(`Tools configured: ${tools.join(', ')}`);
         } catch (err) {
             console.error('Failed to initialize project:', err);
         }
