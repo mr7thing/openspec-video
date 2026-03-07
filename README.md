@@ -114,7 +114,7 @@ MyProject/
 ### 3.1 安装
 
 ```bash
-npm install -g openspec-video
+npm install -g videospec
 ```
 
 ### 3.2 命令一览
