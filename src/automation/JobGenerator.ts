@@ -309,7 +309,23 @@ export class JobGenerator {
                 shotRefs
             );
 
-            if (job) jobs.push(job);
+            if (job) {
+                jobs.push(job);
+
+                // --- 0.3.1 Keyframe Resolution Protocol: 靶向生成 ---
+                if (shot.target_last_prompt) {
+                    const lastFrameJob = this.parseShotToJob(
+                        `${shotId}_last`,
+                        location,
+                        `${compiledBody}\nLast Frame Target: ${shot.target_last_prompt}`,
+                        config,
+                        null,
+                        shot.target_last_prompt,
+                        shotRefs
+                    );
+                    if (lastFrameJob) jobs.push(lastFrameJob);
+                }
+            }
         }
 
         return jobs;

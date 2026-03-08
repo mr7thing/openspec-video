@@ -38,3 +38,5 @@ src/test_gen.ts
 *.log
 npm-debug.log*
 npm-publish-*.log
+
+.antigravity/documents/*

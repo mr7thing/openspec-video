@@ -62,22 +62,23 @@ export class AnimateGenerator {
 
         for (const shot of shots) {
             if (!shot.id && !shot.shot) continue;
-            
+
             // 兼容旧版 shot.id 或新版 shot: 1
             const shotId = shot.id || `shot_${shot.shot}`;
 
             // --- 0.3 Schema 解析图像锚点 ---
             const resolvePath = (p: string | undefined): string | undefined => {
                 if (!p || p.trim() === "") return undefined;
+                if (p.startsWith('@FRAME:')) return p; // Preserve pipeline pointer
                 return path.resolve(this.projectRoot, p);
             };
 
             const absFirstImage = resolvePath(shot.first_image || shot.reference_image);
             const absMiddleImage = resolvePath(shot.middle_image);
             const absLastImage = resolvePath(shot.last_image);
-            
-            const referenceImages = Array.isArray(shot.reference_images) 
-                ? shot.reference_images.map(resolvePath).filter((p): p is string => !!p)
+
+            const referenceImages = Array.isArray(shot.reference_images)
+                ? shot.reference_images.map(resolvePath).filter((p: string | undefined): p is string => !!p)
                 : [];
 
             if (!absFirstImage) {
@@ -85,7 +86,12 @@ export class AnimateGenerator {
                 continue;
             }
 
-            if (!fs.existsSync(absFirstImage)) {
+            if (!absFirstImage) {
+                console.warn(`⚠️ Warning: Shot ${shotId} is missing a first_image. Skipping animation job.`);
+                continue;
+            }
+
+            if (!absFirstImage.startsWith('@FRAME:') && !fs.existsSync(absFirstImage)) {
                 console.error(`❌ Error: First image not found for ${shotId} at ${absFirstImage}. Skipping.`);
                 continue;
             }
@@ -93,7 +99,7 @@ export class AnimateGenerator {
             // --- 0.3 Schema 解析文本 ---
             const motionPrompt = shot.motion_prompt_en || '';
             const motionPromptZh = shot.motion_prompt_zh || '';
-            
+
             if (motionPrompt.trim() === '') {
                 console.warn(`⚠️ Warning: Shot ${shotId} has an empty motion_prompt_en.`);
             }

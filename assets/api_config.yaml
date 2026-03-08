@@ -1,0 +1,23 @@
+# OpsV 0.3 多模态视频引擎调度配置文件
+# 该文件定义了目前支持的生成引擎的能力级，调度器(Dispatcher)在发出请求前将严格根据下表裁切不被支持的参数。
+
+models:
+  wan2.2-i2v:
+    provider: "siliconflow"
+    api_url: "https://api.siliconflow.cn/v1/video/submit"
+    api_status_url: "https://api.siliconflow.cn/v1/video/status"
+    # 模型端点能力
+    supports_first_image: true
+    supports_middle_image: false
+    supports_last_image: false
+    supports_reference_images: false
+
+  # 备用引擎样例展示
+  cogvideox-5b-i2v:
+    provider: "siliconflow"
+    api_url: "https://api.siliconflow.cn/v1/video/submit"
+    api_status_url: "https://api.siliconflow.cn/v1/video/status"
+    supports_first_image: true
+    supports_middle_image: false
+    supports_last_image: false
+    supports_reference_images: false

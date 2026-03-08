@@ -28,13 +28,11 @@ async function main() {
                 const dispatcher = new VideoModelDispatcher(projectRoot);
                 console.log(`\n▶ Starting Execution Pipeline for ${jobs.length} jobs...\n`);
 
-                for (const job of jobs) {
-                    try {
-                        // 现硬编码指定模型做验证，之后可转移到 CLI 参数
-                        await dispatcher.dispatchJob(job, 'wan2.2-i2v');
-                    } catch (e: any) {
-                        console.error(`[Main] ❌ Failed to execute job ${job.id}: ${e.message}`);
-                    }
+                try {
+                    // 交给 Dispatcher 管理内部的时序和挂起
+                    await dispatcher.dispatchAll(jobs, 'wan2.2-i2v');
+                } catch (e: any) {
+                    console.error(`[Main] ❌ Pipeline terminated unexpectedly: ${e.message}`);
                 }
             } else {
                 console.log('No video_jobs.json found to execute.');
