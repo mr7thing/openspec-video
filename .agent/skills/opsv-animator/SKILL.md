@@ -33,3 +33,38 @@ model: sonnet
 - [ ] Motion 指令是否控制在物理时间的绝对允许范围内？
 - [ ] 是否极其干净地规避了特征性词汇，仅包含专业摄影机与物理动作词汇？
 - [ ] 是否与原本的分镜动作流平滑过渡？
+- [ ] 长镜头场景是否正确使用了 `@FRAME:` 继承指针而非重复指定首帧？
+- [ ] 剧烈空间转变的镜头是否预写了 `target_last_prompt`？
+
+## 0.3.1 新增：关键帧塌缩协议 (Keyframe Resolution Protocol)
+
+### 4. 长镜头连续性继承 (Continuous Take Linking)
+当你判断前后两个 Shot 在空间上属于同一个连续运动时（如镜头无中断地跟随角色穿过走廊），**禁止为后续 Shot 重复制造独立的首帧描述**。使用 `@FRAME:` 延迟指针语法：
+
+```yaml
+shots:
+  - shot: 1
+    duration: 5s
+    first_image: "artifacts/drafts_2/K_idle.png"
+    motion_prompt_en: "Slow dolly in. Subject walks toward end of corridor."
+
+  - shot: 2
+    duration: 5s
+    first_image: "@FRAME:shot_1_last"
+    motion_prompt_en: "Continuing forward. Subject pushes door open, light spills through."
+```
+
+**判断标准**：如果导演意图是"一镜到底"或"不跳切地从A点到B点"，则必须使用 `@FRAME:` 而非重新指定参考图。
+
+### 5. 断点修复：靶向诱饵词 (Target Last Prompt)
+当某个 Shot 内部发生剧烈空间或角色状态转变时（如镜头从角色正面旋转180度到背后），单纯的首帧压不住最终画面，你需要主动预写 `target_last_prompt` 来锚定镜头结尾画面。
+
+```yaml
+  - shot: 3
+    duration: 8s
+    first_image: "artifacts/drafts_2/shot_3.png"
+    motion_prompt_en: "Orbit around subject 180 degrees revealing enemy behind."
+    target_last_prompt: "Dark alley from behind the protagonist, a towering cybernetic enforcer pointing a weapon, cinematic composition"
+```
+
+**判断标准**：如果你对运镜结束后画面长什么样感到无法预测，就必须写 `target_last_prompt`。系统会自动将其转化为独立的图像生成任务 (`shot_3_last`)。

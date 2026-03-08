@@ -53,3 +53,47 @@ Use `write_to_file` to create/append to a `.md` file inside `videospec/shots/`.
 
 ## Reference Alignment
 Always cross-reference the exact markdown structure found in your local `references/example-script.md` file before generating.
+
+## 0.3.1 新增：关键帧塌缩协议 (Keyframe Resolution Protocol)
+
+在 OpsV 0.3.1 中，分镜表新增了以下 YAML 可选字段，你必须在适当时机主动使用它们：
+
+### 新增可选的 YAML 字段
+
+| 字段                 | 类型   | 说明                                                    |
+| -------------------- | ------ | ------------------------------------------------------- |
+| `first_image`        | string | 首帧参考图的路径，或者 `@FRAME:<shot_id>_last` 延迟指针 |
+| `middle_image`       | string | 中间帧参考图路径（备用）                                |
+| `last_image`         | string | 尾帧参考图路径                                          |
+| `target_last_prompt` | string | 靶向诱饵词，系统自动为此生成 `<shot_id>_last` 图像任务  |
+| `motion_prompt_zh`   | string | 中文动作描述（供人类核对或 LLM 分析）                   |
+| `motion_prompt_en`   | string | 英文 API 唯一动作指令（给底层视频大模型识别）           |
+
+### 长镜头继承规则
+
+当叙事需要连续运动的长镜头效果时，**后续 Shot 的 `first_image` 必须写为 `@FRAME:<前一个shot_id>_last`**，而非重复指定一张独立图片。底层执行器会在前一个视频渲染完成后用 FFmpeg 自动截取真实尾帧作为下一个镜头的首帧。
+
+```yaml
+  - shot: 5
+    duration: 5s
+    first_image: "artifacts/drafts_2/corridor.png"
+    motion_prompt_en: "Tracking shot following subject down corridor."
+
+  - shot: 6
+    duration: 5s
+    first_image: "@FRAME:shot_5_last"
+    motion_prompt_en: "Subject reaches door, pushes it open. Light floods in."
+```
+
+### 断点修复规则
+
+如果某个 Shot 内部发生剧烈变化（如180度旋转、角色状态突变），你需要主动为该 Shot 预写 `target_last_prompt`。系统会自动将其转化为一个补帧图像生成任务，命名为 `<shot_id>_last`。
+
+```yaml
+  - shot: 7
+    duration: 8s
+    first_image: "artifacts/drafts_2/shot_7.png"
+    motion_prompt_en: "Camera orbits around subject 180 degrees."
+    target_last_prompt: "从主角背后拍摄的电影级构图，敌人举枪对峙，昏暗霓虹灯光"
+```
+
