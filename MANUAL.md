@@ -1,6 +1,6 @@
 # Videospec (OpsV) 用户手册
 
-本文档详细说明 `opsv` 命令行工具的使用方法，以及 0.2.28+ 迭代式视频创作工作流的最佳实践。
+本文档详细说明 `opsv` 命令行工具的使用方法，以及 0.3.x 视频创作工作流的最佳实践。
 
 ## 1. 快速开始 (Quick Start)
 
@@ -10,7 +10,7 @@
 npm install -g videospec
 
 # 或者从本地包安装
-npm install -g ./videospec-0.2.28.tgz
+npm install -g ./videospec-0.3.1.tgz
 ```
 
 ### 初始化项目
@@ -40,11 +40,12 @@ opsv init
     - `--preview`: 仅生成标注为预览的镜头。
     - `--shots 1,5`: 仅生成指定序号的镜头。
 
-### `opsv review [target.md]`
+### `opsv review [路径]`
 文档驱动的参考图确认工具。
-- **作用**: 扫描 `artifacts/drafts_N/` 下的草图，并将其链接注入到相应的 Markdown 文档中。
+- **默认行为** (0.3.2+): 只扫描最新一批 `artifacts/drafts_N/`，读取其 `jobs.json`，将图片精准回写至对应的 Script.md 或 Element 文档。
 - **参数**:
-    - `--alldrafts`: 注入所有历史版本的草稿链接。
+    - `[路径]`：指定任意 `drafts_N/` 目录或 `jobs.json` 文件进行定点审阅。
+    - `--all`: 全量扫描所有历史 `drafts_*/` 目录。
 
 ### `opsv animate`
 **动态编译**: 将 `shots/Shotlist.md` 编译为视频生成队列 `video_jobs.json`。此时引擎还会把包含的所有图片路径转化为绝对环境路径。
