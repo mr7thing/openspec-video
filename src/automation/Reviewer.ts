@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'js-yaml';
 
@@ -9,216 +9,238 @@ export class Reviewer {
         this.projectRoot = path.resolve(projectRoot);
     }
 
+    /**
+     * Main entry point for global review
+     */
     public async reviewAll(options: { allDrafts?: boolean } = {}): Promise<void> {
-        const targets = [
-            path.join(this.projectRoot, 'videospec/elements'),
-            path.join(this.projectRoot, 'videospec/scenes'),
-            path.join(this.projectRoot, 'videospec/shots') // optional if shots have reviews
-        ];
+        const artifactsDir = path.join(this.projectRoot, 'artifacts');
+        if (!fs.existsSync(artifactsDir)) {
+             console.warn('No artifacts directory found. Nothing to review.');
+             return;
+        }
 
-        let processedCount = 0;
-        for (const target of targets) {
-            if (!fs.existsSync(target)) continue;
-
-            const stats = fs.statSync(target);
-            if (stats.isDirectory()) {
-                const files = fs.readdirSync(target).filter(f => f.endsWith('.md'));
-                for (const file of files) {
-                    const filePath = path.join(target, file);
-                    await this.processFile(filePath, options.allDrafts);
-                    processedCount++;
-                }
-            } else if (stats.isFile() && target.endsWith('.md')) {
-                await this.processFile(target, options.allDrafts);
-                processedCount++;
+        if (options.allDrafts) {
+            // --all mode: process all drafts_* folders
+            const folders = fs.readdirSync(artifactsDir)
+                .filter(f => f.startsWith('drafts_'))
+                .sort((a, b) => {
+                    const numA = parseInt(a.replace('drafts_', ''), 10);
+                    const numB = parseInt(b.replace('drafts_', ''), 10);
+                    return numA - numB; // Ascending for historical context
+                });
+            
+            for (const folder of folders) {
+                await this.reviewTarget(path.join('artifacts', folder));
+            }
+        } else {
+            // Default: process only the latest drafts_N
+            const latestFolder = this.getLatestDraftFolder();
+            if (latestFolder) {
+                await this.reviewTarget(path.join('artifacts', latestFolder));
+            } else {
+                console.warn('No drafts folders found.');
             }
         }
-        console.log(`\nReview complete. Processed ${processedCount} markdown files.`);
-        console.log(`Please open the markdown files in your editor to preview the generated drafts.`);
-        console.log(`Delete the ![draft]() links of the images you do not want to keep.`);
     }
 
-    public async reviewTarget(targetPath: string, options: { allDrafts?: boolean } = {}): Promise<void> {
+    /**
+     * Review a specific directory or jobs.json file
+     */
+    public async reviewTarget(targetPath: string): Promise<void> {
         const fullPath = path.resolve(this.projectRoot, targetPath);
         if (!fs.existsSync(fullPath)) {
-            console.error(`Error: File or directory not found: ${fullPath}`);
+            console.error(`Error: Path not found: ${fullPath}`);
             return;
         }
 
-        const stats = fs.statSync(fullPath);
-        if (stats.isDirectory()) {
-            const files = fs.readdirSync(fullPath).filter(f => f.endsWith('.md'));
-            for (const file of files) {
-                await this.processFile(path.join(fullPath, file), options.allDrafts);
-            }
-        } else if (stats.isFile() && fullPath.endsWith('.md')) {
-            await this.processFile(fullPath, options.allDrafts);
+        let jobsJsonPath = '';
+        if (fs.statSync(fullPath).isDirectory()) {
+            jobsJsonPath = path.join(fullPath, 'jobs.json');
+        } else if (fullPath.endsWith('.json')) {
+            jobsJsonPath = fullPath;
+        }
+
+        if (fs.existsSync(jobsJsonPath)) {
+            console.log(`\n🔍 Reviewing via task manifest: ${path.relative(this.projectRoot, jobsJsonPath)}`);
+            await this.processJobsJson(jobsJsonPath);
         } else {
-            console.error(`Error: Target is not a markdown file or directory: ${fullPath}`);
+            // Fallback for legacy or manual scanning (less common in 0.3.2)
+            console.log(`\n📂 Scanning directory: ${path.relative(this.projectRoot, fullPath)}`);
+            await this.legacyScanReview(fullPath);
         }
     }
 
-    private async processFile(filePath: string, allDrafts: boolean = false): Promise<void> {
-        let content = fs.readFileSync(filePath, 'utf-8');
-        const fileName = path.basename(filePath);
-        const parts = content.split(/^---$/m);
-
-        if (parts.length < 3) return; // Not a valid frontmatter markdown file
-
-        let frontmatter: any;
+    /**
+     * Process based on jobs.json (Standard for 0.3.2)
+     */
+    private async processJobsJson(jsonPath: string): Promise<void> {
+        let jobs: any[] = [];
         try {
-            frontmatter = yaml.load(parts[1]);
-        } catch {
+            const data = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+            jobs = Array.isArray(data) ? data : (data.jobs || []);
+        } catch (e) {
+            console.error(`Failed to parse ${jsonPath}:`, e);
             return;
         }
 
-        let bodyContent = parts.slice(2).join('---');
+        const draftDir = path.dirname(jsonPath);
+        const mapDocToImages: Map<string, string[]> = new Map();
 
-        // --- 1. LEGACY LINK FIXING ---
-        let modified = false;
-        // Fix markdown links that are missing the '!' prefix (e.g. [name](path) -> ![name](path))
-        // But only if they link to .png/.jpg/.jpeg/.webp in our artifacts folders
-        const legacyLinkRegex = /(?<!\!)\[(.*?)\]\((.*?artifacts[\\/].*?\.(?:png|jpg|jpeg|webp))\)/gi;
-        if (legacyLinkRegex.test(bodyContent)) {
-            bodyContent = bodyContent.replace(legacyLinkRegex, '![$1]($2)');
-            modified = true;
-            console.log(`  [Fix] Converted plain text links to image links in body of ${fileName}`);
+        for (const job of jobs) {
+            if (job.outputPath && job.id) {
+                const targetDoc = await this.findSourceDocForId(job.id);
+                if (targetDoc) {
+                    const images = mapDocToImages.get(targetDoc) || [];
+                    images.push(job.outputPath);
+                    mapDocToImages.set(targetDoc, images);
+                }
+            }
         }
 
-        // Convert backslashes to forward slashes inside image parentheses for better markdown preview compatibility
-        const backslashRegex = /(!\[.*?\])\((.*?\\.*?)\)/g;
-        if (backslashRegex.test(bodyContent)) {
-            bodyContent = bodyContent.replace(backslashRegex, (match, p1, p2) => {
-                return `${p1}(${p2.replace(/\\/g, '/')})`;
+        for (const [docPath, images] of mapDocToImages.entries()) {
+            await this.updateDocument(docPath, images);
+        }
+    }
+
+    private async findSourceDocForId(id: string): Promise<string | null> {
+        // IDs can be shot_1, role_K, scene_bar, etc.
+        const cleanId = id.replace(/_last$/, '').replace(/_draft$/, '');
+        
+        const searchPaths = [
+            path.join(this.projectRoot, 'videospec/shots', 'Script.md'),
+            path.join(this.projectRoot, 'videospec/elements', `${cleanId}.md`),
+            path.join(this.projectRoot, 'videospec/scenes', `${cleanId}.md`),
+            // Also check for shot specific files if they exist (though 0.3 prefers Script.md)
+            path.join(this.projectRoot, 'videospec/shots', `${cleanId}.md`)
+        ];
+
+        for (const p of searchPaths) {
+            if (fs.existsSync(p)) return p;
+        }
+
+        // Special case: if it's a shot, it's likely in Script.md
+        if (id.startsWith('shot_') || id.startsWith('shot')) {
+            const scriptPath = path.join(this.projectRoot, 'videospec/shots', 'Script.md');
+            if (fs.existsSync(scriptPath)) return scriptPath;
+        }
+
+        return null;
+    }
+
+    private async updateDocument(docPath: string, newImages: string[]): Promise<void> {
+        let content = fs.readFileSync(docPath, 'utf-8');
+        const fileName = path.basename(docPath);
+        let modified = false;
+
+        // 1. Resolve @ references to markdown links
+        const atRefRegex = /(?<!\[)@([a-zA-Z0-9_-]+)/g;
+        if (atRefRegex.test(content)) {
+            content = content.replace(atRefRegex, (match, entity) => {
+                const entityPath = this.findEntityDoc(entity);
+                if (entityPath) {
+                    const rel = path.relative(path.dirname(docPath), entityPath).replace(/\\/g, '/');
+                    return `[@${entity}](${rel})`;
+                }
+                return match;
             });
             modified = true;
-            console.log(`  [Fix] Normalized path slashes for image links in body of ${fileName}`);
         }
 
-        // --- 2. EXTRACT IDs TO PROCESS ---
-        const idsToProcess: { id: string, type: 'asset' | 'shot' }[] = [];
+        // 2. Inject Images
+        const docDir = path.dirname(docPath);
+        
+        for (const imgPath of newImages) {
+            const relImgPath = path.relative(docDir, imgPath).replace(/\\/g, '/');
+            const imgFileName = path.basename(imgPath);
+            const isTarget = imgFileName.includes('_target_');
+            const label = isTarget ? '🎯 定向补帧' : '🖼️ 草图';
 
-        if (frontmatter.shots && Array.isArray(frontmatter.shots)) {
-            for (const shot of frontmatter.shots) {
-                if (shot.id) idsToProcess.push({ id: shot.id, type: 'shot' });
-            }
-        } else {
-            const id = frontmatter.name?.replace(/^@/, '') || path.parse(filePath).name;
-            idsToProcess.push({ id, type: 'asset' });
-        }
-
-        // --- 3. PROCESS EACH ID ---
-        for (const target of idsToProcess) {
-            const drafts = this.findAllDrafts(target.id);
-            if (drafts.length === 0) continue;
-
-            const draftsToProcess = allDrafts ? drafts : [drafts[0]]; // index 0 is newest
-
-            let appendedLinks = "";
-            let linksAddedCount = 0;
-
-            for (const draft of draftsToProcess) {
-                const draftBasename = path.basename(draft.path);
-                const draftDirName = path.basename(path.dirname(draft.path));
-
-                // Just checking if "drafts_N/ID.png" exists in the text
-                const searchStr = `${draftDirName}/${draftBasename}`;
-
-                if (!bodyContent.includes(searchStr)) {
-                    // Determine relative path from the markdown file to the image, ensure forward slashes
-                    const relativePath = path.relative(path.dirname(filePath), draft.path).replace(/\\/g, '/');
-                    appendedLinks += `\n![Draft ${draft.batchIndex}](${relativePath})`;
-                    linksAddedCount++;
-                    console.log(`  [Add] Attached reference image [Draft ${draft.batchIndex}] for ${target.id} in ${fileName}`);
-                }
-            }
-
-            if (linksAddedCount > 0) {
-                modified = true;
-
-                if (target.type === 'asset') {
-                    // Assets: Try to inject under "## 参考图"
-                    const refHeaderRegex = /##\s*参考图\s*\n/i;
-                    if (refHeaderRegex.test(bodyContent)) {
-                        bodyContent = bodyContent.replace(refHeaderRegex, `$&${appendedLinks}\n`);
+            // Check if already in doc
+            const searchStr = path.basename(imgPath);
+            if (!content.includes(searchStr)) {
+                // Determine insertion point
+                if (fileName === 'Script.md') {
+                    // Try to find the specific shot header
+                    const shotId = path.basename(imgPath).split('_')[0] + '_' + path.basename(imgPath).split('_')[1]; // e.g. shot_1
+                    const shotNum = shotId.replace(/shot_?/i, '');
+                    
+                    const headerRegex = new RegExp(`^#+\\s+Shot\\s+${shotNum}\\b`, 'im');
+                    const match = content.match(headerRegex);
+                    if (match) {
+                        const index = match.index! + match[0].length;
+                        content = content.slice(0, index) + `\n\n![${label}](${relImgPath})` + content.slice(index);
                     } else {
-                        // Append to bottom if heading missing
-                        bodyContent += `\n\n## 参考图\n${appendedLinks}\n`;
+                        content += `\n\n### ${shotId} Review\n![${label}](${relImgPath})\n`;
                     }
-                } else if (target.type === 'shot') {
-                    // Shots: Try to inject under the shot bullet point
-                    const normalizedNum = target.id.replace(/shot_?/i, '');
-                    const lines = bodyContent.split('\n');
-                    let injected = false;
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i];
-                        if (/^[-*#]/.test(line.trim()) && (line.toLowerCase().includes(`shot ${normalizedNum}`) || line.toLowerCase().includes(`shot_${normalizedNum}`))) {
-                            // Inject below this line
-                            lines.splice(i + 1, 0, `  ${appendedLinks.replace(/\n/g, '\n  ')}`);
-                            bodyContent = lines.join('\n');
-                            injected = true;
-                            break;
-                        }
-                    }
-                    if (!injected) {
-                        bodyContent += `\n\n<!-- ${target.id} References -->${appendedLinks}\n`;
+                } else {
+                    // Elements/Scenes: Insert under ## 参考图
+                    const refHeaderRegex = /##\s*参考图\s*\n/i;
+                    if (refHeaderRegex.test(content)) {
+                        content = content.replace(refHeaderRegex, `$&![${label}](${relImgPath})\n`);
+                    } else {
+                        content += `\n\n## 参考图\n![${label}](${relImgPath})\n`;
                     }
                 }
+                modified = true;
+                console.log(`  [Review] Attached ${imgFileName} to ${fileName}`);
             }
         }
 
-        // --- 4. UPDATE FRONTMATTER IF NEEDED ---
-        let finalContent = content; // fallback if modifying only the overall structure fails elsewhere
         if (modified) {
-            if (filePath.includes('/elements/') || filePath.includes('/scenes/')) {
-                if (frontmatter.has_image !== true) {
-                    const hasAnyImgLink = /!\[.*?\]\(.*?\)/.test(bodyContent);
-                    if (hasAnyImgLink) {
-                        frontmatter.has_image = true;
-                        console.log(`  [Update] Set has_image to true for ${fileName}`);
-                    }
-                }
-            }
-            const newFrontmatterStr = yaml.dump(frontmatter).trim();
-            finalContent = `---\n${newFrontmatterStr}\n---${bodyContent}`;
-            fs.writeFileSync(filePath, finalContent, 'utf-8');
+            fs.writeFileSync(docPath, content, 'utf-8');
         }
     }
 
-    // Returns all matching drafts sorted from newest to oldest
-    private findAllDrafts(baseName: string): { path: string, batchIndex: number }[] {
+    private findEntityDoc(entity: string): string | null {
+        const dirs = [
+            path.join(this.projectRoot, 'videospec/elements'),
+            path.join(this.projectRoot, 'videospec/scenes')
+        ];
+        for (const d of dirs) {
+            const p = path.join(d, `${entity}.md`);
+            if (fs.existsSync(p)) return p;
+        }
+        return null;
+    }
+
+    private getLatestDraftFolder(): string | null {
         const artifactsDir = path.join(this.projectRoot, 'artifacts');
-        if (!fs.existsSync(artifactsDir)) return [];
+        if (!fs.existsSync(artifactsDir)) return null;
 
         const folders = fs.readdirSync(artifactsDir)
             .filter(f => f.startsWith('drafts_'))
             .sort((a, b) => {
                 const numA = parseInt(a.replace('drafts_', ''), 10);
                 const numB = parseInt(b.replace('drafts_', ''), 10);
-                return numB - numA; // Sort descending (newest first)
+                return numB - numA;
             });
+        
+        return folders[0] || null;
+    }
 
-        const foundDrafts = [];
+    /**
+     * Legacy mode: scans directory for images by naming pattern
+     */
+    private async legacyScanReview(dirPath: string): Promise<void> {
+        const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.png') || f.endsWith('.jpg'));
+        const mapDocToImages: Map<string, string[]> = new Map();
 
-        for (const folder of folders) {
-            const batchIndex = parseInt(folder.replace('drafts_', ''), 10);
-            const p = path.join(artifactsDir, folder, `${baseName}.png`);
-            if (fs.existsSync(p)) {
-                foundDrafts.push({ path: p, batchIndex });
-            }
-            // also look for ID_1, ID_2 etc.
-            let counter = 1;
-            while (true) {
-                const pVariant = path.join(artifactsDir, folder, `${baseName}_${counter}.png`);
-                if (fs.existsSync(pVariant)) {
-                    foundDrafts.push({ path: pVariant, batchIndex });
-                    counter++;
-                } else {
-                    break;
-                }
+        for (const file of files) {
+            const id = file.split('_')[0] + (file.includes('_draft') || file.includes('_target') ? '' : ''); 
+            // This is messy in legacy, exactly why 0.3.2 uses JSON
+            const shotMatch = file.match(/shot_(\d+)/i);
+            const targetId = shotMatch ? shotMatch[0] : file.split('_')[0];
+
+            const targetDoc = await this.findSourceDocForId(targetId);
+            if (targetDoc) {
+                const images = mapDocToImages.get(targetDoc) || [];
+                images.push(path.join(dirPath, file));
+                mapDocToImages.set(targetDoc, images);
             }
         }
 
-        return foundDrafts;
+        for (const [docPath, images] of mapDocToImages.entries()) {
+            await this.updateDocument(docPath, images);
+        }
     }
 }

@@ -30,3 +30,15 @@ shots:
 - `target_last_prompt`: 当需要补充专门的尾帧又不想单独开分镜时，将其写出，图片编译系统就会生成 `<shot_id>_last` 图像任务。
 - `motion_prompt_en`: **严禁包含任何人物外貌特征**（如黑大衣、义眼）。外貌必须全部交由 `first_image` 传递，避免模型在理解语言指令时发生特征渗透现象。
 - 所有 Image 字段的资源将在底层由 TypeScript 编译器强制展开为 OS 绝对路径，这保证了工作流和模型的独立性。
+
+## 4. Draft 生命周期与命名规范 (0.3.2+)
+
+为了保留导演在创作早期的决策自由度，系统采用了**延迟绑定**策略：
+
+### 4.1 自动命名规则
+- **初始分镜生成**：统一命名为 `shot_X_draft_N.png`。不预设首/尾帧角色，仅表示该镜头的视觉候选。
+- **定向补帧生成**：通过 `target_last_prompt` 触发的任务，命名为 `shot_X_target_last_N.png`，在 review 时自动打上意图标签。
+
+### 4.2 画廊化审阅 (Script.md)
+所有的 draft 和 target 图片都会被回写到 `Script.md` 的画廊区域。导演通过批注指定角色（如："Draft 2 做首帧"），由 Animator 最终在 `Shotlist.md` 中完成指针绑定。
+

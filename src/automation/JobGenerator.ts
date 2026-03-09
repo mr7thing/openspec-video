@@ -210,11 +210,11 @@ export class JobGenerator {
 
         let baseName = id;
         let ext = '.png';
-        let finalOutputPath = path.join(outputDir, `${baseName}${ext}`);
+        let finalOutputPath = path.join(outputDir, `${baseName}_draft_1${ext}`);
         let counter = 1;
         while (fs.existsSync(finalOutputPath)) {
-            finalOutputPath = path.join(outputDir, `${baseName}_${counter}${ext}`);
             counter++;
+            finalOutputPath = path.join(outputDir, `${baseName}_draft_${counter}${ext}`);
         }
 
         // ---- Phase 6: Build the Job object (dual-channel) ----
@@ -536,17 +536,20 @@ export class JobGenerator {
         const artifactsDraftDir = this.currentDraftDir;
 
         // Non-destructive filename logic
-        let baseName = id;
+        // 0.3.2 统一使用 draft 后缀，除非是明确的 target 补帧
+        const isTargetLast = id.endsWith('_last');
+        const namingBase = isTargetLast ? id.replace('_last', '_target_last') : `${id}_draft`;
+
         let ext = '.png';
-        let finalOutputPath = path.join(artifactsDraftDir, `${baseName}${ext}`);
+        let finalOutputPath = path.join(artifactsDraftDir, `${namingBase}_1${ext}`);
         let counter = 1;
         while (fs.existsSync(finalOutputPath)) {
-            finalOutputPath = path.join(artifactsDraftDir, `${baseName}_${counter}${ext}`);
             counter++;
+            finalOutputPath = path.join(artifactsDraftDir, `${namingBase}_${counter}${ext}`);
         }
 
         // Save the generated prompt trace for reference
-        const promptLogPath = path.join(artifactsDraftDir, `${baseName}_prompt.txt`);
+        const promptLogPath = path.join(artifactsDraftDir, `${namingBase}_prompt.txt`);
         fs.writeFileSync(promptLogPath, fullPrompt);
 
         if (assetRefs.length === 0 && (refs.size > 0 || (atRefs && atRefs.length > 0))) {

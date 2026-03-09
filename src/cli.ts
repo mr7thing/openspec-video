@@ -277,20 +277,23 @@ program
     });
 
 program
-    .command('review [target]')
+    .command('review [path]')
     .description('Automatically append generated drafts into target markdown documents as reference links')
-    .option('--alldrafts', 'Include all historical drafts instead of just the latest one')
-    .action(async (target, options) => {
+    .option('--all', 'Include all historical drafts instead of just the latest one')
+    .action(async (reviewPath: string | undefined, options: any) => {
         try {
             const projectRoot = process.cwd();
             const reviewer = new Reviewer(projectRoot);
 
-            if (target) {
-                console.log(`Running review for target: ${target}`);
-                await reviewer.reviewTarget(target, { allDrafts: options.alldrafts });
+            if (options.all) {
+                console.log(`Running global review across all historical drafts...`);
+                await reviewer.reviewAll({ allDrafts: true });
+            } else if (reviewPath) {
+                console.log(`Running review for specified path: ${reviewPath}`);
+                await reviewer.reviewTarget(reviewPath);
             } else {
-                console.log(`Running global review across all elements, scenes, and shots...`);
-                await reviewer.reviewAll({ allDrafts: options.alldrafts });
+                console.log(`Running review for the latest draft batch...`);
+                await reviewer.reviewAll({ allDrafts: false });
             }
         } catch (err) {
             console.error('Review failed:', err);

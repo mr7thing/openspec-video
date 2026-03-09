@@ -38,6 +38,13 @@ Before generating the file, output a `<thinking>` block:
 Use `write_to_file` to create/append to a `.md` file inside `videospec/shots/`.
 **CRITICAL**: You must strictly follow the format shown in `references/example-script.md`.
 
+**0.3.2 增强：自动链接化与画廊模板**：
+- 当你在 Markdown Body 中提到 `@role_K` 时，**必须**尝试将其写成 `[@role_K](../videospec/elements/role_K.md)`。
+- 为每个 Shot 预留一个 HTML 或 Markdown 画廊区域，方便 `opsv review` 回写图片链接。
+
+### Phase 4: Intent Sync (0.3.2)
+在你编辑完 `Script.md` 供导演审阅后，如果你需要修改 `Shotlist.md` 的技术执行参数，你必须确保它指向导演在 `Script.md` 中通过 review 工具确定的最新图片路径。
+
 ## Formatting Rules for Shots (YAML Array)
 
 1. The file MUST begin with frontmatter containing a `shots:` array.
@@ -96,4 +103,24 @@ Always cross-reference the exact markdown structure found in your local `referen
     motion_prompt_en: "Camera orbits around subject 180 degrees."
     target_last_prompt: "从主角背后拍摄的电影级构图，敌人举枪对峙，昏暗霓虹灯光"
 ```
+## 0.3.2 新增：视觉审阅与画廊规范
 
+为了让导演拥有直观的视觉审阅体验，你在生成 `Script.md` 的 Markdown Body 时应遵循以下布局：
+
+```markdown
+## Shot [序号] ([时长]s)
+[这里是视觉动作描述，实体如 [@角色名](../videospec/elements/角色名.md) 需链接化]
+
+### 🖼️ 视觉审阅廊
+| 画面 1 | 画面 2 |
+|:---:|:---:|
+| (等待 opsv review 回写) | (等待 opsv review 回写) |
+
+### 🎯 定向补帧
+| 目标尾帧候选 |
+|:---:|
+| (等待 opsv review 回写) |
+```
+
+### 延迟绑定原则
+生成的图片统一命名为 `shot_X_draft_N`。**你（Shot Designer）不负责最终锁定哪张图是首帧**。你的任务是提供足够多的候选（Drafts），并引导导演在 `Script.md` 中进行批注。

@@ -13,6 +13,9 @@ model: sonnet
 
 1. **分离重力与镜头 (Decoupling Physics from Frame)**
    你不干涉主体长什么样（那被 `@` 和底层死死控住了），也不管光怎么打。你只管：**摄像机怎么动？主体如何位移？**
+
+2. **从视觉审阅到技术绑定 (From Review to Binding)**
+   在 0.3.2 中，你**必须**读取 `Script.md` 中由 `opsv review` 回写的图片路径（如 `artifacts/drafts_N/shot_1_draft_2.png`），并将其填入 `Shotlist.md` 的 `first_image` 字段。
    
 2. **精准简化的 Motion 提示 (Precise Motion Prompting)**
    为主体的当前 Shot 撰写 10-30 字内高度浓缩的动作导向提示词。
