@@ -17,7 +17,7 @@ Whenever you are presented with a script passage or scene description containing
 
 ### Step 1: Parse & Resolve
 1.  Identify all `@prefix_identifier` tags in the input.
-2.  Mentally load the corresponding asset definitions (based on the `OPSV-ASSET-0.3.md` spec).
+2.  Mentally load the corresponding asset definitions (based on the `OPSV-ASSET-0.3.2.md` spec).
     -   If an asset has `has_image: true`, extract its brief description and treat it as a physical requirement.
     -   If an asset has `has_image: false`, extract its detailed description.
 

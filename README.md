@@ -1,3 +1,29 @@
+# Videospec (OpsV) 0.3.2 — 代理架构解耦与演进 (Enhancement Patch)
+> 纪元：`0.3` → `0.3.2` | Agent/Skill 角色解耦、画廊审阅协议与定向补帧
+
+## 0.3.2 代理架构核心增量
+为了消除“名实不符”的职责歧义，满足更精准的多角色协同，0.3.2 版本对 `templates/.agent` 目录进行了“角色与技能解耦”重构：
+
+### 1. 角色 (Agent) 与技能 (Skill) 解耦
+- **Agent Roles**: 在 `.agent/` 根目录新增独立的特化角色文档 (如 `Architect.md`, `ScriptDesigner.md`)
+- **Skills**: 在 `.agent/skills/` 降级为底层操作手册与模版规范，供 Agent 读取调用。
+
+### 2. 核心角色职能映射表
+| 独立终端角色 | 依赖技能 (Skill) | 产出成果 | 严控红线 |
+| --- | --- | --- | --- |
+| `Architect.md` | `opsv-architect` | `project.md` | 确立概念，不写详细分镜 |
+| `Screenwriter.md` | `opsv-screenwriter` | `stories/story.md` | 原编剧，建构事件和定义实体，**不写摄像机机位** |
+| `ScriptDesigner.md` | `opsv-script-designer` | `shots/Script.md` | 原分镜师，负责推演机位光影，**预留画廊**，输出 YAML |
+| `AssetDesigner.md` | `opsv-asset-designer` | `elements/*.md`<br> `scenes/*.md`| 补全角色物体细节 |
+| `Animator.md` | `opsv-animator` | `shots/Shotlist.md` | 提取底图，负责动静分离、生成动画 Prompt 及 `@FRAME` 长镜断点 |
+| `Supervisor.md` | `opsv-supervisor` | (体检红绿灯) | 自动化扫描死链与“特征泄漏” |
+
+### 3. Schema 与参考规范硬对齐
+- 所有 `docs/schema/` 统一升格为 `0.3.2` (`OPSV-ASSET-0.3.2.md` 等)。
+- 明确要求各技能生成文件前强一致读取 `references/` (如 `example-story.md`, `example-script.md`) 避免越轨。
+
+---
+
 # Videospec (OpsV) 0.2 — 版本全景交接文档
 > 纪元：`0.2.1` → `0.2.28` | 40+ 项核心迭代 | 2026 年 Q1
 
