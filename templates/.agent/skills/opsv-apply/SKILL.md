@@ -19,7 +19,7 @@ Use this skill when the user wants to "apply" a proposal or a set of changes to 
 
 3.  **Execute (Loop)**:
     - For each task (e.g., "Update K's coat to black"):
-        1.  Locate the target asset (e.g., `assets/characters/K.md`).
+        1.  Locate the target asset (e.g., `videospec/elements/K.md`).
         2.  Modify the content using `replace_file_content` or `write_to_file`.
         3.  **Mark as Done**: Update the proposal file (`- [ ]` -> `- [x]`).
 
