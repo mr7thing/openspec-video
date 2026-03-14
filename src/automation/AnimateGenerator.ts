@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 import { Job } from '../types/PromptSchema';
 import { AssetCompiler } from '../core/AssetCompiler';
 
-// 拓展原有的 Job 接口适配 0.3 的动态数据透传，或在此直接添加任何自定义 Payload 给下游使用
+// 拓展原有的 Job 接口适配 0.3.2 的动态数据透传，或在此直接添加任何自定义 Payload 给下游使用
 
 
 export class AnimateGenerator {
@@ -66,7 +66,7 @@ export class AnimateGenerator {
             // 兼容旧版 shot.id 或新版 shot: 1
             const shotId = shot.id || `shot_${shot.shot}`;
 
-            // --- 0.3 Schema 解析图像锚点 ---
+            // --- 0.3.2 Schema 解析图像锚点 ---
             const resolvePath = (p: string | undefined): string | undefined => {
                 if (!p || p.trim() === "") return undefined;
                 if (p.startsWith('@FRAME:')) return p; // Preserve pipeline pointer
@@ -96,7 +96,7 @@ export class AnimateGenerator {
                 continue;
             }
 
-            // --- 0.3 Schema 解析文本 ---
+            // --- 0.3.2 Schema 解析文本 ---
             const motionPrompt = shot.motion_prompt_en || '';
             const motionPromptZh = shot.motion_prompt_zh || '';
 
@@ -112,7 +112,13 @@ export class AnimateGenerator {
                 global_settings: { aspect_ratio: ar, quality: res },
                 camera: { motion: motionPrompt },
                 duration: durationLiteral, // 提供给下游 API
-                schema_0_3: {
+                schema_0_3_2: {
+                    first_image: absFirstImage,
+                    middle_image: absMiddleImage,
+                    last_image: absLastImage,
+                    reference_images: referenceImages
+                },
+                schema_0_3: { // Legacy Support
                     first_image: absFirstImage,
                     middle_image: absMiddleImage,
                     last_image: absLastImage,
@@ -127,9 +133,9 @@ export class AnimateGenerator {
                 type: 'video_generation',
                 prompt_en: motionPrompt,
                 payload: payload,
-                // 为了向后兼容，我们将最重要的 first_image 塞入老字段，让不支持 0.3 的老生态不报错
+                // 为了向后兼容，我们将最重要的 first_image 塞入老字段，让不支持 0.3+ 的老生态不报错
                 reference_images: [absFirstImage]
-                // 新的 API Client 应当越过 reference_images，直接去 payload.schema_0_3 里读取组装好的 0.3 绝对路径对象
+                // 新的 API Client 应当越过 reference_images，直接去 payload.schema_0_3_2 里读取组装好的 0.3.2 绝对路径对象
             } as any); // 类型断言通过新增的冗余属性
         }
 

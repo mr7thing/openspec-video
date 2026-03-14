@@ -54,7 +54,7 @@ export class JobGenerator {
         const projectConfig = await this.specParser.parseProjectConfig();
         const shotManager = new ShotManager(this.projectRoot);
 
-        // Load 0.2 AssetCompiler and global configurations
+        // Load 0.3.2 AssetCompiler and global configurations
         this.assetCompiler.loadProjectConfig();
         this.assetCompiler.indexAssets();
         this.jobCount = 0;
@@ -312,7 +312,7 @@ export class JobGenerator {
             if (job) {
                 jobs.push(job);
 
-                // --- 0.3.1 Keyframe Resolution Protocol: 靶向生成 ---
+                // --- 0.3.2 Keyframe Resolution Protocol: 靶向生成 ---
                 if (shot.target_last_prompt) {
                     const lastFrameJob = this.parseShotToJob(
                         `${shotId}_last`,
