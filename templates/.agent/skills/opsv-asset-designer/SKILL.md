@@ -1,21 +1,19 @@
 ---
 name: opsv-asset-designer
-description: Create and design extremely detailed Characters, Props, and Scenes for the MV project. Mandates reading `videospec/project.md` first to ensure assets fit the world-building, and utilizes a `<thinking>` phase to construct rich, dense prompts.
+description: 资产生成执行手册。定义 elements/ 和 scenes/ 目录下 `.md` 资产的严格 YAML-First 三段式格式、has_image 决策规则与 `<thinking>` 推理审查要求，供 AssetDesigner Agent 调用。
 ---
 
-# OpsV Asset Designer Skill
+# OpsV Asset Designer — 执行手册 (0.3.2)
 
-This skill defines the behavior for the **Executive Art Director Agent** within the OpenSpec-Video framework. This agent is responsible for creating assets in the `videospec/elements/` and `videospec/scenes/` directories.
+本手册定义了 `AssetDesigner Agent` 在 OpenSpec-Video 架构下创建 `videospec/elements/` 和 `videospec/scenes/` 目录资产的完整执行规范。
 
-## Core Philosophy
+## 核心准则 (0.3.2)
 
-You serve a Human Visual Director. Your job is to translate brief ideas (e.g., "a broken bowl") into highly detailed, cinematic assets that perfectly fit the project's established world.
-
-**Rule 1: Context is King.** You MUST read `videospec/project.md` to understand the era, mood, and global style BEFORE designing any asset.
-**Rule 2: Hyper-Specificity.** Never output sparse descriptions. You must describe materials, lighting, wear-and-tear, mood, and compositional elements densely.
-**Rule 3: Confirmed Reference vs. Flexible Sandbox.** The `has_image` flag indicates if a reference image has been confirmed. You MUST ALWAYS default to `has_image: false`. ONLY set it to `true` if the Director explicitly tells you a reference image has already been confirmed. Do not guess or assume.
-**Rule 4: Output Language.** You must write the asset descriptions and `.md` content in **Chinese** to reduce friction for the native Chinese director. Only the `prompt_en` field meant for external rendering tools (SD/Flux/ComfyUI) should be written in English.
-**Rule 5: YAML Frontmatter Architecture.** ALL descriptions and the English prompt MUST go into the YAML frontmatter. The markdown body is ONLY for human reading and structured payload preview.
+**准则 1：上下文为王。** 必须在设计任何资产前先读取 `videospec/project.md` 以了解时代氛围、基调和全局风格。
+**准则 2：超高精细度。** 绝不输出稀疏描述。必须致密描写材质、光影、磨损度、情绪和构图等元素。
+**准则 3：已确认参考 vs 沙盒探索。** `has_image` 标志表示是否已确认参考图。**必须始终默认 `has_image: false`**。仅当导演明确告知参考图已确认后，才可设为 `true`。绝不猜测或假设。
+**准则 4：输出语言。** 资产描述和 `.md` 内容正文必须使用**中文**，以降低中文导演的认知摩擦。只有 `prompt_en` 字段（供外部渲染工具如 SD/Flux/ComfyUI 使用）使用英文。
+**准则 5：YAML Frontmatter 架构。** 所有描述和英文提示词必须进入 YAML Frontmatter. Markdown 正文仅供人类阅读和结构化 payload 预览。
 
 ## Document Format (CRITICAL)
 

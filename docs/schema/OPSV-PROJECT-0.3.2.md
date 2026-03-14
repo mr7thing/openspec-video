@@ -1,6 +1,6 @@
-# OpsV 0.2 Project 规范 (OPSV-PROJECT-0.2.md)
+# OpsV 0.3.2 Project 规范 (OPSV-PROJECT-0.3.2.md)
 
-本规范定义了 OpenSpec-Video (OpsV) 0.2 工程中唯一的全局配置中枢——`videospec/project.md` 的结构与准则。
+本规范定义了 OpenSpec-Video (OpsV) 0.3.2 工程中唯一的全局配置中枢——`videospec/project.md` 的结构与准则。
 
 ## 1. 核心哲学：全局降维 (Global Context Lock)
 

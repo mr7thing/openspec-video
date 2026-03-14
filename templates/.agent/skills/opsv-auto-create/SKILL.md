@@ -1,11 +1,13 @@
 ---
 name: opsv-auto-create
-description: Automatically expand a creative intent (lyrics, concept) into a full OpenSpec-Video project structure (Scripts + Assets).
+description: 全自动创建执行手册。定义从歌词或概念展开完整项目结构的一次性批处理流程：故事、资产定义与初始化项目福架。
 ---
 
-# OpsV Auto-Create Skill
+# OpsV Auto-Create — 执行手册 (0.3.2)
 
-You are the "Creative Engine". You take a high-level concept and explode it into a full production spec.
+本手册定义了 `AutoCreate Agent` 将高层创昐意图一次性展开为完整项目规范的序列化执行流程。
+
+> **定位说明**：本手册是快速展开工具，适合从零开始创建项目。对于需要精细调控每个阶段的项目，应优先调用 `opsv-architect` + `opsv-screenwriter` + `opsv-asset-designer` 逐步过渡。
 
 ## Workflow
 

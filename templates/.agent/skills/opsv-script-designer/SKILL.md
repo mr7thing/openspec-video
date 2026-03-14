@@ -1,19 +1,18 @@
 ---
-name: opsv-shot-designer
-description: A storyboard artist agent that strictly translates a story outline into concrete visual shots with defined durations (3-15s). It MUST output all shot data as a structured YAML array (`shots:`) in the frontmatter to bypass fragile regex parsing.
+name: opsv-script-designer
+description: 分镜脚本设计执行手册。将故事大纲翻译成带 YAML 结构的 Script.md 文件，包含严格时长约束（3-15s）与画廊占位符模板，供 ScriptDesigner Agent 调用。
 ---
 
-# OpsV Shot Designer Skill
+# OpsV Script Designer — 执行手册 (0.3.2)
 
-This skill defines the behavior for the **Executive Cinematographer Agent** within the OpenSpec-Video framework. Your job is to take the raw story narrative (`videospec/stories/story.md`) and turn it into precise, compilation-ready shot descriptions in `videospec/shots/`.
+本手册定义了 `ScriptDesigner Agent` 在 OpenSpec-Video 架构下生成 `videospec/shots/Script.md` 的完整执行规范。输入为 `story.md`，输出为 YAML 驱动的编译就绪分镜脚本。
 
-## Core Philosophy
+## 核心准则 (0.3.2)
 
-You serve a Human Visual Director.
-**Rule 1: Time is Absolute.** Every shot MUST have a precise duration attached to it. A single shot should ideally be 3-5 seconds. **The absolute maximum duration is 15 seconds.** DO NOT write an infinitely long shot. If an event takes 20 seconds, split it into two or more shots.
-**Rule 2: Visual, Not Literary.** You are describing what the *camera sees*, not a novel. Define the camera angle, movement, subject action, and lighting.
-**Rule 3: YAML First (Absolute Mandate).** The CLI compiler no longer uses fragile regex to parse markdown lists. YOU MUST define EVERY shot inside a `shots:` YAML array in the document frontmatter. The markdown body is for human reading only.
-**Rule 4: Output Language Separation.** The YAML fields (`camera`, `environment`, `subject`) and the markdown body must be in **Chinese**. However, the `prompt_en` field inside the YAML must be **pure English** (for diffusion models like SD/Flux).
+**规则 1：时间是绝对约束。** 每个 Shot 必须有明确的 `duration`。单镜头理想 3-5 秒，**上限为 15 秒**。超过 15 秒必须拆成多个 Shot。
+**规则 2：视觉语言，非文字叙事。** 要描述的是「摄像机看到的内容」：机位、运动、主体动作、光影。
+**规则 3：YAML 优先（强制铁律）。** **必须**将所有 Shot 定义在文档 frontmatter 的 `shots:` YAML 数组中。Markdown 正文仅供人类阅读审阅，编译器完全忽略正文。
+**规则 4：双语分离输出。** YAML 字段（`camera`, `environment`, `subject`）与 Markdown 正文使用**中文**；`prompt_en` 字段使用**纯英文**（供扩散模型如 SD/Flux 使用）。
 
 ## Workflow Execution
 

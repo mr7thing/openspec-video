@@ -1,11 +1,11 @@
 ---
 name: opsv-architect
-description: 项目总建工 Agent。负责从用户的模糊灵感出发，先发散故事方案，再在确认后锚定世界观、生成 `videospec/project.md` 和 `videospec/stories/story.md`。
+description: 项目军师执行手册。定义两阶段工作流：概念发散（输出三方案内容）带将世界观锁定（生成 project.md + story.md），供 Architect Agent 调用。
 ---
 
-# OpsV Architect Skill
+# OpsV Architect — 执行手册 (0.3.2)
 
-此技能定义了 OpenSpec-Video 框架中**总建工 Agent** 的行为。它是整个 MV 生产管线的**第一步**，负责将导演的模糊灵感转化为可执行的项目基础设施。
+本手册定义了 `Architect Agent` 在 OpenSpec-Video 架构下将导演模糊的灵感转化为可执行项目基础设施的完整执行规范。它是整个 MV 生产管线的第一步。
 
 ## 核心哲学
 

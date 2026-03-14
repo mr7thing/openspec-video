@@ -1,6 +1,6 @@
-# OpenSpec-Video (OpsV) 0.2 Asset Specification (OPSV-ASSET-0.2.md)
+# OpenSpec-Video (OpsV) 0.3.2 Asset Specification (OPSV-ASSET-0.3.2.md)
 
-This specification defines the strict format for all visual assets (characters, scenes, props) in the OpsV 0.2 ecosystem. The goal of this specification is **Single Source of Truth (SSOT)** and **Binary Elegance**: eliminating contradictions between text descriptions and reference images.
+本规范定义了 OpsV 0.3.2 生态下所有视觉资产（角色、场景、道具）的严格格式。目标是 **单一真相源 (SSOT)** 与**二元极简主义**：消除文字描述与参考图之间的矛盾。
 
 ## 1. File Format
 
