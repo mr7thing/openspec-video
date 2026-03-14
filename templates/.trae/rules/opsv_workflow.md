@@ -13,4 +13,4 @@
 - 阶段二：将确认的静态镜头同步至 `Shotlist.md`，追加动态运镜指令。
 
 ## 4. 质量审查 (QA)
-- 任何阶段变更后，建议调用 `opsv-qa` (Director Agent) 进行合规性检查。
+- 任何阶段变更后，建议调用 `opsv-qa` (Supervisor Agent) 进行合规性检查。

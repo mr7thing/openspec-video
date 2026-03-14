@@ -1,9 +1,9 @@
-# OpenSpec-Video (OpsV) 0.3 Shot Specification (OPSV-SHOT-0.3.md)
+# OpenSpec-Video (OpsV) 0.3.2 Shot Specification (OPSV-SHOT-0.3.2.md)
 
 本规范定义了 OpsV 0.3 环境下的分镜语法及端点约束设计。这是实现“精准时空锁定”与自动化模型调度的基础。
 
 ## 1. 核心架构逻辑
-与 0.2 中纯视觉构图的静态表达不同，0.3 的 Shot 协议引入了**对时间轴与动作演变的控制**，即首帧、尾帧及多语言提示词分离。
+与 0.2 中纯视觉构图的静态表达不同，0.3.2 的 Shot 协议引入了**对时间轴与动作演变的控制**，即首帧、尾帧及多语言提示词分离。
 
 每个文件（例如 `videospec/shots/Shotlist.md`）的最前部必须使用 YAML 列表声明所有的动作和图像状态，这可极大降低正则解析崩溃的概率。
 

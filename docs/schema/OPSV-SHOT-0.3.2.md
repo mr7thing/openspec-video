@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.3 Shot Specification (OPSV-SHOT-0.3.md)
+# OpenSpec-Video (OpsV) 0.3.2 Shot Specification (OPSV-SHOT-0.3.2.md)
 
 本规范定义了 OpsV 0.3 环境下的分镜语法及端点约束设计。这是实现“精准时空锁定”与自动化模型调度的基础。
 

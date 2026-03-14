@@ -1,6 +1,8 @@
 ---
 project_name: "My Video Project"
-version: "0.1.0"
+version: "0.3.2"
+engine: "wan2.1"
+global_style_postfix: "high quality, cinematic, masterpiece"
 ---
 
 # Project Definition
