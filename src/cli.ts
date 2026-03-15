@@ -325,4 +325,99 @@ program
         }
     });
 
+// ---- 0.3.3 新增：图像生成执行命令 ----
+program
+    .command('execute-image')
+    .description('Execute image generation jobs using SeaDream 5.0 Lite (0.3.3)')
+    .option('-m, --model <model>', 'Target model name', 'seadream-5.0-lite')
+    .option('-c, --concurrency <num>', 'Number of concurrent jobs', '1')
+    .option('-s, --skip-failed', 'Continue on individual job failure', false)
+    .option('--dry-run', 'Validate jobs without executing', false)
+    .action(async (options) => {
+        try {
+            const projectRoot = process.cwd();
+            const jobsPath = path.join(projectRoot, 'queue', 'jobs.json');
+
+            if (!fs.existsSync(jobsPath)) {
+                console.error('❌ No jobs.json found. Run "opsv generate" first.');
+                return;
+            }
+
+            // 过滤图像生成任务
+            const rawJobs = fs.readJsonSync(jobsPath);
+            const imageJobs = rawJobs.filter((j: any) => j.type === 'image_generation');
+
+            if (imageJobs.length === 0) {
+                console.log('ℹ️ No image generation jobs found in queue.');
+                return;
+            }
+
+            console.log(`\n🎨 OpsV Image Executor 0.3.3`);
+            console.log(`   Target Model: ${options.model}`);
+            console.log(`   Jobs Count: ${imageJobs.length}`);
+            console.log(`   Concurrency: ${options.concurrency}\n`);
+
+            if (options.dryRun) {
+                console.log('🔍 Dry run mode - validating jobs...');
+                const { JobValidator } = require('./types/PromptSchema');
+                const { valid, invalid } = JobValidator.validateMany(imageJobs);
+                console.log(`   Valid: ${valid.length}, Invalid: ${invalid.length}`);
+                
+                if (invalid.length > 0) {
+                    invalid.forEach((inv: { index: number; errors: string[] }) => {
+                        console.error(`   ❌ Job ${inv.index}: ${inv.errors.join(', ')}`);
+                    });
+                }
+                return;
+            }
+
+            // 检查 API Key
+            if (!process.env.SEADREAM_API_KEY && !process.env.VOLCENGINE_API_KEY) {
+                console.error('❌ Error: SEADREAM_API_KEY or VOLCENGINE_API_KEY not set');
+                console.error('   Please set your Volcengine API key in .env file');
+                return;
+            }
+
+            const { ImageModelDispatcher } = require('./executor/ImageModelDispatcher');
+            const dispatcher = new ImageModelDispatcher(projectRoot);
+
+            console.log('▶ Starting image generation pipeline...\n');
+
+            const startTime = Date.now();
+            const { results, errors } = await dispatcher.dispatchAll(
+                imageJobs,
+                options.model,
+                {
+                    concurrency: parseInt(options.concurrency),
+                    skipFailed: options.skipFailed,
+                    onProgress: (completed: number, total: number) => {
+                        const percent = Math.round((completed / total) * 100);
+                        process.stdout.write(`\r   Progress: ${completed}/${total} (${percent}%)`);
+                    }
+                }
+            );
+
+            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+            process.stdout.write('\n\n');
+
+            // 输出结果
+            console.log('✅ Pipeline completed!');
+            console.log(`   Duration: ${duration}s`);
+            console.log(`   Success: ${results.length}`);
+            
+            if (errors.length > 0) {
+                console.log(`   Failed: ${errors.length}`);
+                errors.forEach((e: { jobId: string; error: string }) => {
+                    console.error(`   ❌ ${e.jobId}: ${e.error}`);
+                });
+            }
+
+            console.log(`\n📁 Generated images saved to: artifacts/drafts_N/`);
+
+        } catch (err: any) {
+            console.error('\n❌ Image execution failed:', err.message);
+            process.exit(1);
+        }
+    });
+
 program.parse(process.argv);

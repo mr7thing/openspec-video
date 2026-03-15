@@ -5,7 +5,8 @@ import { AssetManager } from '../core/AssetManager';
 import { SpecParser } from '../core/SpecParser';
 import { ShotManager } from '../core/ShotManager';
 import { AssetCompiler, CompiledIntent } from '../core/AssetCompiler';
-import { Job, JobSchema } from '../types/PromptSchema';
+import { Job, JobSchema, PromptPayload } from '../types/PromptSchema';
+import { logger } from '../utils/logger';
 
 export class JobGenerator {
     private projectRoot: string;
@@ -218,7 +219,7 @@ export class JobGenerator {
         }
 
         // ---- Phase 6: Build the Job object (dual-channel) ----
-        const payload: any = {
+        const payload: PromptPayload = {
             prompt: payloadPrompt,
             global_settings: { aspect_ratio: ar, quality: res },
             subject: { description: subjectDesc }
@@ -226,14 +227,15 @@ export class JobGenerator {
         if (envDesc) payload.environment = { description: envDesc };
         if (cameraDesc) payload.camera = { type: cameraDesc };
 
-        jobs.push({
+        const job: Job = {
             id,
             type: 'image_generation',
             prompt_en: promptEn || undefined,
             payload,
             reference_images: referenceImages.length > 0 ? referenceImages : undefined,
             output_path: finalOutputPath
-        } as any);
+        };
+        jobs.push(job);
 
         return jobs;
     }
@@ -511,7 +513,7 @@ export class JobGenerator {
 
 
         const cameraMatch = body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0];
-        const payload: any = {
+        const payload: PromptPayload = {
             prompt: fullPrompt,
             global_settings: workflow?.settings || {
                 aspect_ratio: config.context.style.aspect_ratio || "16:9",
@@ -556,14 +558,15 @@ export class JobGenerator {
             console.warn(`WARNING: Shot ${id} requested references but no approved / draft images were found.Generating blindly.`);
         }
 
-        return {
+        const job: Job = {
             id,
             type: 'image_generation',
             prompt_en: promptEn || undefined,
             payload: payload,
             reference_images: assetRefs, // Absolute paths array for Comfy UI
             output_path: finalOutputPath
-        } as any;
+        };
+        return job;
     }
 
     private extractAssetsFromMarkdown(content: string, baseDir: string): string[] {

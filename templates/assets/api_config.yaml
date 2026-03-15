@@ -1,0 +1,64 @@
+# OpenSpec-Video API Configuration
+# 图像和视频生成模型配置
+
+models:
+  # SeaDream 5.0 Lite - 火山引擎图像生成
+  seadream-5.0-lite:
+    provider: seadream
+    type: image
+    features:
+      - txt2img
+      - img2img
+      - negative_prompt
+      - seed_control
+      - aspect_ratio
+    max_size:
+      width: 2048
+      height: 2048
+    defaults:
+      steps: 30
+      cfg_scale: 7.5
+    cost_per_1k: 0.05  # 估算成本
+
+  # SeaDream 5.0 Pro - 高质量版本（如可用）
+  seadream-5.0-pro:
+    provider: seadream
+    type: image
+    features:
+      - txt2img
+      - img2img
+      - negative_prompt
+      - seed_control
+      - aspect_ratio
+      - hires_fix
+    max_size:
+      width: 2048
+      height: 2048
+    defaults:
+      steps: 50
+      cfg_scale: 7.0
+    cost_per_1k: 0.10
+
+  # wan2.2-i2v - 视频生成模型
+  wan2.2-i2v:
+    provider: siliconflow
+    type: video
+    supports_first_image: true
+    supports_middle_image: false
+    supports_last_image: false
+    supports_reference_images: true
+    max_duration: "5s"
+    cost_per_1k: 0.50
+
+  # 预留：其他模型配置
+  # stability-sd3:
+  #   provider: stability
+  #   type: image
+  #   features: [txt2img, img2img]
+
+# 全局设置
+defaults:
+  image_model: "seadream-5.0-lite"
+  video_model: "wan2.2-i2v"
+  timeout: 120000  # 2分钟
+  retry_attempts: 3

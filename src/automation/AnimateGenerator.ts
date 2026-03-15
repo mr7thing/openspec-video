@@ -128,15 +128,17 @@ export class AnimateGenerator {
 
             const outputPath = path.join(videoOutDir, `${shotId}.mp4`);
 
-            jobs.push({
+            const job: Job = {
                 id: shotId,
                 type: 'video_generation',
                 prompt_en: motionPrompt,
                 payload: payload,
+                output_path: outputPath,
                 // 为了向后兼容，我们将最重要的 first_image 塞入老字段，让不支持 0.3+ 的老生态不报错
-                reference_images: [absFirstImage]
+                reference_images: [absFirstImage!]
                 // 新的 API Client 应当越过 reference_images，直接去 payload.schema_0_3_2 里读取组装好的 0.3.2 绝对路径对象
-            } as any); // 类型断言通过新增的冗余属性
+            };
+            jobs.push(job);
         }
 
         if (jobs.length > 0) {

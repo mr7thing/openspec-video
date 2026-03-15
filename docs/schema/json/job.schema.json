@@ -1,0 +1,282 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openspec-video.dev/schemas/job-0.3.2.json",
+  "title": "OpenSpec-Video Job Schema",
+  "description": "Schema for validating image and video generation jobs in OpsV 0.3.2",
+  "version": "0.3.2",
+  "definitions": {
+    "globalSettings": {
+      "type": "object",
+      "required": ["aspect_ratio"],
+      "properties": {
+        "aspect_ratio": {
+          "type": "string",
+          "enum": ["16:9", "9:16", "1:1", "21:9", "4:3", "2.39:1"],
+          "description": "Aspect ratio of the output"
+        },
+        "quality": {
+          "type": "string",
+          "enum": ["480p", "1080p", "2K", "4K", "8K"],
+          "default": "2K",
+          "description": "Resolution quality"
+        },
+        "duration": {
+          "type": "string",
+          "pattern": "^\\d+s$",
+          "description": "Duration for video jobs (e.g., '5s', '10s')"
+        },
+        "fps": {
+          "type": "number",
+          "enum": [24, 30, 60],
+          "description": "Frames per second for video"
+        }
+      }
+    },
+    "subjectConfig": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Subject description"
+        },
+        "pose": {
+          "type": "string",
+          "description": "Subject pose"
+        },
+        "expression": {
+          "type": "string",
+          "description": "Facial expression"
+        },
+        "motion": {
+          "type": "string",
+          "description": "Motion description for video"
+        }
+      }
+    },
+    "environmentConfig": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Environment description"
+        },
+        "depth_of_field": {
+          "type": "string",
+          "enum": ["shallow", "deep"]
+        },
+        "lighting_change": {
+          "type": "string",
+          "description": "Lighting transition for video"
+        },
+        "weather_change": {
+          "type": "string",
+          "description": "Weather transition for video"
+        }
+      }
+    },
+    "cameraConfig": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "extreme_wide", "wide_shot", "long_shot", "medium_long",
+            "medium_shot", "medium_close", "close_up", "extreme_close", "insert"
+          ],
+          "description": "Camera shot type"
+        },
+        "motion": {
+          "type": "string",
+          "enum": [
+            "static", "pan_left", "pan_right", "tilt_up", "tilt_down",
+            "dolly_in", "dolly_out", "truck_left", "truck_right",
+            "crane_up", "crane_down", "handheld", "steadicam", "gimbal"
+          ],
+          "description": "Camera movement"
+        },
+        "angle": {
+          "type": "string",
+          "enum": ["eye_level", "low_angle", "high_angle", "dutch", "overhead", "worm"]
+        },
+        "speed": {
+          "type": "string",
+          "enum": ["slow", "normal", "fast"]
+        },
+        "easing": {
+          "type": "string",
+          "enum": ["linear", "ease_in", "ease_out", "ease_in_out"]
+        }
+      }
+    },
+    "schema032": {
+      "type": "object",
+      "description": "OpsV 0.3.2 extended schema for image anchoring",
+      "properties": {
+        "first_image": {
+          "type": "string",
+          "description": "Path to first frame image or @FRAME: pointer"
+        },
+        "middle_image": {
+          "type": "string",
+          "description": "Path to middle frame reference"
+        },
+        "last_image": {
+          "type": "string",
+          "description": "Path to last frame reference"
+        },
+        "reference_images": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of reference image paths"
+        },
+        "frame_pointer": {
+          "type": "object",
+          "properties": {
+            "source_job_id": { "type": "string" },
+            "frame_type": { "enum": ["first", "middle", "last"] }
+          },
+          "required": ["source_job_id", "frame_type"]
+        }
+      }
+    },
+    "promptPayload": {
+      "type": "object",
+      "required": ["global_settings"],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "Chinese narrative prompt"
+        },
+        "global_settings": {
+          "$ref": "#/definitions/globalSettings"
+        },
+        "subject": {
+          "$ref": "#/definitions/subjectConfig"
+        },
+        "environment": {
+          "$ref": "#/definitions/environmentConfig"
+        },
+        "camera": {
+          "$ref": "#/definitions/cameraConfig"
+        },
+        "duration": {
+          "type": "string",
+          "pattern": "^\\d+s$"
+        },
+        "schema_0_3": {
+          "$ref": "#/definitions/schema032"
+        },
+        "schema_0_3_2": {
+          "$ref": "#/definitions/schema032"
+        }
+      }
+    },
+    "jobMeta": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "batch": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source file path"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "required": ["id", "type", "payload", "output_path"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Unique job identifier"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["image_generation", "video_generation"],
+      "description": "Type of generation job"
+    },
+    "prompt_en": {
+      "type": "string",
+      "description": "English rendering prompt for SD/Flux/ComfyUI"
+    },
+    "payload": {
+      "$ref": "#/definitions/promptPayload"
+    },
+    "reference_images": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Absolute path to reference image"
+      },
+      "description": "Array of reference image paths"
+    },
+    "output_path": {
+      "type": "string",
+      "description": "Absolute path for output file"
+    },
+    "output_format": {
+      "type": "string",
+      "enum": ["png", "jpg", "webp", "mp4", "mov", "webm"]
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 5
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Array of dependent job IDs"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "Batch identifier"
+    },
+    "workflow": {
+      "type": "object",
+      "description": "ComfyUI workflow configuration"
+    },
+    "seed": {
+      "type": "integer",
+      "description": "Random seed for reproducibility"
+    },
+    "meta": {
+      "$ref": "#/definitions/jobMeta"
+    },
+    "_skip": {
+      "type": "boolean",
+      "description": "UI flag to skip this job"
+    },
+    "_selected": {
+      "type": "boolean",
+      "description": "UI flag for selection"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "video_generation" } }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": ["duration"],
+            "properties": {
+              "schema_0_3_2": {
+                "required": ["first_image"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
