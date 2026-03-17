@@ -1,0 +1,13 @@
+{
+  "id": "test-seadream-group",
+  "type": "image_generation",
+  "prompt_en": "A cute dog lying on the grass",
+  "payload": {
+    "prompt": "一只可爱的小狗趴在草地上",
+    "global_settings": {
+      "aspect_ratio": "16:9",
+      "quality": "2K"
+    }
+  },
+  "output_path": "output/dog_group.png"
+}

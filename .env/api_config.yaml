@@ -2,18 +2,19 @@
 # 该文件定义了目前支持的生成引擎的能力级，调度器(Dispatcher)在发出请求前将严格根据下表裁切不被支持的参数。
 
 models:
-  wan2.2-i2v:
-    provider: "siliconflow"
-    api_url: "https://api.siliconflow.cn/v1/video/submit"
-    api_status_url: "https://api.siliconflow.cn/v1/video/status"
+  # 图像模型：火山引擎 SeaDream 5.0 Lite
+  seadream-5.0-lite:
+    provider: "seadream"
+    # 实际模型/Endpoint ID (请在火山方舟后台获取)
+    model: "doubao-seedream-5-0-260128"
+    # 默认组图数量 (1=单图, >1=组图，组图模式会自动在 prompt 前置“生成一组图像，”)
+    max_images: 4
     # 模型端点能力
-    supports_first_image: true
-    supports_middle_image: false
-    supports_last_image: false
-    supports_reference_images: false
+    features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio"]
+    max_size: { width: 2048, height: 2048 }
 
-  # 备用引擎样例展示
-  cogvideox-5b-i2v:
+  # 视频模型：SiliconFlow Wan 2.1
+  wan2.2-i2v:
     provider: "siliconflow"
     api_url: "https://api.siliconflow.cn/v1/video/submit"
     api_status_url: "https://api.siliconflow.cn/v1/video/status"

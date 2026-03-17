@@ -54,7 +54,7 @@ export class SeaDreamProvider implements ImageProvider {
     providerName = 'seadream';
     
     private defaultConfig: SeaDreamConfig = {
-        endpoint: 'https://cv-api.volces.com/api/v1/cv/image_generation',
+        endpoint: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
         timeout: 120000, // 2分钟
         maxRetries: 3,
         defaults: {
@@ -109,39 +109,79 @@ export class SeaDreamProvider implements ImageProvider {
         const payload = job.payload;
         const globalSettings = payload.global_settings || {};
         
+        // 从 modelConfig 中获取具体配置 (由 Dispatcher 传入，这里通过 Job 负载或全局配置获取)
+        // 实际上 ImageModelDispatcher 应该在调用时传入这些额外参数
+        // 为了兼容现有接口，我们检查 payload.global_settings
+        const maxImages = (globalSettings as any).max_images || 1;
+        const actualModel = (globalSettings as any).model || modelName;
+
         // 解析画幅比例
         const aspectRatio = globalSettings.aspect_ratio || '1:1';
         const baseSize = this.parseAspectRatio(aspectRatio);
-        const multiplier = this.getResolutionMultiplier(globalSettings.quality || '2K');
+        
+        // 解析尺寸枚举 (2K, 1080p, 720p)
+        const size = this.getOfficialSize(globalSettings.quality || '2K');
         
         // 构建提示词
-        const prompt = job.prompt_en || payload.prompt || '';
+        let prompt = job.prompt_en || payload.prompt || '';
+        
+        // 组图逻辑：如果 max_images > 1，添加前缀
+        let sequentialMode = "disabled";
+        if (maxImages > 1) {
+            sequentialMode = "auto";
+            prompt = `生成一组图像，${prompt}`;
+        }
+
         const negativePrompt = this.extractNegativePrompt(payload);
 
-        // SeaDream 5.0 Lite 请求体格式
+        // SeaDream 5.0 Lite 请求体格式 (对齐 ref.md)
         const requestBody: any = {
-            model: modelName,
+            model: actualModel,
             prompt: prompt,
             negative_prompt: negativePrompt || undefined,
-            width: Math.min(Math.round(baseSize.width * multiplier), 2048),
-            height: Math.min(Math.round(baseSize.height * multiplier), 2048),
-            steps: this.config.defaults.steps,
-            cfg_scale: this.config.defaults.cfg_scale,
-            seed: job.seed || -1, // -1 表示随机
-            response_format: 'url' // 或 'b64_json'
+            sequential_image_generation: sequentialMode,
+            response_format: 'url',
+            size: size,
+            stream: false,
+            watermark: true
         };
 
-        // 如果提供了参考图，添加图像到图像参数
+        // 如果是组图，添加选项
+        if (maxImages > 1) {
+            requestBody.sequential_image_generation_options = {
+                max_images: Math.min(maxImages, 12) // 最大 12
+            };
+        }
+
+        // 附件自动适配 (参考图)
         if (job.reference_images && job.reference_images.length > 0) {
-            const refImage = job.reference_images[0];
-            if (fs.existsSync(refImage)) {
-                const base64 = this.imageToBase64(refImage);
-                requestBody.image = base64;
-                requestBody.strength = 0.7; // 图生图强度
+            if (job.reference_images.length === 1) {
+                const refImage = job.reference_images[0];
+                if (fs.existsSync(refImage)) {
+                    requestBody.image = this.imageToBase64(refImage);
+                }
+            } else {
+                // 多参考图模式
+                requestBody.image = job.reference_images
+                    .filter(img => fs.existsSync(img))
+                    .map(img => this.imageToBase64(img));
             }
         }
 
         return requestBody;
+    }
+
+    /**
+     * 获取官方尺寸枚举
+     */
+    private getOfficialSize(quality: string): string {
+        const sizeMap: Record<string, string> = {
+            '480p': '720p', // 映射到最低支持
+            '720p': '720p',
+            '1080p': '1080p',
+            '2K': '2K'
+        };
+        return sizeMap[quality] || '2K';
     }
 
     /**
