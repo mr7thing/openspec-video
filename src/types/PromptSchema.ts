@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ============================================================================
-// OpenSpec-Video 类型定义 (0.3.2)
+// OpenSpec-Video 类型定义 (0.3.3)
 // ============================================================================
 
 // ---- 任务类型枚举 ----
@@ -26,7 +26,7 @@ export const GlobalSettingsSchema = z.object({
 
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>;
 
-// ---- 0.3.2 Schema 扩展 ----
+// ---- 0.3.3 Schema 扩展 ----
 export const Schema032Schema = z.object({
     first_image: z.string().optional(),
     middle_image: z.string().optional(),
