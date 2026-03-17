@@ -14,7 +14,7 @@ export class VideoModelDispatcher {
 
     constructor(projectRoot: string) {
         this.projectRoot = projectRoot;
-        this.apiConfigPath = path.join(this.projectRoot, 'assets', 'api_config.yaml');
+        this.apiConfigPath = path.join(this.projectRoot, '.env', 'api_config.yaml');
         this.config = this.loadConfig();
 
         // 注册已实现的 Provider

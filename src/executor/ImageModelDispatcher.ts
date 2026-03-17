@@ -60,7 +60,7 @@ export class ImageModelDispatcher {
 
     constructor(projectRoot: string) {
         this.projectRoot = projectRoot;
-        this.apiConfigPath = path.join(this.projectRoot, 'assets', 'api_config.yaml');
+        this.apiConfigPath = path.join(this.projectRoot, '.env', 'api_config.yaml');
         this.config = this.loadConfig();
         this.providers = new Map();
         this.stats = {
