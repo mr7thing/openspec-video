@@ -50,15 +50,23 @@ opsv init
 ### `opsv animate`
 **动态编译**: 将 `shots/Shotlist.md` 编译为视频生成队列 `video_jobs.json`。此时引擎还会把包含的所有图片路径转化为绝对环境路径。
 
-### `opsv execute`
-**模型调度与视频闭环** (0.3 核心): 将编译好的 JSON 交给多模型调度器执行。
-- **作用**: 与配置在 `.env` 中的大模型接口（如 SiliconFlow）建连，基于设定的图生视频引擎（如 `wan2.2-i2v`）提交流水线，自动挂起并在云端渲染完毕后落盘至 `artifacts/videos`。
-- **配置依赖**: 确保您在项目根目录下正确编写了包含 `SILICONFLOW_API_KEY=xxx` 的 `.env`。
+### `opsv execute-image`
+**图像生成执行器** (0.3.3 新增): 执行队列中所有 `image_generation` 类型的任务。
+- **默认模型**: `seadream-5.0-lite` (由 SeaDream 5.0 提供动力)。
+- **选项**:
+    - `-m, --model <model>`: 切换目标模型。
+    - `-c, --concurrency <num>`: 设置并发数（默认 1）。
+    - `--skip-failed`: 跳过失败任务继续执行。
+    - `--dry-run`: 仅验证任务参数，不实际调用接口。
+  ### 2. 关键配置
+由于 SeaDream 5.0 运行在火山引擎（Volcengine）之上，您需要：
+1. **配置文件**：将 `.env/secrets.env` 复制并重命名为项目根目录下的 `.env`。
+2. **填入密钥**：在 `.env` 中设置 `VOLCENGINE_API_KEY=您的密钥`。
 
 ### `opsv serve`
 启动本地 WebSocket 守护进程。
 - **默认端口**: `3061`
-- **作用**: 接收浏览器插件产生的图片并存入 `artifacts/` 目录。
+- **作用**: 监听并接收来自浏览器自动化环境（如 Extension）的任务或结果推送。
 
 ---
 

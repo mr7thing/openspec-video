@@ -5,9 +5,26 @@ import path from 'path';
 import os from 'os';
 import WebSocket from 'ws';
 import { spawn } from 'child_process';
+import dotenv from 'dotenv';
 import { JobGenerator } from './automation/JobGenerator';
 import { Reviewer } from './automation/Reviewer';
 import { AnimateGenerator } from './automation/AnimateGenerator';
+
+const projectRoot = process.cwd();
+const envSubDir = path.join(projectRoot, '.env');
+const secretsEnvPath = path.join(envSubDir, 'secrets.env');
+const rootEnvPath = path.join(projectRoot, '.env');
+
+if (fs.existsSync(secretsEnvPath)) {
+    dotenv.config({ path: secretsEnvPath });
+} else if (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory()) {
+    dotenv.config({ path: rootEnvPath });
+} else {
+    dotenv.config();
+}
+
+// Add simple debug info for the user if execution fails later
+const hasKey = !!(process.env.SEADREAM_API_KEY || process.env.VOLCENGINE_API_KEY);
 
 const program = new Command();
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
@@ -179,9 +196,12 @@ program
         try {
             await fs.ensureDir(targetDir);
 
-            // 1. Copy mandatory base templates (.agent skills and .antigravity workflows)
+            // 1. Copy mandatory base templates (.agent skills, .antigravity workflows, and .env config)
             await fs.copy(path.join(TEMPLATE_DIR, '.agent'), path.join(targetDir, '.agent'));
             await fs.copy(path.join(TEMPLATE_DIR, '.antigravity'), path.join(targetDir, '.antigravity'));
+            if (fs.existsSync(path.join(TEMPLATE_DIR, '.env'))) {
+                await fs.copy(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
+            }
 
             // 2. Selective copy based on tools
             if (tools.includes('gemini')) {
@@ -374,7 +394,8 @@ program
             // 检查 API Key
             if (!process.env.SEADREAM_API_KEY && !process.env.VOLCENGINE_API_KEY) {
                 console.error('❌ Error: SEADREAM_API_KEY or VOLCENGINE_API_KEY not set');
-                console.error('   Please set your Volcengine API key in .env file');
+                console.error(`   Checked secrets.env path: ${secretsEnvPath}`);
+                console.error('   Please ensure your .env/secrets.env file exists and contains the correct keys.');
                 return;
             }
 

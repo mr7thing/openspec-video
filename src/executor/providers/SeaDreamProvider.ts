@@ -54,7 +54,7 @@ export class SeaDreamProvider implements ImageProvider {
     providerName = 'seadream';
     
     private defaultConfig: SeaDreamConfig = {
-        endpoint: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+        endpoint: 'https://cv-api.volces.com/api/v1/cv/image_generation',
         timeout: 120000, // 2分钟
         maxRetries: 3,
         defaults: {
