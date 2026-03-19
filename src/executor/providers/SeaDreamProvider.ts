@@ -72,37 +72,6 @@ export class SeaDreamProvider implements ImageProvider {
     }
 
     /**
-     * 解析画幅比例为宽高
-     */
-    private parseAspectRatio(aspectRatio: string): { width: number; height: number } {
-        const ratioMap: Record<string, { width: number; height: number }> = {
-            '1:1': { width: 1024, height: 1024 },
-            '16:9': { width: 1024, height: 576 },
-            '9:16': { width: 576, height: 1024 },
-            '4:3': { width: 1024, height: 768 },
-            '3:4': { width: 768, height: 1024 },
-            '21:9': { width: 1280, height: 548 },
-            '2.39:1': { width: 1280, height: 535 }
-        };
-
-        return ratioMap[aspectRatio] || { width: 1024, height: 1024 };
-    }
-
-    /**
-     * 从 resolution 解析尺寸倍数
-     */
-    private getResolutionMultiplier(quality: string): number {
-        const multipliers: Record<string, number> = {
-            '480p': 0.5,
-            '1080p': 1,
-            '2K': 1.5,
-            '4K': 2,
-            '8K': 4
-        };
-        return multipliers[quality] || 1;
-    }
-
-    /**
      * 准备请求体
      */
     private buildRequestBody(job: Job, modelName: string): any {
@@ -112,15 +81,17 @@ export class SeaDreamProvider implements ImageProvider {
         // 从 modelConfig 中获取具体配置 (由 Dispatcher 传入，这里通过 Job 负载或全局配置获取)
         // 实际上 ImageModelDispatcher 应该在调用时传入这些额外参数
         // 为了兼容现有接口，我们检查 payload.global_settings
-        const maxImages = (globalSettings as any).max_images || 1;
         const actualModel = (globalSettings as any).model || modelName;
 
-        // 解析画幅比例
+        // 解析画幅比例 (从 project.md / payload 传入)
         const aspectRatio = globalSettings.aspect_ratio || '1:1';
-        const baseSize = this.parseAspectRatio(aspectRatio);
         
-        // 解析尺寸枚举 (2K, 1080p, 720p)
-        const size = this.getOfficialSize(globalSettings.quality || '2K');
+        // 获取分辨率 (严格按照配置读取，不自作主张映射坐标)
+        const quality = globalSettings.quality || '2K';
+        
+        // 获取生成数量 (0.3.16)
+        // 优先级：全局配置 (来自 api_config.yaml) > Job 特定配置
+        const maxImages = (globalSettings as any).max_images || job.image_config?.max_images || 1;
         
         // 构建提示词
         let prompt = job.prompt_en || payload.prompt || '';
@@ -132,7 +103,10 @@ export class SeaDreamProvider implements ImageProvider {
             prompt = `生成一组图像，${prompt}`;
         }
 
-        const negativePrompt = this.extractNegativePrompt(payload);
+        const settings = globalSettings as any;
+        const negativePrompt = settings.negative_prompt || this.extractNegativePrompt(payload);
+        const steps = settings.steps || this.config.defaults.steps;
+        const cfgScale = settings.cfg_scale || this.config.defaults.cfg_scale;
 
         // SeaDream 5.0 Lite 请求体格式 (对齐 ref.md)
         const requestBody: any = {
@@ -141,7 +115,10 @@ export class SeaDreamProvider implements ImageProvider {
             negative_prompt: negativePrompt || undefined,
             sequential_image_generation: sequentialMode,
             response_format: 'url',
-            size: size,
+            size: quality, // 传递如 "2K", "4K"
+            aspect_ratio: aspectRatio, // 传递如 "16:9"
+            steps: steps,
+            cfg_scale: cfgScale,
             stream: false,
             watermark: true
         };
@@ -277,30 +254,36 @@ export class SeaDreamProvider implements ImageProvider {
                      throw new Error(`API Error [${data.code}]: ${data.message || 'No message'}`);
                 }
 
-                // 重点：处理可能的嵌套 data.data 结构
-                let actualData: any = null;
+                // 重点：处理可能的嵌套 data.data 结构 (0.3.14 支持组图遍历)
+                let imageEntries: any[] = [];
                 if (Array.isArray(data.data)) {
-                    actualData = data.data[0];
+                    imageEntries = data.data;
                 } else if (data.data && Array.isArray(data.data.data)) {
-                    actualData = data.data.data[0];
+                    imageEntries = data.data.data;
                 } else {
-                    actualData = data.data || data;
+                    imageEntries = [data.data || data];
                 }
 
-                if (!actualData || (!actualData.image_url && !actualData.url && !actualData.image_base64 && !actualData.b64_json)) {
-                    throw new Error(`Invalid API response: image data is missing in ${JSON.stringify(data).substring(0, 100)}...`);
+                if (imageEntries.length === 0) {
+                    throw new Error(`Invalid API response: no image entries found in ${JSON.stringify(data).substring(0, 100)}...`);
                 }
 
-                const result: any = {
-                    url: actualData.image_url || actualData.url,
-                    base64: actualData.image_base64 || actualData.b64_json,
-                    seed: actualData.seed,
-                    generationTime: actualData.inference_time,
+                const result: ImageGenerationResult = {
+                    images: imageEntries.map(entry => ({
+                        url: entry.image_url || entry.url,
+                        base64: entry.image_base64 || entry.b64_json,
+                        seed: entry.seed
+                    })).filter(img => img.url || img.base64),
+                    generationTime: imageEntries[0]?.inference_time,
                     model: modelName
                 };
 
+                if (result.images.length === 0) {
+                    throw new Error("No valid images found in API response");
+                }
+
                 logger.logExecution(job.id, 'SEADREAM_SUCCESS', { 
-                    seed: result.seed,
+                    count: result.images.length,
                     time: result.generationTime
                 });
 
@@ -347,29 +330,49 @@ export class SeaDreamProvider implements ImageProvider {
     }
 
     /**
-     * 生成并下载图像
+     * 生成并下载图像 (0.3.14 支持多图下载)
      */
     async generateAndDownload(job: Job, modelName: string, apiKey: string, outputPath: string): Promise<string> {
         const result = await this.generateImage(job, modelName, apiKey);
+        const downloadedPaths: string[] = [];
 
-        if (result.url) {
-            // 下载图像
-            await this.downloadImage(result.url, outputPath);
-            logger.logExecution(job.id, 'SEADREAM_DOWNLOADED', { outputPath });
-        } else if (result.base64) {
-            // 保存 Base64 图像
-            const dir = path.dirname(outputPath);
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
+        for (let i = 0; i < result.images.length; i++) {
+            const img = result.images[i];
+            
+            // 构造防冲突的文件名：试图生成第一个不存在的序号
+            let finalOutputPath = outputPath;
+            const ext = path.extname(outputPath);
+            const basename = path.basename(outputPath, ext);
+            const dirname = path.dirname(outputPath);
+
+            // 寻找下一个可用的文件名 (e.g., _1, _2, _3...)
+            let fileIndex = i + 1;
+            let candidatePath = path.join(dirname, `${basename}_${fileIndex}${ext}`);
+            
+            // 如果文件已存在，则继续往后推，确保不覆盖旧图 (柒叔：万一有_6, _12呢？)
+            while (fs.existsSync(candidatePath)) {
+                fileIndex++;
+                candidatePath = path.join(dirname, `${basename}_${fileIndex}${ext}`);
             }
-            const base64Data = result.base64.replace(/^data:image\/\w+;base64,/, '');
-            fs.writeFileSync(outputPath, Buffer.from(base64Data, 'base64'));
-            logger.logExecution(job.id, 'SEADREAM_SAVED', { outputPath });
-        } else {
-            throw ErrorFactory.apiError('SeaDream', 'No image URL or base64 in response', job.id);
+            finalOutputPath = candidatePath;
+
+            if (img.url) {
+                await this.downloadImage(img.url, finalOutputPath);
+                logger.logExecution(job.id, 'SEADREAM_DOWNLOAD_SUCCESS', { path: finalOutputPath, index: fileIndex });
+            } else if (img.base64) {
+                const dir = path.dirname(finalOutputPath);
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                }
+                const base64Data = img.base64.replace(/^data:image\/\w+;base64,/, '');
+                fs.writeFileSync(finalOutputPath, Buffer.from(base64Data, 'base64'));
+                logger.logExecution(job.id, 'SEADREAM_SAVE_SUCCESS', { path: finalOutputPath, index: fileIndex });
+            }
+            
+            downloadedPaths.push(finalOutputPath);
         }
 
-        return outputPath;
+        return downloadedPaths[0]; // 返回第一张作为主要结果
     }
 
     /**

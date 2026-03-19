@@ -28,11 +28,12 @@ interface ModelConfig {
     defaults?: {
         steps?: number;
         cfg_scale?: number;
+        max_images?: number;
+        quality?: string;
+        negative_prompt?: string;
     };
     /** 成本估算（每千次调用） */
     cost_per_1k?: number;
-    /** 最大组图数量 (SeaDream 专属) */
-    max_images?: number;
     /** 实际模型 ID/Endpoint ID */
     model?: string;
 }
@@ -86,9 +87,12 @@ export class ImageModelDispatcher {
             models: {
                 'seadream-5.0-lite': {
                     provider: 'seadream',
-                    features: ['txt2img', 'img2img', 'negative_prompt', 'seed_control'],
+                    features: ['txt2img', 'img2img', 'negative_prompt', 'seed_control', 'aspect_ratio'],
                     max_size: { width: 2048, height: 2048 },
-                    max_images: 4,
+                    defaults: {
+                        max_images: 4,
+                        quality: '2K'
+                    },
                     model: 'doubao-seedream-5-0-260128'
                 }
             }
@@ -210,10 +214,18 @@ export class ImageModelDispatcher {
         }
 
         // 注入模型特定配置到 payload 以便提供商读取
-        // 注意：这里使用类型断言是因为 max_images 和 model 是针对特定后端的动态字段
+        // 优先级：任务自带设置 > api_config.yaml 里的 defaults > 固定默认值
         const settings = job.payload.global_settings as any;
         if (settings) {
-            settings.max_images = modelConfig.max_images || 1;
+            const defaults = modelConfig.defaults || {};
+            
+            // 穿透注入
+            settings.max_images = settings.max_images || defaults.max_images || 1;
+            settings.quality = settings.quality || defaults.quality || '2K';
+            settings.steps = settings.steps || defaults.steps || 30;
+            settings.cfg_scale = settings.cfg_scale || defaults.cfg_scale || 7.5;
+            settings.negative_prompt = settings.negative_prompt || defaults.negative_prompt;
+            
             settings.model = modelConfig.model || targetModel;
         }
 

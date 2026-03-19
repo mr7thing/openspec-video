@@ -1,24 +1,57 @@
 # OpsV 0.3 多模态视频引擎调度配置文件
-# 该文件定义了目前支持的生成引擎的能力级，调度器(Dispatcher)在发出请求前将严格根据下表裁切不被支持的参数。
+# 该文件定义了目前支持的生成引擎的能力级与默认参数。
+# 调度器 (Dispatcher) 在发出请求前将严格根据下表映射参数。
 
 models:
+  # ==========================================
   # 图像模型：火山引擎 SeaDream 5.0 Lite
+  # ==========================================
   seadream-5.0-lite:
     provider: "seadream"
-    # 实际模型/Endpoint ID (请在火山方舟后台获取)
+    # 实际模型/Endpoint ID (由火山方舟提供)
     model: "doubao-seedream-5-0-260128"
-    # 默认组图数量 (1=单图, >1=组图，组图模式会自动在 prompt 前置“生成一组图像，”)
-    max_images: 4
     # 模型端点能力
-    features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio"]
+    features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
+    
+    # [默认参数] - 所有的 API 行为都应在此体现
+    defaults:
+      # 默认分辨率质量 (2K, 4K)
+      quality: "2K"
+      # 默认组图数量 (1=单图, >1=组图)
+      max_images: 4
+      # 采样步数 (1-50)
+      steps: 30
+      # 提示词引导系数 (1-20)
+      cfg_scale: 7.5
+      # 默认负面提示词
+      negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
+    
+    # 物理限制
     max_size: { width: 2048, height: 2048 }
+    max_batch: 12
 
+  # ==========================================
   # 视频模型：SiliconFlow Wan 2.1
+  # ==========================================
   wan2.2-i2v:
     provider: "siliconflow"
+    model: "wan-ai/Wan2.1-T2V-14B"
     api_url: "https://api.siliconflow.cn/v1/video/submit"
     api_status_url: "https://api.siliconflow.cn/v1/video/status"
+    
+    defaults:
+      # 默认视频分辨率
+      size: "1280x720"
+      # 帧率
+      fps: 24
+      # 时长 (秒)
+      duration: 5
+    
+    # 灵活性支持
     supports_first_image: true
     supports_middle_image: false
     supports_last_image: false
     supports_reference_images: false
+
+  # ==========================================
+

@@ -86,12 +86,10 @@ export const ImageConfigSchema = z.object({
     negative_prompt: z.string().optional(),
     /** 采样器 */
     sampler: z.enum(['Euler', 'Euler a', 'DPM++ 2M', 'DPM++ 2M Karras']).optional(),
-    /** 图像增强 */
-    enhance: z.boolean().optional(),
-    /** 高清修复 */
-    hires_fix: z.boolean().optional(),
     /** 高清修复倍率 */
-    hires_scale: z.number().optional()
+    hires_scale: z.number().optional(),
+    /** 最大生成图像数量 (0.3.14) */
+    max_images: z.number().min(1).max(12).default(1)
 });
 
 export type ImageConfig = z.infer<typeof ImageConfigSchema>;
