@@ -15,6 +15,7 @@ const envSubDir = path.join(projectRoot, '.env');
 const secretsEnvPath = path.join(envSubDir, 'secrets.env');
 const rootEnvPath = path.join(projectRoot, '.env');
 
+//--- 核心：必须先加载环境变量 ---
 if (fs.existsSync(secretsEnvPath)) {
     dotenv.config({ path: secretsEnvPath });
 } else if (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory()) {
@@ -23,10 +24,24 @@ if (fs.existsSync(secretsEnvPath)) {
     dotenv.config();
 }
 
-// Add simple debug info for the user if execution fails later
-const hasKey = !!(process.env.SEADREAM_API_KEY || process.env.VOLCENGINE_API_KEY);
+// 获取版本号 (从 package.json 动态读取)
+const pkgPath = path.join(__dirname, '../package.json');
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.3.6' };
+const VERSION = pkg.version;
+
+function showEnvCheck() {
+    const envPath = fs.existsSync(secretsEnvPath) ? secretsEnvPath : (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory() ? rootEnvPath : 'default');
+    const volceKey = process.env.VOLCENGINE_API_KEY;
+    const seaKey = process.env.SEADREAM_API_KEY;
+
+    console.log(`\n🔍 Environment Check:`);
+    console.log(`   - Config Source: ${envPath}`);
+    console.log(`   - VOLCENGINE_API_KEY: ${volceKey ? 'Present (****' + volceKey.slice(-4) + ')' : 'Missing'}`);
+    console.log(`   - SEADREAM_API_KEY: ${seaKey ? 'Present (****' + seaKey.slice(-4) + ')' : 'Missing'}\n`);
+}
 
 const program = new Command();
+program.version(VERSION);
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
 const PROPOSAL_TEMPLATE = path.join(__dirname, '../templates/proposal.md');
 const PID_FILE = path.join(os.homedir(), '.opsv', 'daemon.pid');
@@ -106,8 +121,7 @@ function registerProject(projectRoot: string) {
 
 program
     .name('opsv')
-    .description('OpenSpec-Video Automation CLI')
-    .version('0.3.3');
+    .description('OpenSpec-Video Automation CLI');
 
 program
     .command('serve')
@@ -372,7 +386,7 @@ program
                 return;
             }
 
-            console.log(`\n🎨 OpsV Image Executor 0.3.3`);
+            console.log(`\n🎨 OpsV Image Executor ${VERSION}`);
             console.log(`   Target Model: ${options.model}`);
             console.log(`   Jobs Count: ${imageJobs.length}`);
             console.log(`   Concurrency: ${options.concurrency}\n`);
@@ -393,8 +407,9 @@ program
 
             // 检查 API Key
             if (!process.env.SEADREAM_API_KEY && !process.env.VOLCENGINE_API_KEY) {
+                showEnvCheck();
                 console.error('❌ Error: SEADREAM_API_KEY or VOLCENGINE_API_KEY not set');
-                console.error(`   Checked secrets.env path: ${secretsEnvPath}`);
+                console.error(`   Checked path: ${secretsEnvPath}`);
                 console.error('   Please ensure your .env/secrets.env file exists and contains the correct keys.');
                 return;
             }

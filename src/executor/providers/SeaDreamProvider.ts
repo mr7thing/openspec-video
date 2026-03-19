@@ -55,7 +55,7 @@ export class SeaDreamProvider implements ImageProvider {
     
     private defaultConfig: SeaDreamConfig = {
         endpoint: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
-        timeout: 120000, // 2分钟
+        timeout: 300000, // 增加到 5 分钟
         maxRetries: 3,
         defaults: {
             width: 1024,
@@ -250,8 +250,8 @@ export class SeaDreamProvider implements ImageProvider {
         const requestBody = this.buildRequestBody(job, modelName);
         
         logger.logExecution(job.id, 'SEADREAM_SUBMIT', { 
-            model: modelName, 
-            size: `${requestBody.width}x${requestBody.height}` 
+            model: requestBody.model, 
+            size: requestBody.size 
         });
 
         let lastError: Error | null = null;
@@ -271,19 +271,31 @@ export class SeaDreamProvider implements ImageProvider {
                     }
                 );
 
-                const data = response.data;
-
-                // 检查响应状态
-                if (data.code !== 0 || !data.data) {
-                    throw new Error(`API Error [${data.code}]: ${data.message}`);
+                const data = response.data as any;
+                
+                if (data.code !== undefined && data.code !== 0) {
+                     throw new Error(`API Error [${data.code}]: ${data.message || 'No message'}`);
                 }
 
-                const resultData = data.data;
-                const result: ImageGenerationResult = {
-                    url: resultData.image_url,
-                    base64: resultData.image_base64,
-                    seed: resultData.seed,
-                    generationTime: resultData.inference_time,
+                // 重点：处理可能的嵌套 data.data 结构
+                let actualData: any = null;
+                if (Array.isArray(data.data)) {
+                    actualData = data.data[0];
+                } else if (data.data && Array.isArray(data.data.data)) {
+                    actualData = data.data.data[0];
+                } else {
+                    actualData = data.data || data;
+                }
+
+                if (!actualData || (!actualData.image_url && !actualData.url && !actualData.image_base64 && !actualData.b64_json)) {
+                    throw new Error(`Invalid API response: image data is missing in ${JSON.stringify(data).substring(0, 100)}...`);
+                }
+
+                const result: any = {
+                    url: actualData.image_url || actualData.url,
+                    base64: actualData.image_base64 || actualData.b64_json,
+                    seed: actualData.seed,
+                    generationTime: actualData.inference_time,
                     model: modelName
                 };
 
@@ -296,9 +308,26 @@ export class SeaDreamProvider implements ImageProvider {
 
             } catch (error: any) {
                 lastError = error;
+                const apiError = error.response?.data;
+                const status = error.response?.status;
+                const errorCode = error.code; // Axios 的错误代码 (e.g., ECONNABORTED)
+                
+                let errorMsg = '';
+                if (apiError) {
+                    errorMsg = `API Error [${apiError.code || status}]: ${apiError.message || 'Unknown API error'}`;
+                } else if (errorCode) {
+                    errorMsg = `Network/Axios Error [${errorCode}]: ${error.message}`;
+                } else {
+                    errorMsg = `Unknown Error: ${error.message}`;
+                }
+
                 logger.warn(`SeaDream API attempt ${attempt} failed`, { 
                     jobId: job.id, 
-                    error: error.message 
+                    error: errorMsg,
+                    code: errorCode,
+                    status: status,
+                    response: apiError ? JSON.stringify(apiError) : 'No response data',
+                    stack: error.stack?.split('\n')[1]
                 });
 
                 if (attempt < this.config.maxRetries) {

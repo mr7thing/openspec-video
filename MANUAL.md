@@ -51,17 +51,27 @@ opsv init
 **动态编译**: 将 `shots/Shotlist.md` 编译为视频生成队列 `video_jobs.json`。此时引擎还会把包含的所有图片路径转化为绝对环境路径。
 
 ### `opsv execute-image`
-**图像生成执行器** (0.3.3 新增): 执行队列中所有 `image_generation` 类型的任务。
+**图像生成执行器** (0.3.5 深度增强): 执行队列中所有 `image_generation` 类型的任务。
 - **默认模型**: `seadream-5.0-lite` (由 SeaDream 5.0 提供动力)。
+- **组图自动化 (New)**: 
+    - 如果配置 `max_images > 1`，系统会自动激活 `sequential_image_generation: auto`。
+    - 自动在 Prompt 前缀注入“生成一组图像，”，实现批量连贯生成。
+- **多参考图支持**: 自动适配单张图（string）或多张图（array）的参考附件。
 - **选项**:
     - `-m, --model <model>`: 切换目标模型。
     - `-c, --concurrency <num>`: 设置并发数（默认 1）。
     - `--skip-failed`: 跳过失败任务继续执行。
-    - `--dry-run`: 仅验证任务参数，不实际调用接口。
-  ### 2. 关键配置
-由于 SeaDream 5.0 运行在火山引擎（Volcengine）之上，您需要：
-1. **配置文件**：将 `.env/secrets.env` 复制并重命名为项目根目录下的 `.env`。
-2. **填入密钥**：在 `.env` 中设置 `VOLCENGINE_API_KEY=您的密钥`。
+
+## 3. 关键配置与密钥
+
+由于 0.3.3+ 版本的配置目录重构，配置寻址逻辑如下：
+
+1. **API 密钥**: 
+   - 必须存放在项目根目录的 `.env/secrets.env` 文件中。
+   - 变量名：`VOLCENGINE_API_KEY` (或 `ARK_API_KEY`)。
+2. **引擎参数**: 
+   - 在 `.env/api_config.yaml` 中配置 `max_images`（最大 12）和 `model` (Endpoint ID)。
+   - `max_images: 1` 为单图模式；`max_images: 4` 为组图模式。
 
 ### `opsv serve`
 启动本地 WebSocket 守护进程。

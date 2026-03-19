@@ -60,6 +60,14 @@
 核心信念：版本号是代码迭代的纪元，任何未声明版本演进的构建都是对使用者的欺骗。 
 </npm_packaging_protocol>
 
+<api_defensive_protocol>
+触发时机：集成任何第三方模型 API（如火山引擎、OpenAI、DeepSeek）。
+核心准则：
+- 准则一：深度穿透解析 (Deep Penetrative Parsing)。绝不假设返回体是单一结构。必须兼容 `data.data[0]`、`data.data.data[0]` 或直发 `data` 的多种变体。使用防御性代码 `(Array.isArray(d) ? d[0] : d)` 确保结果稳健。
+- 准则二：强力证据式日志 (Evidential Logging)。禁用模糊的 `undefined` 输出。对于任何非 2xx 响应或怀疑格式错误的情况，必须使用 `JSON.stringify(apiError)` 强制记录原始 JSON 载荷，确保证据链闭环。
+- 准则三：Axios 防空逻辑 (Axios Defensive Handling)。必须处理 `error.response` 为空（网络中断/超时）的情况。捕获并区分 `error.code`（如 `ETIMEDOUT`）与业务错误码，避免在异常处理流程中崩溃。
+</api_defensive_protocol>
+
 <director_interaction_principles>
 原则一：无中生有的终结。导演绝不从零手动创建任何文件或目录，应调用 Agent 或 CLI 脚手架代劳，导演仅进行填空、确认与检查。
 原则二：显式约束注释。任何具有强制性格式要求的内容（如 YAML frontmatter、特定命名等），必须在模板与文档中以注释显式说明，绝不依赖默契。
