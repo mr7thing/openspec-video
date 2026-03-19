@@ -29,6 +29,12 @@ openspec/
 MANUAL_STRUCTURE*.md
 forMr7th.md
 FOR_Uncle7.md
+IMPLEMENTATION-*.md
+IMPROVEMENT_*.md
+MANUAL.md
+PACKAGING-REPORT.md
+ROADMAP-*.md
+TECHNICAL_ANALYSIS.md
 
 # Debug & Logs
 debug_gen.ts
@@ -38,5 +44,11 @@ src/test_gen.ts
 *.log
 npm-debug.log*
 npm-publish-*.log
+
+# Tests
+test/
+test-*/
+test-image.json
+jest.config.js
 
 .antigravity/documents/*
