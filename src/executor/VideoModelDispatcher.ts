@@ -4,6 +4,7 @@ import yaml from 'js-yaml';
 import { Job } from '../types/PromptSchema';
 import { VideoProvider } from './providers/VideoProvider';
 import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
+import { SeedanceProvider } from './providers/SeedanceProvider';
 import { FrameExtractor } from './FrameExtractor';
 
 export class VideoModelDispatcher {
@@ -20,6 +21,7 @@ export class VideoModelDispatcher {
         // 注册已实现的 Provider
         this.providers = new Map();
         this.providers.set('siliconflow', new SiliconFlowProvider());
+        this.providers.set('seedance', new SeedanceProvider());
     }
 
     private loadConfig(): any {
@@ -82,12 +84,27 @@ export class VideoModelDispatcher {
             if (!modelConf.supports_reference_images) schema.reference_images = [];
         }
 
+        // 注入配置中的额外字段 (如 api_url, resolution)
+        (sanitizedJob as any).api_url = modelConf.api_url;
+        
+        // 分辨率映射：读取 quality 控制对应的物理分辨率
+        const quality = sanitizedJob.payload.global_settings.quality;
+        if (modelConf.quality_map && modelConf.quality_map[quality]) {
+            (sanitizedJob as any).resolution = modelConf.quality_map[quality].resolution;
+        } else {
+            // fallback 到 default
+            (sanitizedJob as any).resolution = modelConf.defaults?.size || "1280x720";
+        }
+
         // 获取或校验鉴权
         // 根据 Provider 类型抓取对应的环境变量
         let apiKey = '';
         if (providerName === 'siliconflow') {
             apiKey = process.env.SILICONFLOW_API_KEY || '';
             if (!apiKey) throw new Error("SILICONFLOW_API_KEY environment variable is not set.");
+        } else if (providerName === 'seedance') {
+            apiKey = process.env.SEEDANCE_API_KEY || process.env.VOLCENGINE_API_KEY || '';
+            if (!apiKey) throw new Error("Neither SEEDANCE_API_KEY nor VOLCENGINE_API_KEY is set.");
         }
         // else if ...
 

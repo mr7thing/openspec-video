@@ -54,5 +54,34 @@ models:
     supports_reference_images: false
 
   # ==========================================
+  # 视频模型：Seedance 1.5 Pro (火山引擎)
+  # ==========================================
+  seedance-1.5-pro:
+    provider: "seedance"
+    model: "doubao-seedance-1-5-pro"
+    api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
+    
+    # 质量映射 (用户层配置)
+    quality_map:
+      "480p": 
+        resolution: "848x480"
+      "720p":
+        resolution: "1280x720"
+      "1080p":
+        resolution: "1920x1080"
+    
+    defaults:
+      quality: "720p"
+      fps: 24
+      duration: 5
+      sound: true
+    
+    # 能力边界
+    supports_first_image: true
+    supports_middle_image: false
+    supports_last_image: true
+    supports_reference_images: true
+
+  # ==========================================
   # 视频模型：CogVideoX (示例)
   # ==========================================

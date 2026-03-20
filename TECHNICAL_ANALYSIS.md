@@ -667,6 +667,11 @@ for (const root of activeProjects.keys()) {
 
 **评估**: 基础防护到位，但 `startsWith` 存在路径遍历风险 (如 `/project` 匹配 `/project-malicious`)。
 
+### 7.5 0.4.x：Seedance 1.5 Pro 增强
+- **环境安全**: 支持 `SEEDANCE_API_KEY` 与 `VOLCENGINE_API_KEY` 双重解析。
+- **质量分级**: 引入 `quality_map`，实现业务层（480p/720p/1080p）与物理层（848x480/1280x720/1920x1080）的彻底解耦。
+- **模式对齐**: 显式支持首尾帧生视频（I2V v2），通过 `schema_0_3` 传递引用图。
+
 ### 7.3 网络通信
 
 - WebSocket 仅绑定 `127.0.0.1`，不接受外部连接
