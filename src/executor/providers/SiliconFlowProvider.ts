@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { VideoProvider } from './VideoProvider';
 import { Job } from '../../types/PromptSchema';
+import { logger } from '../../utils/logger';
 
 export class SiliconFlowProvider implements VideoProvider {
     providerName = 'siliconflow';
@@ -41,22 +42,23 @@ export class SiliconFlowProvider implements VideoProvider {
         }
 
         // 当模型是图生视频时，首帧图通常必填。这里抛给外部或 API 自身去校验
-        if (!imageArg && modelName.includes("I2V")) {
-            console.warn(`[SiliconFlowProvider] Warning: Job ${job.id} uses I2V model but lacks first_image.`);
+        if (!imageArg && modelName.toLowerCase().includes("i2v")) {
+            logger.warn(`[SiliconFlowProvider] Warning: Job ${job.id} uses I2V model but lacks first_image.`);
         }
 
         const requestBody = {
             model: modelName,
             prompt: job.prompt_en || "Cinematic video.",
-            // 针对 wan2.2 暂时硬编码支持。理想情况从 job.payload 调配
-            image_size: "1280x720",
+            // Wan2.1 官方参数是 image_size
+            image_size: job.payload.global_settings.quality === '1080p' ? "1280x720" : "1280x720", // 暂设默认
             image: imageArg,
-            // 默认随机数，也可以从 job 里进一步暴露控制
-            // seed: Math.floor(Math.random() * 9999999999) 
         };
 
         if (process.env.OPSV_DEBUG === 'true') {
-            console.log(`[SiliconFlowProvider] Submitting to ${modelName} with prompt: ${requestBody.prompt}`);
+            logger.debug(`[SiliconFlowProvider] Submitting to ${modelName}`, { 
+                image_size: requestBody.image_size,
+                prompt: requestBody.prompt 
+            });
         }
 
         const response = await axios.post(url, requestBody, {
@@ -78,7 +80,7 @@ export class SiliconFlowProvider implements VideoProvider {
         let retries = 0;
         const maxRetries = 120; // 约等待 20 分钟 (120 * 10s)
 
-        console.log(`[SiliconFlow] Start polling for RequestID: ${requestId}`);
+        logger.info(`[SiliconFlow] Start polling for RequestID: ${requestId}`);
 
         while (retries < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 10000)); // 10秒轮询间隔
@@ -99,7 +101,7 @@ export class SiliconFlowProvider implements VideoProvider {
                     if (!videoUrl) {
                         throw new Error(`Status is Succeed but no video URL found in response.`);
                     }
-                    console.log(`[SiliconFlow] 🟢 Video generation succeeded! Downloading from: ${videoUrl}`);
+                    logger.info(`[SiliconFlow] 🟢 Video generation succeeded! Downloading from: ${videoUrl}`);
                     await this.downloadVideo(videoUrl, outputFilePath);
                     return;
                 } else if (status === 'Failed') {
@@ -111,12 +113,9 @@ export class SiliconFlowProvider implements VideoProvider {
                     }
                 }
             } catch (error: any) {
-                if (error.response) {
-                    console.error(`[SiliconFlow] API Error during poll: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
-                } else {
-                    console.error(`[SiliconFlow] Network/Poll Error: ${error.message}`);
+                if (retries > 5) {
+                    logger.warn(`[SiliconFlow] Poll Error (Try ${retries}): ${error.message}`);
                 }
-                // 发生异常时视情况决定是否继续。这里继续轮询几次可能遇到网络跳动
             }
         }
 

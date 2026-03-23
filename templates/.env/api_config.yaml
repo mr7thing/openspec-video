@@ -13,11 +13,13 @@ models:
     # 模型端点能力
     features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
     
-    # [默认参数] - 所有的 API 行为都应在此体现
+    # [默认参数] - 所有的 API 行为都应在此体现，严格对齐官方文档
     defaults:
-      # 默认分辨率质量 (2K, 4K)
+      # 默认分辨率质量 (2K, 3K, 4K)
       quality: "2K"
-      # 默认组图数量 (1=单图, >1=组图)
+      # 默认画幅比例 (1:1, 16:9, 9:16, 3:4, 4:3)
+      aspect_ratio: "1:1"
+      # 默认组图数量 (1-12)
       max_images: 4
       # 采样步数 (1-50)
       steps: 30
@@ -61,19 +63,17 @@ models:
     model: "doubao-seedance-1-5-pro"
     api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
     
-    # 质量映射 (用户层配置)
+    # 质量映射 (Seedance 官方支持 480p, 720p, 1080p)
     quality_map:
-      "480p": 
-        resolution: "848x480"
-      "720p":
-        resolution: "1280x720"
-      "1080p":
-        resolution: "1920x1080"
-    
+      "480p": "480p"
+      "720p": "720p"
+      "1080p": "1080p"
+    # 默认值
     defaults:
       quality: "720p"
-      fps: 24
+      aspect_ratio: "16:9" # 支持 16:9, 9:16, 1:1, 4:3, 3:4, 21:9
       duration: 5
+      fps: 24
       sound: true
     
     # 能力边界

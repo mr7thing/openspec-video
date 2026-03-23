@@ -3,13 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import { VideoProvider } from './VideoProvider';
 import { Job } from '../../types/PromptSchema';
+import { logger } from '../../utils/logger';
 
 /**
  * SeedanceProvider - 字节跳动 Seedance 1.5 Pro 视频生成实现
  * 
  * 核心逻辑：
  * 1. 支持文生视频、单图生视频、首尾帧生视频。
- * 2. 分辨率映射：480p, 720p, 1080p。
+ * 2. 官方参数对齐：resolution (480p/720p/1080p), aspect_ratio。
  * 3. 异步任务提交 + 轮询状态。
  */
 export class SeedanceProvider implements VideoProvider {
@@ -38,36 +39,29 @@ export class SeedanceProvider implements VideoProvider {
         // 1. 获取配置 (从 api_config.yaml 注入到 dispatcher，但这里需要从环境变量补充)
         const url = (job as any).api_url || 'https://ark.cn-beijing.volces.com/api/v3/video/submit';
         
-        // 2. 解析质量映射
+        // 2. 解析质量与比例 (对齐 api_config.yaml 与 官方文档)
         const quality = job.payload.global_settings.quality || '720p';
-        const resolution = (job as any).resolution || '1280x720';
+        const resolution = (job as any).resolution || quality; // 优先使用 dispatcher 传入的映射值，若无则使用 quality
+        const aspectRatio = job.payload.global_settings.aspect_ratio || '16:9';
 
-        // 3. 构造 Payload (针对 Seedance 1.5 Pro)
+        // 3. 构造 Payload (针对 Seedance 1.5 Pro 官方文档)
         const schemaExtra = job.payload.schema_0_3;
         const requestBody: any = {
             model: modelName,
             prompt: job.prompt_en || "Cinematic video.",
-            resolution: resolution,
+            resolution: resolution, // 官方支持 "480p", "720p", "1080p"
+            aspect_ratio: aspectRatio, // 官方支持 "16:9", "9:16", "1:1" 等
             duration: parseInt(job.payload.duration || '5'),
             fps: 24,
-            sound: true // 默认开启空间音频
+            sound: (job.payload.global_settings as any).sound !== false
         };
 
-        // 处理图像引用 (首帧/尾帧)
-        if (schemaExtra) {
-            if (schemaExtra.first_image) {
-                requestBody.image = this.getBase64Image(schemaExtra.first_image);
-            }
-            if (schemaExtra.last_image) {
-                requestBody.last_image = this.getBase64Image(schemaExtra.last_image);
-            }
-        } else if (job.reference_images && job.reference_images.length > 0) {
-            // 后备：使用第一张参考图作为首帧
-            requestBody.image = this.getBase64Image(job.reference_images[0]);
-        }
-
         if (process.env.OPSV_DEBUG === 'true') {
-            console.log(`[Seedance] Submitting to ${modelName} (${resolution}) with prompt: ${requestBody.prompt}`);
+            logger.debug(`[Seedance] Submitting to ${modelName}`, { 
+                resolution, 
+                aspectRatio, 
+                prompt: requestBody.prompt 
+            });
         }
 
         try {
@@ -100,7 +94,7 @@ export class SeedanceProvider implements VideoProvider {
         let retries = 0;
         const maxRetries = 150; // 约等待 25 分钟
 
-        console.log(`[Seedance] Start polling for TaskID: ${requestId}`);
+        logger.info(`[Seedance] Start polling for TaskID: ${requestId}`);
 
         while (retries < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 10000));
@@ -121,7 +115,7 @@ export class SeedanceProvider implements VideoProvider {
                     if (!videoUrl) {
                         throw new Error(`Status is completed but no video_url found: ${JSON.stringify(data)}`);
                     }
-                    console.log(`[Seedance] 🟢 Video generation succeeded! Downloading: ${videoUrl}`);
+                    logger.info(`[Seedance] 🟢 Video generation succeeded! Downloading: ${videoUrl}`);
                     await this.downloadVideo(videoUrl, outputFilePath);
                     return;
                 } else if (status === 'failed') {
@@ -129,12 +123,12 @@ export class SeedanceProvider implements VideoProvider {
                     throw new Error(`Video generation failed remotely: ${reason}`);
                 } else {
                     if (process.env.OPSV_DEBUG === 'true') {
-                        process.stdout.write('s'); // Seedance polling
+                        process.stdout.write('s');
                     }
                 }
             } catch (error: any) {
-                if (retries > 5) { // 允许前几次由于 API 尚未生效导致的波动
-                    console.error(`[Seedance] Poll Error (Try ${retries}): ${error.message}`);
+                if (retries > 5) {
+                    logger.warn(`[Seedance] Poll Error (Try ${retries}): ${error.message}`);
                 }
             }
         }
