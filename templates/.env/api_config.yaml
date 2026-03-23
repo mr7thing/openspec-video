@@ -1,15 +1,19 @@
-# OpsV 0.3 多模态视频引擎调度配置文件
+# OpsV 0.4 多模态视频引擎调度配置文件
 # 该文件定义了目前支持的生成引擎的能力级与默认参数。
 # 调度器 (Dispatcher) 在发出请求前将严格根据下表映射参数。
+# gen_command 标注该模型由哪个 CLI 命令执行。
 
 models:
   # ==========================================
   # 图像模型：火山引擎 SeaDream 5.0 Lite
+  # CLI: opsv gen-image -m seadream-5.0-lite
   # ==========================================
   seadream-5.0-lite:
     provider: "seadream"
     # 实际模型/Endpoint ID (由火山方舟提供)
     model: "doubao-seedream-5-0-260128"
+    # 关联的 CLI 命令
+    gen_command: "gen-image"
     # 模型端点能力
     features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
     
@@ -34,12 +38,15 @@ models:
 
   # ==========================================
   # 视频模型：SiliconFlow Wan 2.1
+  # CLI: opsv gen-video -m wan2.2-i2v
   # ==========================================
   wan2.2-i2v:
     provider: "siliconflow"
     model: "wan-ai/Wan2.1-T2V-14B"
     api_url: "https://api.siliconflow.cn/v1/video/submit"
     api_status_url: "https://api.siliconflow.cn/v1/video/status"
+    # 关联的 CLI 命令
+    gen_command: "gen-video"
     
     defaults:
       # 默认视频分辨率
@@ -57,11 +64,14 @@ models:
 
   # ==========================================
   # 视频模型：Seedance 1.5 Pro (火山引擎)
+  # CLI: opsv gen-video -m seedance-1.5-pro
   # ==========================================
   seedance-1.5-pro:
     provider: "seedance"
     model: "doubao-seedance-1-5-pro"
     api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
+    # 关联的 CLI 命令
+    gen_command: "gen-video"
     
     # 质量映射 (Seedance 官方支持 480p, 720p, 1080p)
     quality_map:
