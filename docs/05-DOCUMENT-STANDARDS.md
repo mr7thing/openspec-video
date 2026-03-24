@@ -48,93 +48,107 @@ key: value
 
 ## 2. 资产文档格式 (elements/ 和 scenes/)
 
-### 2.1 YAML-First 三段式结构
+> 详细规范见 [OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
 
-每个资产文件必须遵循以下格式：
+### 2.1 YAML Frontmatter
 
 ```yaml
 ---
-# ===== 元数据 =====
 name: "@role_hero"           # @ 前缀 + 类型前缀 + 标识符
 type: "character"             # character | scene | prop
-has_image: false              # 默认 false，导演确认后改 true
-
-# ===== 描述区（中文） =====
-detailed_description: >
-  致密的中文特征描写，至少3-5句话。
-  包含材质、光影、磨损度、情绪、构图等元素。
 brief_description: "一句话简略描述"
-
-# ===== 渲染提示词（英文） =====
-prompt_en: >
+detailed_description: >       # 无参考图时的详尽描写
+  致密的中文特征描写，至少3-5句话。
+prompt_en: >                  # 英文渲染提示词
   Dense English prompt for image generation models.
-  Include composition, lighting, texture, resolution, style...
-
-# ===== Schema 版本 =====
-schema_version: "0.3.2"
 ---
-
-<!-- 以下正文区域供编译器提取补充字段 -->
-
-## subject
-[对主体的一句话描述，中文]
-
-## environment
-[拍摄环境/背景。如果是纯物品特写可留空]
-
-## camera
-[景别，英文。如 Close-Up, Macro, Wide Shot]
-
-## 参考图
-<!-- 确认参考图后，填入路径 -->
-![]()
 ```
 
-### 2.2 `has_image` 二元法则
+> **`has_image` 已废弃**（0.4.1）。参考图状态由 Markdown Body 的 d-ref / a-ref 节自动推导。
 
-这是 OpsV 最核心的格式规则。**违反此规则将导致编译失败或特征泄漏。**
+### 2.2 双通道参考图体系 (d-ref / a-ref)
 
-#### 场景 A：`has_image: true`（身份锁定）
+这是 OpsV 0.4 最核心的格式升级。统一规则：
 
-> 哲学：一图胜千言，别用千言去描述一张图。
+```
+生成自身 → 使用自己的 Design References (d-ref)
+被引用时 → 提供自己的 Approved References (a-ref)
+```
 
-- 文字描述限制为**一句话，不超过 20 个字**
-- **必须**提供 `![Image](path)` 参考图路径
-- 编译器提取极简描述 + 图片路径
+#### `## Design References`（d-ref：生成输入）
 
-```yaml
+`opsv generate` 生成**本实体自身**时，将此节中的图片作为 img2img 输入参考。
+
+典型来源：
+- 外部灵感图（服装、配色、情绪板）
+- 已有资产的 a-ref（用于生成变体：老年版 / 卡通版 / 职业形象）
+- 草图或手绘稿
+
+```markdown
+## Design References
+- [服装灵感 - 赛博朋克风衣](refs/costume_mood.png)
+- [年轻版原型 - 用于老年变体生成](artifacts/drafts_3/role_K_turnaround.png)
+```
+
+#### `## Approved References`（a-ref：定档输出）
+
+**其他实体引用本实体**时（如 Shot 中 `@role_K`），将此节中的图片注入引用方的 `reference_images`。
+
+代表经导演审批确认的最终形象。
+
+```markdown
+## Approved References
+- [角色三视图](artifacts/drafts_3/role_K_turnaround.png)
+- [角色正脸特写](artifacts/drafts_3/role_K_closeup.png)
+```
+
+#### 自动推导规则
+
+| 条件 | 等价 | 编译行为 |
+|------|------|---------|
+| d-ref **或** a-ref 任一存在且非空 | `has_image: true` | 使用 `brief_description` + 参考图 |
+| 两节均不存在或为空 | `has_image: false` | 使用 `detailed_description` 纯文生图 |
+
+### 2.3 完整示例
+
+```markdown
 ---
 name: "@role_K"
 type: "character"
-has_image: true
 brief_description: "30多岁赛博侦探，黑色高领大衣"
+prompt_en: >
+  A cyber detective in his 30s, black turtleneck coat,
+  red cybernetic eye, moody cinematic lighting, 8k.
 ---
 
-# Subject Identity
-30多岁赛博侦探，黑色高领大衣，左眼亮起红色义眼流光。
+## Design References
+- [服装灵感 - 赛博朋克风衣](refs/costume_mood.png)
+- [义眼参考 - 红色光效](refs/cyber_eye_ref.jpg)
 
-# Physical Anchor
-![K_Ref](../../artifacts/characters/K.png)
+## Approved References
+- [角色三视图](artifacts/drafts_3/role_K_turnaround.png)
+- [角色正脸特写](artifacts/drafts_3/role_K_closeup.png)
+
+## subject
+赛博侦探 K
+
+## environment
+雨夜霓虹街头
+
+## camera
+Medium Close-Up
 ```
 
-#### 场景 B：`has_image: false`（全文描述）
+### 2.4 变体链
 
-> 哲学：没有图片锚定时，文字是唯一的真相源，必须穷尽。
+已有资产的 a-ref 可作为新资产的 d-ref，实现变体生成：
 
-- 详尽描写所有视觉特征
-- **禁止**包含任何 `![Image]()` 标签
-- 编译器提取全部文字作为生成参数
-
-```yaml
----
-name: "@scene_neon_alley"
-type: "scene"
-has_image: false
-detailed_description: >
-  赛博朋克风格的狭窄幽暗小巷，持续不断的大雨，
-  地面水洼倒映着闪烁的紫色和青色霓虹灯招牌。
-  两侧是生锈的金属管道和满是涂鸦的砖墙...
----
+```
+@role_K 的 a-ref (年轻版定档图)
+   ↓ 作为 @role_K_old 的 d-ref
+   ↓ opsv generate → 生成老年版
+   ↓ review → approve
+   ↓ 写入 @role_K_old 的 a-ref
 ```
 
 ---

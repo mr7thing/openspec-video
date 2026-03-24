@@ -49,7 +49,7 @@ CLI 启动时按以下优先级加载环境变量：
 
 ```bash
 # 查看环境变量加载状态
-opsv execute-image --dry-run
+opsv gen-image --dry-run
 ```
 
 输出将显示：
@@ -80,14 +80,16 @@ models:
   seadream-5.0-lite:
     provider: "seadream"
     model: "doubao-seedream-5-0-260128"
-    gen_command: "gen-image"              # ← 0.4.1 新增
+    gen_command: "gen-image"
+    required_env: ["VOLCENGINE_API_KEY"]       # ← 0.4.1 声明所需 Key
+    fallback_env: ["SEADREAM_API_KEY"]         # ← 备选 Key（任一存在即可）
     features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
     defaults:
-      quality: "2K"                           # 分辨率质量 (2K/3K/4K)
-      aspect_ratio: "1:1"                     # 默认画幅 (1:1/16:9/9:16/3:4/4:3)
-      max_images: 4                           # 组图数量 (1-12)
-      steps: 30                               # 采样步数 (1-50)
-      cfg_scale: 7.5                          # 提示词引导系数 (1-20)
+      quality: "2K"
+      aspect_ratio: "1:1"
+      max_images: 4
+      steps: 30
+      cfg_scale: 7.5
       negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark"
     max_size:
       width: 2048
@@ -103,11 +105,12 @@ models:
     model: "wan-ai/Wan2.1-T2V-14B"
     api_url: "https://api.siliconflow.cn/v1/video/submit"
     api_status_url: "https://api.siliconflow.cn/v1/video/status"
-    gen_command: "gen-video"              # ← 0.4.1 新增
+    gen_command: "gen-video"
+    required_env: ["SILICONFLOW_API_KEY"]
     defaults:
-      size: "1280x720"                        # 分辨率
-      fps: 24                                 # 帧率
-      duration: 5                             # 时长（秒）
+      size: "1280x720"
+      fps: 24
+      duration: 5
     supports_first_image: true
     supports_middle_image: false
     supports_last_image: false
@@ -121,17 +124,19 @@ models:
     provider: "seedance"
     model: "doubao-seedance-1-5-pro"
     api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
-    gen_command: "gen-video"              # ← 0.4.1 新增
+    gen_command: "gen-video"
+    required_env: ["VOLCENGINE_API_KEY"]
+    fallback_env: ["SEEDANCE_API_KEY"]
     quality_map:
       "480p": "480p"
       "720p": "720p"
       "1080p": "1080p"
     defaults:
-      quality: "720p"                          # 默认分辨率
-      aspect_ratio: "16:9"                     # 支持: 16:9/9:16/1:1/4:3/3:4/21:9
-      duration: 5                              # 默认时长（秒）
-      fps: 24                                  # 固定 24fps
-      sound: true                              # 空间音频
+      quality: "720p"
+      aspect_ratio: "16:9"
+      duration: 5
+      fps: 24
+      sound: true
     supports_first_image: true
     supports_middle_image: false
     supports_last_image: true
@@ -201,11 +206,11 @@ templates/.env/                 .env/
 
 ## 7. 添加新模型
 
-1. 在 `api_config.yaml` 中添加新模型配置块
-2. 在 `src/executor/providers/` 中实现对应的 Provider 类
-3. 在 `ImageModelDispatcher` 或 `VideoModelDispatcher` 中注册新 Provider
-4. 更新 `docs/07-API-REFERENCE.md` 添加接口文档
-5. 编写测试用例
+1. 在 `api_config.yaml` 中添加新模型配置块（含 `required_env`）
+2. 在 `secrets.env` 中添加对应的 API Key
+3. 在 `src/executor/providers/` 中实现对应的 Provider 类
+4. 在 `ImageModelDispatcher` 或 `VideoModelDispatcher` 中注册新 Provider
+5. 更新 `docs/07-API-REFERENCE.md` 添加接口文档
 
 ```yaml
 # api_config.yaml 新增示例
@@ -214,12 +219,23 @@ models:
     provider: "custom"
     model: "model-endpoint-id"
     api_url: "https://api.example.com/v1/generate"
+    gen_command: "gen-image"          # 或 "gen-video"
+    required_env: ["MY_MODEL_API_KEY"]
     defaults:
       quality: "720p"
       duration: 5
     supports_first_image: true
     supports_last_image: false
 ```
+
+### `required_env` / `fallback_env` 字段
+
+声明模型所需的 API Key 环境变量名。CLI 在执行前查表校验，无需硬编码。
+
+| 字段 | 含义 | 示例 |
+|------|------|------|
+| `required_env` | 必需的 Key（至少一个存在） | `["VOLCENGINE_API_KEY"]` |
+| `fallback_env` | 备选 Key（required 不存在时尝试） | `["SEADREAM_API_KEY"]` |
 
 ---
 

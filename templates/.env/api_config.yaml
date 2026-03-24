@@ -14,6 +14,9 @@ models:
     model: "doubao-seedream-5-0-260128"
     # 关联的 CLI 命令
     gen_command: "gen-image"
+    # 所需 API Key（CLI 查表校验）
+    required_env: ["VOLCENGINE_API_KEY"]
+    fallback_env: ["SEADREAM_API_KEY"]
     # 模型端点能力
     features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
     
@@ -47,6 +50,8 @@ models:
     api_status_url: "https://api.siliconflow.cn/v1/video/status"
     # 关联的 CLI 命令
     gen_command: "gen-video"
+    # 所需 API Key
+    required_env: ["SILICONFLOW_API_KEY"]
     
     defaults:
       # 默认视频分辨率
@@ -72,6 +77,9 @@ models:
     api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
     # 关联的 CLI 命令
     gen_command: "gen-video"
+    # 所需 API Key
+    required_env: ["VOLCENGINE_API_KEY"]
+    fallback_env: ["SEEDANCE_API_KEY"]
     
     # 质量映射 (Seedance 官方支持 480p, 720p, 1080p)
     quality_map:

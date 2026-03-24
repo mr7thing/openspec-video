@@ -120,30 +120,58 @@ global_style_postfix: "ethereal atmosphere, minimalist composition, soft bokeh, 
 为 `project.md` 花名册中列出的每个实体创建独立的 `.md` 定义文件。
 
 ### 工作规则
+
+> 详细规范见 [OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
+
 1. **先读全局上下文**：必须读取 `project.md` 了解时代氛围和风格
-2. **`has_image` 二元决策**：
-   - 默认 `has_image: false` → 详尽描述（材质、光影、磨损度、情绪）
-   - 仅当导演明确确认参考图后 → `has_image: true` → 极简描述 + 图片路径
-3. **YAML-First 三段式**：元数据 → 描述 → 英文渲染提示词
+2. **双通道参考图体系**：
+   - `## Design References`（d-ref）：放入生成本实体时需要的输入参考图（灵感图、已有资产的 a-ref 用于变体生成）
+   - `## Approved References`（a-ref）：放入定档后的正式参考图（经 `opsv review` 审批确认）
+   - 两节均为空时 → 纯文生图，使用 `detailed_description`
+   - 任一节非空时 → 使用 `brief_description` + 参考图
+3. **YAML 存元数据，Markdown Body 存参考图链接** — 用户只维护一处
 
 ### 产物示例
 
-```yaml
+```markdown
 # videospec/elements/@role_butterfly.md
 ---
 name: "@role_butterfly"
 type: "character"
-has_image: false
 detailed_description: >
   一只翅膀如彩色玻璃般的凤蝶，翼展约15厘米。上翅为深邃的靛蓝色，
-  边缘渐变为琥珀色，布满细密的金色鳞粉。下翅有两个对称的"眼斑"，
-  外圈为橙红色，内圈为幽蓝...
+  边缘渐变为琥珀色，布满细密的金色鳞粉...
 brief_description: "靛蓝渐变琥珀色的凤蝶，翅膀如彩色玻璃"
 prompt_en: >
   A swallowtail butterfly with indigo-to-amber gradient wings,
   golden scale dust, glass-like transparency, macro photography,
   ethereal backlighting, 8k ultra detailed...
 ---
+
+## Design References
+- [蝴蝶翅膀纹理参考](refs/butterfly_wing_texture.jpg)
+- [琥珀色调光影参考](refs/amber_lighting_mood.png)
+
+## Approved References
+<!-- opsv review 审批后回写 →
+- [蝴蝶三视图](artifacts/drafts_2/role_butterfly_turnaround.png)
+-->
+```
+
+### 变体链示例
+
+```markdown
+# videospec/elements/@role_butterfly_aged.md — 老化版蝴蝶
+---
+name: "@role_butterfly_aged"
+type: "character"
+brief_description: "翅膀褪色破损的老年凤蝶"
+prompt_en: "An aged swallowtail butterfly, faded colors, torn wing edges..."
+---
+
+## Design References
+- [年轻版定档图 - 作为老化基础](artifacts/drafts_2/role_butterfly_turnaround.png)
+- [老化纹理参考](refs/aged_wing_texture.jpg)
 ```
 
 ### 质检门禁

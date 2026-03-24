@@ -13,7 +13,7 @@ OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演
 - **代码即规范**：`.md` 文件是唯一的真相源，图像和视频是其编译产物
 - **资产先行**：角色/场景/道具必须先独立建档，分镜中只允许引用（`@` 语法）
 - **动静分离**：图像生成和视频生成是两条独立管线，互不干扰
-- **YAML 优先**：编译器读 YAML Frontmatter，Markdown 正文仅供人类审阅
+- **Markdown 驱动**：YAML Frontmatter 存元数据，Markdown Body 存参考图引用和人类审阅内容，两者协同
 
 ---
 
@@ -81,7 +81,9 @@ project/
 |------|------|
 | **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码 |
 | **Asset-First** | 资产先于分镜存在，分镜只引用不描述 |
-| **has_image 二元法** | `true` = 极简文字 + 参考图锁定；`false` = 详尽文字描述 |
+| **d-ref (Design References)** | 生成输入参考图。`opsv generate` 生成本实体时作为 img2img 输入 |
+| **a-ref (Approved References)** | 定档输出参考图。其他实体通过 `@` 引用时，提供此参考图 |
+| **变体链** | 将 A 的 a-ref 作为 B 的 d-ref，生成基于 A 的新变体（如老年版、卡通版） |
 | **@ 引用语法** | 用 `@role_K`、`@scene_bar` 等标签引用独立的资产文件 |
 | **global_style_postfix** | 在 `project.md` 中定义的全局渲染风格后缀，编译器自动注入每个任务 |
 | **动静分离** | 图像管线（Script.md → jobs.json）与视频管线（Shotlist.md → video_jobs.json）互相独立 |
