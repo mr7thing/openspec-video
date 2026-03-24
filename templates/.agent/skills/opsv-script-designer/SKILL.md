@@ -1,18 +1,19 @@
 ---
 name: opsv-script-designer
-description: 分镜脚本设计执行手册。将故事大纲翻译成带 YAML 结构的 Script.md 文件，包含严格时长约束（3-15s）与画廊占位符模板，供 ScriptDesigner Agent 调用。
+description: 分镜脚本设计执行手册。将故事大纲翻译成带 YAML 结构的 Script.md 文件，包含严谨时长约束与画廊占位符模板，支持 d-ref/a-ref，供 ScriptDesigner Agent 调用。
 ---
 
-# OpsV Script Designer — 执行手册 (0.3.2)
+# OpsV Script Designer — 执行手册 (0.4.1)
 
 本手册定义了 `ScriptDesigner Agent` 在 OpenSpec-Video 架构下生成 `videospec/shots/Script.md` 的完整执行规范。输入为 `story.md`，输出为 YAML 驱动的编译就绪分镜脚本。
 
-## 核心准则 (0.3.2)
+## 核心准则 (0.4.1)
 
 **规则 1：时间是绝对约束。** 每个 Shot 必须有明确的 `duration`。单镜头理想 3-5 秒，**上限为 15 秒**。超过 15 秒必须拆成多个 Shot。
 **规则 2：视觉语言，非文字叙事。** 要描述的是「摄像机看到的内容」：机位、运动、主体动作、光影。
-**规则 3：YAML 优先（强制铁律）。** **必须**将所有 Shot 定义在文档 frontmatter 的 `shots:` YAML 数组中。Markdown 正文仅供人类阅读审阅，编译器完全忽略正文。
-**规则 4：双语分离输出。** YAML 字段（`camera`, `environment`, `subject`）与 Markdown 正文使用**中文**；`prompt_en` 字段使用**纯英文**（供扩散模型如 SD/Flux 使用）。
+**规则 3：YAML 优先（强制铁律）。** **必须**将所有 Shot 定义在文档 frontmatter 的 `shots:` YAML 数组中。Markdown 正文仅供人类阅读审阅。
+**规则 4：双语分离输出。** YAML 字段（`camera`, `environment`, `subject`）与 Markdown 正文使用**中文**；`prompt_en` 字段使用**纯英文**。
+**规则 5：a-ref 与 d-ref 的边界。** 分镜主要引用元素的 `Approved References (a-ref)`，分镜自身的图片渲染将在 `Script.md` 的 `Design References (d-ref)` 或者具体的画廊中确认。
 
 ## Workflow Execution
 
