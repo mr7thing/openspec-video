@@ -46,6 +46,14 @@ export class SeedanceProvider implements VideoProvider {
 
         // 3. 构造 Payload (针对 Seedance 1.5 Pro 官方文档)
         const schemaExtra = job.payload.schema_0_3;
+        // 获取可能作为参考的首帧图
+        let imageArg = undefined;
+        if (schemaExtra && schemaExtra.first_image) {
+            imageArg = this.getBase64Image(schemaExtra.first_image);
+        } else if (job.reference_images && job.reference_images.length > 0) {
+            imageArg = this.getBase64Image(job.reference_images[0]);
+        }
+
         const requestBody: any = {
             model: modelName,
             prompt: job.prompt_en || "Cinematic video.",
@@ -53,13 +61,15 @@ export class SeedanceProvider implements VideoProvider {
             aspect_ratio: aspectRatio, // 官方支持 "16:9", "9:16", "1:1" 等
             duration: parseInt(job.payload.duration || '5'),
             fps: 24,
-            sound: (job.payload.global_settings as any).sound !== false
+            sound: (job.payload.global_settings as any).sound !== false,
+            ...(imageArg && { image: imageArg })
         };
 
         if (process.env.OPSV_DEBUG === 'true') {
             logger.debug(`[Seedance] Submitting to ${modelName}`, { 
                 resolution, 
                 aspectRatio, 
+                hasImage: !!imageArg,
                 prompt: requestBody.prompt 
             });
         }
@@ -127,6 +137,11 @@ export class SeedanceProvider implements VideoProvider {
                     }
                 }
             } catch (error: any) {
+                // 如果是我们手动抛出的明确失败错误，则应中止整个重试流
+                if (error.message && error.message.includes('Video generation failed remotely')) {
+                    throw error;
+                }
+                
                 if (retries > 5) {
                     logger.warn(`[Seedance] Poll Error (Try ${retries}): ${error.message}`);
                 }

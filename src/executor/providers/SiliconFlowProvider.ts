@@ -113,6 +113,11 @@ export class SiliconFlowProvider implements VideoProvider {
                     }
                 }
             } catch (error: any) {
+                // 判断如果是手动抛出的明确 Failed，直接中止轮询不再重试
+                if (error.message && error.message.includes('Video generation failed remotely')) {
+                    throw error;
+                }
+                
                 if (retries > 5) {
                     logger.warn(`[SiliconFlow] Poll Error (Try ${retries}): ${error.message}`);
                 }
