@@ -50,5 +50,10 @@ test/
 test-*/
 test-image.json
 jest.config.js
+error_msg.txt
+jest**
+out**
+error*
+
 
 .antigravity/documents/*
