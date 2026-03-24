@@ -173,9 +173,19 @@ export class JobGenerator {
 
         // ---- Phase 3: Extract reference images ----
         const referenceImages: string[] = [];
-        const refImgMatch = body.match(/\[.*?\]\((.*?)\)/);
-        if (refImgMatch && refImgMatch[1] && fs.existsSync(refImgMatch[1])) {
-            referenceImages.push(refImgMatch[1]);
+        
+        // Use AssetManager's parsed references if available
+        const asset = this.assetManager.getElement(id) || this.assetManager.getScene(id);
+        if (asset && asset.design_references && asset.design_references.length > 0) {
+            referenceImages.push(...asset.design_references);
+        } else if (asset && asset.reference_images && asset.reference_images.length > 0) {
+            referenceImages.push(...asset.reference_images);
+        } else {
+            const refImgMatch = body.match(/\[.*?\]\((.*?)\)/);
+            if (refImgMatch && refImgMatch[1]) {
+                const absPath = path.resolve(path.dirname(filePath), refImgMatch[1]);
+                if (fs.existsSync(absPath)) referenceImages.push(absPath);
+            }
         }
 
         // ---- Phase 4: Build payload.prompt (中文叙事) ----
@@ -350,7 +360,10 @@ export class JobGenerator {
             if (char) {
                 let foundRef = false;
                 // 1. Look for Document-Driven References (Highest Priority)
-                if (char.reference_images && char.reference_images.length > 0) {
+                if (char.approved_references && char.approved_references.length > 0) {
+                    assetRefs.push(char.approved_references[0]);
+                    foundRef = true;
+                } else if (char.reference_images && char.reference_images.length > 0) {
                     assetRefs.push(char.reference_images[0]); // Pick first registered reference
                     foundRef = true;
                 } else {
@@ -379,7 +392,10 @@ export class JobGenerator {
             const scene = this.assetManager.getScene(refId);
             if (scene) {
                 let foundRef = false;
-                if (scene.reference_images && scene.reference_images.length > 0) {
+                if (scene.approved_references && scene.approved_references.length > 0) {
+                    assetRefs.push(scene.approved_references[0]);
+                    foundRef = true;
+                } else if (scene.reference_images && scene.reference_images.length > 0) {
                     assetRefs.push(scene.reference_images[0]);
                     foundRef = true;
                 } else {
@@ -419,7 +435,10 @@ export class JobGenerator {
 
                 if (char) {
                     let foundRef = false;
-                    if (char.reference_images && char.reference_images.length > 0) {
+                    if (char.approved_references && char.approved_references.length > 0) {
+                        assetRefs.push(char.approved_references[0]);
+                        foundRef = true;
+                    } else if (char.reference_images && char.reference_images.length > 0) {
                         assetRefs.push(char.reference_images[0]);
                         foundRef = true;
                     } else {
@@ -452,7 +471,10 @@ export class JobGenerator {
 
                 if (scene) {
                     let foundRef = false;
-                    if (scene.reference_images && scene.reference_images.length > 0) {
+                    if (scene.approved_references && scene.approved_references.length > 0) {
+                        assetRefs.push(scene.approved_references[0]);
+                        foundRef = true;
+                    } else if (scene.reference_images && scene.reference_images.length > 0) {
                         assetRefs.push(scene.reference_images[0]);
                         foundRef = true;
                     } else {

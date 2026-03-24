@@ -17,7 +17,9 @@ const CharacterSchema = z.object({
         clothing: z.string().optional(),
         distinctive_features: z.array(z.string()).optional()
     }).optional(),
-    reference_images: z.array(z.string()).optional() // Replaces reference_sheet
+    reference_images: z.array(z.string()).optional(), // Legacy support
+    design_references: z.array(z.string()).optional(),
+    approved_references: z.array(z.string()).optional()
 }).passthrough(); // Allow unknown keys
 
 const SceneSchema = z.object({
@@ -28,7 +30,9 @@ const SceneSchema = z.object({
     description: z.string().optional(),
     lighting: z.string().optional(),
     atmosphere: z.string().optional(),
-    reference_images: z.array(z.string()).optional()
+    reference_images: z.array(z.string()).optional(), // Legacy support
+    design_references: z.array(z.string()).optional(),
+    approved_references: z.array(z.string()).optional()
 }).passthrough();
 
 export type Element = z.infer<typeof CharacterSchema>;
@@ -43,6 +47,32 @@ export class AssetManager {
     constructor(projectRoot: string) {
         this.elementsRoot = path.join(path.resolve(projectRoot), 'videospec', 'elements');
         this.scenesRoot = path.join(path.resolve(projectRoot), 'videospec', 'scenes');
+    }
+
+    private extractLinksFromSection(body: string, sectionTitleRegex: RegExp, rootPath: string): string[] {
+        const lines = body.split('\n');
+        let inSection = false;
+        const images: string[] = [];
+        
+        for (const line of lines) {
+            if (line.match(/^##\s+.+/)) {
+                inSection = sectionTitleRegex.test(line);
+                continue;
+            }
+            if (inSection) {
+                const imgRegex = /!\[.*?\]\((.*?)\)/g;
+                let imgMatch;
+                while ((imgMatch = imgRegex.exec(line)) !== null) {
+                    try {
+                        const absPath = path.resolve(rootPath, imgMatch[1]);
+                        if (fs.existsSync(absPath)) images.push(absPath);
+                    } catch (e) {
+                        // ignore invalid paths
+                    }
+                }
+            }
+        }
+        return images;
     }
 
     async loadAssets(): Promise<void> {
@@ -119,18 +149,29 @@ export class AssetManager {
                 // Extract reference images from markdown links ![...](path)
                 if (file.endsWith('.md')) {
                     const body = content.split(/^---$/m).slice(2).join('---');
-                    const imgRegex = /!\[.*?\]\((.*?)\)/g;
-                    const images = [];
-                    let imgMatch;
-                    while ((imgMatch = imgRegex.exec(body)) !== null) {
-                        try {
-                            const absPath = path.resolve(this.elementsRoot, imgMatch[1]);
-                            if (fs.existsSync(absPath)) images.push(absPath);
-                        } catch (e) {
-                            // ignore invalid paths
+
+                    // Extract Design References and Approved References
+                    const dRefs = this.extractLinksFromSection(body, /Design References|d-ref/i, this.elementsRoot);
+                    const aRefs = this.extractLinksFromSection(body, /Approved References|a-ref/i, this.elementsRoot);
+                    
+                    if (dRefs.length > 0) raw.design_references = dRefs;
+                    if (aRefs.length > 0) raw.approved_references = aRefs;
+
+                    // Fallback to unstructured references if strict sections not found
+                    if (dRefs.length === 0 && aRefs.length === 0) {
+                        const imgRegex = /!\[.*?\]\((.*?)\)/g;
+                        const images = [];
+                        let imgMatch;
+                        while ((imgMatch = imgRegex.exec(body)) !== null) {
+                            try {
+                                const absPath = path.resolve(this.elementsRoot, imgMatch[1]);
+                                if (fs.existsSync(absPath)) images.push(absPath);
+                            } catch (e) {
+                                // ignore invalid paths
+                            }
                         }
+                        if (images.length > 0) raw.reference_images = images;
                     }
-                    if (images.length > 0) raw.reference_images = images;
                 }
 
                 const asset = CharacterSchema.parse(raw);
@@ -186,18 +227,28 @@ export class AssetManager {
                     if (!raw.name) raw.name = raw.id;
 
                     // Extract reference images from markdown links ![...](path)
-                    const imgRegex = /!\[.*?\]\((.*?)\)/g;
-                    const images = [];
-                    let imgMatch;
-                    while ((imgMatch = imgRegex.exec(body)) !== null) {
-                        try {
-                            const absPath = path.resolve(this.scenesRoot, imgMatch[1]);
-                            if (fs.existsSync(absPath)) images.push(absPath);
-                        } catch (e) {
-                            // ignore invalid paths
+                    // Extract Design References and Approved References
+                    const dRefs = this.extractLinksFromSection(body, /Design References|d-ref/i, this.scenesRoot);
+                    const aRefs = this.extractLinksFromSection(body, /Approved References|a-ref/i, this.scenesRoot);
+                    
+                    if (dRefs.length > 0) raw.design_references = dRefs;
+                    if (aRefs.length > 0) raw.approved_references = aRefs;
+
+                    // Fallback to unstructured references if strict sections not found
+                    if (dRefs.length === 0 && aRefs.length === 0) {
+                        const imgRegex = /!\[.*?\]\((.*?)\)/g;
+                        const images = [];
+                        let imgMatch;
+                        while ((imgMatch = imgRegex.exec(body)) !== null) {
+                            try {
+                                const absPath = path.resolve(this.scenesRoot, imgMatch[1]);
+                                if (fs.existsSync(absPath)) images.push(absPath);
+                            } catch (e) {
+                                // ignore invalid paths
+                            }
                         }
+                        if (images.length > 0) raw.reference_images = images;
                     }
-                    if (images.length > 0) raw.reference_images = images;
 
                 } else {
                     raw = yaml.load(content);

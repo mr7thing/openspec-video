@@ -1,41 +1,27 @@
 import fs from 'fs';
 import path from 'path';
-import yaml from 'js-yaml';
 import { Job } from '../types/PromptSchema';
 import { VideoProvider } from './providers/VideoProvider';
 import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
 import { SeedanceProvider } from './providers/SeedanceProvider';
 import { FrameExtractor } from './FrameExtractor';
+import { ConfigLoader, ApiConfig } from '../utils/configLoader';
 
 export class VideoModelDispatcher {
     private projectRoot: string;
-    private apiConfigPath: string;
-    private config: any;
+    private configLoader: ConfigLoader;
+    private config: ApiConfig;
     private providers: Map<string, VideoProvider>;
 
     constructor(projectRoot: string) {
         this.projectRoot = projectRoot;
-        this.apiConfigPath = path.join(this.projectRoot, '.env', 'api_config.yaml');
-        this.config = this.loadConfig();
+        this.configLoader = ConfigLoader.getInstance();
+        this.config = this.configLoader.loadConfig(this.projectRoot);
 
         // 注册已实现的 Provider
         this.providers = new Map();
         this.providers.set('siliconflow', new SiliconFlowProvider());
         this.providers.set('seedance', new SeedanceProvider());
-    }
-
-    private loadConfig(): any {
-        if (!fs.existsSync(this.apiConfigPath)) {
-            console.warn(`[Dispatcher] Warning: api_config.yaml not found at ${this.apiConfigPath}. Using empty config.`);
-            return { models: {} };
-        }
-        try {
-            const raw = fs.readFileSync(this.apiConfigPath, 'utf8');
-            return yaml.load(raw);
-        } catch (e: any) {
-            console.error(`[Dispatcher] Failed to parse api_config.yaml: ${e.message}`);
-            return { models: {} };
-        }
     }
 
     /**
@@ -97,16 +83,8 @@ export class VideoModelDispatcher {
         }
 
         // 获取或校验鉴权
-        // 根据 Provider 类型抓取对应的环境变量
-        let apiKey = '';
-        if (providerName === 'siliconflow') {
-            apiKey = process.env.SILICONFLOW_API_KEY || '';
-            if (!apiKey) throw new Error("SILICONFLOW_API_KEY environment variable is not set.");
-        } else if (providerName === 'seedance') {
-            apiKey = process.env.SEEDANCE_API_KEY || process.env.VOLCENGINE_API_KEY || '';
-            if (!apiKey) throw new Error("Neither SEEDANCE_API_KEY nor VOLCENGINE_API_KEY is set.");
-        }
-        // else if ...
+        // 通过 ConfigLoader 统一处理
+        const apiKey = this.configLoader.getResolvedApiKey(targetModel);
 
         console.log(`[Dispatcher] 🚀 Dispatching job [${job.id}] to model [${targetModel}] via Provider [${providerName}]...`);
 

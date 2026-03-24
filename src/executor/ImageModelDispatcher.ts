@@ -7,43 +7,12 @@
 
 import fs from 'fs';
 import path from 'path';
-import yaml from 'js-yaml';
 import { Job } from '../types/PromptSchema';
 import { ImageProvider } from './providers/ImageProvider';
 import { SeaDreamProvider } from './providers/SeaDreamProvider';
 import { logger } from '../utils/logger';
 import { ErrorFactory, OpsVError } from '../errors/OpsVError';
-
-/**
- * 模型配置接口
- */
-interface ModelConfig {
-    /** 提供商名称 */
-    provider: string;
-    /** 支持的特性 */
-    features: string[];
-    /** 最大图像尺寸 */
-    max_size: { width: number; height: number };
-    /** 默认参数 */
-    defaults?: {
-        steps?: number;
-        cfg_scale?: number;
-        max_images?: number;
-        quality?: string;
-        negative_prompt?: string;
-    };
-    /** 成本估算（每千次调用） */
-    cost_per_1k?: number;
-    /** 实际模型 ID/Endpoint ID */
-    model?: string;
-}
-
-/**
- * API 配置接口
- */
-interface ApiConfig {
-    models: Record<string, ModelConfig>;
-}
+import { ConfigLoader, ApiConfig, ModelConfig } from '../utils/configLoader';
 
 /**
  * 执行统计
@@ -58,15 +27,15 @@ interface ExecutionStats {
 
 export class ImageModelDispatcher {
     private projectRoot: string;
-    private apiConfigPath: string;
+    private configLoader: ConfigLoader;
     private config: ApiConfig;
     private providers: Map<string, ImageProvider>;
     private stats: ExecutionStats;
 
     constructor(projectRoot: string) {
         this.projectRoot = projectRoot;
-        this.apiConfigPath = path.join(this.projectRoot, '.env', 'api_config.yaml');
-        this.config = this.loadConfig();
+        this.configLoader = ConfigLoader.getInstance();
+        this.config = this.configLoader.loadConfig(this.projectRoot);
         this.providers = new Map();
         this.stats = {
             total: 0,
@@ -77,40 +46,6 @@ export class ImageModelDispatcher {
         };
 
         this.registerProviders();
-    }
-
-    /**
-     * 加载 API 配置
-     */
-    private loadConfig(): ApiConfig {
-        const defaultConfig: ApiConfig = {
-            models: {
-                'seadream-5.0-lite': {
-                    provider: 'seadream',
-                    features: ['txt2img', 'img2img', 'negative_prompt', 'seed_control', 'aspect_ratio'],
-                    max_size: { width: 2048, height: 2048 },
-                    defaults: {
-                        max_images: 4,
-                        quality: '2K'
-                    },
-                    model: 'doubao-seedream-5-0-260128'
-                }
-            }
-        };
-
-        if (!fs.existsSync(this.apiConfigPath)) {
-            logger.warn(`API config not found at ${this.apiConfigPath}, using defaults`);
-            return defaultConfig;
-        }
-
-        try {
-            const raw = fs.readFileSync(this.apiConfigPath, 'utf8');
-            const config = yaml.load(raw) as ApiConfig;
-            return { ...defaultConfig, ...config };
-        } catch (e: any) {
-            logger.error(`Failed to load api_config.yaml`, { error: e.message });
-            return defaultConfig;
-        }
     }
 
     /**
@@ -205,13 +140,7 @@ export class ImageModelDispatcher {
         this.validateJob(job, modelConfig);
 
         // 获取 API Key
-        const apiKey = process.env.SEADREAM_API_KEY || process.env.VOLCENGINE_API_KEY;
-        if (!apiKey) {
-            throw ErrorFactory.compilationFailed(
-                'SEADREAM_API_KEY or VOLCENGINE_API_KEY environment variable not set',
-                { jobId: job.id }
-            );
-        }
+        const apiKey = this.configLoader.getResolvedApiKey(targetModel);
 
         // 注入模型特定配置到 payload 以便提供商读取
         // 优先级：任务自带设置 > api_config.yaml 里的 defaults > 固定默认值
