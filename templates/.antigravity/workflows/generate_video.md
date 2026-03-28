@@ -1,4 +1,4 @@
-# Workflow: Generate Video
+﻿# Workflow: Generate Video
 
 This workflow orchestrates the creation of video clips from existing storyboards using Veo 3.1.
 
@@ -35,3 +35,4 @@ Proceed to run the **Executor Workflow**.
 ### 4. Post-Processing
 1. Rename files to match shot IDs (e.g., `shot_1_video.mp4`).
 2. Update `artifacts/manifest.md` (if it exists) to log the new video assets.
+

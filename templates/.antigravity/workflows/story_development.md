@@ -1,4 +1,4 @@
----
+﻿---
 description: Workflow for iterative story development and script writing
 ---
 
@@ -29,3 +29,4 @@ description: Workflow for iterative story development and script writing
 
 1.  **Approve**: User renames final draft to `videospec/stories/Script.md`.
 2.  **Validate**: Ensure all roles and scenes are identified (placeholders allowed).
+

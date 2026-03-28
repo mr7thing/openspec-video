@@ -1,26 +1,26 @@
-# Videospec (OpsV) 0.4.3 — 工业级电影感流水线 (Cinematic Workflow Evolution)
+﻿# Videospec (OpsV) 0.4.3 鈥?宸ヤ笟绾х數褰辨劅娴佹按绾?(Cinematic Workflow Evolution)
 
-> 纪元：`0.3` → `0.4.3` | 从“创作实验”向“工业级资产编译器”的终极跃迁
+> 绾厓锛歚0.3` 鈫?`0.4.3` | 浠庘€滃垱浣滃疄楠屸€濆悜鈥滃伐涓氱骇璧勪骇缂栬瘧鍣ㄢ€濈殑缁堟瀬璺冭縼
 
-## 0.4.x 核心使命
-0.4 系列版本通过引入 **d-ref (Design) / a-ref (Approved)** 双通道参考体系和**级联式环境校验 (Cascading Config)**，彻底解决了大模型创作中“风格飘移”和“配置混乱”的痛点。这是一个为“AI 导演”量身定制的基石版本。
+## 0.4.x 鏍稿績浣垮懡
+0.4 绯诲垪鐗堟湰閫氳繃寮曞叆 **d-ref (Design) / a-ref (Approved)** 鍙岄€氶亾鍙傝€冧綋绯诲拰**绾ц仈寮忕幆澧冩牎楠?(Cascading Config)**锛屽交搴曡В鍐充簡澶фā鍨嬪垱浣滀腑鈥滈鏍奸绉烩€濆拰鈥滈厤缃贩涔扁€濈殑鐥涚偣銆傝繖鏄竴涓负鈥淎I 瀵兼紨鈥濋噺韬畾鍒剁殑鍩虹煶鐗堟湰銆?
 
 ---
 
-## 安装与部署 (Installation)
+## 瀹夎涓庨儴缃?(Installation)
 
-### 1. 全局安装 (推荐)
-直接从 npm 官方仓库安装，一键获取 `opsv` 全局指令：
+### 1. 鍏ㄥ眬瀹夎 (鎺ㄨ崘)
+鐩存帴浠?npm 瀹樻柟浠撳簱瀹夎锛屼竴閿幏鍙?`opsv` 鍏ㄥ眬鎸囦护锛?
 ```bash
 npm install -g videospec
 ```
-安装完成后，在任意终端输入：
+瀹夎瀹屾垚鍚庯紝鍦ㄤ换鎰忕粓绔緭鍏ワ細
 ```bash
-opsv --version  # 返回 0.4.3
+opsv --version  # 杩斿洖 0.4.3
 ```
 
-### 2. 本地开发安装
-如果您需要深度定制或参与开发：
+### 2. 鏈湴寮€鍙戝畨瑁?
+濡傛灉鎮ㄩ渶瑕佹繁搴﹀畾鍒舵垨鍙備笌寮€鍙戯細
 ```bash
 git clone https://github.com/mr7thing/openspec-video.git
 npm install
@@ -29,54 +29,56 @@ npm run build
 
 ---
 
-## 0.4.3 重大特性 (Major Highlights)
+## 0.4.3 閲嶅ぇ鐗规€?(Major Highlights)
 
-### 1. Minimax 深度集成 (Minimax Integration)
-*   **文生图 (MiniMax-Image-01)**: 高质量 base64 图像流处理，支持创意性强的艺术渲染。
-*   **Hailuo 视频生成 (MiniMax-Hailuo-2.3)**: 工业级长视频（约 6s）生成，支持高动态物理特性模拟。
-*   **异步轮询防空体系**: 针对视频生成任务，实装了具各“深度穿透解析”与“自动化网络抖动恢复（Max Retries 120）”的 Provider。
+### 1. d-ref / a-ref 鍙岄€氶亾浣撶郴
+*   **d-ref (Design References)**: 鍦ㄨ祫浜ц璁￠樁娈碉紝浣滀负鈥滅伒鎰熷簳鑹测€濊娓叉煋寮曟搸娑堣垂銆?
+*   **a-ref (Approved References)**: 鍦ㄨ瘎瀹￠€氳繃鍚庯紝浣滀负鈥滃敮涓€瑙嗚閿氱偣鈥濊嚜鍔ㄦ敞鍏ュ悗缁垎闀滀笌瑙嗛鐢熸垚浠诲姟锛岀‘淇濊鑹?鍦烘櫙鍦ㄥ叏鍓т腑鐨勮瑙変竴鑷存€с€?
+*   *涓嶅啀渚濊禆闅愭櫐鐨?`has_image` 瀛楁锛屽叏闈㈣浆鍚?Markdown 閾炬帴瑙ｆ瀽銆?
 
-### 2. 多模型“多宇宙”调度架构 (Parallel Multi-Model Dispatching)
-*   **一键全模态巡游**: CLI 支持通过 `-m all`（默认）同时激活 `api_config.yaml` 中所有 `enable: true` 的模型。
-*   **资产防撞车 (Subdirectory Output)**: 不同模型生成的资产会自动落盘至 `artifacts/drafts_N/[provider_name]/` 独立子目录，解决多机位/多方案竞争下的文件覆盖痛点。
-*   **Gemini 网页原生流**: 如果模型定义为 `gemini` 类型，资产仍保留在 `drafts_N/` 根目录，平滑兼容网页端手动拖拽创作习惯。
+### 2. 绾ц仈寮忕幆澧冩牎楠?(Robust Provider Engine)
+*   **涓ユ牸 Key 鏍￠獙**锛氭墍鏈?Provider 鍦ㄦ墽琛屽墠鍧囦細杩涜 `required_env` 寮烘牎楠岋紝閬垮厤鍥犵己澶?API Key 瀵艰嚧鐨勬棤鎰忎箟閲嶈瘯銆?
+*   **寮傚父绌块€忛€昏緫**锛氶拡瀵?NSFW 灞忚斀鎴栦綑棰濅笉瓒崇瓑杩滅▼閿欒锛屽紩鎿庝細绔嬪嵆缁堟浠诲姟骞惰褰曠簿鍑嗘棩蹇楋紝涓嶅啀闄峰叆姝诲惊鐜€?
+*   **SeaDream 5.0 澧炲己**锛氭敮鎸佸浘鐢熷浘 (I2I)銆佺粍鍥捐繛缁敓鎴?(Max Images) 鍙婂鍙傝€冨浘铻嶅悎銆?
 
-### 3. 品味至上的架构简化 (Architectural Refinement)
-*   **鉴权收束 (Auth Unity)**: 移除了零散的 API Key 环境变量，通用的火山引擎（Seadream/Seedance）统一使用 `VOLCENGINE_API_KEY`，Minimax 使用 `MINIMAX_API_KEY`。
-*   **配置即逻辑**: 通过 `api_config.yaml` 的 `type` (image/video) 与 `enable` 字段，实现静态配置驱动动态执行逻辑，无需再硬编码 CLI 分支。
+### 3. 妯″潡鍖?CLI 鏋舵瀯
+*   **鏍稿績瑙ｈ€?*锛氬師濮嬭噧鑲跨殑 `src/cli.ts` 宸叉媶鍒嗕负 `src/commands/` 涓嬬殑鐙珛妯″潡锛坓en-image, gen-video, daemon 绛夛級銆?
+*   **鎸囦护瀵归綈**锛氬叏闈慨姝ｄ簡鍛戒护鍛藉悕瑙勮寖锛屼娇鍏舵洿绗﹀悎 Unix 寮€鍙戜範鎯笌 Agent 鑷姩鍖栬皟鐢ㄣ€?
 
 ---
 
-## 真相源 (Source of Truth) 目录结构
+## 鐪熺浉婧?(Source of Truth) 鐩綍缁撴瀯
 
 ```text
 /
-├── .env/                   # 本地唯一环境配置
-│   ├── api_config.yaml     # 【核心】配置模型启用状态与参数
-│   └── secrets.env         # API 密钥存放区
-├── .agent/                 # OpsV 认知心智层 (Agent Specs & Skills)
-├── docs/schema/            # 0.4.x 工业级协议规范
-├── videospec/              # 剧本/分镜/资产定义
-└── artifacts/              # 编译产出目录
-    └── drafts_N/           # 第 N 次小样编译结果
-        ├── minimax/        # Minimax 宇宙资产
-        ├── seadream/       # Seadream 宇宙资产
-        └── ...
+鈹溾攢鈹€ .env/                   # 鐜閰嶇疆 (宸插拷鐣ワ紝鏈湴鍞竴)
+鈹?  鈹溾攢鈹€ api_config.yaml     # 寮曟搸鍙傛暟 (绾ц仈鏍￠獙锛歳equired_env)
+鈹?  鈹斺攢鈹€ secrets.env         # API 瀵嗛挜 (椤圭洰涓嶈窡韪?
+鈹溾攢鈹€ .agent/                 # AI 鏅哄泭鍥?(Architect, Screenwriter...)
+鈹溾攢鈹€ docs/schema/            # 0.4.x 宸ヤ笟绾у崗璁鑼?
+鈹溾攢鈹€ videospec/              # 鏍稿績鍓ф湰璧勪骇
+鈹?  鈹溾攢鈹€ elements/           # 浣跨敤 d-ref 鎻忚堪鐨勫疄浣撹祫浜?
+鈹?  鈹斺攢鈹€ shots/
+鈹?      鈹溾攢鈹€ Script.md       # 閿氬畾 a-ref 鐨勯潤鎬佸垎闀?
+鈹?      鈹斺攢鈹€ Shotlist.md     # 閿佸畾 a-ref 鐨勫姩鎬佽繍闀滃彴鏈?
+鈹斺攢鈹€ artifacts/              # 缂栬瘧浜х墿 (Images & Videos)
 ```
 
 ---
 
-## 核心编译器指令 (CLI)
+## 鏍稿績缂栬瘧鍣ㄦ寚浠?(CLI)
 
-| 命令             | 描述                                     | 0.4.3 亮点                                       |
-| ---------------- | ---------------------------------------- | ------------------------------------------------ |
-| `opsv gen-image` | 【高频】执行全局绘图任务                 | 支持 `--model all` 自动并发/串行多引擎任务派发   |
-| `opsv gen-video` | 【高频】执行全局视频生成任务             | 内置 10s 间隔轮询保护，支持长视频任务            |
-| `opsv init`      | 环境初始化与脚手架部署                   | 自动重置 0.4.3 版本的 `api_config` 模板          |
-| `opsv review`    | 资产回显评审                             | 能够识别子文件夹中的模型资产并进行渲染回缩       |
+| 鍛戒护                 | 鑱岃矗           | 0.4.3 鏋佺畝鐗规€?                                     |
+| -------------------- | -------------- | --------------------------------------------------- |
+| `opsv init`          | 鐜鑴氭墜鏋堕儴缃?| 鑷姩鍚屾 `.agent` 鎶€鑳藉簱涓庢妧鑳藉弬鑰冪ず渚?             |
+| `opsv generate`      | 缂栬瘧闈欐€佷换鍔?  | 瑙ｆ瀽 Markdown 閾炬帴锛岃嚜鍔ㄥ尯鍒?d-ref 涓?a-ref         |
+| `opsv execute-image` | 鎵ц娓叉煋       | 寮哄姏娉ㄥ叆 `style_postfix` 涓庡弬鑰冨浘璺緞               |
+| `opsv review`        | 瑙嗚璧勪骇璇勫   | 鑷姩鍖栧洖鏄炬渶鏂拌崏鍥捐嚦 `.md` 瀵瑰簲绔犺妭                 |
+| `opsv animate`       | 缂栬瘧瑙嗛浠诲姟   | 绾ц仈鍚堝苟 `global_settings` 涓庡垎闀滅骇 `motion_prompt` |
 
 ---
 
-> *“代码是写给人看的，只是顺便让机器运行。”*   
-> *“—— OpsV，让创作像编译代码一样精准。”*  
-> *“—— 柒叔 & Antigravity”*
+> *鈥滀唬鐮佹槸鍐欑粰浜虹湅鐨勶紝鍙槸椤轰究璁╂満鍣ㄨ繍琛屻€傗€?   
+> *鈥溾€斺€?OpsV锛岃鍒涗綔鍍忕紪璇戜唬鐮佷竴鏍风簿鍑嗐€傗€?  
+> *鈥溾€斺€?鏌掑彅 & Antigravity鈥?
+

@@ -42,3 +42,4 @@ shots:
 ### 4.2 鐢诲粖鍖栧闃?(Script.md)
 鎵€鏈夌殑 draft 鍜?target 鍥剧墖閮戒細琚洖鍐欏埌 `Script.md` 鐨勭敾寤婂尯鍩熴€傚婕旈€氳繃鎵规敞鎸囧畾瑙掕壊锛堝锛?Draft 2 鍋氶甯?锛夛紝鐢?Animator 鏈€缁堝湪 `Shotlist.md` 涓畬鎴愭寚閽堢粦瀹氥€?
 
+

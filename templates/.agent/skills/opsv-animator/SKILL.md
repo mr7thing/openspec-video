@@ -61,3 +61,4 @@ shots:
 
 ## 馃摉 Reference Alignment
 鍦ㄤ綘杈撳嚭鎴栬嚜鏌ユ牸寮忔椂锛屽己鍒惰姹傚弬鑰?`references/example-shotlist.md` 鐨?YAML 鎺掔増涓庡眰绾х粨鏋勩€傜粷瀵逛繚璇?`motion_prompt_en` 鍜?`reference_image` 瀛楁鐨勬纭缉杩涖€?
+

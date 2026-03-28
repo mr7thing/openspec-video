@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
@@ -16,7 +16,7 @@ const envSubDir = path.join(projectRoot, '.env');
 const secretsEnvPath = path.join(envSubDir, 'secrets.env');
 const rootEnvPath = path.join(projectRoot, '.env');
 
-//--- 核心：必须先加载环境变量 ---
+//--- 鏍稿績锛氬繀椤诲厛鍔犺浇鐜鍙橀噺 ---
 if (fs.existsSync(secretsEnvPath)) {
     dotenv.config({ path: secretsEnvPath });
 } else if (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory()) {
@@ -25,7 +25,7 @@ if (fs.existsSync(secretsEnvPath)) {
     dotenv.config();
 }
 
-// 获取版本号 (从 package.json 动态读取)
+// 鑾峰彇鐗堟湰鍙?(浠?package.json 鍔ㄦ€佽鍙?
 const pkgPath = path.join(__dirname, '../package.json');
 const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.4.3' };
 const VERSION = pkg.version;
@@ -36,7 +36,7 @@ program
     .version(VERSION)
     .description('OpenSpec-Video Automation CLI');
 
-// 注册所有拆分的子命令
+// 娉ㄥ唽鎵€鏈夋媶鍒嗙殑瀛愬懡浠?
 registerDaemonCommands(program, VERSION);
 registerInitCommand(program, VERSION);
 registerGenerateCommand(program, VERSION);
@@ -46,3 +46,4 @@ registerGenImageCommand(program, VERSION);
 registerGenVideoCommand(program, VERSION);
 
 program.parse(process.argv);
+

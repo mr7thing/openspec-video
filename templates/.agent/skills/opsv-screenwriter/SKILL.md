@@ -45,3 +45,4 @@ model: sonnet
 - [ ] 澶х翰姝ｆ枃鏄惁鏋佸害绮剧偧锛屸€滃姘存祦涓€鑸€濇病鏈夊璨岀粏鑺傚爢鐮岋紵
 - [ ] 鍦ㄥ畾涔夎祫浜ф椂锛屾槸鍚︾粷瀵逛弗瀹堜簡 `OPSV-ASSET-0.3.2.md` 鐨?YAML 绾︽潫锛?
 - [ ] `story.md` 鏄惁宸蹭弗鏍奸伒寰?`references/example-story.md` 鐨勬牸寮忥紵
+

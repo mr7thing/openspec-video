@@ -1,4 +1,4 @@
-# OpsV 0.4.3 多模态视频引擎调度配置文件
+# OpsV 0.4 多模态视频引擎调度配置文件
 # 该文件定义了目前支持的生成引擎的能力级与默认参数。
 # 调度器 (Dispatcher) 在发出请求前将严格根据下表映射参数。
 # gen_command 标注该模型由哪个 CLI 命令执行。
@@ -10,15 +10,13 @@ models:
   # ==========================================
   seadream-5.0-lite:
     provider: "seadream"
-    type: "image"
-    enable: true
     # 实际模型/Endpoint ID (由火山方舟提供)
     model: "doubao-seedream-5-0-260128"
     # 关联的 CLI 命令
     gen_command: "gen-image"
     # 所需 API Key（CLI 查表校验）
     required_env: ["VOLCENGINE_API_KEY"]
-    # 废弃 fallback_env，统一鉴权
+    fallback_env: ["SEADREAM_API_KEY"]
     # 模型端点能力
     features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
     
@@ -47,8 +45,6 @@ models:
   # ==========================================
   wan2.2-i2v:
     provider: "siliconflow"
-    type: "video"
-    enable: false
     model: "wan-ai/Wan2.1-T2V-14B"
     api_url: "https://api.siliconflow.cn/v1/video/submit"
     api_status_url: "https://api.siliconflow.cn/v1/video/status"
@@ -77,15 +73,13 @@ models:
   # ==========================================
   seedance-1.5-pro:
     provider: "seedance"
-    type: "video"
-    enable: true
     model: "doubao-seedance-1-5-pro"
     api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
     # 关联的 CLI 命令
     gen_command: "gen-video"
     # 所需 API Key
     required_env: ["VOLCENGINE_API_KEY"]
-    # 废弃 fallback_env，统一鉴权
+    fallback_env: ["SEEDANCE_API_KEY"]
     
     # 质量映射 (Seedance 官方支持 480p, 720p, 1080p)
     quality_map:
@@ -107,36 +101,5 @@ models:
     supports_reference_images: true
 
   # ==========================================
-  # 图像模型：MiniMax Image 01
+  # 视频模型：CogVideoX (示例)
   # ==========================================
-  minimax-image-01:
-    provider: "minimax"
-    type: "image"
-    enable: false
-    model: "image-01"
-    api_url: "https://api.minimaxi.com/v1/image_generation"
-    gen_command: "gen-image"
-    required_env: ["MINIMAX_API_KEY"]
-    features: ["txt2img", "img2img", "aspect_ratio"]
-    defaults:
-      aspect_ratio: "16:9"
-
-  # ==========================================
-  # 视频模型：MiniMax Hailuo
-  # ==========================================
-  minimax-video-01:
-    provider: "minimax"
-    type: "video"
-    enable: false
-    model: "MiniMax-Hailuo-2.3"
-    api_url: "https://api.minimaxi.com/v1/video_generation"
-    api_status_url: "https://api.minimaxi.com/v1/query/video_generation"
-    gen_command: "gen-video"
-    required_env: ["MINIMAX_API_KEY"]
-    defaults:
-      resolution: "1080P"
-      duration: 5
-    supports_first_image: true
-    supports_middle_image: false
-    supports_last_image: true
-    supports_reference_images: true

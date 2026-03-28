@@ -29,3 +29,4 @@ Use this skill when the user wants to "apply" a proposal or a set of changes to 
 ## Guardrails
 - **Visual Consistency**: If changing a visual trait, remind the user that the Reference Image might need updating.
 - **Reference Integrity**: If renaming an ID, check `Script.md` for broken references.
+

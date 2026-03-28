@@ -35,3 +35,4 @@ Macro, shallow depth of field
 ## Approved References
 <!-- a-ref: 鏈€缁堝畾妗ｅ浘銆傚綋鍒嗛暅涓紩鐢ㄦ湰璧勪骇搴撴椂锛屼互姝ゅ鐨勫浘鐗囦紭鍏堢淮鎸佷竴鑷存€?-->
 <!-- [鏈€缁堟覆鏌撶‘璁ょ増鏈琞(artifacts/drafts_1/RustyIronSword_draft_1.png) -->
+

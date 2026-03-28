@@ -42,3 +42,4 @@ description: 鍏ㄨ嚜鍔ㄥ垱寤烘墽琛屾墜鍐屻€傚畾涔変粠姝岃�
 3.  Gen Image: "Sad cyberpunk robot face, rain, neon lights".
 4.  Link Image: `char_robot.md` -> `![Ref](./robot.png)`.
 5.  Done.
+

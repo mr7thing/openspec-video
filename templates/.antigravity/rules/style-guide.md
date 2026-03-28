@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-style-guide
 description: Standard behavior rules for OpenSpec-Video Agents.
 ---
@@ -16,3 +16,4 @@ description: Standard behavior rules for OpenSpec-Video Agents.
 3.  **Communication**:
     - Use film terminology (Director, Cast, Shoot, Cut).
     - Be concise in status reports.
+

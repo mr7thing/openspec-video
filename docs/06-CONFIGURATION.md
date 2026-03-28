@@ -1,52 +1,60 @@
-﻿# OpsV 閰嶇疆浣撶郴 (Configuration Guide)
+# OpsV 配置体系 (Configuration Guide)
 
-> 鍙岄噸閰嶇疆浣撶郴锛氬瘑閽ュ綊瀵嗛挜锛屽弬鏁板綊鍙傛暟銆備竴鍒囩敓鎴愯涓虹敱閰嶇疆鏂囦欢椹卞姩銆?
+> 双重配置体系：密钥归密钥，参数归参数。一切生成行为由配置文件驱动。
+
 ---
 
-## 1. 閰嶇疆鏋舵瀯鎬昏
+## 1. 配置架构总览
 
 ```
 project/
-鈹斺攢鈹€ .env/                       # 鐜閰嶇疆鐩綍锛坓it 蹇界暐锛?    鈹溾攢鈹€ secrets.env             # API 瀵嗛挜锛堢粷瀵嗭級
-    鈹斺攢鈹€ api_config.yaml         # 寮曟搸鍙傛暟锛堝彲鍏变韩锛?```
+└── .env/                       # 环境配置目录（git 忽略）
+    ├── secrets.env             # API 密钥（绝密）
+    └── api_config.yaml         # 引擎参数（可共享）
+```
 
-| 鏂囦欢 | 瀛樺偍鍐呭 | Git 璺熻釜 | 淇敼棰戠巼 |
+| 文件 | 存储内容 | Git 跟踪 | 修改频率 |
 |------|---------|---------|---------|
-| `secrets.env` | API Key 绛夋晱鎰熶俊鎭?| 鉂?蹇界暐 | 鏋佸皯锛堝垵濮嬪寲鍚庝笉鍙橈級 |
-| `api_config.yaml` | 妯″瀷鍙傛暟銆侀粯璁ゅ€笺€佽兘鍔涙弿杩?| 鉂?蹇界暐 | 鍋跺皵锛堝垏鎹㈡ā鍨?璋冨弬鏃讹級 |
+| `secrets.env` | API Key 等敏感信息 | ❌ 忽略 | 极少（初始化后不变） |
+| `api_config.yaml` | 模型参数、默认值、能力描述 | ❌ 忽略 | 偶尔（切换模型/调参时） |
 
 ---
 
-## 2. API 瀵嗛挜閰嶇疆 (`secrets.env`)
+## 2. API 密钥配置 (`secrets.env`)
 
-### 鏍煎紡
+### 格式
 
 ```env
-# 鐏北寮曟搸 API Key锛圫eaDream 鍥惧儚 + Seedance 瑙嗛锛?VOLCENGINE_API_KEY=your_volcengine_key_here
+# 火山引擎 API Key（SeaDream 图像 + Seedance 视频）
+VOLCENGINE_API_KEY=your_volcengine_key_here
 
-# SeaDream 鐙珛 Key锛堝涓庣伀灞卞紩鎿庝笉鍚岋級
+# SeaDream 独立 Key（如与火山引擎不同）
 SEADREAM_API_KEY=your_seadream_key_here
 
-# SiliconFlow API Key锛圵an2.1 瑙嗛锛?SILICONFLOW_API_KEY=your_siliconflow_key_here
+# SiliconFlow API Key（Wan2.1 视频）
+SILICONFLOW_API_KEY=your_siliconflow_key_here
 ```
 
-### 鍔犺浇浼樺厛绾?
-CLI 鍚姩鏃舵寜浠ヤ笅浼樺厛绾у姞杞界幆澧冨彉閲忥細
+### 加载优先级
+
+CLI 启动时按以下优先级加载环境变量：
 
 ```
-1 (鏈€楂? 鈫?.env/secrets.env    # 鎺ㄨ崘瀛樻斁浣嶇疆
-2        鈫?.env (鏂囦欢)          # 鏍囧噯 dotenv 鏂囦欢锛堥潪鐩綍锛?3 (鏈€浣? 鈫?绯荤粺鐜鍙橀噺         # process.env 鍏滃簳
+1 (最高) → .env/secrets.env    # 推荐存放位置
+2        → .env (文件)          # 标准 dotenv 文件（非目录）
+3 (最低) → 系统环境变量         # process.env 兜底
 ```
 
-### 楠岃瘉鏂瑰紡
+### 验证方式
 
 ```bash
-# 鏌ョ湅鐜鍙橀噺鍔犺浇鐘舵€?opsv gen-image --dry-run
+# 查看环境变量加载状态
+opsv gen-image --dry-run
 ```
 
-杈撳嚭灏嗘樉绀猴細
+输出将显示：
 ```
-馃攳 Environment Check:
+🔍 Environment Check:
    - Config Source: .env/secrets.env
    - VOLCENGINE_API_KEY: Present (****abc1)
    - SEADREAM_API_KEY: Missing
@@ -54,26 +62,28 @@ CLI 鍚姩鏃舵寜浠ヤ笅浼樺厛绾у姞杞界幆澧冨彉閲忥細
 
 ---
 
-## 3. 寮曟搸鍙傛暟閰嶇疆 (`api_config.yaml`)
+## 3. 引擎参数配置 (`api_config.yaml`)
 
-### 瀹屾暣閰嶇疆妯℃澘
+### 完整配置模板
 
 ```yaml
-# OpsV 0.4 澶氭ā鎬佽棰戝紩鎿庤皟搴﹂厤缃枃浠?# 璋冨害鍣?(Dispatcher) 鍦ㄥ彂鍑鸿姹傚墠涓ユ牸鏍规嵁姝よ〃鏄犲皠鍙傛暟
-# gen_command 鏍囨敞璇ユā鍨嬬敱鍝釜 CLI 鍛戒护鎵ц
+# OpsV 0.4 多模态视频引擎调度配置文件
+# 调度器 (Dispatcher) 在发出请求前严格根据此表映射参数
+# gen_command 标注该模型由哪个 CLI 命令执行
 
 models:
 
   # ==========================================
-  # 鍥惧儚妯″瀷锛氱伀灞卞紩鎿?SeaDream 5.0 Lite
+  # 图像模型：火山引擎 SeaDream 5.0 Lite
   # CLI: opsv gen-image -m seadream-5.0-lite
   # ==========================================
   seadream-5.0-lite:
     provider: "seadream"
     model: "doubao-seedream-5-0-260128"
     gen_command: "gen-image"
-    required_env: ["VOLCENGINE_API_KEY"]       # 鈫?0.4.3 澹版槑鎵€闇€ Key
-    fallback_env: ["SEADREAM_API_KEY"]         # 鈫?澶囬€?Key锛堜换涓€瀛樺湪鍗冲彲锛?    features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
+    required_env: ["VOLCENGINE_API_KEY"]       # ← 0.4.1 声明所需 Key
+    fallback_env: ["SEADREAM_API_KEY"]         # ← 备选 Key（任一存在即可）
+    features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
     defaults:
       quality: "2K"
       aspect_ratio: "1:1"
@@ -87,7 +97,7 @@ models:
     max_batch: 12
 
   # ==========================================
-  # 瑙嗛妯″瀷锛歋iliconFlow Wan 2.1
+  # 视频模型：SiliconFlow Wan 2.1
   # CLI: opsv gen-video -m wan2.2-i2v
   # ==========================================
   wan2.2-i2v:
@@ -107,7 +117,7 @@ models:
     supports_reference_images: false
 
   # ==========================================
-  # 瑙嗛妯″瀷锛歋eedance 1.5 Pro (鐏北寮曟搸)
+  # 视频模型：Seedance 1.5 Pro (火山引擎)
   # CLI: opsv gen-video -m seedance-1.5-pro
   # ==========================================
   seedance-1.5-pro:
@@ -135,72 +145,81 @@ models:
 
 ---
 
-## 4. 妯″瀷鑳藉姏鐭╅樀
+## 4. 模型能力矩阵
 
-| 鑳藉姏 | SeaDream 5.0 | Wan 2.1 | Seedance 1.5 Pro |
+| 能力 | SeaDream 5.0 | Wan 2.1 | Seedance 1.5 Pro |
 |------|:---:|:---:|:---:|
-| **绫诲瀷** | 鍥惧儚 | 瑙嗛 | 瑙嗛 |
-| **棣栧抚鍙傝€?* | N/A | 鉁?| 鉁?|
-| **灏惧抚鍙傝€?* | N/A | 鉂?| 鉁?|
-| **涓棿甯?* | N/A | 鉂?| 鉂?|
-| **瑙掕壊鍙傝€冨浘** | N/A | 鉂?| 鉁?|
-| **缁勫浘妯″紡** | 鉁?(1-12) | 鉂?| 鉂?|
-| **璐熼潰鎻愮ず璇?* | 鉁?| 鉂?| 鉂?|
-| **绉嶅瓙鎺у埗** | 鉁?| 鉂?| 鉂?|
-| **绌洪棿闊抽** | N/A | 鉂?| 鉁?|
-| **鐢诲箙閫夐」** | 5 绉?| 鍥哄畾 | 7 绉?|
-| **鍒嗚鲸鐜?* | 2K-4K | 720p | 480p-1080p |
+| **类型** | 图像 | 视频 | 视频 |
+| **首帧参考** | N/A | ✅ | ✅ |
+| **尾帧参考** | N/A | ❌ | ✅ |
+| **中间帧** | N/A | ❌ | ❌ |
+| **角色参考图** | N/A | ❌ | ✅ |
+| **组图模式** | ✅ (1-12) | ❌ | ❌ |
+| **负面提示词** | ✅ | ❌ | ❌ |
+| **种子控制** | ✅ | ❌ | ❌ |
+| **空间音频** | N/A | ❌ | ✅ |
+| **画幅选项** | 5 种 | 固定 | 7 种 |
+| **分辨率** | 2K-4K | 720p | 480p-1080p |
 
 ---
 
-## 5. 鍏抽敭鍙傛暟瑙ｈ
+## 5. 关键参数解读
 
-### `max_images`锛堢粍鍥炬暟閲忥級
+### `max_images`（组图数量）
 
-褰?`max_images > 1` 鏃讹紝娓叉煋寮曟搸鑷姩婵€娲?杩炵画鐢熸垚"妯″紡锛?- 绯荤粺鍚?Prompt 娉ㄥ叆杩炶疮鎬у紩瀵艰瘝
-- 鍚屼竴瀹炰綋鐨勫寮犲浘鐗囦繚鎸侀珮搴︾壒寰佷竴鑷存€?- **鎺ㄨ崘鍊?*锛歚4`锛堝吋椤炬晥鐜囦笌澶氭牱鎬э級
-- **涓婇檺**锛歚12`
+当 `max_images > 1` 时，渲染引擎自动激活"连续生成"模式：
+- 系统向 Prompt 注入连贯性引导词
+- 同一实体的多张图片保持高度特征一致性
+- **推荐值**：`4`（兼顾效率与多样性）
+- **上限**：`12`
 
-### `global_style_postfix`锛堝叏灞€椋庢牸鍚庣紑锛?
-瀹氫箟鍦?`videospec/project.md` 涓紝缂栬瘧鍣ㄥ湪 `opsv generate` 鏃惰嚜鍔ㄦ敞鍏ユ瘡涓换鍔＄殑 Prompt 鏈熬锛?
+### `global_style_postfix`（全局风格后缀）
+
+定义在 `videospec/project.md` 中，编译器在 `opsv generate` 时自动注入每个任务的 Prompt 末尾：
+
 ```
 [Shot Prompt] + [Asset Description] + [global_style_postfix]
 ```
 
-绀轰緥锛歚"cinematic lighting, ultra detailed, masterpiece, arri alexa 65, 8k"`
+示例：`"cinematic lighting, ultra detailed, masterpiece, arri alexa 65, 8k"`
 
-### `quality_map`锛堣川閲忔槧灏勶級
+### `quality_map`（质量映射）
 
-涓嶅悓妯″瀷鐨勫垎杈ㄧ巼鍙傛暟鍚嶇О涓嶇粺涓€銆俙quality_map` 灏?OpsV 鏍囧噯鍖栫殑璐ㄩ噺绛夌骇鏄犲皠鍒板悇妯″瀷鐨勫師鐢熷弬鏁般€?
+不同模型的分辨率参数名称不统一。`quality_map` 将 OpsV 标准化的质量等级映射到各模型的原生参数。
+
 ---
 
-## 6. 妯℃澘涓庢湰鍦伴厤缃殑鍏崇郴
+## 6. 模板与本地配置的关系
 
 ```
-瀹夎鍖咃紙npm 鍖咃級               鐢ㄦ埛椤圭洰
+安装包（npm 包）               用户项目
 templates/.env/                 .env/
-鈹溾攢鈹€ api_config.yaml      鈫掆啋鈫?  鈹溾攢鈹€ api_config.yaml   (opsv init 澶嶅埗)
-鈹斺攢鈹€ secrets.env          鈫掆啋鈫?  鈹斺攢鈹€ secrets.env        (opsv init 澶嶅埗)
+├── api_config.yaml      →→→   ├── api_config.yaml   (opsv init 复制)
+└── secrets.env          →→→   └── secrets.env        (opsv init 复制)
 ```
 
-- `opsv init` 灏?`templates/.env/` 浣滀负绉嶅瓙妯℃澘澶嶅埗鍒版柊椤圭洰
-- 鐢ㄦ埛淇敼鏈湴 `.env/` 涓嶅奖鍝嶅叏灞€妯℃澘
-- 鎵嬪姩鍗囩骇鏃跺彲瀵规瘮 `templates/.env/api_config.yaml` 鑾峰彇鏂板弬鏁?
+- `opsv init` 将 `templates/.env/` 作为种子模板复制到新项目
+- 用户修改本地 `.env/` 不影响全局模板
+- 手动升级时可对比 `templates/.env/api_config.yaml` 获取新参数
+
 ---
 
-## 7. 娣诲姞鏂版ā鍨?
-1. 鍦?`api_config.yaml` 涓坊鍔犳柊妯″瀷閰嶇疆鍧楋紙鍚?`required_env`锛?2. 鍦?`secrets.env` 涓坊鍔犲搴旂殑 API Key
-3. 鍦?`src/executor/providers/` 涓疄鐜板搴旂殑 Provider 绫?4. 鍦?`ImageModelDispatcher` 鎴?`VideoModelDispatcher` 涓敞鍐屾柊 Provider
-5. 鏇存柊 `docs/07-API-REFERENCE.md` 娣诲姞鎺ュ彛鏂囨。
+## 7. 添加新模型
+
+1. 在 `api_config.yaml` 中添加新模型配置块（含 `required_env`）
+2. 在 `secrets.env` 中添加对应的 API Key
+3. 在 `src/executor/providers/` 中实现对应的 Provider 类
+4. 在 `ImageModelDispatcher` 或 `VideoModelDispatcher` 中注册新 Provider
+5. 更新 `docs/07-API-REFERENCE.md` 添加接口文档
 
 ```yaml
-# api_config.yaml 鏂板绀轰緥
+# api_config.yaml 新增示例
 models:
   my-new-model:
     provider: "custom"
     model: "model-endpoint-id"
     api_url: "https://api.example.com/v1/generate"
-    gen_command: "gen-image"          # 鎴?"gen-video"
+    gen_command: "gen-image"          # 或 "gen-video"
     required_env: ["MY_MODEL_API_KEY"]
     defaults:
       quality: "720p"
@@ -209,15 +228,16 @@ models:
     supports_last_image: false
 ```
 
-### `required_env` / `fallback_env` 瀛楁
+### `required_env` / `fallback_env` 字段
 
-澹版槑妯″瀷鎵€闇€鐨?API Key 鐜鍙橀噺鍚嶃€侰LI 鍦ㄦ墽琛屽墠鏌ヨ〃鏍￠獙锛屾棤闇€纭紪鐮併€?
-| 瀛楁 | 鍚箟 | 绀轰緥 |
+声明模型所需的 API Key 环境变量名。CLI 在执行前查表校验，无需硬编码。
+
+| 字段 | 含义 | 示例 |
 |------|------|------|
-| `required_env` | 蹇呴渶鐨?Key锛堣嚦灏戜竴涓瓨鍦級 | `["VOLCENGINE_API_KEY"]` |
-| `fallback_env` | 澶囬€?Key锛坮equired 涓嶅瓨鍦ㄦ椂灏濊瘯锛?| `["SEADREAM_API_KEY"]` |
+| `required_env` | 必需的 Key（至少一个存在） | `["VOLCENGINE_API_KEY"]` |
+| `fallback_env` | 备选 Key（required 不存在时尝试） | `["SEADREAM_API_KEY"]` |
 
 ---
 
-> *"閰嶇疆鍗冲懡浠わ紝鍙傛暟鍗崇邯寰嬨€?*
-> *OpsV 0.4.3 | 鏈€鍚庢洿鏂? 2026-03-28*
+> *"配置即命令，参数即纪律。"*
+> *OpsV 0.4.1 | 最后更新: 2026-03-23*

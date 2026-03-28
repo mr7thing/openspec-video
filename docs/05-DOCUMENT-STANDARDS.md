@@ -1,6 +1,7 @@
 ﻿# OpsV 鏂囨。瑙勮寖涓庢牸寮忚鏄?(Document Standards)
 
 > 鎵€鏈?`.md` 鏂囦欢鐨勬牸寮忕害瀹氥€乊AML 妯℃澘銆丂 寮曠敤璇硶鍜屽懡鍚嶈鑼冦€?
+
 ---
 
 ## 1. 閫氱敤鏍煎紡鍑嗗垯
@@ -53,17 +54,22 @@ key: value
 
 ```yaml
 ---
-name: "@role_hero"           # @ 鍓嶇紑 + 绫诲瀷鍓嶇紑 + 鏍囪瘑绗?type: "character"             # character | scene | prop
+name: "@role_hero"           # @ 鍓嶇紑 + 绫诲瀷鍓嶇紑 + 鏍囪瘑绗?
+type: "character"             # character | scene | prop
 brief_description: "涓€鍙ヨ瘽绠€鐣ユ弿杩?
 detailed_description: >       # 鏃犲弬鑰冨浘鏃剁殑璇﹀敖鎻忓啓
-  鑷村瘑鐨勪腑鏂囩壒寰佹弿鍐欙紝鑷冲皯3-5鍙ヨ瘽銆?prompt_en: >                  # 鑻辨枃娓叉煋鎻愮ず璇?  Dense English prompt for image generation models.
+  鑷村瘑鐨勪腑鏂囩壒寰佹弿鍐欙紝鑷冲皯3-5鍙ヨ瘽銆?
+prompt_en: >                  # 鑻辨枃娓叉煋鎻愮ず璇?
+  Dense English prompt for image generation models.
 ---
 ```
 
 > **`has_image` 宸插簾寮?*锛?.4.1锛夈€傚弬鑰冨浘鐘舵€佺敱 Markdown Body 鐨?d-ref / a-ref 鑺傝嚜鍔ㄦ帹瀵笺€?
+
 ### 2.2 鍙岄€氶亾鍙傝€冨浘浣撶郴 (d-ref / a-ref)
 
 杩欐槸 OpsV 0.4 鏈€鏍稿績鐨勬牸寮忓崌绾с€傜粺涓€瑙勫垯锛?
+
 ```
 鐢熸垚鑷韩 鈫?浣跨敤鑷繁鐨?Design References (d-ref)
 琚紩鐢ㄦ椂 鈫?鎻愪緵鑷繁鐨?Approved References (a-ref)
@@ -72,7 +78,11 @@ detailed_description: >       # 鏃犲弬鑰冨浘鏃剁殑璇﹀敖鎻忓啓
 #### `## Design References`锛坉-ref锛氱敓鎴愯緭鍏ワ級
 
 `opsv generate` 鐢熸垚**鏈疄浣撹嚜韬?*鏃讹紝灏嗘鑺備腑鐨勫浘鐗囦綔涓?img2img 杈撳叆鍙傝€冦€?
-鍏稿瀷鏉ユ簮锛?- 澶栭儴鐏垫劅鍥撅紙鏈嶈銆侀厤鑹层€佹儏缁澘锛?- 宸叉湁璧勪骇鐨?a-ref锛堢敤浜庣敓鎴愬彉浣擄細鑰佸勾鐗?/ 鍗￠€氱増 / 鑱屼笟褰㈣薄锛?- 鑽夊浘鎴栨墜缁樼
+
+鍏稿瀷鏉ユ簮锛?
+- 澶栭儴鐏垫劅鍥撅紙鏈嶈銆侀厤鑹层€佹儏缁澘锛?
+- 宸叉湁璧勪骇鐨?a-ref锛堢敤浜庣敓鎴愬彉浣擄細鑰佸勾鐗?/ 鍗￠€氱増 / 鑱屼笟褰㈣薄锛?
+- 鑽夊浘鎴栨墜缁樼
 
 ```markdown
 ## Design References
@@ -83,7 +93,9 @@ detailed_description: >       # 鏃犲弬鑰冨浘鏃剁殑璇﹀敖鎻忓啓
 #### `## Approved References`锛坅-ref锛氬畾妗ｈ緭鍑猴級
 
 **鍏朵粬瀹炰綋寮曠敤鏈疄浣?*鏃讹紙濡?Shot 涓?`@role_K`锛夛紝灏嗘鑺備腑鐨勫浘鐗囨敞鍏ュ紩鐢ㄦ柟鐨?`reference_images`銆?
+
 浠ｈ〃缁忓婕斿鎵圭‘璁ょ殑鏈€缁堝舰璞°€?
+
 ```markdown
 ## Approved References
 - [瑙掕壊涓夎鍥綸(artifacts/drafts_3/role_K_turnaround.png)
@@ -128,12 +140,14 @@ Medium Close-Up
 ```
 
 ### 2.4 鍙樹綋閾?
+
 宸叉湁璧勪骇鐨?a-ref 鍙綔涓烘柊璧勪骇鐨?d-ref锛屽疄鐜板彉浣撶敓鎴愶細
 
 ```
 @role_K 鐨?a-ref (骞磋交鐗堝畾妗ｅ浘)
    鈫?浣滀负 @role_K_old 鐨?d-ref
-   鈫?opsv generate 鈫?鐢熸垚鑰佸勾鐗?   鈫?review 鈫?approve
+   鈫?opsv generate 鈫?鐢熸垚鑰佸勾鐗?
+   鈫?review 鈫?approve
    鈫?鍐欏叆 @role_K_old 鐨?a-ref
 ```
 
@@ -167,9 +181,11 @@ resolution: "2K"               # 480p | 1080p | 2K | 4K | 8K
 - @prop_Gun
 ```
 
-**绾︽潫**锛?- 涓€涓」鐩彧鏈変竴涓?`project.md`
+**绾︽潫**锛?
+- 涓€涓」鐩彧鏈変竴涓?`project.md`
 - 鏈櫥璁扮殑 `@` 瀹炰綋瑙嗕负璇硶杩濊
 - `global_style_postfix` 浼氳缂栬瘧鍣ㄨ嚜鍔ㄦ敞鍏ユ瘡涓敓鎴愪换鍔?
+
 ---
 
 ## 4. 鍒嗛暅鑴氭湰鏍煎紡 (Script.md)
@@ -180,20 +196,29 @@ resolution: "2K"               # 480p | 1080p | 2K | 4K | 8K
 ---
 shots:
   - id: "shot_1"
-    duration: 5                       # 绉掓暟锛?-15 鑼冨洿锛?    camera: "鏋佽嚧寰窛鐗瑰啓"              # 鏅埆涓庤繍闀滐紙涓枃锛?    environment: "@scene_cocoon 钖勯浘涓? # 鍦烘櫙锛堝惈 @ 寮曠敤锛?    subject: "@role_butterfly 鐮磋導"    # 涓讳綋锛堝惈 @ 寮曠敤锛?    prompt_en: >                       # 绾嫳鏂囨覆鏌撴彁绀鸿瘝
+    duration: 5                       # 绉掓暟锛?-15 鑼冨洿锛?
+    camera: "鏋佽嚧寰窛鐗瑰啓"              # 鏅埆涓庤繍闀滐紙涓枃锛?
+    environment: "@scene_cocoon 钖勯浘涓? # 鍦烘櫙锛堝惈 @ 寮曠敤锛?
+    subject: "@role_butterfly 鐮磋導"    # 涓讳綋锛堝惈 @ 寮曠敤锛?
+    prompt_en: >                       # 绾嫳鏂囨覆鏌撴彁绀鸿瘝
       Extreme macro shot, butterfly emerging from chrysalis,
       morning dew trembles, soft backlighting, 8k cinematic.
-    # 鍙€夊瓧娈?    first_image: "artifacts/drafts_1/shot_1.png"
+    # 鍙€夊瓧娈?
+    first_image: "artifacts/drafts_1/shot_1.png"
     last_image: ""
     target_last_prompt: ""
 ---
 ```
 
 ### 4.2 Markdown 姝ｆ枃瀹￠槄鍖?
+
 ```markdown
 ## Shot 1 (5s)
-[@role_butterfly](../elements/@role_butterfly.md) 鍦?[@scene_cocoon](../scenes/@scene_cocoon.md) 涓牬鑼ц€屽嚭銆?
-### 馃柤锔?瑙嗚瀹￠槄寤?| 鐢婚潰 1 | 鐢婚潰 2 |
+[@role_butterfly](../elements/@role_butterfly.md) 鍦?
+[@scene_cocoon](../scenes/@scene_cocoon.md) 涓牬鑼ц€屽嚭銆?
+
+### 馃柤锔?瑙嗚瀹￠槄寤?
+| 鐢婚潰 1 | 鐢婚潰 2 |
 |:---:|:---:|
 | (绛夊緟 opsv review 鍥炲啓) | (绛夊緟 opsv review 鍥炲啓) |
 
@@ -227,7 +252,9 @@ shots:
 ---
 ```
 
-**鍏抽敭绾︽潫**锛?- `duration` 浠?Script.md 鍘熸牱閫忎紶锛屼笉鍙嚜琛岃ˉ鍏?- `motion_prompt_en` 涓ョ鍖呭惈澶栬矊鐗瑰緛
+**鍏抽敭绾︽潫**锛?
+- `duration` 浠?Script.md 鍘熸牱閫忎紶锛屼笉鍙嚜琛岃ˉ鍏?
+- `motion_prompt_en` 涓ョ鍖呭惈澶栬矊鐗瑰緛
 - `@FRAME:<shot_id>_last` 鐢ㄤ簬闀块暅澶撮灏惧抚缁ф壙
 
 ---
@@ -243,9 +270,11 @@ shots:
 # 鏂规嫭鍙峰紩鐢紙鎺ㄨ崘锛屼究浜庤秴閾炬帴鍖栵級
 [@role_K] 璧板悜鍚у彴
 
-# 瓒呴摼鎺ュ寲寮曠敤锛圫cript.md 姝ｆ枃鎺ㄨ崘锛?[@role_K](../elements/@role_K.md) 璧板悜鍚у彴
+# 瓒呴摼鎺ュ寲寮曠敤锛圫cript.md 姝ｆ枃鎺ㄨ崘锛?
+[@role_K](../elements/@role_K.md) 璧板悜鍚у彴
 
-# YAML 涓娇鐢?subject: "@role_K walks toward the bar"
+# YAML 涓娇鐢?
+subject: "@role_K walks toward the bar"
 environment: "@scene_neon_alley in heavy rain"
 ```
 
@@ -258,13 +287,16 @@ environment: "@scene_neon_alley in heavy rain"
 | `@prop_` | 閬撳叿/鍏抽敭鐗╁搧 | `videospec/elements/` |
 
 ### 6.3 寮曠敤瑙ｆ瀽浼樺厛绾?
+
 缂栬瘧鍣ㄦ寜浠ヤ笅椤哄簭鏌ユ壘 `@` 寮曠敤瀵瑰簲鐨勫畾涔夋枃浠讹細
 1. `videospec/elements/{id}.md` 鈥?瑙掕壊/閬撳叿
 2. `videospec/scenes/{id}.md` 鈥?鍦烘櫙
 3. 鍐呰仈鎻忚堪锛坒allback锛屾湭鎵惧埌鏂囦欢鏃剁敤鍘熷鏂囨湰锛?
+
 ---
 
 ## 7. 鐩告満鏈閫熸煡琛?
+
 ### 鏅埆 (Shot Type)
 
 | 鏈 | 缂╁啓 | 璇存槑 |
@@ -304,7 +336,8 @@ environment: "@scene_neon_alley in heavy rain"
 ### 鐢诲箙姣斾緥
 `16:9` | `9:16` | `1:1` | `21:9` | `4:3` | `3:4` | `2.39:1`
 
-### 鍒嗚鲸鐜?`480p` | `720p` | `1080p` | `2K` | `3K` | `4K` | `8K`
+### 鍒嗚鲸鐜?
+`480p` | `720p` | `1080p` | `2K` | `3K` | `4K` | `8K`
 
 ### 瑙嗛鏃堕暱
 `3s`锛堟渶鐭級| `5s`锛堟帹鑽愶級| `10s` | `15s`锛堜笂闄愶級
@@ -316,3 +349,4 @@ environment: "@scene_neon_alley in heavy rain"
 
 > *"鏍煎紡鍗虫硶寰嬶紝YAML 鍗崇湡鐞嗐€?*
 > *OpsV 0.4.3 | 鏈€鍚庢洿鏂? 2026-03-28*
+

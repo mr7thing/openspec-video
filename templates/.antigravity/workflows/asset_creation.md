@@ -1,4 +1,4 @@
----
+﻿---
 description: Standard workflow for creating new visual assets
 ---
 
@@ -18,3 +18,4 @@ description: Standard workflow for creating new visual assets
 
 4.  **Validate**:
     - Ensure the ID matches what is used in `Script.md`.
+

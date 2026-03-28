@@ -5,11 +5,16 @@
 ---
 
 ## 1. OpsV 鏄粈涔?
+
 OpsV 鏄竴濂?**Spec-as-Code** 瑙嗛鍒朵綔绠＄嚎銆傚畠鍏佽鍒涗綔鑰咃紙瀵兼紨/PM/鑹烘湳鎬荤洃锛夌敤 Markdown 鎾板啓鏁呬簨銆佸畾涔夎祫浜с€佽璁″垎闀滐紝鐒跺悗閫氳繃 CLI 鍛戒护灏嗚繖浜涙枃鏈鑼?缂栬瘧"涓哄彲鎵ц鐨?JSON 浠诲姟闃熷垪锛屾渶缁堥┍鍔?AI 妯″瀷锛圫eaDream銆丼eedance銆丼iliconFlow 绛夛級鎵归噺鐢熸垚鍥惧儚涓庤棰戙€?
+
 **鏍稿績淇℃潯**锛?
+
 - **浠ｇ爜鍗宠鑼?*锛歚.md` 鏂囦欢鏄敮涓€鐨勭湡鐩告簮锛屽浘鍍忓拰瑙嗛鏄叾缂栬瘧浜х墿
-- **璧勪骇鍏堣**锛氳鑹?鍦烘櫙/閬撳叿蹇呴』鍏堢嫭绔嬪缓妗ｏ紝鍒嗛暅涓彧鍏佽寮曠敤锛坄@` 璇硶锛?- **鍔ㄩ潤鍒嗙**锛氬浘鍍忕敓鎴愬拰瑙嗛鐢熸垚鏄袱鏉＄嫭绔嬬绾匡紝浜掍笉骞叉壈
+- **璧勪骇鍏堣**锛氳鑹?鍦烘櫙/閬撳叿蹇呴』鍏堢嫭绔嬪缓妗ｏ紝鍒嗛暅涓彧鍏佽寮曠敤锛坄@` 璇硶锛?
+- **鍔ㄩ潤鍒嗙**锛氬浘鍍忕敓鎴愬拰瑙嗛鐢熸垚鏄袱鏉＄嫭绔嬬绾匡紝浜掍笉骞叉壈
 - **Markdown 椹卞姩**锛歒AML Frontmatter 瀛樺厓鏁版嵁锛孧arkdown Body 瀛樺弬鑰冨浘寮曠敤鍜屼汉绫诲闃呭唴瀹癸紝涓よ€呭崗鍚?
+
 ---
 
 ## 2. 鎶€鏈爤
@@ -34,15 +39,21 @@ OpsV 鏄竴濂?**Spec-as-Code** 瑙嗛鍒朵綔绠＄嚎銆傚畠鍏佽
 ```
 project/
 鈹溾攢鈹€ .agent/                     # AI Agent 閰嶇疆
-鈹?  鈹溾攢鈹€ Architect.md            # 鏋舵瀯甯堣鑹插畾涔?鈹?  鈹溾攢鈹€ Screenwriter.md         # 缂栧墽瑙掕壊瀹氫箟
-鈹?  鈹溾攢鈹€ AssetDesigner.md        # 璧勪骇璁捐甯堣鑹插畾涔?鈹?  鈹溾攢鈹€ ScriptDesigner.md       # 鍒嗛暅璁捐甯堣鑹插畾涔?鈹?  鈹溾攢鈹€ Animator.md             # 鍔ㄧ敾缂栧瑙掕壊瀹氫箟
+鈹?  鈹溾攢鈹€ Architect.md            # 鏋舵瀯甯堣鑹插畾涔?
+鈹?  鈹溾攢鈹€ Screenwriter.md         # 缂栧墽瑙掕壊瀹氫箟
+鈹?  鈹溾攢鈹€ AssetDesigner.md        # 璧勪骇璁捐甯堣鑹插畾涔?
+鈹?  鈹溾攢鈹€ ScriptDesigner.md       # 鍒嗛暅璁捐甯堣鑹插畾涔?
+鈹?  鈹溾攢鈹€ Animator.md             # 鍔ㄧ敾缂栧瑙掕壊瀹氫箟
 鈹?  鈹溾攢鈹€ Supervisor.md           # 璐ㄦ鐩戝埗瑙掕壊瀹氫箟
-鈹?  鈹斺攢鈹€ skills/                 # 鎶€鑳芥墜鍐屽簱锛?0 涓?Skill锛?鈹溾攢鈹€ .antigravity/               # Antigravity 宸ュ叿閰嶇疆
+鈹?  鈹斺攢鈹€ skills/                 # 鎶€鑳芥墜鍐屽簱锛?0 涓?Skill锛?
+鈹溾攢鈹€ .antigravity/               # Antigravity 宸ュ叿閰嶇疆
 鈹?  鈹溾攢鈹€ rules/                  # 琛屼负瑙勫垯
 鈹?  鈹斺攢鈹€ workflows/              # 宸ヤ綔娴佹ā鏉匡紙8 涓級
-鈹溾攢鈹€ .env/                       # 鐜閰嶇疆锛坓it 蹇界暐锛?鈹?  鈹溾攢鈹€ secrets.env             # API 瀵嗛挜
+鈹溾攢鈹€ .env/                       # 鐜閰嶇疆锛坓it 蹇界暐锛?
+鈹?  鈹溾攢鈹€ secrets.env             # API 瀵嗛挜
 鈹?  鈹斺攢鈹€ api_config.yaml         # 寮曟搸鍙傛暟閰嶇疆
-鈹溾攢鈹€ videospec/                  # 鏍稿績鍙欎簨璧勪骇锛堢湡鐩告簮锛?鈹?  鈹溾攢鈹€ project.md              # 椤圭洰鍏ㄥ眬閰嶇疆涓庤祫浜ц姳鍚嶅唽
+鈹溾攢鈹€ videospec/                  # 鏍稿績鍙欎簨璧勪骇锛堢湡鐩告簮锛?
+鈹?  鈹溾攢鈹€ project.md              # 椤圭洰鍏ㄥ眬閰嶇疆涓庤祫浜ц姳鍚嶅唽
 鈹?  鈹溾攢鈹€ stories/                # 鏁呬簨澶х翰
 鈹?  鈹?  鈹斺攢鈹€ story.md
 鈹?  鈹溾攢鈹€ elements/               # 瑙掕壊/閬撳叿璧勪骇瀹氫箟
@@ -50,8 +61,12 @@ project/
 鈹?  鈹?  鈹斺攢鈹€ @prop_sword.md
 鈹?  鈹溾攢鈹€ scenes/                 # 鍦烘櫙璧勪骇瀹氫箟
 鈹?  鈹?  鈹斺攢鈹€ @scene_forest.md
-鈹?  鈹斺攢鈹€ shots/                  # 鍒嗛暅涓庡姩鐢诲彴鏈?鈹?      鈹溾攢鈹€ Script.md           # 闈欐€佹瀯鍥惧垎闀?鈹?      鈹斺攢鈹€ Shotlist.md         # 鍔ㄦ€佽繍闀滃彴鏈?鈹溾攢鈹€ artifacts/                  # 鐢熸垚浜х墿
-鈹?  鈹斺攢鈹€ drafts_N/               # 绗?N 鎵规覆鏌撹崏鍥?鈹溾攢鈹€ queue/                      # 浠诲姟闃熷垪
+鈹?  鈹斺攢鈹€ shots/                  # 鍒嗛暅涓庡姩鐢诲彴鏈?
+鈹?      鈹溾攢鈹€ Script.md           # 闈欐€佹瀯鍥惧垎闀?
+鈹?      鈹斺攢鈹€ Shotlist.md         # 鍔ㄦ€佽繍闀滃彴鏈?
+鈹溾攢鈹€ artifacts/                  # 鐢熸垚浜х墿
+鈹?  鈹斺攢鈹€ drafts_N/               # 绗?N 鎵规覆鏌撹崏鍥?
+鈹溾攢鈹€ queue/                      # 浠诲姟闃熷垪
 鈹?  鈹溾攢鈹€ jobs.json               # 鍥惧儚鐢熸垚浠诲姟
 鈹?  鈹斺攢鈹€ video_jobs.json         # 瑙嗛鐢熸垚浠诲姟
 鈹溾攢鈹€ GEMINI.md                   # Gemini 涓撶敤鍏ㄥ眬浜烘牸閰嶇疆
@@ -78,23 +93,28 @@ project/
 ---
 
 ## 5. 蹇€熷紑濮?
+
 ```bash
 # 1. 鍏ㄥ眬瀹夎
 npm install -g videospec
 
-# 2. 鍒涘缓鏂伴」鐩?opsv init my-mv-project
+# 2. 鍒涘缓鏂伴」鐩?
+opsv init my-mv-project
 
 # 3. 閰嶇疆 API 瀵嗛挜
 echo "VOLCENGINE_API_KEY=your_key_here" > .env/secrets.env
 
 # 4. 缂栧啓璧勪骇鍜屽垎闀滐紙鍙傝€冨伐浣滄祦鏂囨。锛?
-# 5. 缂栬瘧骞剁敓鎴愬浘鍍?opsv generate
+
+# 5. 缂栬瘧骞剁敓鎴愬浘鍍?
+opsv generate
 opsv gen-image
 
 # 6. 灏嗙粨鏋滃洖鍐欐枃妗ｅ苟瀹￠槄
 opsv review
 
-# 7. 缂栬瘧骞剁敓鎴愯棰?opsv animate
+# 7. 缂栬瘧骞剁敓鎴愯棰?
+opsv animate
 opsv gen-video
 ```
 
@@ -116,3 +136,4 @@ opsv gen-video
 
 > *"浠ｇ爜鏄啓缁欎汉鐪嬬殑锛屽彧鏄『渚胯鏈哄櫒杩愯銆?*
 > *OpsV 0.4.3 | 鏈€鍚庢洿鏂? 2026-03-28*
+

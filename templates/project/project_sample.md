@@ -1,4 +1,4 @@
----
+﻿---
 project_name: "My Video Project"
 version: "0.3.2"
 engine: "wan2.1"
@@ -16,3 +16,4 @@ global_style_postfix: "high quality, cinematic, masterpiece"
 **Visual Style**: Cinematic Realism
 **Aspect Ratio**: 16:9
 **Resolution**: 2K
+

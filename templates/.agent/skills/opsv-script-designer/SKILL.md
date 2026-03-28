@@ -124,3 +124,4 @@ Always cross-reference the exact markdown structure found in your local `referen
 
 ### 寤惰繜缁戝畾鍘熷垯
 鐢熸垚鐨勫浘鐗囩粺涓€鍛藉悕涓?`shot_X_draft_N`銆?*浣狅紙Shot Designer锛変笉璐熻矗鏈€缁堥攣瀹氬摢寮犲浘鏄甯?*銆備綘鐨勪换鍔℃槸鎻愪緵瓒冲澶氱殑鍊欓€夛紙Drafts锛夛紝骞跺紩瀵煎婕斿湪 `Script.md` 涓繘琛屾壒娉ㄣ€?
+

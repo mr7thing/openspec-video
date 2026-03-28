@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-behavior
 description: Operational rules for OpsV Agents.
 ---
@@ -14,3 +14,4 @@ description: Operational rules for OpsV Agents.
 2.  **Tool Usage**:
     - Prefer `opsv` CLI over manual file editing where possible.
     - Use `opsv-new` skill for creation tasks.
+

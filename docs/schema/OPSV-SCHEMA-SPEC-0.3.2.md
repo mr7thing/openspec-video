@@ -1282,3 +1282,4 @@ opsv validate ./queue/jobs.json --schema job
 *Schema 鐗堟湰: 0.3.2*  
 *鏈€鍚庢洿鏂? 2026-03-15*  
 *缁存姢鑰? OpsV Core Team*
+
