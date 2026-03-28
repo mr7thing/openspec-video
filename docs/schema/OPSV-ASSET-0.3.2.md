@@ -1,6 +1,6 @@
-# OpenSpec-Video (OpsV) 0.3.2 Asset Specification (OPSV-ASSET-0.3.2.md)
+﻿# OpenSpec-Video (OpsV) 0.3.2 Asset Specification (OPSV-ASSET-0.3.2.md)
 
-本规范定义了 OpsV 0.3.2 生态下所有视觉资产（角色、场景、道具）的严格格式。目标是 **单一真相源 (SSOT)** 与**二元极简主义**：消除文字描述与参考图之间的矛盾。
+鏈鑼冨畾涔変簡 OpsV 0.3.2 鐢熸€佷笅鎵€鏈夎瑙夎祫浜э紙瑙掕壊銆佸満鏅€侀亾鍏凤級鐨勪弗鏍兼牸寮忋€傜洰鏍囨槸 **鍗曚竴鐪熺浉婧?(SSOT)** 涓?*浜屽厓鏋佺畝涓讳箟**锛氭秷闄ゆ枃瀛楁弿杩颁笌鍙傝€冨浘涔嬮棿鐨勭煕鐩俱€?
 
 ## 1. File Format
 
@@ -48,7 +48,7 @@ has_image: true
 ---
 
 # Subject Identity
-30多岁赛博侦探，黑色高领大衣，左眼亮起红色义眼流光。
+30澶氬瞾璧涘崥渚︽帰锛岄粦鑹查珮棰嗗ぇ琛ｏ紝宸︾溂浜捣绾㈣壊涔夌溂娴佸厜銆?
 
 # Physical Anchor
 ![K_Ref](C:/Gemini/OpenSpec-Video/assets/characters/K.png)
@@ -69,7 +69,7 @@ has_image: false
 ---
 
 # Scene Description
-赛博朋克风格的狭窄幽暗小巷，持续不断的大雨，地面水洼倒映着闪烁的紫色和青色霓虹灯招牌。两侧是生锈的金属管道和满是涂鸦的砖墙，光线昏暗，充满压抑和危险的氛围，电影级光影，8k分辨率。
+璧涘崥鏈嬪厠椋庢牸鐨勭嫮绐勫菇鏆楀皬宸凤紝鎸佺画涓嶆柇鐨勫ぇ闆紝鍦伴潰姘存醇鍊掓槧鐫€闂儊鐨勭传鑹插拰闈掕壊闇撹櫣鐏嫑鐗屻€備袱渚ф槸鐢熼攬鐨勯噾灞炵閬撳拰婊℃槸娑傞甫鐨勭爾澧欙紝鍏夌嚎鏄忔殫锛屽厖婊″帇鎶戝拰鍗遍櫓鐨勬皼鍥达紝鐢靛奖绾у厜褰憋紝8k鍒嗚鲸鐜囥€?
 ```
 
 ## 4. Compilation Constraints (For the Agent/CLI)

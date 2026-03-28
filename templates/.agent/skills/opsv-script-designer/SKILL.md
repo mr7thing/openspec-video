@@ -1,19 +1,19 @@
----
+﻿---
 name: opsv-script-designer
-description: 分镜脚本设计执行手册。将故事大纲翻译成带 YAML 结构的 Script.md 文件，包含严谨时长约束与画廊占位符模板，支持 d-ref/a-ref，供 ScriptDesigner Agent 调用。
+description: 鍒嗛暅鑴氭湰璁捐鎵ц鎵嬪唽銆傚皢鏁呬簨澶х翰缈昏瘧鎴愬甫 YAML 缁撴瀯鐨?Script.md 鏂囦欢锛屽寘鍚弗璋ㄦ椂闀跨害鏉熶笌鐢诲粖鍗犱綅绗︽ā鏉匡紝鏀寔 d-ref/a-ref锛屼緵 ScriptDesigner Agent 璋冪敤銆?
 ---
 
-# OpsV Script Designer — 执行手册 (0.4.1)
+# OpsV Script Designer 鈥?鎵ц鎵嬪唽 (0.4.3)
 
-本手册定义了 `ScriptDesigner Agent` 在 OpenSpec-Video 架构下生成 `videospec/shots/Script.md` 的完整执行规范。输入为 `story.md`，输出为 YAML 驱动的编译就绪分镜脚本。
+鏈墜鍐屽畾涔変簡 `ScriptDesigner Agent` 鍦?OpenSpec-Video 鏋舵瀯涓嬬敓鎴?`videospec/shots/Script.md` 鐨勫畬鏁存墽琛岃鑼冦€傝緭鍏ヤ负 `story.md`锛岃緭鍑轰负 YAML 椹卞姩鐨勭紪璇戝氨缁垎闀滆剼鏈€?
 
-## 核心准则 (0.4.1)
+## 鏍稿績鍑嗗垯 (0.4.3)
 
-**规则 1：时间是绝对约束。** 每个 Shot 必须有明确的 `duration`。单镜头理想 3-5 秒，**上限为 15 秒**。超过 15 秒必须拆成多个 Shot。
-**规则 2：视觉语言，非文字叙事。** 要描述的是「摄像机看到的内容」：机位、运动、主体动作、光影。
-**规则 3：YAML 优先（强制铁律）。** **必须**将所有 Shot 定义在文档 frontmatter 的 `shots:` YAML 数组中。Markdown 正文仅供人类阅读审阅。
-**规则 4：双语分离输出。** YAML 字段（`camera`, `environment`, `subject`）与 Markdown 正文使用**中文**；`prompt_en` 字段使用**纯英文**。
-**规则 5：a-ref 与 d-ref 的边界。** 分镜主要引用元素的 `Approved References (a-ref)`，分镜自身的图片渲染将在 `Script.md` 的 `Design References (d-ref)` 或者具体的画廊中确认。
+**瑙勫垯 1锛氭椂闂存槸缁濆绾︽潫銆?* 姣忎釜 Shot 蹇呴』鏈夋槑纭殑 `duration`銆傚崟闀滃ご鐞嗘兂 3-5 绉掞紝**涓婇檺涓?15 绉?*銆傝秴杩?15 绉掑繀椤绘媶鎴愬涓?Shot銆?
+**瑙勫垯 2锛氳瑙夎瑷€锛岄潪鏂囧瓧鍙欎簨銆?* 瑕佹弿杩扮殑鏄€屾憚鍍忔満鐪嬪埌鐨勫唴瀹广€嶏細鏈轰綅銆佽繍鍔ㄣ€佷富浣撳姩浣溿€佸厜褰便€?
+**瑙勫垯 3锛歒AML 浼樺厛锛堝己鍒堕搧寰嬶級銆?* **蹇呴』**灏嗘墍鏈?Shot 瀹氫箟鍦ㄦ枃妗?frontmatter 鐨?`shots:` YAML 鏁扮粍涓€侻arkdown 姝ｆ枃浠呬緵浜虹被闃呰瀹￠槄銆?
+**瑙勫垯 4锛氬弻璇垎绂昏緭鍑恒€?* YAML 瀛楁锛坄camera`, `environment`, `subject`锛変笌 Markdown 姝ｆ枃浣跨敤**涓枃**锛沗prompt_en` 瀛楁浣跨敤**绾嫳鏂?*銆?
+**瑙勫垯 5锛歛-ref 涓?d-ref 鐨勮竟鐣屻€?* 鍒嗛暅涓昏寮曠敤鍏冪礌鐨?`Approved References (a-ref)`锛屽垎闀滆嚜韬殑鍥剧墖娓叉煋灏嗗湪 `Script.md` 鐨?`Design References (d-ref)` 鎴栬€呭叿浣撶殑鐢诲粖涓‘璁ゃ€?
 
 ## Workflow Execution
 
@@ -38,12 +38,12 @@ Before generating the file, output a `<thinking>` block:
 Use `write_to_file` to create/append to a `.md` file inside `videospec/shots/`.
 **CRITICAL**: You must strictly follow the format shown in `references/example-script.md`.
 
-**0.3.2 增强：自动链接化与画廊模板**：
-- 当你在 Markdown Body 中提到 `@role_K` 时，**必须**尝试将其写成 `[@role_K](../videospec/elements/role_K.md)`。
-- 为每个 Shot 预留一个 HTML 或 Markdown 画廊区域，方便 `opsv review` 回写图片链接。
+**0.3.2 澧炲己锛氳嚜鍔ㄩ摼鎺ュ寲涓庣敾寤婃ā鏉?*锛?
+- 褰撲綘鍦?Markdown Body 涓彁鍒?`@role_K` 鏃讹紝**蹇呴』**灏濊瘯灏嗗叾鍐欐垚 `[@role_K](../videospec/elements/role_K.md)`銆?
+- 涓烘瘡涓?Shot 棰勭暀涓€涓?HTML 鎴?Markdown 鐢诲粖鍖哄煙锛屾柟渚?`opsv review` 鍥炲啓鍥剧墖閾炬帴銆?
 
 ### Phase 4: Intent Sync (0.3.2)
-在你编辑完 `Script.md` 供导演审阅后，如果你需要修改 `Shotlist.md` 的技术执行参数，你必须确保它指向导演在 `Script.md` 中通过 review 工具确定的最新图片路径。
+鍦ㄤ綘缂栬緫瀹?`Script.md` 渚涘婕斿闃呭悗锛屽鏋滀綘闇€瑕佷慨鏀?`Shotlist.md` 鐨勬妧鏈墽琛屽弬鏁帮紝浣犲繀椤荤‘淇濆畠鎸囧悜瀵兼紨鍦?`Script.md` 涓€氳繃 review 宸ュ叿纭畾鐨勬渶鏂板浘鐗囪矾寰勩€?
 
 ## Formatting Rules for Shots (YAML Array)
 
@@ -51,34 +51,34 @@ Use `write_to_file` to create/append to a `.md` file inside `videospec/shots/`.
 2. Every item in the `shots:` array MUST have the following keys:
    - `id`: e.g., "shot_1"
    - `duration`: integer (seconds)
-   - `camera`: string (e.g., "Wide shot, pan down" - 中文或单侧英文均可)
-   - `environment`: string (背景描述，保留 `@` 实体)
-   - `subject`: string (主体动作，保留 `@` 实体)
-   - `prompt_en`: string (**纯英文**密集的生图提示词)
+   - `camera`: string (e.g., "Wide shot, pan down" - 涓枃鎴栧崟渚ц嫳鏂囧潎鍙?
+   - `environment`: string (鑳屾櫙鎻忚堪锛屼繚鐣?`@` 瀹炰綋)
+   - `subject`: string (涓讳綋鍔ㄤ綔锛屼繚鐣?`@` 瀹炰綋)
+   - `prompt_en`: string (**绾嫳鏂?*瀵嗛泦鐨勭敓鍥炬彁绀鸿瘝)
 
 3. Below the frontmatter (`---`), you can generate the Markdown body for the director to read, grouping shots under Acts (e.g., `## Act 1`). The compiler will ignore the Markdown body, but the director relies on it for review.
 
 ## Reference Alignment
 Always cross-reference the exact markdown structure found in your local `references/example-script.md` file before generating.
 
-## 0.3.1 新增：关键帧塌缩协议 (Keyframe Resolution Protocol)
+## 0.3.1 鏂板锛氬叧閿抚濉岀缉鍗忚 (Keyframe Resolution Protocol)
 
-在 OpsV 0.3.1 中，分镜表新增了以下 YAML 可选字段，你必须在适当时机主动使用它们：
+鍦?OpsV 0.3.1 涓紝鍒嗛暅琛ㄦ柊澧炰簡浠ヤ笅 YAML 鍙€夊瓧娈碉紝浣犲繀椤诲湪閫傚綋鏃舵満涓诲姩浣跨敤瀹冧滑锛?
 
-### 新增可选的 YAML 字段
+### 鏂板鍙€夌殑 YAML 瀛楁
 
-| 字段                 | 类型   | 说明                                                    |
+| 瀛楁                 | 绫诲瀷   | 璇存槑                                                    |
 | -------------------- | ------ | ------------------------------------------------------- |
-| `first_image`        | string | 首帧参考图的路径，或者 `@FRAME:<shot_id>_last` 延迟指针 |
-| `middle_image`       | string | 中间帧参考图路径（备用）                                |
-| `last_image`         | string | 尾帧参考图路径                                          |
-| `target_last_prompt` | string | 靶向诱饵词，系统自动为此生成 `<shot_id>_last` 图像任务  |
-| `motion_prompt_zh`   | string | 中文动作描述（供人类核对或 LLM 分析）                   |
-| `motion_prompt_en`   | string | 英文 API 唯一动作指令（给底层视频大模型识别）           |
+| `first_image`        | string | 棣栧抚鍙傝€冨浘鐨勮矾寰勶紝鎴栬€?`@FRAME:<shot_id>_last` 寤惰繜鎸囬拡 |
+| `middle_image`       | string | 涓棿甯у弬鑰冨浘璺緞锛堝鐢級                                |
+| `last_image`         | string | 灏惧抚鍙傝€冨浘璺緞                                          |
+| `target_last_prompt` | string | 闈跺悜璇遍サ璇嶏紝绯荤粺鑷姩涓烘鐢熸垚 `<shot_id>_last` 鍥惧儚浠诲姟  |
+| `motion_prompt_zh`   | string | 涓枃鍔ㄤ綔鎻忚堪锛堜緵浜虹被鏍稿鎴?LLM 鍒嗘瀽锛?                  |
+| `motion_prompt_en`   | string | 鑻辨枃 API 鍞竴鍔ㄤ綔鎸囦护锛堢粰搴曞眰瑙嗛澶фā鍨嬭瘑鍒級           |
 
-### 长镜头继承规则
+### 闀块暅澶寸户鎵胯鍒?
 
-当叙事需要连续运动的长镜头效果时，**后续 Shot 的 `first_image` 必须写为 `@FRAME:<前一个shot_id>_last`**，而非重复指定一张独立图片。底层执行器会在前一个视频渲染完成后用 FFmpeg 自动截取真实尾帧作为下一个镜头的首帧。
+褰撳彊浜嬮渶瑕佽繛缁繍鍔ㄧ殑闀块暅澶存晥鏋滄椂锛?*鍚庣画 Shot 鐨?`first_image` 蹇呴』鍐欎负 `@FRAME:<鍓嶄竴涓猻hot_id>_last`**锛岃€岄潪閲嶅鎸囧畾涓€寮犵嫭绔嬪浘鐗囥€傚簳灞傛墽琛屽櫒浼氬湪鍓嶄竴涓棰戞覆鏌撳畬鎴愬悗鐢?FFmpeg 鑷姩鎴彇鐪熷疄灏惧抚浣滀负涓嬩竴涓暅澶寸殑棣栧抚銆?
 
 ```yaml
   - shot: 5
@@ -92,35 +92,35 @@ Always cross-reference the exact markdown structure found in your local `referen
     motion_prompt_en: "Subject reaches door, pushes it open. Light floods in."
 ```
 
-### 断点修复规则
+### 鏂偣淇瑙勫垯
 
-如果某个 Shot 内部发生剧烈变化（如180度旋转、角色状态突变），你需要主动为该 Shot 预写 `target_last_prompt`。系统会自动将其转化为一个补帧图像生成任务，命名为 `<shot_id>_last`。
+濡傛灉鏌愪釜 Shot 鍐呴儴鍙戠敓鍓х儓鍙樺寲锛堝180搴︽棆杞€佽鑹茬姸鎬佺獊鍙橈級锛屼綘闇€瑕佷富鍔ㄤ负璇?Shot 棰勫啓 `target_last_prompt`銆傜郴缁熶細鑷姩灏嗗叾杞寲涓轰竴涓ˉ甯у浘鍍忕敓鎴愪换鍔★紝鍛藉悕涓?`<shot_id>_last`銆?
 
 ```yaml
   - shot: 7
     duration: 8s
     first_image: "artifacts/drafts_2/shot_7.png"
     motion_prompt_en: "Camera orbits around subject 180 degrees."
-    target_last_prompt: "从主角背后拍摄的电影级构图，敌人举枪对峙，昏暗霓虹灯光"
+    target_last_prompt: "浠庝富瑙掕儗鍚庢媿鎽勭殑鐢靛奖绾ф瀯鍥撅紝鏁屼汉涓炬灙瀵瑰硻锛屾槒鏆楅湏铏圭伅鍏?
 ```
-## 0.3.2 新增：视觉审阅与画廊规范
+## 0.3.2 鏂板锛氳瑙夊闃呬笌鐢诲粖瑙勮寖
 
-为了让导演拥有直观的视觉审阅体验，你在生成 `Script.md` 的 Markdown Body 时应遵循以下布局：
+涓轰簡璁╁婕旀嫢鏈夌洿瑙傜殑瑙嗚瀹￠槄浣撻獙锛屼綘鍦ㄧ敓鎴?`Script.md` 鐨?Markdown Body 鏃跺簲閬靛惊浠ヤ笅甯冨眬锛?
 
 ```markdown
-## Shot [序号] ([时长]s)
-[这里是视觉动作描述，实体如 [@角色名](../videospec/elements/角色名.md) 需链接化]
+## Shot [搴忓彿] ([鏃堕暱]s)
+[杩欓噷鏄瑙夊姩浣滄弿杩帮紝瀹炰綋濡?[@瑙掕壊鍚峕(../videospec/elements/瑙掕壊鍚?md) 闇€閾炬帴鍖朷
 
-### 🖼️ 视觉审阅廊
-| 画面 1 | 画面 2 |
+### 馃柤锔?瑙嗚瀹￠槄寤?
+| 鐢婚潰 1 | 鐢婚潰 2 |
 |:---:|:---:|
-| (等待 opsv review 回写) | (等待 opsv review 回写) |
+| (绛夊緟 opsv review 鍥炲啓) | (绛夊緟 opsv review 鍥炲啓) |
 
-### 🎯 定向补帧
-| 目标尾帧候选 |
+### 馃幆 瀹氬悜琛ュ抚
+| 鐩爣灏惧抚鍊欓€?|
 |:---:|
-| (等待 opsv review 回写) |
+| (绛夊緟 opsv review 鍥炲啓) |
 ```
 
-### 延迟绑定原则
-生成的图片统一命名为 `shot_X_draft_N`。**你（Shot Designer）不负责最终锁定哪张图是首帧**。你的任务是提供足够多的候选（Drafts），并引导导演在 `Script.md` 中进行批注。
+### 寤惰繜缁戝畾鍘熷垯
+鐢熸垚鐨勫浘鐗囩粺涓€鍛藉悕涓?`shot_X_draft_N`銆?*浣狅紙Shot Designer锛変笉璐熻矗鏈€缁堥攣瀹氬摢寮犲浘鏄甯?*銆備綘鐨勪换鍔℃槸鎻愪緵瓒冲澶氱殑鍊欓€夛紙Drafts锛夛紝骞跺紩瀵煎婕斿湪 `Script.md` 涓繘琛屾壒娉ㄣ€?

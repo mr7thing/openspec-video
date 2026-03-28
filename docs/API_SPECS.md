@@ -1,16 +1,14 @@
-# OpsV 多模型 API 接口规范 (v0.4.x)
+﻿# OpsV 澶氭ā鍨?API 鎺ュ彛瑙勮寖 (v0.4.x)
 
-本文件定义了 OpsV 框架支持的各类视频生成模型的接口格式、数据类型及交互协议。
-
-## 1. 核心交互模式
-OpsV 采用 **“提交-轮询-下载”** 的异步模式。
-
-### 统一作业对象 (Internal Job Object)
+鏈枃浠跺畾涔変簡 OpsV 妗嗘灦鏀寔鐨勫悇绫昏棰戠敓鎴愭ā鍨嬬殑鎺ュ彛鏍煎紡銆佹暟鎹被鍨嬪強浜や簰鍗忚銆?
+## 1. 鏍稿績浜や簰妯″紡
+OpsV 閲囩敤 **鈥滄彁浜?杞-涓嬭浇鈥?* 鐨勫紓姝ユā寮忋€?
+### 缁熶竴浣滀笟瀵硅薄 (Internal Job Object)
 ```typescript
 interface Job {
   id: string;
   prompt_en: string;
-  reference_images?: string[]; // 本地路径
+  reference_images?: string[]; // 鏈湴璺緞
   payload: {
     duration: string;
     global_settings: {
@@ -28,7 +26,7 @@ interface Job {
 
 ## 2. ByteDance Seedance 1.5 Pro
 
-### 提交接口 (Submit)
+### 鎻愪氦鎺ュ彛 (Submit)
 - **Endpoint**: `https://ark.cn-beijing.volces.com/api/v3/video/submit`
 - **Method**: `POST`
 - **Headers**:
@@ -38,45 +36,42 @@ interface Job {
 {
   "model": "doubao-seedance-1-5-pro",
   "prompt": "prompt string",
-  "resolution": "720p", // 官方支持 480p, 720p, 1080p
-  "aspect_ratio": "16:9", // 官方支持 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, adaptive
-  "duration": 5, // 整数秒
-  "fps": 24, // 固定 24
-  "image": "data:image/jpeg;base64,...", // 可选，首帧
-  "last_image": "data:image/jpeg;base64,...", // 可选，尾帧
+  "resolution": "720p", // 瀹樻柟鏀寔 480p, 720p, 1080p
+  "aspect_ratio": "16:9", // 瀹樻柟鏀寔 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, adaptive
+  "duration": 5, // 鏁存暟绉?  "fps": 24, // 鍥哄畾 24
+  "image": "data:image/jpeg;base64,...", // 鍙€夛紝棣栧抚
+  "last_image": "data:image/jpeg;base64,...", // 鍙€夛紝灏惧抚
   "sound": true
 }
 ```
 
-### 状态查询 (Status)
+### 鐘舵€佹煡璇?(Status)
 - **Endpoint**: `https://ark.cn-beijing.volces.com/api/v3/video/status?id=<requestId>`
 - **Method**: `GET`
 - **Response**:
 ```json
 {
   "status": "succeeded", // succeeded, failed, pending, running
-  "video_url": "https://...", // 仅 status 为 succeeded 时包含
-  "error_message": "" // 仅 status 为 failed 时包含
-}
+  "video_url": "https://...", // 浠?status 涓?succeeded 鏃跺寘鍚?  "error_message": "" // 浠?status 涓?failed 鏃跺寘鍚?}
 ```
 
 ---
 
 ## 3. SiliconFlow (Wan2.1)
 
-### 提交接口 (Submit)
+### 鎻愪氦鎺ュ彛 (Submit)
 - **Endpoint**: `https://api.siliconflow.cn/v1/video/submit`
 - **Method**: `POST`
 - **Payload**:
 ```json
 {
-  "model": "DeepSeek-AI/Wan2.1-T2V-14B", // 或其他 Wan2.1 变体
+  "model": "DeepSeek-AI/Wan2.1-T2V-14B", // 鎴栧叾浠?Wan2.1 鍙樹綋
   "prompt": "prompt string",
   "image_size": "1280x720"
 }
 ```
 
-### 状态查询 (Status)
+### 鐘舵€佹煡璇?(Status)
 - **Endpoint**: `https://api.siliconflow.cn/v1/video/status`
 - **Method**: `POST`
 - **Payload**:
@@ -101,7 +96,7 @@ interface Job {
 
 ## 4. SeaDream 5.0 (Image Generation)
 
-### 提交接口 (Submit)
+### 鎻愪氦鎺ュ彛 (Submit)
 - **Endpoint**: `https://api.volcengine.com/visual/image_generation/2024-08-01`
 - **Method**: `POST`
 - **Payload**:
@@ -110,14 +105,14 @@ interface Job {
   "req_key": "high_definition_generation",
   "prompt": "prompt string",
   "model_version": "seadream_5_0",
-  "aspect_ratio": "16:9", // 官方预设画幅
-  "size": "2K", // 官方支持 2K, 3K, 4K
-  "width": 1024, // 仅在不使用 size 时可选 custom pixel
+  "aspect_ratio": "16:9", // 瀹樻柟棰勮鐢诲箙
+  "size": "2K", // 瀹樻柟鏀寔 2K, 3K, 4K
+  "width": 1024, // 浠呭湪涓嶄娇鐢?size 鏃跺彲閫?custom pixel
   "height": 1024
 }
 ```
 
-### 响应格式
+### 鍝嶅簲鏍煎紡
 ```json
 {
   "data": {
@@ -129,21 +124,16 @@ interface Job {
 
 ---
 
-## 5. 异常处理协议 (Defensive Protocol)
+## 5. 寮傚父澶勭悊鍗忚 (Defensive Protocol)
 
-所有 Provider 必须实现以下防御性解析准则：
+鎵€鏈?Provider 蹇呴』瀹炵幇浠ヤ笅闃插尽鎬цВ鏋愬噯鍒欙細
 
-1.  **深度穿透解析 (Deep Penetrative Parsing)**:
-    - 兼容 `data.id`, `data.data.id`, `data.data[0].id` 等变体。
-    - 使用 `(Array.isArray(d) ? d[0] : d)` 确保结果稳健。
-
-2.  **强力证据式日志 (Evidential Logging)**:
-    - 详细记录 API 响应体，严禁返回模糊的 `undefined`。
-
-3.  **Axios 防空逻辑 (Axios Defensive Handling)**:
-    - 捕获 `error.response` 并提取业务错误码。
-    - 区分网络超时 (`ETIMEDOUT`) 与业务错误。
-
+1.  **娣卞害绌块€忚В鏋?(Deep Penetrative Parsing)**:
+    - 鍏煎 `data.id`, `data.data.id`, `data.data[0].id` 绛夊彉浣撱€?    - 浣跨敤 `(Array.isArray(d) ? d[0] : d)` 纭繚缁撴灉绋冲仴銆?
+2.  **寮哄姏璇佹嵁寮忔棩蹇?(Evidential Logging)**:
+    - 璇︾粏璁板綍 API 鍝嶅簲浣擄紝涓ョ杩斿洖妯＄硦鐨?`undefined`銆?
+3.  **Axios 闃茬┖閫昏緫 (Axios Defensive Handling)**:
+    - 鎹曡幏 `error.response` 骞舵彁鍙栦笟鍔￠敊璇爜銆?    - 鍖哄垎缃戠粶瓒呮椂 (`ETIMEDOUT`) 涓庝笟鍔￠敊璇€?
 ---
 > [!IMPORTANT]
-> 任何新的模型集成必须依照此文档更新相应的接口描述，并同步至 `SeedanceProvider` 或相关测试用例中。
+> 浠讳綍鏂扮殑妯″瀷闆嗘垚蹇呴』渚濈収姝ゆ枃妗ｆ洿鏂扮浉搴旂殑鎺ュ彛鎻忚堪锛屽苟鍚屾鑷?`SeedanceProvider` 鎴栫浉鍏虫祴璇曠敤渚嬩腑銆?

@@ -1,4 +1,4 @@
----
+﻿---
 shots:
   - id: shot_1
     reference_image: "../artifacts/drafts_4/shot_1.png"

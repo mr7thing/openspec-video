@@ -6,6 +6,8 @@ import { ErrorFactory } from '../errors/OpsVError';
 
 export interface ModelConfig {
     provider: string;
+    type?: 'image' | 'video';
+    enable?: boolean;
     model?: string;
     api_url?: string;
     api_status_url?: string;

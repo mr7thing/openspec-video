@@ -1,115 +1,94 @@
-# OPSV-ASSET-0.4 资产规范
+﻿# OPSV-ASSET-0.4 璧勪骇瑙勮寖
 
-> 定义所有视觉资产（角色、场景、道具）的文档格式。本版本引入 **d-ref / a-ref 双通道参考图体系**，废弃 0.3.2 的 `has_image` 二元开关。
-
+> 瀹氫箟鎵€鏈夎瑙夎祫浜э紙瑙掕壊銆佸満鏅€侀亾鍏凤級鐨勬枃妗ｆ牸寮忋€傛湰鐗堟湰寮曞叆 **d-ref / a-ref 鍙岄€氶亾鍙傝€冨浘浣撶郴**锛屽簾寮?0.3.2 鐨?`has_image` 浜屽厓寮€鍏炽€?
 ---
 
-## 核心规则
+## 鏍稿績瑙勫垯
 
 ```
-生成自身 → 使用自己的 Design References (d-ref)
-被引用时 → 提供自己的 Approved References (a-ref)
+鐢熸垚鑷韩 鈫?浣跨敤鑷繁鐨?Design References (d-ref)
+琚紩鐢ㄦ椂 鈫?鎻愪緵鑷繁鐨?Approved References (a-ref)
 ```
 
-此规则统一适用于 element、scene、shot 所有实体类型。
-
+姝よ鍒欑粺涓€閫傜敤浜?element銆乻cene銆乻hot 鎵€鏈夊疄浣撶被鍨嬨€?
 ---
 
-## 1. 文件结构
+## 1. 鏂囦欢缁撴瀯
 
-每个资产文件由 **YAML Frontmatter + Markdown Body** 组成：
-
+姣忎釜璧勪骇鏂囦欢鐢?**YAML Frontmatter + Markdown Body** 缁勬垚锛?
 ```markdown
 ---
-# YAML 元数据（机器消费）
----
-# Markdown Body（人类+机器双消费）
+# YAML 鍏冩暟鎹紙鏈哄櫒娑堣垂锛?---
+# Markdown Body锛堜汉绫?鏈哄櫒鍙屾秷璐癸級
 ```
 
 ---
 
 ## 2. YAML Frontmatter
 
-### 必填字段
+### 蹇呭～瀛楁
 
 ```yaml
 ---
-name: "@prefix_identifier"       # 唯一标识（@ + 类型前缀 + 名称）
-type: "character"                # character | scene | prop
-brief_description: "一句话描述"   # ≤ 20 字
-prompt_en: >                     # 英文渲染提示词
-  Dense English prompt for generation models...
+name: "@prefix_identifier"       # 鍞竴鏍囪瘑锛園 + 绫诲瀷鍓嶇紑 + 鍚嶇О锛?type: "character"                # character | scene | prop
+brief_description: "涓€鍙ヨ瘽鎻忚堪"   # 鈮?20 瀛?prompt_en: >                     # 鑻辨枃娓叉煋鎻愮ず璇?  Dense English prompt for generation models...
 ---
 ```
 
-### 可选字段
-
+### 鍙€夊瓧娈?
 ```yaml
-detailed_description: >          # 无参考图时的详尽描述
-schema_version: "0.4"            # Schema 版本
+detailed_description: >          # 鏃犲弬鑰冨浘鏃剁殑璇﹀敖鎻忚堪
+schema_version: "0.4"            # Schema 鐗堟湰
 ```
 
-> **`has_image` 已废弃**。是否有参考图由 Markdown Body 中的 `## Approved References` 节是否存在且非空自动推导。
-
+> **`has_image` 宸插簾寮?*銆傛槸鍚︽湁鍙傝€冨浘鐢?Markdown Body 涓殑 `## Approved References` 鑺傛槸鍚﹀瓨鍦ㄤ笖闈炵┖鑷姩鎺ㄥ銆?
 ---
 
-## 3. Markdown Body — 双通道参考图
+## 3. Markdown Body 鈥?鍙岄€氶亾鍙傝€冨浘
 
-### 3.1 `## Design References`（d-ref：生成输入）
+### 3.1 `## Design References`锛坉-ref锛氱敓鎴愯緭鍏ワ級
 
-**用途**：当 `opsv generate` 生成**本实体自身**时，将此节中的图片作为 img2img 输入参考图传给模型。
-
-**使用场景**：
-- 外部灵感图（服装参考、配色参考、情绪板）
-- 已有资产的 a-ref（用于生成变体：老年版、卡通版、职业形象等）
-- 草图/手绘稿
-
-**格式**：标准 Markdown 链接，`[用途描述](图片路径)`
+**鐢ㄩ€?*锛氬綋 `opsv generate` 鐢熸垚**鏈疄浣撹嚜韬?*鏃讹紝灏嗘鑺備腑鐨勫浘鐗囦綔涓?img2img 杈撳叆鍙傝€冨浘浼犵粰妯″瀷銆?
+**浣跨敤鍦烘櫙**锛?- 澶栭儴鐏垫劅鍥撅紙鏈嶈鍙傝€冦€侀厤鑹插弬鑰冦€佹儏缁澘锛?- 宸叉湁璧勪骇鐨?a-ref锛堢敤浜庣敓鎴愬彉浣擄細鑰佸勾鐗堛€佸崱閫氱増銆佽亴涓氬舰璞＄瓑锛?- 鑽夊浘/鎵嬬粯绋?
+**鏍煎紡**锛氭爣鍑?Markdown 閾炬帴锛宍[鐢ㄩ€旀弿杩癩(鍥剧墖璺緞)`
 
 ```markdown
 ## Design References
-- [服装灵感 - 赛博朋克风衣](refs/costume_mood.png)
-- [年轻版原型 - 用于生成老年变体](../elements/@role_K.md → a-ref)
+- [鏈嶈鐏垫劅 - 璧涘崥鏈嬪厠椋庤。](refs/costume_mood.png)
+- [骞磋交鐗堝師鍨?- 鐢ㄤ簬鐢熸垚鑰佸勾鍙樹綋](../elements/@role_K.md 鈫?a-ref)
 ```
 
-### 3.2 `## Approved References`（a-ref：定档输出）
+### 3.2 `## Approved References`锛坅-ref锛氬畾妗ｈ緭鍑猴級
 
-**用途**：当**其他实体引用本实体**时（如 Shot 中 `@role_K`），将此节中的图片注入引用方的 `reference_images`。
+**鐢ㄩ€?*锛氬綋**鍏朵粬瀹炰綋寮曠敤鏈疄浣?*鏃讹紙濡?Shot 涓?`@role_K`锛夛紝灏嗘鑺備腑鐨勫浘鐗囨敞鍏ュ紩鐢ㄦ柟鐨?`reference_images`銆?
+**浣跨敤鍦烘櫙**锛?- 缁忓婕斿鎵圭‘璁ょ殑瀹氭。鍥?- 瑙掕壊涓夎鍥?/ 姝ｈ劯鐗瑰啓
+- 鍦烘櫙鍏ㄦ櫙瀹氱
 
-**使用场景**：
-- 经导演审批确认的定档图
-- 角色三视图 / 正脸特写
-- 场景全景定稿
-
-**格式**：同上
-
+**鏍煎紡**锛氬悓涓?
 ```markdown
 ## Approved References
-- [角色三视图](artifacts/drafts_3/role_K_turnaround.png)
-- [角色正脸特写](artifacts/drafts_3/role_K_closeup.png)
+- [瑙掕壊涓夎鍥綸(artifacts/drafts_3/role_K_turnaround.png)
+- [瑙掕壊姝ｈ劯鐗瑰啓](artifacts/drafts_3/role_K_closeup.png)
 ```
 
-### 3.3 `has_image` 自动推导
+### 3.3 `has_image` 鑷姩鎺ㄥ
 
 ```
-## Design References 或 ## Approved References 任一存在且包含有效链接
-  → 等价 has_image: true
+## Design References 鎴?## Approved References 浠讳竴瀛樺湪涓斿寘鍚湁鏁堥摼鎺?  鈫?绛変环 has_image: true
 
-两节均不存在或为空
-  → 等价 has_image: false → 依赖 detailed_description 全文描述
+涓よ妭鍧囦笉瀛樺湪鎴栦负绌?  鈫?绛変环 has_image: false 鈫?渚濊禆 detailed_description 鍏ㄦ枃鎻忚堪
 ```
 
 ---
 
-## 4. 完整示例
+## 4. 瀹屾暣绀轰緥
 
-### 示例 A：有参考图的角色
-
+### 绀轰緥 A锛氭湁鍙傝€冨浘鐨勮鑹?
 ```markdown
 ---
 name: "@role_K"
 type: "character"
-brief_description: "30多岁赛博侦探，黑色高领大衣"
+brief_description: "30澶氬瞾璧涘崥渚︽帰锛岄粦鑹查珮棰嗗ぇ琛?
 prompt_en: >
   A cyber detective in his 30s, wearing a black turtleneck coat,
   left eye glowing with red cybernetic implant, rain-soaked,
@@ -117,78 +96,70 @@ prompt_en: >
 ---
 
 ## Design References
-- [服装灵感 - 赛博朋克风衣](refs/costume_mood.png)
-- [义眼参考 - 红色光效](refs/cyber_eye_ref.jpg)
+- [鏈嶈鐏垫劅 - 璧涘崥鏈嬪厠椋庤。](refs/costume_mood.png)
+- [涔夌溂鍙傝€?- 绾㈣壊鍏夋晥](refs/cyber_eye_ref.jpg)
 
 ## Approved References
-- [角色三视图](artifacts/drafts_3/role_K_turnaround.png)
-- [角色正脸特写](artifacts/drafts_3/role_K_closeup.png)
+- [瑙掕壊涓夎鍥綸(artifacts/drafts_3/role_K_turnaround.png)
+- [瑙掕壊姝ｈ劯鐗瑰啓](artifacts/drafts_3/role_K_closeup.png)
 ```
 
-### 示例 B：纯文字描述的场景（无参考图）
-
+### 绀轰緥 B锛氱函鏂囧瓧鎻忚堪鐨勫満鏅紙鏃犲弬鑰冨浘锛?
 ```markdown
 ---
 name: "@scene_neon_alley"
 type: "scene"
-brief_description: "赛博朋克霓虹小巷"
+brief_description: "璧涘崥鏈嬪厠闇撹櫣灏忓贩"
 detailed_description: >
-  赛博朋克风格的狭窄幽暗小巷，持续不断的大雨，
-  地面水洼倒映着闪烁的紫色和青色霓虹灯招牌。
-  两侧是生锈的金属管道和满是涂鸦的砖墙。
-prompt_en: >
+  璧涘崥鏈嬪厠椋庢牸鐨勭嫮绐勫菇鏆楀皬宸凤紝鎸佺画涓嶆柇鐨勫ぇ闆紝
+  鍦伴潰姘存醇鍊掓槧鐫€闂儊鐨勭传鑹插拰闈掕壊闇撹櫣鐏嫑鐗屻€?  涓や晶鏄敓閿堢殑閲戝睘绠￠亾鍜屾弧鏄秱楦︾殑鐮栧銆?prompt_en: >
   Narrow cyberpunk alley, heavy rain, neon reflections in puddles,
   rusty pipes, graffiti walls, purple and cyan neon signs...
 ---
 ```
 
-> 无 `## Design References` 和 `## Approved References` → 自动等价 `has_image: false`。编译器使用 `detailed_description` + `prompt_en` 纯文生图。
-
-### 示例 C：变体链（从已有角色生成新形象）
+> 鏃?`## Design References` 鍜?`## Approved References` 鈫?鑷姩绛変环 `has_image: false`銆傜紪璇戝櫒浣跨敤 `detailed_description` + `prompt_en` 绾枃鐢熷浘銆?
+### 绀轰緥 C锛氬彉浣撻摼锛堜粠宸叉湁瑙掕壊鐢熸垚鏂板舰璞★級
 
 ```markdown
 ---
 name: "@role_K_old"
 type: "character"
-brief_description: "60岁老年版 K，灰白头发，伤疤累累"
+brief_description: "60宀佽€佸勾鐗?K锛岀伆鐧藉ご鍙戯紝浼ょ枻绱疮"
 prompt_en: >
   An aged version of the cyber detective K, now 60 years old,
   gray-white hair, deep facial scars, worn leather coat...
 ---
 
 ## Design References
-- [年轻版定档图 - 作为生成基础](artifacts/drafts_3/role_K_turnaround.png)
-- [老化参考 - 皱纹与伤疤纹理](refs/aging_reference.jpg)
+- [骞磋交鐗堝畾妗ｅ浘 - 浣滀负鐢熸垚鍩虹](artifacts/drafts_3/role_K_turnaround.png)
+- [鑰佸寲鍙傝€?- 鐨辩汗涓庝激鐤ょ汗鐞哴(refs/aging_reference.jpg)
 ```
 
-> d-ref 引用了 `@role_K` 的 a-ref，形成变体链。`opsv generate` 会将这些图片传给模型做 img2img。
+> d-ref 寮曠敤浜?`@role_K` 鐨?a-ref锛屽舰鎴愬彉浣撻摼銆俙opsv generate` 浼氬皢杩欎簺鍥剧墖浼犵粰妯″瀷鍋?img2img銆?
+---
+
+## 5. 缂栬瘧绾︽潫
+
+### 鐢熸垚鑷韩锛坄opsv generate` 澶勭悊 elements/ 鍜?scenes/锛?
+1. 妫€鏌?`## Design References` 鑺?鈫?鎻愬彇鍥剧墖璺緞 鈫?璁句负 `reference_images`
+2. 鏃?d-ref 鏃?鈫?绾枃鐢熷浘锛坱xt2img锛?3. 鏂囧瓧閮ㄥ垎锛氭湁 a-ref 鏃剁敤 `brief_description`锛屽惁鍒欑敤 `detailed_description`
+
+### 琚紩鐢紙Shot 鍒嗛暅涓?`@entity` 瑙ｆ瀽锛?
+1. 瑙ｆ瀽琚紩鐢ㄥ疄浣撶殑 `## Approved References` 鈫?鎻愬彇绗竴寮犲浘 鈫?娉ㄥ叆 Shot 鐨?`reference_images`
+2. 鏃?a-ref 鏃?鈫?fallback锛氭悳绱?`artifacts/drafts_*` 涓渶鏂扮敓鎴愮殑瀵瑰簲鏂囦欢
+3. 浠嶆湭鎵惧埌 鈫?鍛婅 `[WARN] No approved ref for @xxx`
 
 ---
 
-## 5. 编译约束
+## 6. 鍚戝悗鍏煎
 
-### 生成自身（`opsv generate` 处理 elements/ 和 scenes/）
-
-1. 检查 `## Design References` 节 → 提取图片路径 → 设为 `reference_images`
-2. 无 d-ref 时 → 纯文生图（txt2img）
-3. 文字部分：有 a-ref 时用 `brief_description`，否则用 `detailed_description`
-
-### 被引用（Shot 分镜中 `@entity` 解析）
-
-1. 解析被引用实体的 `## Approved References` → 提取第一张图 → 注入 Shot 的 `reference_images`
-2. 无 a-ref 时 → fallback：搜索 `artifacts/drafts_*` 中最新生成的对应文件
-3. 仍未找到 → 告警 `[WARN] No approved ref for @xxx`
-
----
-
-## 6. 向后兼容
-
-| 旧格式 | 新系统行为 |
+| 鏃ф牸寮?| 鏂扮郴缁熻涓?|
 |--------|-----------|
-| `has_image: true` + body `![img](path)` | 按 `## Approved References` 处理 |
-| `has_image: false` 无图片 | `detailed_description` 纯文生图 |
-| 无 d-ref / a-ref 节 | 完全兼容旧逻辑 |
+| `has_image: true` + body `![img](path)` | 鎸?`## Approved References` 澶勭悊 |
+| `has_image: false` 鏃犲浘鐗?| `detailed_description` 绾枃鐢熷浘 |
+| 鏃?d-ref / a-ref 鑺?| 瀹屽叏鍏煎鏃ч€昏緫 |
 
 ---
 
-> *OPSV-ASSET-0.4 | OpsV 0.4.1 | 2026-03-24*
+> *OPSV-ASSET-0.4 | OpsV 0.4.3 | 2026-03-24*

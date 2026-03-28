@@ -1,14 +1,13 @@
-# OpsV 文档规范与格式说明 (Document Standards)
+﻿# OpsV 鏂囨。瑙勮寖涓庢牸寮忚鏄?(Document Standards)
 
-> 所有 `.md` 文件的格式约定、YAML 模板、@ 引用语法和命名规范。
-
+> 鎵€鏈?`.md` 鏂囦欢鐨勬牸寮忕害瀹氥€乊AML 妯℃澘銆丂 寮曠敤璇硶鍜屽懡鍚嶈鑼冦€?
 ---
 
-## 1. 通用格式准则
+## 1. 閫氱敤鏍煎紡鍑嗗垯
 
-### 1.1 YAML Frontmatter 强制规范
+### 1.1 YAML Frontmatter 寮哄埗瑙勮寖
 
-所有 OpsV 文档（资产、分镜、项目配置）**必须**以 YAML Frontmatter 开头：
+鎵€鏈?OpsV 鏂囨。锛堣祫浜с€佸垎闀溿€侀」鐩厤缃級**蹇呴』**浠?YAML Frontmatter 寮€澶达細
 
 ```yaml
 ---
@@ -16,221 +15,197 @@ key: value
 ---
 ```
 
-- 编译器**只读 YAML 区域**
-- Markdown 正文仅供人类审阅，编译器忽略
-- YAML 必须合法（注意缩进、引号、冒号后的空格）
+- 缂栬瘧鍣?*鍙 YAML 鍖哄煙**
+- Markdown 姝ｆ枃浠呬緵浜虹被瀹￠槄锛岀紪璇戝櫒蹇界暐
+- YAML 蹇呴』鍚堟硶锛堟敞鎰忕缉杩涖€佸紩鍙枫€佸啋鍙峰悗鐨勭┖鏍硷級
 
-### 1.2 语言规范
+### 1.2 璇█瑙勮寖
 
-| 位置 | 语言 | 说明 |
+| 浣嶇疆 | 璇█ | 璇存槑 |
 |------|------|------|
-| 正文/描述/注释 | 中文 | 降低导演的认知摩擦 |
-| `prompt_en` | 英文 | 供扩散模型（SD/Flux/ComfyUI）渲染 |
-| `motion_prompt_en` | 英文 | 供视频大模型（Seedance/Sora）识别 |
-| `global_style_postfix` | 英文 | 全局渲染修饰词 |
-| YAML 键名 | 英文 | 保持编程一致性 |
+| 姝ｆ枃/鎻忚堪/娉ㄩ噴 | 涓枃 | 闄嶄綆瀵兼紨鐨勮鐭ユ懇鎿?|
+| `prompt_en` | 鑻辨枃 | 渚涙墿鏁ｆā鍨嬶紙SD/Flux/ComfyUI锛夋覆鏌?|
+| `motion_prompt_en` | 鑻辨枃 | 渚涜棰戝ぇ妯″瀷锛圫eedance/Sora锛夎瘑鍒?|
+| `global_style_postfix` | 鑻辨枃 | 鍏ㄥ眬娓叉煋淇グ璇?|
+| YAML 閿悕 | 鑻辨枃 | 淇濇寔缂栫▼涓€鑷存€?|
 
-### 1.3 文件命名约定
+### 1.3 鏂囦欢鍛藉悕绾﹀畾
 
-| 类型 | 命名格式 | 示例 |
+| 绫诲瀷 | 鍛藉悕鏍煎紡 | 绀轰緥 |
 |------|---------|------|
-| 角色资产 | `@role_<name>.md` | `@role_hero.md` |
-| 道具资产 | `@prop_<name>.md` | `@prop_sword.md` |
-| 场景资产 | `@scene_<name>.md` | `@scene_forest.md` |
-| 静态分镜 | `Script.md` | 固定名称 |
-| 动态台本 | `Shotlist.md` | 固定名称 |
-| 项目配置 | `project.md` | 固定名称 |
-| 故事大纲 | `story.md` | 固定名称 |
-| 渲染草图 | `shot_X_draft_N.png` | `shot_1_draft_2.png` |
-| 定向补帧 | `shot_X_target_last_N.png` | `shot_3_target_last_1.png` |
+| 瑙掕壊璧勪骇 | `@role_<name>.md` | `@role_hero.md` |
+| 閬撳叿璧勪骇 | `@prop_<name>.md` | `@prop_sword.md` |
+| 鍦烘櫙璧勪骇 | `@scene_<name>.md` | `@scene_forest.md` |
+| 闈欐€佸垎闀?| `Script.md` | 鍥哄畾鍚嶇О |
+| 鍔ㄦ€佸彴鏈?| `Shotlist.md` | 鍥哄畾鍚嶇О |
+| 椤圭洰閰嶇疆 | `project.md` | 鍥哄畾鍚嶇О |
+| 鏁呬簨澶х翰 | `story.md` | 鍥哄畾鍚嶇О |
+| 娓叉煋鑽夊浘 | `shot_X_draft_N.png` | `shot_1_draft_2.png` |
+| 瀹氬悜琛ュ抚 | `shot_X_target_last_N.png` | `shot_3_target_last_1.png` |
 
 ---
 
-## 2. 资产文档格式 (elements/ 和 scenes/)
+## 2. 璧勪骇鏂囨。鏍煎紡 (elements/ 鍜?scenes/)
 
-> 详细规范见 [OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
+> 璇︾粏瑙勮寖瑙?[OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
 
 ### 2.1 YAML Frontmatter
 
 ```yaml
 ---
-name: "@role_hero"           # @ 前缀 + 类型前缀 + 标识符
-type: "character"             # character | scene | prop
-brief_description: "一句话简略描述"
-detailed_description: >       # 无参考图时的详尽描写
-  致密的中文特征描写，至少3-5句话。
-prompt_en: >                  # 英文渲染提示词
-  Dense English prompt for image generation models.
+name: "@role_hero"           # @ 鍓嶇紑 + 绫诲瀷鍓嶇紑 + 鏍囪瘑绗?type: "character"             # character | scene | prop
+brief_description: "涓€鍙ヨ瘽绠€鐣ユ弿杩?
+detailed_description: >       # 鏃犲弬鑰冨浘鏃剁殑璇﹀敖鎻忓啓
+  鑷村瘑鐨勪腑鏂囩壒寰佹弿鍐欙紝鑷冲皯3-5鍙ヨ瘽銆?prompt_en: >                  # 鑻辨枃娓叉煋鎻愮ず璇?  Dense English prompt for image generation models.
 ---
 ```
 
-> **`has_image` 已废弃**（0.4.1）。参考图状态由 Markdown Body 的 d-ref / a-ref 节自动推导。
+> **`has_image` 宸插簾寮?*锛?.4.1锛夈€傚弬鑰冨浘鐘舵€佺敱 Markdown Body 鐨?d-ref / a-ref 鑺傝嚜鍔ㄦ帹瀵笺€?
+### 2.2 鍙岄€氶亾鍙傝€冨浘浣撶郴 (d-ref / a-ref)
 
-### 2.2 双通道参考图体系 (d-ref / a-ref)
-
-这是 OpsV 0.4 最核心的格式升级。统一规则：
-
+杩欐槸 OpsV 0.4 鏈€鏍稿績鐨勬牸寮忓崌绾с€傜粺涓€瑙勫垯锛?
 ```
-生成自身 → 使用自己的 Design References (d-ref)
-被引用时 → 提供自己的 Approved References (a-ref)
+鐢熸垚鑷韩 鈫?浣跨敤鑷繁鐨?Design References (d-ref)
+琚紩鐢ㄦ椂 鈫?鎻愪緵鑷繁鐨?Approved References (a-ref)
 ```
 
-#### `## Design References`（d-ref：生成输入）
+#### `## Design References`锛坉-ref锛氱敓鎴愯緭鍏ワ級
 
-`opsv generate` 生成**本实体自身**时，将此节中的图片作为 img2img 输入参考。
-
-典型来源：
-- 外部灵感图（服装、配色、情绪板）
-- 已有资产的 a-ref（用于生成变体：老年版 / 卡通版 / 职业形象）
-- 草图或手绘稿
+`opsv generate` 鐢熸垚**鏈疄浣撹嚜韬?*鏃讹紝灏嗘鑺備腑鐨勫浘鐗囦綔涓?img2img 杈撳叆鍙傝€冦€?
+鍏稿瀷鏉ユ簮锛?- 澶栭儴鐏垫劅鍥撅紙鏈嶈銆侀厤鑹层€佹儏缁澘锛?- 宸叉湁璧勪骇鐨?a-ref锛堢敤浜庣敓鎴愬彉浣擄細鑰佸勾鐗?/ 鍗￠€氱増 / 鑱屼笟褰㈣薄锛?- 鑽夊浘鎴栨墜缁樼
 
 ```markdown
 ## Design References
-- [服装灵感 - 赛博朋克风衣](refs/costume_mood.png)
-- [年轻版原型 - 用于老年变体生成](artifacts/drafts_3/role_K_turnaround.png)
+- [鏈嶈鐏垫劅 - 璧涘崥鏈嬪厠椋庤。](refs/costume_mood.png)
+- [骞磋交鐗堝師鍨?- 鐢ㄤ簬鑰佸勾鍙樹綋鐢熸垚](artifacts/drafts_3/role_K_turnaround.png)
 ```
 
-#### `## Approved References`（a-ref：定档输出）
+#### `## Approved References`锛坅-ref锛氬畾妗ｈ緭鍑猴級
 
-**其他实体引用本实体**时（如 Shot 中 `@role_K`），将此节中的图片注入引用方的 `reference_images`。
-
-代表经导演审批确认的最终形象。
-
+**鍏朵粬瀹炰綋寮曠敤鏈疄浣?*鏃讹紙濡?Shot 涓?`@role_K`锛夛紝灏嗘鑺備腑鐨勫浘鐗囨敞鍏ュ紩鐢ㄦ柟鐨?`reference_images`銆?
+浠ｈ〃缁忓婕斿鎵圭‘璁ょ殑鏈€缁堝舰璞°€?
 ```markdown
 ## Approved References
-- [角色三视图](artifacts/drafts_3/role_K_turnaround.png)
-- [角色正脸特写](artifacts/drafts_3/role_K_closeup.png)
+- [瑙掕壊涓夎鍥綸(artifacts/drafts_3/role_K_turnaround.png)
+- [瑙掕壊姝ｈ劯鐗瑰啓](artifacts/drafts_3/role_K_closeup.png)
 ```
 
-#### 自动推导规则
+#### 鑷姩鎺ㄥ瑙勫垯
 
-| 条件 | 等价 | 编译行为 |
+| 鏉′欢 | 绛変环 | 缂栬瘧琛屼负 |
 |------|------|---------|
-| d-ref **或** a-ref 任一存在且非空 | `has_image: true` | 使用 `brief_description` + 参考图 |
-| 两节均不存在或为空 | `has_image: false` | 使用 `detailed_description` 纯文生图 |
+| d-ref **鎴?* a-ref 浠讳竴瀛樺湪涓旈潪绌?| `has_image: true` | 浣跨敤 `brief_description` + 鍙傝€冨浘 |
+| 涓よ妭鍧囦笉瀛樺湪鎴栦负绌?| `has_image: false` | 浣跨敤 `detailed_description` 绾枃鐢熷浘 |
 
-### 2.3 完整示例
+### 2.3 瀹屾暣绀轰緥
 
 ```markdown
 ---
 name: "@role_K"
 type: "character"
-brief_description: "30多岁赛博侦探，黑色高领大衣"
+brief_description: "30澶氬瞾璧涘崥渚︽帰锛岄粦鑹查珮棰嗗ぇ琛?
 prompt_en: >
   A cyber detective in his 30s, black turtleneck coat,
   red cybernetic eye, moody cinematic lighting, 8k.
 ---
 
 ## Design References
-- [服装灵感 - 赛博朋克风衣](refs/costume_mood.png)
-- [义眼参考 - 红色光效](refs/cyber_eye_ref.jpg)
+- [鏈嶈鐏垫劅 - 璧涘崥鏈嬪厠椋庤。](refs/costume_mood.png)
+- [涔夌溂鍙傝€?- 绾㈣壊鍏夋晥](refs/cyber_eye_ref.jpg)
 
 ## Approved References
-- [角色三视图](artifacts/drafts_3/role_K_turnaround.png)
-- [角色正脸特写](artifacts/drafts_3/role_K_closeup.png)
+- [瑙掕壊涓夎鍥綸(artifacts/drafts_3/role_K_turnaround.png)
+- [瑙掕壊姝ｈ劯鐗瑰啓](artifacts/drafts_3/role_K_closeup.png)
 
 ## subject
-赛博侦探 K
+璧涘崥渚︽帰 K
 
 ## environment
-雨夜霓虹街头
+闆ㄥ闇撹櫣琛楀ご
 
 ## camera
 Medium Close-Up
 ```
 
-### 2.4 变体链
-
-已有资产的 a-ref 可作为新资产的 d-ref，实现变体生成：
+### 2.4 鍙樹綋閾?
+宸叉湁璧勪骇鐨?a-ref 鍙綔涓烘柊璧勪骇鐨?d-ref锛屽疄鐜板彉浣撶敓鎴愶細
 
 ```
-@role_K 的 a-ref (年轻版定档图)
-   ↓ 作为 @role_K_old 的 d-ref
-   ↓ opsv generate → 生成老年版
-   ↓ review → approve
-   ↓ 写入 @role_K_old 的 a-ref
+@role_K 鐨?a-ref (骞磋交鐗堝畾妗ｅ浘)
+   鈫?浣滀负 @role_K_old 鐨?d-ref
+   鈫?opsv generate 鈫?鐢熸垚鑰佸勾鐗?   鈫?review 鈫?approve
+   鈫?鍐欏叆 @role_K_old 鐨?a-ref
 ```
 
 ---
 
-## 3. 项目配置格式 (project.md)
+## 3. 椤圭洰閰嶇疆鏍煎紡 (project.md)
 
 ```yaml
 ---
-aspect_ratio: "16:9"          # 画幅：16:9 | 9:16 | 1:1 | 21:9 | 4:3 | 2.39:1
-engine: ""                     # 默认渲染引擎
-vision: "一句话全局描述（中文）"
+aspect_ratio: "16:9"          # 鐢诲箙锛?6:9 | 9:16 | 1:1 | 21:9 | 4:3 | 2.39:1
+engine: ""                     # 榛樿娓叉煋寮曟搸
+vision: "涓€鍙ヨ瘽鍏ㄥ眬鎻忚堪锛堜腑鏂囷級"
 global_style_postfix: "cinematic lighting, ultra detailed, masterpiece, 8k"
 resolution: "2K"               # 480p | 1080p | 2K | 4K | 8K
 ---
 
-# Asset Manifest (资产花名册)
+# Asset Manifest (璧勪骇鑺卞悕鍐?
 
-## Main Characters (主要角色)
+## Main Characters (涓昏瑙掕壊)
 - @role_K
 - @role_Emma
 
-## Extras (群演)
+## Extras (缇ゆ紨)
 - @role_ThugA
 
-## Scenes (场景)
+## Scenes (鍦烘櫙)
 - @scene_NeonBar
 - @scene_Wasteland
 
-## Props (道具)
+## Props (閬撳叿)
 - @prop_Gun
 ```
 
-**约束**：
-- 一个项目只有一个 `project.md`
-- 未登记的 `@` 实体视为语法违规
-- `global_style_postfix` 会被编译器自动注入每个生成任务
-
+**绾︽潫**锛?- 涓€涓」鐩彧鏈変竴涓?`project.md`
+- 鏈櫥璁扮殑 `@` 瀹炰綋瑙嗕负璇硶杩濊
+- `global_style_postfix` 浼氳缂栬瘧鍣ㄨ嚜鍔ㄦ敞鍏ユ瘡涓敓鎴愪换鍔?
 ---
 
-## 4. 分镜脚本格式 (Script.md)
+## 4. 鍒嗛暅鑴氭湰鏍煎紡 (Script.md)
 
-### 4.1 YAML 区域
+### 4.1 YAML 鍖哄煙
 
 ```yaml
 ---
 shots:
   - id: "shot_1"
-    duration: 5                       # 秒数（3-15 范围）
-    camera: "极致微距特写"              # 景别与运镜（中文）
-    environment: "@scene_cocoon 薄雾中" # 场景（含 @ 引用）
-    subject: "@role_butterfly 破茧"    # 主体（含 @ 引用）
-    prompt_en: >                       # 纯英文渲染提示词
+    duration: 5                       # 绉掓暟锛?-15 鑼冨洿锛?    camera: "鏋佽嚧寰窛鐗瑰啓"              # 鏅埆涓庤繍闀滐紙涓枃锛?    environment: "@scene_cocoon 钖勯浘涓? # 鍦烘櫙锛堝惈 @ 寮曠敤锛?    subject: "@role_butterfly 鐮磋導"    # 涓讳綋锛堝惈 @ 寮曠敤锛?    prompt_en: >                       # 绾嫳鏂囨覆鏌撴彁绀鸿瘝
       Extreme macro shot, butterfly emerging from chrysalis,
       morning dew trembles, soft backlighting, 8k cinematic.
-    # 可选字段
-    first_image: "artifacts/drafts_1/shot_1.png"
+    # 鍙€夊瓧娈?    first_image: "artifacts/drafts_1/shot_1.png"
     last_image: ""
     target_last_prompt: ""
 ---
 ```
 
-### 4.2 Markdown 正文审阅区
-
+### 4.2 Markdown 姝ｆ枃瀹￠槄鍖?
 ```markdown
 ## Shot 1 (5s)
-[@role_butterfly](../elements/@role_butterfly.md) 在
-[@scene_cocoon](../scenes/@scene_cocoon.md) 中破茧而出。
-
-### 🖼️ 视觉审阅廊
-| 画面 1 | 画面 2 |
+[@role_butterfly](../elements/@role_butterfly.md) 鍦?[@scene_cocoon](../scenes/@scene_cocoon.md) 涓牬鑼ц€屽嚭銆?
+### 馃柤锔?瑙嗚瀹￠槄寤?| 鐢婚潰 1 | 鐢婚潰 2 |
 |:---:|:---:|
-| (等待 opsv review 回写) | (等待 opsv review 回写) |
+| (绛夊緟 opsv review 鍥炲啓) | (绛夊緟 opsv review 鍥炲啓) |
 
-### 🎯 定向补帧
-| 目标尾帧候选 |
+### 馃幆 瀹氬悜琛ュ抚
+| 鐩爣灏惧抚鍊欓€?|
 |:---:|
-| (等待 opsv review 回写) |
+| (绛夊緟 opsv review 鍥炲啓) |
 ```
 
 ---
 
-## 5. 动画台本格式 (Shotlist.md)
+## 5. 鍔ㄧ敾鍙版湰鏍煎紡 (Shotlist.md)
 
 ```yaml
 ---
@@ -252,100 +227,92 @@ shots:
 ---
 ```
 
-**关键约束**：
-- `duration` 从 Script.md 原样透传，不可自行补充
-- `motion_prompt_en` 严禁包含外貌特征
-- `@FRAME:<shot_id>_last` 用于长镜头首尾帧继承
+**鍏抽敭绾︽潫**锛?- `duration` 浠?Script.md 鍘熸牱閫忎紶锛屼笉鍙嚜琛岃ˉ鍏?- `motion_prompt_en` 涓ョ鍖呭惈澶栬矊鐗瑰緛
+- `@FRAME:<shot_id>_last` 鐢ㄤ簬闀块暅澶撮灏惧抚缁ф壙
 
 ---
 
-## 6. @ 引用语法详解
+## 6. @ 寮曠敤璇硶璇﹁В
 
-### 6.1 基本语法
+### 6.1 鍩烘湰璇硶
 
 ```markdown
-# 直接引用
-@role_K 走向吧台
+# 鐩存帴寮曠敤
+@role_K 璧板悜鍚у彴
 
-# 方括号引用（推荐，便于超链接化）
-[@role_K] 走向吧台
+# 鏂规嫭鍙峰紩鐢紙鎺ㄨ崘锛屼究浜庤秴閾炬帴鍖栵級
+[@role_K] 璧板悜鍚у彴
 
-# 超链接化引用（Script.md 正文推荐）
-[@role_K](../elements/@role_K.md) 走向吧台
+# 瓒呴摼鎺ュ寲寮曠敤锛圫cript.md 姝ｆ枃鎺ㄨ崘锛?[@role_K](../elements/@role_K.md) 璧板悜鍚у彴
 
-# YAML 中使用
-subject: "@role_K walks toward the bar"
+# YAML 涓娇鐢?subject: "@role_K walks toward the bar"
 environment: "@scene_neon_alley in heavy rain"
 ```
 
-### 6.2 命名规范
+### 6.2 鍛藉悕瑙勮寖
 
-| 前缀 | 含义 | 存放位置 |
+| 鍓嶇紑 | 鍚箟 | 瀛樻斁浣嶇疆 |
 |------|------|---------|
-| `@role_` | 角色（主角/配角/群演） | `videospec/elements/` |
-| `@scene_` | 场景/环境 | `videospec/scenes/` |
-| `@prop_` | 道具/关键物品 | `videospec/elements/` |
+| `@role_` | 瑙掕壊锛堜富瑙?閰嶈/缇ゆ紨锛?| `videospec/elements/` |
+| `@scene_` | 鍦烘櫙/鐜 | `videospec/scenes/` |
+| `@prop_` | 閬撳叿/鍏抽敭鐗╁搧 | `videospec/elements/` |
 
-### 6.3 引用解析优先级
-
-编译器按以下顺序查找 `@` 引用对应的定义文件：
-1. `videospec/elements/{id}.md` — 角色/道具
-2. `videospec/scenes/{id}.md` — 场景
-3. 内联描述（fallback，未找到文件时用原始文本）
-
+### 6.3 寮曠敤瑙ｆ瀽浼樺厛绾?
+缂栬瘧鍣ㄦ寜浠ヤ笅椤哄簭鏌ユ壘 `@` 寮曠敤瀵瑰簲鐨勫畾涔夋枃浠讹細
+1. `videospec/elements/{id}.md` 鈥?瑙掕壊/閬撳叿
+2. `videospec/scenes/{id}.md` 鈥?鍦烘櫙
+3. 鍐呰仈鎻忚堪锛坒allback锛屾湭鎵惧埌鏂囦欢鏃剁敤鍘熷鏂囨湰锛?
 ---
 
-## 7. 相机术语速查表
+## 7. 鐩告満鏈閫熸煡琛?
+### 鏅埆 (Shot Type)
 
-### 景别 (Shot Type)
-
-| 术语 | 缩写 | 说明 |
+| 鏈 | 缂╁啓 | 璇存槑 |
 |------|------|------|
-| `extreme_wide` | EWS | 大远景，环境为主 |
-| `wide_shot` | WS | 全景，人物全身 |
-| `medium_shot` | MS | 中景，膝盖以上 |
-| `medium_close` | MCU | 中近景，胸部以上 |
-| `close_up` | CU | 特写，面部 |
-| `extreme_close` | ECU | 大特写，局部细节 |
+| `extreme_wide` | EWS | 澶ц繙鏅紝鐜涓轰富 |
+| `wide_shot` | WS | 鍏ㄦ櫙锛屼汉鐗╁叏韬?|
+| `medium_shot` | MS | 涓櫙锛岃啙鐩栦互涓?|
+| `medium_close` | MCU | 涓繎鏅紝鑳搁儴浠ヤ笂 |
+| `close_up` | CU | 鐗瑰啓锛岄潰閮?|
+| `extreme_close` | ECU | 澶х壒鍐欙紝灞€閮ㄧ粏鑺?|
 
-### 角度 (Angle)
+### 瑙掑害 (Angle)
 
-| 术语 | 说明 |
+| 鏈 | 璇存槑 |
 |------|------|
-| `eye_level` | 平视（最常用） |
-| `low_angle` | 仰拍（显高大） |
-| `high_angle` | 俯拍（显渺小） |
-| `dutch` | 荷兰角（倾斜不安） |
+| `eye_level` | 骞宠锛堟渶甯哥敤锛?|
+| `low_angle` | 浠版媿锛堟樉楂樺ぇ锛?|
+| `high_angle` | 淇媿锛堟樉娓哄皬锛?|
+| `dutch` | 鑽峰叞瑙掞紙鍊炬枩涓嶅畨锛?|
 
-### 运动 (Movement)
+### 杩愬姩 (Movement)
 
-| 术语 | 说明 |
+| 鏈 | 璇存槑 |
 |------|------|
-| `static` | 固定机位 |
-| `dolly_in/out` | 推/拉 |
-| `pan_left/right` | 左右摇 |
-| `truck_left/right` | 左右移 |
-| `crane_up/down` | 升降 |
-| `orbit` | 环绕 |
-| `tracking` | 跟踪 |
+| `static` | 鍥哄畾鏈轰綅 |
+| `dolly_in/out` | 鎺?鎷?|
+| `pan_left/right` | 宸﹀彸鎽?|
+| `truck_left/right` | 宸﹀彸绉?|
+| `crane_up/down` | 鍗囬檷 |
+| `orbit` | 鐜粫 |
+| `tracking` | 璺熻釜 |
 
 ---
 
-## 8. 枚举值速查
+## 8. 鏋氫妇鍊奸€熸煡
 
-### 画幅比例
+### 鐢诲箙姣斾緥
 `16:9` | `9:16` | `1:1` | `21:9` | `4:3` | `3:4` | `2.39:1`
 
-### 分辨率
-`480p` | `720p` | `1080p` | `2K` | `3K` | `4K` | `8K`
+### 鍒嗚鲸鐜?`480p` | `720p` | `1080p` | `2K` | `3K` | `4K` | `8K`
 
-### 视频时长
-`3s`（最短）| `5s`（推荐）| `10s` | `15s`（上限）
+### 瑙嗛鏃堕暱
+`3s`锛堟渶鐭級| `5s`锛堟帹鑽愶級| `10s` | `15s`锛堜笂闄愶級
 
-### 资产类型
+### 璧勪骇绫诲瀷
 `character` | `scene` | `prop`
 
 ---
 
-> *"格式即法律，YAML 即真理。"*
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *"鏍煎紡鍗虫硶寰嬶紝YAML 鍗崇湡鐞嗐€?*
+> *OpsV 0.4.3 | 鏈€鍚庢洿鏂? 2026-03-28*

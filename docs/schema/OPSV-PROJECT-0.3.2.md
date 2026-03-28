@@ -1,60 +1,60 @@
-# OpsV 0.3.2 Project 规范 (OPSV-PROJECT-0.3.2.md)
+﻿# OpsV 0.3.2 Project 瑙勮寖 (OPSV-PROJECT-0.3.2.md)
 
-本规范定义了 OpenSpec-Video (OpsV) 0.3.2 工程中唯一的全局配置中枢——`videospec/project.md` 的结构与准则。
+鏈鑼冨畾涔変簡 OpenSpec-Video (OpsV) 0.3.2 宸ョ▼涓敮涓€鐨勫叏灞€閰嶇疆涓灑鈥斺€擿videospec/project.md` 鐨勭粨鏋勪笌鍑嗗垯銆?
 
-## 1. 核心哲学：全局降维 (Global Context Lock)
+## 1. 鏍稿績鍝插锛氬叏灞€闄嶇淮 (Global Context Lock)
 
-为了极度压缩底层 Agent 和脚本撰写者的心智负担，彻底消除在每一个镜头 (Shot) 里反复默写“电影光泽、8k分辨率”等冗余行为，我们强制将这些**贯穿始终的上下文**提纯至根目录的 `project.md` 中。
+涓轰簡鏋佸害鍘嬬缉搴曞眰 Agent 鍜岃剼鏈挵鍐欒€呯殑蹇冩櫤璐熸媴锛屽交搴曟秷闄ゅ湪姣忎竴涓暅澶?(Shot) 閲屽弽澶嶉粯鍐欌€滅數褰卞厜娉姐€?k鍒嗚鲸鐜団€濈瓑鍐椾綑琛屼负锛屾垜浠己鍒跺皢杩欎簺**璐┛濮嬬粓鐨勪笂涓嬫枃**鎻愮函鑷虫牴鐩綍鐨?`project.md` 涓€?
 
-这是唯一一个允许声明全局渲染参数的文件。底层构建器 (`AssetCompiler`) 会无视分镜师的想法，在最终生成 `jobs.json` 的 Payload 时，**强制将此处的参数与后缀垫入每一个镜头的执行上下文中**。
+杩欐槸鍞竴涓€涓厑璁稿０鏄庡叏灞€娓叉煋鍙傛暟鐨勬枃浠躲€傚簳灞傛瀯寤哄櫒 (`AssetCompiler`) 浼氭棤瑙嗗垎闀滃笀鐨勬兂娉曪紝鍦ㄦ渶缁堢敓鎴?`jobs.json` 鐨?Payload 鏃讹紝**寮哄埗灏嗘澶勭殑鍙傛暟涓庡悗缂€鍨叆姣忎竴涓暅澶寸殑鎵ц涓婁笅鏂囦腑**銆?
 
-## 2. 文件结构与 YAML 规范
+## 2. 鏂囦欢缁撴瀯涓?YAML 瑙勮寖
 
-`project.md` 必须存放于工程的 `videospec/` 根目录下，并以 YAML Frontmatter 开头。
+`project.md` 蹇呴』瀛樻斁浜庡伐绋嬬殑 `videospec/` 鏍圭洰褰曚笅锛屽苟浠?YAML Frontmatter 寮€澶淬€?
 
 ### 2.1 YAML Frontmatter
 
-这部分定义所有的环境参数。
+杩欓儴鍒嗗畾涔夋墍鏈夌殑鐜鍙傛暟銆?
 
 ```yaml
 ---
-aspect_ratio: "16:9" # 强制的画幅设置 (16:9 横屏，9:16 竖屏短视频)
-engine: "nano_banana_pro" # 默认使用的生图/视频模型引擎
-global_style_postfix: "cinematic lighting, ultra detailed, masterpiece, arri alexa 65" # 全局强化的风格后缀
-resolution: "2K" # 基准分辨率
+aspect_ratio: "16:9" # 寮哄埗鐨勭敾骞呰缃?(16:9 妯睆锛?:16 绔栧睆鐭棰?
+engine: "nano_banana_pro" # 榛樿浣跨敤鐨勭敓鍥?瑙嗛妯″瀷寮曟搸
+global_style_postfix: "cinematic lighting, ultra detailed, masterpiece, arri alexa 65" # 鍏ㄥ眬寮哄寲鐨勯鏍煎悗缂€
+resolution: "2K" # 鍩哄噯鍒嗚鲸鐜?
 ---
 ```
 
-### 2.2 正文：资产花名册 (Asset Roster)
+### 2.2 姝ｆ枃锛氳祫浜ц姳鍚嶅唽 (Asset Roster)
 
-在 YAML 块结束之后，是一份 Markdown 格式的清单。
-**它的唯一作用是：宣告本工程拥有哪些合法的 `@` 实体资产。**
-这既能让人类导演一目了然，又是底层 Agent（例如 `opsv-director`）校验分镜剧本是否出现越界或“无中生有”资产的重要字典。
+鍦?YAML 鍧楃粨鏉熶箣鍚庯紝鏄竴浠?Markdown 鏍煎紡鐨勬竻鍗曘€?
+**瀹冪殑鍞竴浣滅敤鏄細瀹ｅ憡鏈伐绋嬫嫢鏈夊摢浜涘悎娉曠殑 `@` 瀹炰綋璧勪骇銆?*
+杩欐棦鑳借浜虹被瀵兼紨涓€鐩簡鐒讹紝鍙堟槸搴曞眰 Agent锛堜緥濡?`opsv-director`锛夋牎楠屽垎闀滃墽鏈槸鍚﹀嚭鐜拌秺鐣屾垨鈥滄棤涓敓鏈夆€濊祫浜х殑閲嶈瀛楀吀銆?
 
-清单应按以下标准分类列出所有实体（必须与其 `.md` 声明文件中的 YAML `name` 属性保持绝对一致）：
+娓呭崟搴旀寜浠ヤ笅鏍囧噯鍒嗙被鍒楀嚭鎵€鏈夊疄浣擄紙蹇呴』涓庡叾 `.md` 澹版槑鏂囦欢涓殑 YAML `name` 灞炴€т繚鎸佺粷瀵逛竴鑷达級锛?
 
 ```markdown
 # Asset Manifest
 
-## Main Characters (主要角色)
+## Main Characters (涓昏瑙掕壊)
 - `@role_K`
 - `@role_Emma`
 
-## Extras (群演/次要角色)
+## Extras (缇ゆ紨/娆¤瑙掕壊)
 - `@role_ThugA`
 - `@role_ThugB`
 
-## Scenes (空间场景)
+## Scenes (绌洪棿鍦烘櫙)
 - `@scene_NeonBar`
 - `@scene_Wasteland`
 
-## Props (关键道具)
+## Props (鍏抽敭閬撳叿)
 - `@prop_Gun`
 - `@prop_Kite`
 ```
 
-## 3. 设计制约 (Constraints)
+## 3. 璁捐鍒剁害 (Constraints)
 
-1. **唯一性**：一个 OpsV 工程只能有一个激活的 `project.md`。
-2. **合法性前哨**：如果某个实体（如 `@prop_Car`）未在这个花名册中登记，那么底层的审查 Agent 理应视为语法违规，予以驳回。
-3. **消除冗余**：开发者在编写 `videospec/shots/*.md` 时，如果试图给场景加写 `cinematic lighting`，底层编译器应当视为坏品味，因为这在 `global_style_postfix` 中已经提供了系统级的保障。
+1. **鍞竴鎬?*锛氫竴涓?OpsV 宸ョ▼鍙兘鏈変竴涓縺娲荤殑 `project.md`銆?
+2. **鍚堟硶鎬у墠鍝?*锛氬鏋滄煇涓疄浣擄紙濡?`@prop_Car`锛夋湭鍦ㄨ繖涓姳鍚嶅唽涓櫥璁帮紝閭ｄ箞搴曞眰鐨勫鏌?Agent 鐞嗗簲瑙嗕负璇硶杩濊锛屼簣浠ラ┏鍥炪€?
+3. **娑堥櫎鍐椾綑**锛氬紑鍙戣€呭湪缂栧啓 `videospec/shots/*.md` 鏃讹紝濡傛灉璇曞浘缁欏満鏅姞鍐?`cinematic lighting`锛屽簳灞傜紪璇戝櫒搴斿綋瑙嗕负鍧忓搧鍛筹紝鍥犱负杩欏湪 `global_style_postfix` 涓凡缁忔彁渚涗簡绯荤粺绾х殑淇濋殰銆?
