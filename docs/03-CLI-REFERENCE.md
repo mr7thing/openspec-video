@@ -174,7 +174,7 @@ opsv gen-image [options]
 
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
-| `-m, --model <model>` | `seadream-5.0-lite` | 目标渲染模型名称 |
+| `-m, --model <model>` | `all` | 目标渲染模型名称（默认自动横向遍历所有 `enabled: true` 的图像模型） |
 | `-c, --concurrency <num>` | `1` | 并发任务数 |
 | `-s, --skip-failed` | `false` | 单任务失败时继续执行 |
 | `--dry-run` | `false` | 仅校验任务结构，不实际执行 |
@@ -186,11 +186,11 @@ opsv gen-image [options]
 ### 使用示例
 
 ```bash
-# 使用默认模型生成图像
+# 使用所有已启用的模型并发生成图像（默认行为）
 opsv gen-image
 
-# 使用指定模型，2 并发
-opsv gen-image -m seadream-5.0-lite -c 2
+# 仅使用指定模型，2 并发
+opsv gen-image -m minimax-image-01 -c 2
 
 # 仅校验不执行（排查配置问题）
 opsv gen-image --dry-run
@@ -265,8 +265,8 @@ opsv gen-video [options]
 
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
-| `-m, --model <model>` | `seedance-1.5-pro` | 目标视频模型名称 |
-| `-s, --skip-failed` | `false` | 失败时的提示（视频管线为串行，不可跳过） |
+| `-m, --model <model>` | `all` | 目标视频模型名称（默认自动横向遍历所有 `enabled: true` 的视频模型） |
+| `-s, --skip-failed` | `false` | 失败时的提示（单个视频生成管线为串行，不可跳过） |
 | `--dry-run` | `false` | 仅校验任务结构，不实际执行 |
 
 ### 前置条件
@@ -285,10 +285,10 @@ shot_1 生成完毕 → 截取 shot_1_last.jpg → 注入 shot_2.first_image →
 ### 使用示例
 
 ```bash
-# 使用默认模型（Seedance 1.5 Pro）生成视频
+# 使用所有已启用的模型（如 Minimax、Seedance 等）生成视频
 opsv gen-video
 
-# 使用 SiliconFlow Wan 2.1 模型
+# 仅使用指定模型
 opsv gen-video -m wan2.2-i2v
 
 # 仅校验不执行
@@ -329,11 +329,11 @@ CLI 启动时按以下优先级加载环境变量：
 
 | 变量名 | 用途 | 关联命令 |
 |--------|------|---------|
-| `VOLCENGINE_API_KEY` | 火山引擎 API 密钥（SeaDream / Seedance） | `gen-image` / `gen-video` |
-| `SEADREAM_API_KEY` | SeaDream 独立密钥 | `gen-image` |
-| `SEEDANCE_API_KEY` | Seedance 独立密钥 | `gen-video` |
+| `VOLCENGINE_API_KEY` | 火山引擎 API 密钥（SeaDream / Seedance 等火山系服务统一鉴权） | `gen-image` / `gen-video` |
+| `MINIMAX_API_KEY` | 稀宇科技 Minimax 海螺模型密钥 | `gen-image` / `gen-video` |
 | `SILICONFLOW_API_KEY` | SiliconFlow API 密钥 | `gen-video` |
 
 ---
 
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *OpsV 0.4.3 | 最后更新: 2026-03-28*
+

@@ -14,4 +14,4 @@ skills: ["opsv-animator"]
 2. 将纯动作的英文指令 `motion_prompt_en` 单独抽出，实现【动静管线分离】。
 3. 最终输出能够被执行的 `videospec/shots/Shotlist.md` 清单。
 
-必须遵从长镜头继承策略与 0.4.1 定义的关键帧折叠规范。
+必须遵从长镜头继承策略与 0.4.3 定义的关键帧折叠规范。

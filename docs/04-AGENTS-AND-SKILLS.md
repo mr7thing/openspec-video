@@ -182,6 +182,7 @@ prompt_en: >
 | `/opsv-qa act1` | 资产对账：文件与 `project.md` 花名册一致性 | 无黑户、无遗漏 |
 | `/opsv-qa act2` | 死链核查：`has_image: true` 的图片路径是否真实存在 | 文件存在且 >0 bytes |
 | `/opsv-qa act3` | 特征泄漏：分镜中是否有容貌描写跟在 `@实体名` 后面 | 无偷渡特征 |
+| `/opsv-qa act4` | 配置核查：检查 `api_config.yaml` 确保至少有一个模型 `enable: true` | 模型开关正确配置 |
 | `/opsv-qa final` | Payload 断言：`jobs.json` 的全局后缀注入和参考图路径 | 针脚对齐 |
 
 **输出格式**：
@@ -265,4 +266,4 @@ prompt_en: >
 ---
 
 > *"Agent 是灵魂，Skill 是技法，CLI 是双手。"*
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *OpsV 0.4.3 | 最后更新: 2026-03-28*

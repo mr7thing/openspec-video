@@ -348,4 +348,4 @@ environment: "@scene_neon_alley in heavy rain"
 ---
 
 > *"格式即法律，YAML 即真理。"*
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *OpsV 0.4.3 | 最后更新: 2026-03-28*

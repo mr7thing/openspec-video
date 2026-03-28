@@ -1,12 +1,12 @@
 # OpsV 项目全景 (Project Overview)
 
-> **OpenSpec-Video (OpsV) 0.4.1** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
+> **OpenSpec-Video (OpsV) 0.4.3** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
 
 ---
 
 ## 1. OpsV 是什么
 
-OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演/PM/艺术总监）用 Markdown 撰写故事、定义资产、设计分镜，然后通过 CLI 命令将这些文本规范"编译"为可执行的 JSON 任务队列，最终驱动 AI 模型（SeaDream、Seedance、SiliconFlow 等）批量生成图像与视频。
+OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演/PM/艺术总监）用 Markdown 撰写故事、定义资产、设计分镜，然后通过 CLI 命令将这些文本规范"编译"为可执行的 JSON 任务队列，最终驱动 AI 模型（SeaDream、Seedance、Minimax、SiliconFlow 等）并发批量生成图像与视频。
 
 **核心信条**：
 
@@ -79,6 +79,7 @@ project/
 
 | 概念 | 含义 |
 |------|------|
+| **平行宇宙沙箱** | 0.4.3 引入，根据 `api_config.yaml` 启用的多模型并发执行，不同引擎的结果被严格隔离在 `artifacts/drafts_N/[引擎名]/` 中 |
 | **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码 |
 | **Asset-First** | 资产先于分镜存在，分镜只引用不描述 |
 | **d-ref (Design References)** | 生成输入参考图。`opsv generate` 生成本实体时作为 img2img 输入 |
@@ -135,4 +136,4 @@ opsv gen-video
 ---
 
 > *"代码是写给人看的，只是顺便让机器运行。"*
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *OpsV 0.4.3 | 最后更新: 2026-03-28*
