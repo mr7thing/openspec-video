@@ -10,6 +10,7 @@ import path from 'path';
 import { Job } from '../types/PromptSchema';
 import { ImageProvider } from './providers/ImageProvider';
 import { SeaDreamProvider } from './providers/SeaDreamProvider';
+import { MinimaxImageProvider } from './providers/MinimaxImageProvider';
 import { logger } from '../utils/logger';
 import { ErrorFactory, OpsVError } from '../errors/OpsVError';
 import { ConfigLoader, ApiConfig, ModelConfig } from '../utils/configLoader';
@@ -55,9 +56,8 @@ export class ImageModelDispatcher {
         // 注册 SeaDream 提供商
         this.providers.set('seadream', new SeaDreamProvider());
         
-        // 预留：未来可添加更多提供商
-        // this.providers.set('stability', new StabilityProvider());
-        // this.providers.set('midjourney', new MidjourneyProvider());
+        // 注册 Minimax 提供商
+        this.providers.set('minimax', new MinimaxImageProvider());
     }
 
     /**
@@ -158,12 +158,24 @@ export class ImageModelDispatcher {
             settings.model = modelConfig.model || targetModel;
         }
 
-        // 计算输出路径
+        // 计算输出路径：如果是 Gemini 等默认情况存入根，API模型存入子目录
         const baseOutputPath = path.isAbsolute(job.output_path)
             ? job.output_path
             : path.join(this.projectRoot, job.output_path);
 
-        const finalOutputPath = this.getUniqueImagePath(baseOutputPath);
+        const draftBaseDir = path.dirname(baseOutputPath);
+        const fileName = path.basename(baseOutputPath);
+
+        // 如果是指定的特定 API 模型（非人工方式），强制坍缩到子目录
+        const targetDir = (modelConfig.provider === 'gemini' || !modelConfig.provider) 
+            ? draftBaseDir 
+            : path.join(draftBaseDir, modelConfig.provider);
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const finalOutputPath = this.getUniqueImagePath(path.join(targetDir, fileName));
 
         logger.logExecution(job.id, 'DISPATCH', { 
             model: targetModel, 
@@ -175,7 +187,7 @@ export class ImageModelDispatcher {
 
         try {
             // 执行生成
-            if (provider instanceof SeaDreamProvider) {
+            if (provider instanceof SeaDreamProvider || provider instanceof MinimaxImageProvider) {
                 await provider.generateAndDownload(job, targetModel, apiKey, finalOutputPath);
             } else {
                 // 通用提供商接口

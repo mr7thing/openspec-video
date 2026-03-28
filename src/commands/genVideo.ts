@@ -2,13 +2,14 @@ import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
 import { VideoModelDispatcher } from '../executor/VideoModelDispatcher';
+import { ConfigLoader } from '../utils/configLoader';
 import { showEnvCheck } from './utils';
 
 export function registerGenVideoCommand(program: Command, VERSION: string) {
     program
         .command('gen-video')
         .description('Generate videos from compiled animation queue (opsv animate → gen-video)')
-        .option('-m, --model <model>', 'Target video model name', 'seedance-1.5-pro')
+        .option('-m, --model <model>', 'Target video model name (or "all" for all enabled models)', 'all')
         .option('-s, --skip-failed', 'Continue on individual job failure', false)
         .option('--dry-run', 'Validate video jobs without executing', false)
         .action(async (options) => {
@@ -50,32 +51,40 @@ export function registerGenVideoCommand(program: Command, VERSION: string) {
                     return;
                 }
 
-                // 检查 API Key（根据模型决定需要哪个 key）
-                const needsVolce = options.model.includes('seedance');
-                const needsSilicon = options.model.includes('wan') || options.model.includes('siliconflow');
+                // 去除冗长的各写死的环境变量检查：统一委托 dispatcher 或下放
+                // 如果需要预检，可提取 ConfigLoader.getResolvedApiKey 的调用
 
-                if (needsVolce && !process.env.VOLCENGINE_API_KEY && !process.env.SEEDANCE_API_KEY) {
-                    showEnvCheck(projectRoot);
-                    console.error('❌ Error: VOLCENGINE_API_KEY or SEEDANCE_API_KEY not set for Seedance model');
-                    return;
-                }
-                if (needsSilicon && !process.env.SILICONFLOW_API_KEY) {
-                    showEnvCheck(projectRoot);
-                    console.error('❌ Error: SILICONFLOW_API_KEY not set for SiliconFlow model');
-                    return;
+                const configLoader = ConfigLoader.getInstance();
+                const apiConfig = configLoader.loadConfig(projectRoot);
+
+                let modelsToRun: string[] = [];
+                if (options.model === 'all') {
+                    modelsToRun = Object.entries(apiConfig.models || {})
+                        .filter(([name, cfg]) => cfg.type === 'video' && cfg.enable)
+                        .map(([name]) => name);
+
+                    if (modelsToRun.length === 0) {
+                        console.error('❌ Error: No video models are currently enabled in api_config.yaml.');
+                        return;
+                    }
+                } else {
+                    modelsToRun = [options.model];
                 }
 
                 const dispatcher = new VideoModelDispatcher(projectRoot);
 
-                console.log('▶ Starting video generation pipeline...\n');
-
                 const startTime = Date.now();
-                await dispatcher.dispatchAll(videoJobs, options.model);
+                
+                for (const targetModel of modelsToRun) {
+                    console.log(`\n▶ Starting video generation pipeline for model: [${targetModel}]...\n`);
+                    await dispatcher.dispatchAll(videoJobs, targetModel);
+                    console.log(`✅ Video pipeline completed for ${targetModel}!`);
+                }
 
                 const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-                console.log(`\n✅ Video pipeline completed!`);
+                console.log(`\n✅ All Video pipelines completed!`);
                 console.log(`   Duration: ${duration}s`);
-                console.log(`   Jobs: ${videoJobs.length}`);
+                console.log(`   Jobs per model: ${videoJobs.length}`);
                 console.log(`\n📁 Generated videos saved to: artifacts/videos/`);
 
             } catch (err: any) {

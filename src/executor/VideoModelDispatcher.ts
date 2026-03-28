@@ -4,6 +4,7 @@ import { Job } from '../types/PromptSchema';
 import { VideoProvider } from './providers/VideoProvider';
 import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
 import { SeedanceProvider } from './providers/SeedanceProvider';
+import { MinimaxVideoProvider } from './providers/MinimaxVideoProvider';
 import { FrameExtractor } from './FrameExtractor';
 import { ConfigLoader, ApiConfig } from '../utils/configLoader';
 
@@ -22,6 +23,7 @@ export class VideoModelDispatcher {
         this.providers = new Map();
         this.providers.set('siliconflow', new SiliconFlowProvider());
         this.providers.set('seedance', new SeedanceProvider());
+        this.providers.set('minimax', new MinimaxVideoProvider());
     }
 
     /**
@@ -97,7 +99,19 @@ export class VideoModelDispatcher {
             ? job.output_path
             : path.join(this.projectRoot, job.output_path);
 
-        const finalOutputPath = this.getUniqueVideoPath(baseOutputPath);
+        const draftBaseDir = path.dirname(baseOutputPath);
+        const fileName = path.basename(baseOutputPath);
+
+        // 如果是指定的特定 API 模型（非人工方式），强制坍缩到子目录
+        const targetDir = (modelConf.provider === 'gemini' || !modelConf.provider) 
+            ? draftBaseDir 
+            : path.join(draftBaseDir, modelConf.provider);
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        
+        const finalOutputPath = this.getUniqueVideoPath(path.join(targetDir, fileName));
 
         // 3. 阻塞挂起：轮询并等待落盘
         console.log(`[Dispatcher]   Waiting for job to finish remotely...`);
@@ -135,7 +149,7 @@ export class VideoModelDispatcher {
 
                 const sourceVideoPath = jobResults.get(sourceJobId)!;
                 const frameFilename = `${sourceJobId}_${frameType}.jpg`;
-                // 落盘于统一的临时草稿区，遵循 _last / _middle 命名范式
+                // 落盘于对应的模型子文件夹的父文件夹的临时草稿区 (统一下降到 artifacts/drafts_frame_cache/)
                 const extractedFramePath = path.join(this.projectRoot, 'artifacts', 'drafts_frame_cache', frameFilename);
 
                 // 注入幽灵组件执行提取

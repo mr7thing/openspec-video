@@ -3,7 +3,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import { JobValidator } from '../types/PromptSchema';
 import { ImageModelDispatcher } from '../executor/ImageModelDispatcher';
-import { showEnvCheck, getEnvPaths } from './utils';
+import { ConfigLoader } from '../utils/configLoader';
+import { getEnvPaths } from './utils';
 
 export function registerGenImageCommand(program: Command, VERSION: string) {
     const genImageAction = async (options: any) => {
@@ -44,45 +45,55 @@ export function registerGenImageCommand(program: Command, VERSION: string) {
                 return;
             }
 
-            // 检查 API Key
-            if (!process.env.SEADREAM_API_KEY && !process.env.VOLCENGINE_API_KEY) {
-                showEnvCheck(projectRoot);
-                console.error('❌ Error: SEADREAM_API_KEY or VOLCENGINE_API_KEY not set');
-                console.error(`   Checked path: ${secretsEnvPath}`);
-                console.error('   Please ensure your .env/secrets.env file exists and contains the correct keys.');
-                return;
+            const configLoader = ConfigLoader.getInstance();
+            const apiConfig = configLoader.loadConfig(projectRoot);
+
+            let modelsToRun: string[] = [];
+            if (options.model === 'all') {
+                modelsToRun = Object.entries(apiConfig.models || {})
+                    .filter(([name, cfg]) => cfg.type === 'image' && cfg.enable)
+                    .map(([name]) => name);
+
+                if (modelsToRun.length === 0) {
+                    console.error('❌ Error: No image models are currently enabled in api_config.yaml.');
+                    return;
+                }
+            } else {
+                modelsToRun = [options.model];
             }
 
             const dispatcher = new ImageModelDispatcher(projectRoot);
 
-            console.log('▶ Starting image generation pipeline...\n');
+            for (const targetModel of modelsToRun) {
+                console.log(`\n▶ Starting image generation pipeline for model: [${targetModel}]...\n`);
 
-            const startTime = Date.now();
-            const { results, errors } = await dispatcher.dispatchAll(
-                imageJobs,
-                options.model,
-                {
-                    concurrency: parseInt(options.concurrency),
-                    skipFailed: options.skipFailed,
-                    onProgress: (completed: number, total: number) => {
-                        const percent = Math.round((completed / total) * 100);
-                        process.stdout.write(`\r   Progress: ${completed}/${total} (${percent}%)`);
+                const startTime = Date.now();
+                const { results, errors } = await dispatcher.dispatchAll(
+                    imageJobs,
+                    targetModel,
+                    {
+                        concurrency: parseInt(options.concurrency),
+                        skipFailed: options.skipFailed,
+                        onProgress: (completed: number, total: number) => {
+                            const percent = Math.round((completed / total) * 100);
+                            process.stdout.write(`\r   Progress: ${completed}/${total} (${percent}%)`);
+                        }
                     }
+                );
+
+                const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+                process.stdout.write('\n\n');
+
+                console.log(`✅ Pipeline completed for ${targetModel}!`);
+                console.log(`   Duration: ${duration}s`);
+                console.log(`   Success: ${results.length}`);
+                
+                if (errors.length > 0) {
+                    console.log(`   Failed: ${errors.length}`);
+                    errors.forEach((e: { jobId: string; error: string }) => {
+                        console.error(`   ❌ ${e.jobId}: ${e.error}`);
+                    });
                 }
-            );
-
-            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-            process.stdout.write('\n\n');
-
-            console.log('✅ Pipeline completed!');
-            console.log(`   Duration: ${duration}s`);
-            console.log(`   Success: ${results.length}`);
-            
-            if (errors.length > 0) {
-                console.log(`   Failed: ${errors.length}`);
-                errors.forEach((e: { jobId: string; error: string }) => {
-                    console.error(`   ❌ ${e.jobId}: ${e.error}`);
-                });
             }
 
             console.log(`\n📁 Generated images saved to: artifacts/drafts_N/`);
@@ -96,7 +107,7 @@ export function registerGenImageCommand(program: Command, VERSION: string) {
     program
         .command('gen-image')
         .description('Generate images from compiled job queue (opsv generate → gen-image)')
-        .option('-m, --model <model>', 'Target model name', 'seadream-5.0-lite')
+        .option('-m, --model <model>', 'Target model name (or "all" for all enabled models)', 'all')
         .option('-c, --concurrency <num>', 'Number of concurrent jobs', '1')
         .option('-s, --skip-failed', 'Continue on individual job failure', false)
         .option('--dry-run', 'Validate jobs without executing', false)
@@ -106,7 +117,7 @@ export function registerGenImageCommand(program: Command, VERSION: string) {
     program
         .command('execute-image', { hidden: true })
         .description('(Deprecated) Alias for gen-image')
-        .option('-m, --model <model>', 'Target model name', 'seadream-5.0-lite')
+        .option('-m, --model <model>', 'Target model name (or "all" for all enabled models)', 'all')
         .option('-c, --concurrency <num>', 'Number of concurrent jobs', '1')
         .option('-s, --skip-failed', 'Continue on individual job failure', false)
         .option('--dry-run', 'Validate jobs without executing', false)

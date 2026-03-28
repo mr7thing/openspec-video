@@ -27,7 +27,7 @@ if (fs.existsSync(secretsEnvPath)) {
 
 // 获取版本号 (从 package.json 动态读取)
 const pkgPath = path.join(__dirname, '../package.json');
-const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.4.1' };
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.4.3' };
 const VERSION = pkg.version;
 
 const program = new Command();
