@@ -4,67 +4,91 @@
 
 ---
 
-## 1. Global Setup
+## Command Quick Reference
 
-### Authentication (Environment Variables)
-Set these in `.env/secrets.env`:
-- `VOLCENGINE_API_KEY`: For SeaDream and Seedance engines.
-- `MINIMAX_API_KEY`: For Minimax video engine.
-- `SILICON_FLOW_API_KEY`: For SiliconFlow image engines.
+| Command | Responsibility | Key Options |
+|---------|----------------|-------------|
+| `opsv init` | Initialize project | `[projectName]` |
+| `opsv serve` | Start background service | — |
+| `opsv generate` | Compile image jobs | `--preview`, `--shots` |
+| `opsv gen-image` | Execute image generation | `--model`, `--dry-run` |
+| `opsv review` | Write results back to docs | `--all` |
+| `opsv animate` | Compile video jobs | — |
+| `opsv gen-video` | Execute video generation | `--model`, `--dry-run` |
 
 ---
 
-## 2. Command Reference
+## 1. Project Initialization
 
 ### `opsv init [projectName]`
-Initializes a new project skeleton.
-- Sets up `.agent/`, `.antigravity/`, and directory structure.
-- Copies template configs to `.env/`.
+Sets up a new project skeleton.
+- **Actions**: Creates directory structure, copies `.agent/` and `.env/` templates.
+- **Interactions**: Prompts to select AI assistant support (Gemini, OpenCode, or Trae).
 
-### `opsv generate`
-Compiles static narrative assets into image generation jobs.
-- **Inputs**: `videospec/elements/`, `videospec/scenes/`, `videospec/shots/Script.md`.
-- **Outputs**: `queue/jobs.json`.
+---
+
+## 2. Background Service (Daemon)
+
+### `opsv serve` / `opsv start`
+Starts the OpsV background WebSocket daemon (`ws://127.0.0.1:3061`).
+- Used for global task tracking and project registration.
+
+### `opsv stop`
+Stops the daemon using the PID file in `~/.opsv/daemon.pid`.
+
+---
+
+## 3. Image Pipeline
+
+### `opsv generate [targets...]`
+Compiles Markdown specifications into a JSON task queue (`queue/jobs.json`).
 - **Options**:
-  - `--preview`: Generates only one keyframe per shot.
-  - `--shots 1,2`: Generates jobs for specific short IDs.
+    - `-p, --preview`: Only generate key shots or single character sketches.
+    - `--shots 1,5`: Generate jobs for specific shot IDs.
+- **Principle**: Injects `@entity` details and `global_style_postfix` into prompts.
 
 ### `opsv gen-image`
-Executes image rendering via API.
-- **Parallel Universe Sandbox**: Defaults to `--model all`, running all models concurrently.
+Executes image rendering.
+- **Parallel Universe Mode**: By default (`--model all`), it runs all enabled models concurrently.
 - **Output**: `artifacts/drafts_N/[EngineName]/`.
+- **Dry Run**: Use `--dry-run` to validate configurations without spending credits.
 
-### `opsv review`
-Updates Markdown files with the latest generation results.
-- Scans `artifacts/drafts_N/` and writes image links into `Script.md`.
-- **Options**:
-  - `--all`: Includes results from all historical drafting batches.
+---
+
+## 4. Video Pipeline
 
 ### `opsv animate`
-Compiles the animation script into video generation jobs.
-- **Inputs**: `videospec/shots/Shotlist.md`.
-- **Outputs**: `queue/video_jobs.json`.
+Compiles `Shotlist.md` into video job queue (`queue/video_jobs.json`).
+- Translates `motion_prompt_en` and `reference_image` into absolute paths.
 
 ### `opsv gen-video`
-Executes video rendering via API.
-- Supports long-running job polling and status monitoring.
+Executes video rendering.
+- **Serial Execution**: Unlike image generation, video tasks run serially if `@FRAME` inheritance is used (requiring the last frame of the previous video).
 - **Output**: `artifacts/videos/[EngineName]/`.
 
 ---
 
-## 3. Advanced Usage
+## 5. Review & Feedback
 
-### Parallel Scheduling
-When using `--model all`, the system reads `api_config.yaml` and executes tasks for every entry where `enable: true`.
-- Each engine gets its own subdirectory to avoid file naming collisions.
-- Task status is tracked independently.
-
-### Project Refresh
-To sync your project structure with the latest global templates:
-```bash
-opsv init . --update
-```
+### `opsv review [path]`
+Scans generation artifacts and writes links/previews back into Markdown files (e.g., `Script.md`).
+- **Options**:
+    - `--all`: Includes all historical drafting batches.
 
 ---
 
-> *OpsV 0.4.3 | Latest Update: 2026-03-28*
+## 6. Environment & Variables
+
+CLI loads variables in this priority:
+1. `.env/secrets.env` (Recommended)
+2. `.env` file (Root)
+3. System Environment Variables
+
+| Variable | Usage |
+|----------|-------|
+| `VOLCENGINE_API_KEY` | Unified key for SeaDream and Seedance. |
+| `SILICONFLOW_API_KEY` | For Wan 2.1 video models. |
+
+---
+
+> *OpsV 0.4.3 | Latest Update: 2026-03-29*
