@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.4.5
+# OpenSpec-Video (OpsV) 0.4.6
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
@@ -60,11 +60,17 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.4.5 | 2026-03-29*
+> *OpsV 0.4.6 | 2026-03-29*
 
 ---
 
-## 🆕 Release Notes / 更新说明 (v0.4.5)
+## 🆕 Release Notes / 更新说明 (v0.4.6)
+
+### 0.4.6 - Global Logic Simplification (2026-03-29)
+- **Deprecation**: Officially removed `has_image` binary switch from v0.4.x assets (Characters/Scenes/Props).
+- **Auto-Derivation**: Implemented `d-ref / a-ref` automated status detection in Markdown body.
+- **Documentation Restoration**: Re-synchronized v0.4.6 documentation with clean v0.3.2 legacy schemas.
+- **System Prompt Evolution**: Updated `GEMINI.md` and `AGENTS.md` to reflect the latest "Asset-First" logic.
 
 ### 0.4.5 - Digital Archaeology & Recovery (2026-03-29)
 - **Document Restoration**: Restored corrupted Agent Skill reference files from Git history (v0.2/v0.3 reconciliation).

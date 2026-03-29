@@ -1,6 +1,6 @@
-# OpsV Project Panorama
+﻿# OpsV Project Panorama
 
-> **OpenSpec-Video (OpsV) 0.4.3** — An automation framework that compiles Markdown/YAML narratives into video/image generation tasks.
+> **OpenSpec-Video (OpsV) 0.4.3** 鈥?An automation framework that compiles Markdown/YAML narratives into video/image generation tasks.
 
 ---
 
@@ -23,7 +23,7 @@ OpsV is a **Spec-as-Code** video production pipeline. It allows creators (direct
 |------|------|------|
 | Language | TypeScript | Core logic |
 | CLI Framework | Commander.js | Command Line Interface |
-| Communication | WebSocket (ws) | Daemon ↔ Browser Extension |
+| Communication | WebSocket (ws) | Daemon 鈫?Browser Extension |
 | Configuration | dotenv + js-yaml | Env variables + YAML config |
 | Validation | Zod | Job schema validation |
 | Logging | Winston | Unified logging system |
@@ -38,29 +38,29 @@ Project structure created by `opsv init`:
 
 ```
 project/
-├── .agent/                     # AI Agent configuration
-│   ├── Architect.md            # Role definition: Architect
-│   ├── Screenwriter.md         # Role definition: Screenwriter
-│   ├── AssetDesigner.md        # Role definition: Asset Designer
-│   ├── ScriptDesigner.md       # Role definition: Script Designer
-│   ├── Animator.md             # Role definition: Animator
-│   ├── Supervisor.md           # Role definition: Supervisor (QA)
-│   └── skills/                 # Skills library
-├── .antigravity/               # Antigravity tool configuration
-├── .env/                       # Environment config (git ignored)
-│   ├── secrets.env             # API keys
-│   └── api_config.yaml         # Engine parameters
-├── videospec/                  # Core narratives (Source of Truth)
-│   ├── project.md              # Global config & asset manifest
-│   ├── stories/                # Story outlines
-│   ├── elements/               # Character/prop definitions
-│   ├── scenes/                 # Scene definitions
-│   └── shots/                  # Storyboards & animation scripts
-│       ├── Script.md           # Static composition
-│       └── Shotlist.md         # Motion & animation
-├── artifacts/                  # Generated outputs
-├── queue/                      # Job queues
-└── README.md                   # Project landing page
+鈹溾攢鈹€ .agent/                     # AI Agent configuration
+鈹?  鈹溾攢鈹€ Architect.md            # Role definition: Architect
+鈹?  鈹溾攢鈹€ Screenwriter.md         # Role definition: Screenwriter
+鈹?  鈹溾攢鈹€ AssetDesigner.md        # Role definition: Asset Designer
+鈹?  鈹溾攢鈹€ ScriptDesigner.md       # Role definition: Script Designer
+鈹?  鈹溾攢鈹€ Animator.md             # Role definition: Animator
+鈹?  鈹溾攢鈹€ Supervisor.md           # Role definition: Supervisor (QA)
+鈹?  鈹斺攢鈹€ skills/                 # Skills library
+鈹溾攢鈹€ .antigravity/               # Antigravity tool configuration
+鈹溾攢鈹€ .env/                       # Environment config (git ignored)
+鈹?  鈹溾攢鈹€ secrets.env             # API keys
+鈹?  鈹斺攢鈹€ api_config.yaml         # Engine parameters
+鈹溾攢鈹€ videospec/                  # Core narratives (Source of Truth)
+鈹?  鈹溾攢鈹€ project.md              # Global config & asset manifest
+鈹?  鈹溾攢鈹€ stories/                # Story outlines
+鈹?  鈹溾攢鈹€ elements/               # Character/prop definitions
+鈹?  鈹溾攢鈹€ scenes/                 # Scene definitions
+鈹?  鈹斺攢鈹€ shots/                  # Storyboards & animation scripts
+鈹?      鈹溾攢鈹€ Script.md           # Static composition
+鈹?      鈹斺攢鈹€ Shotlist.md         # Motion & animation
+鈹溾攢鈹€ artifacts/                  # Generated outputs
+鈹溾攢鈹€ queue/                      # Job queues
+鈹斺攢鈹€ README.md                   # Project landing page
 ```
 
 ---

@@ -1,12 +1,12 @@
 ﻿# OpsV 椤圭洰鍏ㄦ櫙 (Project Overview)
 
-> **OpenSpec-Video (OpsV) 0.4.6** 鈥?鑷姩鍖栧奖鍍忕敓鎴愮殑 Spec-as-Code 妗嗘灦銆傚彊浜嬭鑼冪紪璇戜负瑙嗛/鍥惧儚鐢熸垚浠诲姟鐨勮嚜鍔ㄥ寲妗嗘灦
+> **OpenSpec-Video (OpsV) 0.4.3** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
 
 ---
 
 ## 1. OpsV 鏄粈涔?
 
-OpsV 鏄竴濂?**Spec-as-Code** 瑙嗛鍒朵綔绠＄嚎銆傚畠鍏佽鍒涗綔鑰咃紙瀵兼紨/PM/鑹烘湳鎬荤洃锛夌敤 Markdown 鎾板啓鏁呬簨銆佸畾涔夎祫浜с€佽璁″垎闀滐紝鐒跺悗閫氳繃 CLI 鍛戒护灏嗚繖浜涙枃鏈鑼?缂栬瘧"涓哄彲鎵ц鐨?JSON 浠诲姟闃熷垪锛屾渶缁堥┍鍔?AI 妯″瀷锛圫eaDream銆丼eedance銆丮inimax銆丼iliconFlow 绛夛級骞跺彂鎵归噺鐢熸垚鍥惧儚涓庤棰戙€?
+OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演/PM/艺术总监）用 Markdown 撰写故事、定义资产、设计分镜，然后通过 CLI 命令将这些文本规范"编译"为可执行的 JSON 任务队列，最终驱动 AI 模型（SeaDream、Seedance、Minimax、SiliconFlow 等）并发批量生成图像与视频。
 
 **鏍稿績淇℃潯**锛?
 
@@ -79,17 +79,17 @@ project/
 
 | 姒傚康 | 鍚箟 |
 |------|------|
-| **骞宠瀹囧畽娌欑** | 0.4.6 寮曞叆锛屾牴鎹?`api_config.yaml` 鍚敤鐨勫妯″瀷骞跺彂鎵ц锛屼笉鍚屽紩鎿庣殑缁撴灉琚弗鏍奸殧绂诲湪 `artifacts/drafts_N/[寮曟搸鍚峕/` 涓?|
-| **Spec-as-Code** | 鐢ㄧ粨鏋勫寲 Markdown 浣滀负瑙嗛鍒朵綔鐨勬簮浠ｇ爜 |
-| **Asset-First** | 璧勪骇鍏堜簬鍒嗛暅瀛樺湪锛屽垎闀滃彧寮曠敤涓嶆弿杩?|
-| **d-ref (Design References)** | 鐢熸垚杈撳叆鍙傝€冨浘銆俙opsv generate` 鐢熸垚鏈疄浣撴椂浣滀负 img2img 杈撳叆 |
-| **a-ref (Approved References)** | 瀹氭。杈撳嚭鍙傝€冨浘銆傚叾浠栧疄浣撻€氳繃 `@` 寮曠敤鏃讹紝鎻愪緵姝ゅ弬鑰冨浘 |
-| **鍙樹綋閾?* | 灏?A 鐨?a-ref 浣滀负 B 鐨?d-ref锛岀敓鎴愬熀浜?A 鐨勬柊鍙樹綋锛堝鑰佸勾鐗堛€佸崱閫氱増锛?|
-| **@ 寮曠敤璇硶** | 鐢?`@role_K`銆乣@scene_bar` 绛夋爣绛惧紩鐢ㄧ嫭绔嬬殑璧勪骇鏂囦欢 |
-| **global_style_postfix** | 鍦?`project.md` 涓畾涔夌殑鍏ㄥ眬娓叉煋椋庢牸鍚庣紑锛岀紪璇戝櫒鑷姩娉ㄥ叆姣忎釜浠诲姟 |
-| **鍔ㄩ潤鍒嗙** | 鍥惧儚绠＄嚎锛圫cript.md 鈫?jobs.json锛変笌瑙嗛绠＄嚎锛圫hotlist.md 鈫?video_jobs.json锛変簰鐩哥嫭绔?|
-| **鍏抽敭甯у缂?* | `@FRAME:<shot_id>_last` 寤惰繜鎸囬拡锛屽悗涓€闀滃ご棣栧抚鑷姩缁ф壙鍓嶄竴闀滃ご灏惧抚 |
-| **鐗瑰緛娉勬紡 (Concept Bleeding)** | 鍒嗛暅涓笉鎱庢弿杩颁簡瑙掕壊澶栬矊缁嗚妭锛屽鑷存覆鏌撳啿绐?|
+| **平行宇宙沙箱** | 0.4.3 引入，根据 `api_config.yaml` 启用的多模型并发执行，不同引擎的结果被严格隔离在 `artifacts/drafts_N/[引擎名]/` 中 |
+| **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码 |
+| **Asset-First** | 资产先于分镜存在，分镜只引用不描述 |
+| **d-ref (Design References)** | 生成输入参考图。`opsv generate` 生成本实体时作为 img2img 输入 |
+| **a-ref (Approved References)** | 定档输出参考图。其他实体通过 `@` 引用时，提供此参考图 |
+| **变体链** | 将 A 的 a-ref 作为 B 的 d-ref，生成基于 A 的新变体（如老年版、卡通版） |
+| **@ 引用语法** | 用 `@role_K`、`@scene_bar` 等标签引用独立的资产文件 |
+| **global_style_postfix** | 在 `project.md` 中定义的全局渲染风格后缀，编译器自动注入每个任务 |
+| **动静分离** | 图像管线（Script.md → jobs.json）与视频管线（Shotlist.md → video_jobs.json）互相独立 |
+| **关键帧塌缩** | `@FRAME:<shot_id>_last` 延迟指针，后一镜头首帧自动继承前一镜头尾帧 |
+| **特征泄漏 (Concept Bleeding)** | 分镜中不慎描述了角色外貌细节，导致渲染冲突 |
 
 ---
 
@@ -135,5 +135,5 @@ opsv gen-video
 
 ---
 
-> *"浠ｇ爜鏄啓缁欎汉鐪嬬殑锛屽彧鏄『渚胯鏈哄櫒杩愯銆?*
-> *OpsV 0.4.6 | 鏈€鍚庢洿鏂? 2026-03-29*
+> *"代码是写给人看的，只是顺便让机器运行。"*
+> *OpsV 0.4.3 | 最后更新: 2026-03-28*
