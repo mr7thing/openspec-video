@@ -37,7 +37,7 @@
 
 | Agent | 鏂囦欢 | 鑱岃矗 | 缁戝畾 Skill |
 |-------|------|------|-----------|
-| **Director** | `Director.md` | 策劃者与指挥家：负责跨 Agent 调度，驱动全自动工作流。 | `opsv-director` |
+| **CLI-Agent** | `Director.md` | 自动化执行官：跨 Agent 调度，驱动非交互式全自动 CLI 流程。 | `opsv-cli-agent` |
 | **Architect** | `Architect.md` | 鎬绘灦鏋勫笀锛氬皢鐏垫劅閿氬畾涓洪」鐩笘鐣岃锛岀敓鎴?`project.md` + `story.md` | `opsv-architect` |
 | **Screenwriter** | `Screenwriter.md` | 涓荤紪鍓э細鎾板啓鏁呬簨澶х翰锛屾彁绾疄浣撹祫浜э紝鍩嬭 `@` 鎸囬拡 | `opsv-screenwriter` |
 | **AssetDesigner** | `AssetDesigner.md` | 璧勪骇璁捐甯堬細鍒涘缓 `elements/` 鍜?`scenes/` 涓嬬殑瀹炰綋瀹氫箟 | `opsv-asset-designer` |
@@ -67,19 +67,44 @@
 
 ---
 
-### 2. `opsv-screenwriter` 鈥?缂栧墽鎵嬪唽
+### 0. `opsv-cli-agent` — 非交互式全自动执行手册 (v0.4.4+)
+- **第一阶段：Agent 零摩擦初始化**：利用 `-g/-o/-t` 标识实现静默部署。
+- **第二阶段：CLI 自动化调度**：串联剧作、分镜与动画的全量生成与校验。
+- **第三阶段：导演审查桥接**：为 Agent 提供强制性的人工介入点（Checkpoint）。
+- **第四阶段：视频合成流水线**：驱动 `opsv animate` 与 `execute-video` 完成交付。
+锛氳瘑鍒珮棰戝嚭鐜扮殑瑙掕壊/鍦烘櫙/閬撳叿
+2. **璧勪骇澹版槑**锛氬啓鍏?`elements/` 鍜?`scenes/` 鐩綍锛屼弗瀹?`has_image` 浜屽厓娉?
+3. **浠ｇ爜鍖栧ぇ绾?*锛氭墍鏈夋暟鎹繘 YAML Frontmatter
+
+**涓夋寮忔牸寮?*锛?
+```yaml
+---
+name: opsv-cli-agent
+description: Comprehensive guide for AI Agents to autonomously orchestrate the OpsV CLI pipeline. Supports Phase 1 (Init) -> Phase 2 (Script/Spec) -> Phase 3 (Asset Rendering) -> Phase 4 (Manual Review) -> Phase 5 (Video Gen). Essential for "agent-driven" production.
+---
+
+# OpsV CLI Agent: Automation Execution Manual (v0.4.4+)ironment
+[鐜/鑳屾櫙锛屼腑鏂嘳
+
+## camera
+[鏅埆锛岃嫳鏂嘳
+```
+
+---
+
+### 2. `opsv-screenwriter` 鈥?缂姈鎵嬪唽
 
 **瑙﹀彂鍦烘櫙**锛氬厖瀹炴晠浜嬭鑲夛紝鎾板啓 `story.md`
 
 **鏍稿績浠诲姟**锛?
 1. **瀹炰綋鎻愮函**锛氳瘑鍒珮棰戝嚭鐜扮殑瑙掕壊/鍦烘櫙/閬撳叿
 2. **璧勪骇澹版槑**锛氬啓鍏?`elements/` 鍜?`scenes/` 鐩綍锛屼弗瀹?`has_image` 浜屽厓娉?
-3. **浠ｇ爜鍖栧ぇ绾?*锛氱敤 `@瀹炰綋鍚峘 鎸囬拡鏇夸唬鍐楅暱鐨勫璨屾弿鍐?
+3. **浠ｇ爜鍖栧ぇ绾?*锛氭墍鏈夋暟鎹繘 YAML Frontmatter
 
 **閾佸緥**锛?
 - 鉂?閿欒锛?`@role_K` 閭ｄ釜绌跨潃榛戣壊鐮撮槻椋庤。鐨勭敺浜鸿蛋鍚戝惂鍙?
-- 鉁?姝ｇ‘锛?`@role_K` 璧板悜鍚у彴"锛堥琛ｉ鑹插彧鍦?`K.md` 閲岋級
-- 缁濅笉鍐欎换浣?`Shot X` 绛夋憚鍍忔満鏈轰綅瑕佹眰
+- 鉁?姝ｇ‘锛?`@role_K` 璧板悜鍚у彴"锛堥琛ｉ鑹插彧鍦?`K.md` 閲柑锛?
+- 缁濅笉鐣欎换浣?`Shot X` 绛夋憚鍍忔満鏈轰綅瑕佹眰
 
 ---
 
@@ -89,7 +114,7 @@
 
 **浜斿ぇ鍑嗗垯**锛?
 1. **涓婁笅鏂囦负鐜?*锛氬厛璇?`project.md` 浜嗚В鍏ㄥ眬椋庢牸
-2. **瓒呴珮绮剧粏搴?*锛氳嚧瀵嗘弿鍐欐潗璐ㄣ€佸厜褰便€佺（鎹熷害銆佹儏缁?
+2. **瓒呴珮绮剧粏搴?*锛氳嚧瀵嗘弿鐣欐潗璐ㄣ€佸厜褰便€佺（鎹熷害銆佹儏缁?
 3. **has_image 榛樿 false**锛氫粎瀵兼紨纭鍚庢墠鍙涓?true
 4. **姣嶈鍙嬪ソ**锛氭鏂囦腑鏂囷紝鍙湁 `prompt_en` 瀛楁鑻辨枃
 5. **YAML-First**锛氭墍鏈夋暟鎹繘 YAML Frontmatter
@@ -101,7 +126,7 @@ name: "@AssetName"
 type: "character"       # character | scene | prop
 has_image: false
 detailed_description: >
-  [鑷村瘑鐨勪腑鏂囩壒寰佹弿鍐欙紝鑷冲皯3-5鍙ヨ瘽]
+  [鑷村瘑鐨勪腑鏂囩壒寰佹弿鐣欙紝鑷冲皯3-5鍙ヨ瘽]
 brief_description: "[涓€鍙ヨ瘽绠€鐣ユ弿杩癩"
 prompt_en: >
   [Dense English prompt for image generation]

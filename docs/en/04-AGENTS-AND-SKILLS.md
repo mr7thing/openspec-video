@@ -37,7 +37,7 @@
 
 | Agent | File | Responsibility | Primary Skill |
 |-------|------|------|-----------|
-| **Director** | `Director.md` | Orchestrator: Drives the full pipeline from init to video synthesis. | `opsv-director` |
+| **CLI-Agent** | `Director.md` | Auto-Executor: Drives the non-interactive CLI pipeline via cross-agent orchestration. | `opsv-cli-agent` |
 | **Architect** | `Architect.md` | Strategist: Anchors inspiration into project worldview; generates `project.md` + `story.md`. | `opsv-architect` |
 | **Screenwriter** | `Screenwriter.md` | Writer: Drafts story outlines, identifies entities, and embeds `@` anchors. | `opsv-screenwriter` |
 | **AssetDesigner** | `AssetDesigner.md` | Designer: Creates entity definitions in `elements/` and `scenes/`. | `opsv-asset-designer` |
@@ -48,6 +48,12 @@
 ---
 
 ## Detailed Skill Overviews
+
+### 0. `opsv-cli-agent` — Automation Execution Manual (v0.4.4+)
+- **Phase 1: Agent Zero-Friction Init**: Automation via `-g/-o/-t` non-interactive flags.
+- **Phase 2: CLI Pipeline Orchestration**: Chains Screenwriter, ScriptDesigner, and Animator.
+- **Phase 3: Director Bridge Checkpoint**: Managed human-in-the-loop review for rendered assets.
+- **Phase 4: Synthesis**: Final animation and video generation via CLI execution.
 
 ### 1. `opsv-architect` — Project Strategist Manual
 - **Workflow**: Two phases (Ideation & Anchoring).

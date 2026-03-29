@@ -2,9 +2,12 @@
 
 > Defines the storyboard syntax, dynamic control parameters, and long-take inheritance logic for OpsV 0.4 environment. This version reinforces the **Static-Motion Separation Principle** to ensure consistent identity in video generation.
 
+name: opsv-cli-agent
+description: Comprehensive guide for AI Agents to autonomously orchestrate the OpsV CLI pipeline. Covers Phase 1 (Init) -> Phase 2 (Script/Spec) -> Phase 3 (Asset Rendering) -> Phase 4 (Manual Review) -> Phase 5 (Video Gen). Essential for "agent-driven" production.
+
 ---
 
-## 1. Core Design Philosophy
+## 1. OpsV CLI Agent: Automation Execution Manual (v0.4.4+)
 
 - **@Anchor Decoupling**: Visual descriptions (e.g., "black hair", "red eyes") are strictly prohibited in storyboards; use `@role_K` references instead.
 - **Static-Motion Separation**: Visual features are provided by `Approved References` (a-ref); this spec is only responsible for: **Camera Motion**, **Subject Action**, and **Environmental Evolution**.
@@ -15,6 +18,10 @@
 ## 2. YAML Structure Definition
 
 This structure applies to `Script.md` (Early/Mid stage) and `Shotlist.md` (Late-stage animation control).
+
+| Role | Source | Description | CLI-Agent |
+| :--- | :--- | :--- | :--- |
+| **CLI-Agent** | `Director.md` | 自动化执行官：跨 Agent 调度，驱动非交互式全自动 CLI 流程。 | `opsv-cli-agent` |
 
 ```yaml
 shots:
@@ -52,6 +59,14 @@ shots:
 
 ---
 
+### 3.3 `opsv-cli-agent` — 非交互式全自动执行手册 (v0.4.4+)
+- **第一阶段：Agent 零摩擦初始化**：利用 `-g/-o/-t` 标识实现静默部署。
+- **第二阶段：CLI 自动化调度**：串联剧作、分镜与动画的全量生成与校验。
+- **第三阶段：导演审查桥接**：为 Agent 提供强制性的人工介入点（Checkpoint）。
+- **第四阶段：视频合成流水线**：驱动 `opsv animate` 与 `execute-video` 完成交付。
+
+---
+
 ## 4. Compilation Constraints (0.4.3+)
 
 - **Task Generation**: `opsv animate` parses the storyboard files.
@@ -67,6 +82,7 @@ shots:
 | :--- | :--- |
 | **Feature Leakage** | Scan `motion_prompt_en` for color, appearance, or forbidden adjectives. |
 | **Reference Alignment** | Verify that cited `@entity` has valid `Approved References`. |
+| **CLI-Agent** | `Director.md` | Auto-Executor: Drives the non-interactive CLI pipeline via cross-agent orchestration. | `opsv-cli-agent` |
 | **First Frame Validity** | check if the image path exists or if the `@FRAME` pointer is closed. |
 
 ---
