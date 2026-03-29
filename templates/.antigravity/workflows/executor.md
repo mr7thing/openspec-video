@@ -1,4 +1,4 @@
-# Workflow: Auto Executor (Batch Processing)
+﻿# Workflow: Auto Executor (Batch Processing)
 
 This workflow guides the Agent to execute video/image generation tasks defined in the `queue/jobs.json`.
 
@@ -50,3 +50,4 @@ If `target_tool` is `veo_3_1`:
 ### 3. Verification
 - After processing all jobs, list the `artifacts/` directory to confirm file creation.
 - Update `task.md` or a log file to mark jobs as "Done".
+

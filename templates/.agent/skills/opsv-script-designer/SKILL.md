@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-script-designer
 description: Storyboard and script design execution manual. Translates story outlines into YAML-structured `Script.md` files, including rigorous timing constraints and gallery templates. Supports d-ref/a-ref logic.
 ---

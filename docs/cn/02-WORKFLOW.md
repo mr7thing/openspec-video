@@ -1,26 +1,26 @@
-# OpsV 工作流程说明 (Workflow Guide)
+﻿# OpsV 宸ヤ綔娴佺▼璇存槑 (Workflow Guide)
 
-> 从灵感到成片的五步循环，理解 Agent 协作与 CLI 命令的完整交互逻辑。
+> 浠庣伒鎰熷埌鎴愮墖鐨勪簲姝ュ惊鐜紝鐞嗚В Agent 鍗忎綔涓?CLI 鍛戒护鐨勫畬鏁翠氦浜掗€昏緫銆?
 
 ---
 
-## 全景流程图
+## 鍏ㄦ櫙娴佺▼鍥?
 
 ```mermaid
 flowchart TD
-    START["💡 创意灵感"] --> INIT["opsv init"]
-    INIT --> ARCH["🏛️ Architect Agent"]
-    ARCH -->|"project.md + story.md"| WRITE["✍️ Screenwriter Agent"]
-    WRITE -->|"story.md + @ 锚点"| ASSET["🎨 AssetDesigner Agent"]
-    ASSET -->|"elements/ + scenes/"| SCRIPT["📐 ScriptDesigner Agent"]
+    START["馃挕 鍒涙剰鐏垫劅"] --> INIT["opsv init"]
+    INIT --> ARCH["馃彌锔?Architect Agent"]
+    ARCH -->|"project.md + story.md"| WRITE["鉁嶏笍 Screenwriter Agent"]
+    WRITE -->|"story.md + @ 閿氱偣"| ASSET["馃帹 AssetDesigner Agent"]
+    ASSET -->|"elements/ + scenes/"| SCRIPT["馃搻 ScriptDesigner Agent"]
     SCRIPT -->|"Script.md"| GEN["opsv generate"]
     GEN -->|"jobs.json"| EXEC["opsv gen-image"]
     EXEC -->|"artifacts/drafts_N/"| REVIEW["opsv review"]
-    REVIEW -->|"图写回 Script.md"| QA2["🔍 Supervisor /opsv-qa act2"]
-    QA2 -->|"PASS ✅"| ANIM["🎬 Animator Agent"]
+    REVIEW -->|"鍥惧啓鍥?Script.md"| QA2["馃攳 Supervisor /opsv-qa act2"]
+    QA2 -->|"PASS 鉁?| ANIM["馃幀 Animator Agent"]
     ANIM -->|"Shotlist.md"| COMPILE["opsv animate"]
     COMPILE -->|"video_jobs.json"| VIDGEN["opsv gen-video"]
-    VIDGEN -->|"artifacts/videos/"| DONE["🎬 视频生成"]
+    VIDGEN -->|"artifacts/videos/"| DONE["馃幀 瑙嗛鐢熸垚"]
 
     style START fill:#f9f,stroke:#333
     style DONE fill:#9f9,stroke:#333
@@ -28,73 +28,73 @@ flowchart TD
 
 ---
 
-## 阶段一：项目初始化 (Init)
+## 闃舵涓€锛氶」鐩垵濮嬪寲 (Init)
 
-### 触发命令
+### 瑙﹀彂鍛戒护
 ```bash
 opsv init [projectName]
 ```
 
-### 发生了什么
-1. **交互式选择** AI 助手（Gemini / OpenCode / Trae）
-2. **复制模板**：
-   - `.agent/` — Agent 角色定义 + Skills 技能手册
-   - `.antigravity/` — 工作流和行为规则
-   - `.env/` — API 配置模板
-   - `GEMINI.md` / `AGENTS.md` — 按选择复制
-3. **创建目录骨架**：
-   - `videospec/stories/`、`videospec/elements/`、`videospec/scenes/`、`videospec/shots/`
-   - `artifacts/`、`queue/`
+### 鍙戠敓浜嗕粈涔?
+1. **浜や簰寮忛€夋嫨** AI 鍔╂墜锛圙emini / OpenCode / Trae锛?
+2. **澶嶅埗妯℃澘**锛?
+   - `.agent/` 鈥?Agent 瑙掕壊瀹氫箟 + Skills 鎶€鑳芥墜鍐?
+   - `.antigravity/` 鈥?宸ヤ綔娴佸拰琛屼负瑙勫垯
+   - `.env/` 鈥?API 閰嶇疆妯℃澘
+   - `GEMINI.md` / `AGENTS.md` 鈥?鎸夐€夋嫨澶嶅埗
+3. **鍒涘缓鐩綍楠ㄦ灦**锛?
+   - `videospec/stories/`銆乣videospec/elements/`銆乣videospec/scenes/`銆乣videospec/shots/`
+   - `artifacts/`銆乣queue/`
 
-### 产物
+### 浜х墿
 ```
 my-project/
-├── .agent/skills/...
-├── .env/api_config.yaml
-├── videospec/
-│   ├── stories/
-│   ├── elements/
-│   ├── scenes/
-│   └── shots/
-├── artifacts/
-└── queue/
+鈹溾攢鈹€ .agent/skills/...
+鈹溾攢鈹€ .env/api_config.yaml
+鈹溾攢鈹€ videospec/
+鈹?  鈹溾攢鈹€ stories/
+鈹?  鈹溾攢鈹€ elements/
+鈹?  鈹溾攢鈹€ scenes/
+鈹?  鈹斺攢鈹€ shots/
+鈹溾攢鈹€ artifacts/
+鈹斺攢鈹€ queue/
 ```
 
 ---
 
-## 阶段二：创意锚定 (Concept Anchoring)
+## 闃舵浜岋細鍒涙剰閿氬畾 (Concept Anchoring)
 
-### 负责 Agent
-**Architect** → 调用 `opsv-architect` 技能
+### 璐熻矗 Agent
+**Architect** 鈫?璋冪敤 `opsv-architect` 鎶€鑳?
 
-### 两阶段工作流
+### 涓ら樁娈靛伐浣滄祦
 
-#### Phase 1：概念发散
-- 输入：一句歌词、一段旋律描述或一个模糊概念
-- 输出：**3 个差异化的故事方案**，每个方案包含：
-  - 方案标题（一句话）
-  - 核心情节（3-5 句话）
-  - 视觉风格关键词
-  - 核心角色清单
-  - 预估镜头数
-- **此阶段不生成任何文件**
+#### Phase 1锛氭蹇靛彂鏁?
+- 杈撳叆锛氫竴鍙ユ瓕璇嶃€佷竴娈垫棆寰嬫弿杩版垨涓€涓ā绯婃蹇?
+- 杈撳嚭锛?*3 涓樊寮傚寲鐨勬晠浜嬫柟妗?*锛屾瘡涓柟妗堝寘鍚細
+  - 鏂规鏍囬锛堜竴鍙ヨ瘽锛?
+  - 鏍稿績鎯呰妭锛?-5 鍙ヨ瘽锛?
+  - 瑙嗚椋庢牸鍏抽敭璇?
+  - 鏍稿績瑙掕壊娓呭崟
+  - 棰勪及闀滃ご鏁?
+- **姝ら樁娈典笉鐢熸垚浠讳綍鏂囦欢**
 
-#### Phase 2：世界观锚定
-- 导演选择方案后，生成两个核心文件：
-  - `videospec/project.md` — 全局参数 + 资产花名册
-  - `videospec/stories/story.md` — 叙事大纲（含 `@` 实体锚点）
+#### Phase 2锛氫笘鐣岃閿氬畾
+- 瀵兼紨閫夋嫨鏂规鍚庯紝鐢熸垚涓や釜鏍稿績鏂囦欢锛?
+  - `videospec/project.md` 鈥?鍏ㄥ眬鍙傛暟 + 璧勪骇鑺卞悕鍐?
+  - `videospec/stories/story.md` 鈥?鍙欎簨澶х翰锛堝惈 `@` 瀹炰綋閿氱偣锛?
 
-### 示例
+### 绀轰緥
 
-导演说："一首关于蝴蝶的歌，很空灵"
+瀵兼紨璇达細"涓€棣栧叧浜庤澊铦剁殑姝岋紝寰堢┖鐏?
 
-→ Architect 产出：
+鈫?Architect 浜у嚭锛?
 ```yaml
 # videospec/project.md
 ---
 aspect_ratio: "16:9"
 engine: ""
-vision: "一只破茧蝴蝶的孤独飞行，穿越四季的极简之美"
+vision: "涓€鍙牬鑼ц澊铦剁殑瀛ょ嫭椋炶锛岀┛瓒婂洓瀛ｇ殑鏋佺畝涔嬬編"
 global_style_postfix: "ethereal atmosphere, minimalist composition, soft bokeh, dreamlike quality, 8k"
 ---
 
@@ -106,32 +106,32 @@ global_style_postfix: "ethereal atmosphere, minimalist composition, soft bokeh, 
 - @scene_spring_forest
 ```
 
-### 质检门禁
-完成后可运行 `/opsv-qa act1`，由 Supervisor 核查资产清单是否完整。
+### 璐ㄦ闂ㄧ
+瀹屾垚鍚庡彲杩愯 `/opsv-qa act1`锛岀敱 Supervisor 鏍告煡璧勪骇娓呭崟鏄惁瀹屾暣銆?
 
 ---
 
-## 阶段三：资产设计 (Asset Design)
+## 闃舵涓夛細璧勪骇璁捐 (Asset Design)
 
-### 负责 Agent
-**AssetDesigner** → 调用 `opsv-asset-designer` 技能
+### 璐熻矗 Agent
+**AssetDesigner** 鈫?璋冪敤 `opsv-asset-designer` 鎶€鑳?
 
-### 核心任务
-为 `project.md` 花名册中列出的每个实体创建独立的 `.md` 定义文件。
+### 鏍稿績浠诲姟
+涓?`project.md` 鑺卞悕鍐屼腑鍒楀嚭鐨勬瘡涓疄浣撳垱寤虹嫭绔嬬殑 `.md` 瀹氫箟鏂囦欢銆?
 
-### 工作规则
+### 宸ヤ綔瑙勫垯
 
-> 详细规范见 [OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
+> 璇︾粏瑙勮寖瑙?[OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
 
-1. **先读全局上下文**：必须读取 `project.md` 了解时代氛围和风格
-2. **双通道参考图体系**：
-   - `## Design References`（d-ref）：放入生成本实体时需要的输入参考图（灵感图、已有资产的 a-ref 用于变体生成）
-   - `## Approved References`（a-ref）：放入定档后的正式参考图（经 `opsv review` 审批确认）
-   - 两节均为空时 → 纯文生图，使用 `detailed_description`
-   - 任一节非空时 → 使用 `brief_description` + 参考图
-3. **YAML 存元数据，Markdown Body 存参考图链接** — 用户只维护一处
+1. **鍏堣鍏ㄥ眬涓婁笅鏂?*锛氬繀椤昏鍙?`project.md` 浜嗚В鏃朵唬姘涘洿鍜岄鏍?
+2. **鍙岄€氶亾鍙傝€冨浘浣撶郴**锛?
+   - `## Design References`锛坉-ref锛夛細鏀惧叆鐢熸垚鏈疄浣撴椂闇€瑕佺殑杈撳叆鍙傝€冨浘锛堢伒鎰熷浘銆佸凡鏈夎祫浜х殑 a-ref 鐢ㄤ簬鍙樹綋鐢熸垚锛?
+   - `## Approved References`锛坅-ref锛夛細鏀惧叆瀹氭。鍚庣殑姝ｅ紡鍙傝€冨浘锛堢粡 `opsv review` 瀹℃壒纭锛?
+   - 涓よ妭鍧囦负绌烘椂 鈫?绾枃鐢熷浘锛屼娇鐢?`detailed_description`
+   - 浠讳竴鑺傞潪绌烘椂 鈫?浣跨敤 `brief_description` + 鍙傝€冨浘
+3. **YAML 瀛樺厓鏁版嵁锛孧arkdown Body 瀛樺弬鑰冨浘閾炬帴** 鈥?鐢ㄦ埛鍙淮鎶や竴澶?
 
-### 产物示例
+### 浜х墿绀轰緥
 
 ```markdown
 # videospec/elements/@role_butterfly.md
@@ -139,9 +139,9 @@ global_style_postfix: "ethereal atmosphere, minimalist composition, soft bokeh, 
 name: "@role_butterfly"
 type: "character"
 detailed_description: >
-  一只翅膀如彩色玻璃般的凤蝶，翼展约15厘米。上翅为深邃的靛蓝色，
-  边缘渐变为琥珀色，布满细密的金色鳞粉...
-brief_description: "靛蓝渐变琥珀色的凤蝶，翅膀如彩色玻璃"
+  涓€鍙繀鑶€濡傚僵鑹茬幓鐠冭埇鐨勫嚖铦讹紝缈煎睍绾?5鍘樼背銆備笂缈呬负娣遍們鐨勯潧钃濊壊锛?
+  杈圭紭娓愬彉涓虹惀鐝€鑹诧紝甯冩弧缁嗗瘑鐨勯噾鑹查碁绮?..
+brief_description: "闈涜摑娓愬彉鐞ョ弨鑹茬殑鍑よ澏锛岀繀鑶€濡傚僵鑹茬幓鐠?
 prompt_en: >
   A swallowtail butterfly with indigo-to-amber gradient wings,
   golden scale dust, glass-like transparency, macro photography,
@@ -149,129 +149,129 @@ prompt_en: >
 ---
 
 ## Design References
-- [蝴蝶翅膀纹理参考](refs/butterfly_wing_texture.jpg)
-- [琥珀色调光影参考](refs/amber_lighting_mood.png)
+- [铦磋澏缈呰唨绾圭悊鍙傝€僝(refs/butterfly_wing_texture.jpg)
+- [鐞ョ弨鑹茶皟鍏夊奖鍙傝€僝(refs/amber_lighting_mood.png)
 
 ## Approved References
-<!-- opsv review 审批后回写 →
-- [蝴蝶三视图](artifacts/drafts_2/role_butterfly_turnaround.png)
+<!-- opsv review 瀹℃壒鍚庡洖鍐?鈫?
+- [铦磋澏涓夎鍥綸(artifacts/drafts_2/role_butterfly_turnaround.png)
 -->
 ```
 
-### 变体链示例
+### 鍙樹綋閾剧ず渚?
 
 ```markdown
-# videospec/elements/@role_butterfly_aged.md — 老化版蝴蝶
+# videospec/elements/@role_butterfly_aged.md 鈥?鑰佸寲鐗堣澊铦?
 ---
 name: "@role_butterfly_aged"
 type: "character"
-brief_description: "翅膀褪色破损的老年凤蝶"
+brief_description: "缈呰唨瑜壊鐮存崯鐨勮€佸勾鍑よ澏"
 prompt_en: "An aged swallowtail butterfly, faded colors, torn wing edges..."
 ---
 
 ## Design References
-- [年轻版定档图 - 作为老化基础](artifacts/drafts_2/role_butterfly_turnaround.png)
-- [老化纹理参考](refs/aged_wing_texture.jpg)
+- [骞磋交鐗堝畾妗ｅ浘 - 浣滀负鑰佸寲鍩虹](artifacts/drafts_2/role_butterfly_turnaround.png)
+- [鑰佸寲绾圭悊鍙傝€僝(refs/aged_wing_texture.jpg)
 ```
 
-### 质检门禁
-`/opsv-qa act1` — 核查所有文件是否已在 `project.md` 花名册中登记。
+### 璐ㄦ闂ㄧ
+`/opsv-qa act1` 鈥?鏍告煡鎵€鏈夋枃浠舵槸鍚﹀凡鍦?`project.md` 鑺卞悕鍐屼腑鐧昏銆?
 
 ---
 
-## 阶段四：分镜编译与审阅 (Script → Generate → Review)
+## 闃舵鍥涳細鍒嗛暅缂栬瘧涓庡闃?(Script 鈫?Generate 鈫?Review)
 
-这是最核心的循环，包含 3 个子步骤。
+杩欐槸鏈€鏍稿績鐨勫惊鐜紝鍖呭惈 3 涓瓙姝ラ銆?
 
-### 4.1 分镜设计
+### 4.1 鍒嗛暅璁捐
 
-**负责 Agent**：**ScriptDesigner** → 调用 `opsv-script-designer` 技能
+**璐熻矗 Agent**锛?*ScriptDesigner** 鈫?璋冪敤 `opsv-script-designer` 鎶€鑳?
 
-- 阅读 `story.md`，将叙事转化为结构化镜头语言
-- 输出 `videospec/shots/Script.md`（YAML 数组 + Markdown 审阅正文）
-- 每个 Shot 设计时长 **3-5 秒**，上限 **15 秒**
-- 分镜中**严禁刻画角色外貌**，必须用 `@实体名` 引用
+- 闃呰 `story.md`锛屽皢鍙欎簨杞寲涓虹粨鏋勫寲闀滃ご璇█
+- 杈撳嚭 `videospec/shots/Script.md`锛圷AML 鏁扮粍 + Markdown 瀹￠槄姝ｆ枃锛?
+- 姣忎釜 Shot 璁捐鏃堕暱 **3-5 绉?*锛屼笂闄?**15 绉?*
+- 鍒嗛暅涓?*涓ョ鍒荤敾瑙掕壊澶栬矊**锛屽繀椤荤敤 `@瀹炰綋鍚峘 寮曠敤
 
 ```yaml
-# videospec/shots/Script.md (YAML 区)
+# videospec/shots/Script.md (YAML 鍖?
 ---
 shots:
   - id: "shot_1"
     duration: 5
-    camera: "极致微距，紧贴茧壳表面"
-    environment: "@scene_cocoon 破晓薄雾中"
-    subject: "@role_butterfly 破茧瞬间"
+    camera: "鏋佽嚧寰窛锛岀揣璐磋導澹宠〃闈?
+    environment: "@scene_cocoon 鐮存檽钖勯浘涓?
+    subject: "@role_butterfly 鐮磋導鐬棿"
     prompt_en: "Extreme macro shot of a butterfly emerging from chrysalis..."
   - id: "shot_2"
     duration: 4
-    camera: "广角仰拍"
+    camera: "骞胯浠版媿"
     environment: "@scene_spring_forest"
-    subject: "@role_butterfly 首次振翅"
+    subject: "@role_butterfly 棣栨鎸繀"
     prompt_en: "Low angle wide shot, butterfly's first wing spread..."
 ---
 ```
 
-### 4.2 图像生成
+### 4.2 鍥惧儚鐢熸垚
 
 ```bash
-# 编译 Markdown 为 JSON 任务
+# 缂栬瘧 Markdown 涓?JSON 浠诲姟
 opsv generate
 
 # 执行图像渲染（默认同时调度 api_config.yaml 中所有启用的模型）
 # 结果落盘至 artifacts/drafts_N/[引擎供应商]/ 下，形成“平行宇宙沙箱”
 opsv gen-image
 
-# 可选：预览模式（只生成关键镜头）
+# 鍙€夛細棰勮妯″紡锛堝彧鐢熸垚鍏抽敭闀滃ご锛?
 opsv generate --preview
 
-# 可选：只生成指定镜头
+# 鍙€夛細鍙敓鎴愭寚瀹氶暅澶?
 opsv generate --shots 1,3,5
 ```
 
-### 4.3 文档审阅
+### 4.3 鏂囨。瀹￠槄
 
 ```bash
-# 将最新的生成结果回写到 .md 文档
+# 灏嗘渶鏂扮殑鐢熸垚缁撴灉鍥炲啓鍒?.md 鏂囨。
 opsv review
 
-# 回写所有历史批次
+# 鍥炲啓鎵€鏈夊巻鍙叉壒娆?
 opsv review --all
 ```
 
-执行 `opsv review` 后，`Script.md` 的 Markdown 正文区会出现图片链接：
+鎵ц `opsv review` 鍚庯紝`Script.md` 鐨?Markdown 姝ｆ枃鍖轰細鍑虹幇鍥剧墖閾炬帴锛?
 
 ```markdown
 ## Shot 1 (5s)
-[@role_butterfly](../elements/@role_butterfly.md) 在 [@scene_cocoon] 中破茧而出
+[@role_butterfly](../elements/@role_butterfly.md) 鍦?[@scene_cocoon] 涓牬鑼ц€屽嚭
 
-### 🖼️ 视觉审阅廊
-| 画面 1 | 画面 2 |
+### 馃柤锔?瑙嗚瀹￠槄寤?
+| 鐢婚潰 1 | 鐢婚潰 2 |
 |:---:|:---:|
 | ![Draft 1](../../artifacts/drafts_1/shot_1_draft_1.png) | ![Draft 2](../../artifacts/drafts_1/shot_1_draft_2.png) |
 ```
 
-导演在 IDE 预览中选出最佳草图，批注确认。
+瀵兼紨鍦?IDE 棰勮涓€夊嚭鏈€浣宠崏鍥撅紝鎵规敞纭銆?
 
-### 质检门禁
-- `/opsv-qa act2` — 扫描死链、检查超链接完整性
-- `/opsv-qa act3` — 预警分镜中的特征泄漏
+### 璐ㄦ闂ㄧ
+- `/opsv-qa act2` 鈥?鎵弿姝婚摼銆佹鏌ヨ秴閾炬帴瀹屾暣鎬?
+- `/opsv-qa act3` 鈥?棰勮鍒嗛暅涓殑鐗瑰緛娉勬紡
 
 ---
 
-## 阶段五：动画编导 (Animation)
+## 闃舵浜旓細鍔ㄧ敾缂栧 (Animation)
 
-### 负责 Agent
-**Animator** → 调用 `opsv-animator` 技能
+### 璐熻矗 Agent
+**Animator** 鈫?璋冪敤 `opsv-animator` 鎶€鑳?
 
-### 核心任务
-读取已审阅确认的 `Script.md`，提取纯动态控制指令，输出 `Shotlist.md`。
+### 鏍稿績浠诲姟
+璇诲彇宸插闃呯‘璁ょ殑 `Script.md`锛屾彁鍙栫函鍔ㄦ€佹帶鍒舵寚浠わ紝杈撳嚭 `Shotlist.md`銆?
 
-### 动静分离原则
-- **不描述**穿什么衣服（已有参考图）
-- **只描述**：镜头怎么动？角色怎么动？场景有什么动态变化？
-- `motion_prompt_en` 必须**全英文**
+### 鍔ㄩ潤鍒嗙鍘熷垯
+- **涓嶆弿杩?*绌夸粈涔堣。鏈嶏紙宸叉湁鍙傝€冨浘锛?
+- **鍙弿杩?*锛氶暅澶存€庝箞鍔紵瑙掕壊鎬庝箞鍔紵鍦烘櫙鏈変粈涔堝姩鎬佸彉鍖栵紵
+- `motion_prompt_en` 蹇呴』**鍏ㄨ嫳鏂?*
 
-### 产物示例
+### 浜х墿绀轰緥
 
 ```yaml
 # videospec/shots/Shotlist.md
@@ -289,50 +289,50 @@ shots:
 ---
 ```
 
-### 编译发布
+### 缂栬瘧鍙戝竷
 
 ```bash
-# 将 Shotlist.md 编译为视频任务队列
+# 灏?Shotlist.md 缂栬瘧涓鸿棰戜换鍔￠槦鍒?
 opsv animate
 
 # 执行视频生成（默认调度所有开启的视频模型如 Minimax、Seedance 等）
 opsv gen-video
 ```
 
-### 长镜头继承
-当连续运动需要无缝衔接时，后续 Shot 的 `first_image` 设为 `@FRAME:<前一个shot_id>_last`，系统会自动截取前一视频的尾帧作为下一镜头的首帧。
+### 闀块暅澶寸户鎵?
+褰撹繛缁繍鍔ㄩ渶瑕佹棤缂濊鎺ユ椂锛屽悗缁?Shot 鐨?`first_image` 璁句负 `@FRAME:<鍓嶄竴涓猻hot_id>_last`锛岀郴缁熶細鑷姩鎴彇鍓嶄竴瑙嗛鐨勫熬甯т綔涓轰笅涓€闀滃ご鐨勯甯с€?
 
-### 质检门禁
-`/opsv-qa final` — Payload 断言检查，确认全局风格后缀注入与参考图路径一致性。
+### 璐ㄦ闂ㄧ
+`/opsv-qa final` 鈥?Payload 鏂█妫€鏌ワ紝纭鍏ㄥ眬椋庢牸鍚庣紑娉ㄥ叆涓庡弬鑰冨浘璺緞涓€鑷存€с€?
 
 ---
 
-## 质检体系总览
+## 璐ㄦ浣撶郴鎬昏
 
-| Slash 命令 | 阶段 | 检查内容 |
+| Slash 鍛戒护 | 闃舵 | 妫€鏌ュ唴瀹?|
 |-----------|------|---------|
-| `/opsv-qa act1` | 编剧后 | 资产花名册是否完整，无黑户无重复 |
-| `/opsv-qa act2` | 选图后 | 死链扫描，参考图路径是否存在 |
-| `/opsv-qa act3` | 分镜后 | 特征泄漏预警，防止容貌描写渗透分镜 |
-| `/opsv-qa final` | 编译后 | Payload 断言，风格后缀注入 + 参考图对齐 |
+| `/opsv-qa act1` | 缂栧墽鍚?| 璧勪骇鑺卞悕鍐屾槸鍚﹀畬鏁达紝鏃犻粦鎴锋棤閲嶅 |
+| `/opsv-qa act2` | 閫夊浘鍚?| 姝婚摼鎵弿锛屽弬鑰冨浘璺緞鏄惁瀛樺湪 |
+| `/opsv-qa act3` | 鍒嗛暅鍚?| 鐗瑰緛娉勬紡棰勮锛岄槻姝㈠璨屾弿鍐欐笚閫忓垎闀?|
+| `/opsv-qa final` | 缂栬瘧鍚?| Payload 鏂█锛岄鏍煎悗缂€娉ㄥ叆 + 鍙傝€冨浘瀵归綈 |
 
-所有质检由 **Supervisor Agent** 执行，输出红绿灯报告：
-- 🟢 `PASS: 针脚严丝合缝`
-- 🔴 `FAIL: 扫出 2 个未登记黑户：@xxx, @yyy`
+鎵€鏈夎川妫€鐢?**Supervisor Agent** 鎵ц锛岃緭鍑虹孩缁跨伅鎶ュ憡锛?
+- 馃煝 `PASS: 閽堣剼涓ヤ笣鍚堢紳`
+- 馃敶 `FAIL: 鎵嚭 2 涓湭鐧昏榛戞埛锛欯xxx, @yyy`
 
 ---
 
-## 循环迭代
+## 寰幆杩唬
 
-以上五个阶段并非一次通过。实际场景中，导演会基于审阅结果反复迭代：
+浠ヤ笂浜斾釜闃舵骞堕潪涓€娆￠€氳繃銆傚疄闄呭満鏅腑锛屽婕斾細鍩轰簬瀹￠槄缁撴灉鍙嶅杩唬锛?
 
 ```
-Script → Generate → gen-image → Review → (不满意) → 修改资产/分镜 → Generate → gen-image → Review → (OK)
-                                                          ↑
-                                                    opsv-apply 批量修改
+Script 鈫?Generate 鈫?gen-image 鈫?Review 鈫?(涓嶆弧鎰? 鈫?淇敼璧勪骇/鍒嗛暅 鈫?Generate 鈫?gen-image 鈫?Review 鈫?(OK)
+                                                          鈫?
+                                                    opsv-apply 鎵归噺淇敼
 ```
 
-`opsv-apply` 技能可以批量读取变更提案（`videospec/changes/*.md`）并自动执行资产更新。
+`opsv-apply` 鎶€鑳藉彲浠ユ壒閲忚鍙栧彉鏇存彁妗堬紙`videospec/changes/*.md`锛夊苟鑷姩鎵ц璧勪骇鏇存柊銆?
 
 ---
 

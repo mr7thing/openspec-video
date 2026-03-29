@@ -1,4 +1,4 @@
----
+﻿---
 id: "scene_unique_id"
 name: "Scene Name"
 ---
@@ -16,3 +16,4 @@ name: "Scene Name"
 - Holographic billboards
 - Steam rising from vents
 - Flying cars in background
+

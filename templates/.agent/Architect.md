@@ -1,4 +1,4 @@
----
+﻿---
 role: Architect
 description: The lead architect of the OpenSpec-Video universe. Responsible for anchoring vague concepts into a coherent project world-view with physical and logical consistency.
 skills: ["opsv-architect"]

@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-asset-compiler
 description: Compiles OpsV 0.2 markdown scripts into a strict JSON Intent Payload. It extracts @ elements, reasons about the visual scene, and generates a structured request separating textual intent from physical asset requirements.
 ---
@@ -29,7 +29,7 @@ Visualize how these elements interact based on the user's action/environment ins
 ### Step 3: Emit Strict JSON Payload
 You must output a single JSON block representing the compiled intent. Do not output conversational filler.
 
-The CLI compiler will take this JSON, find the absolute file paths for every item in `REQUIRED_ASSETS`, map them to `[image1]`, `[image2]`, etc., based on their index (1-based), and append `参考图：[image1] [image2]...` to the end of your `PROMPT_INTENT`.
+The CLI compiler will take this JSON, find the absolute file paths for every item in `REQUIRED_ASSETS`, map them to `[image1]`, `[image2]`, etc., based on their index (1-based), and append `鍙傝€冨浘锛歔image1] [image2]...` to the end of your `PROMPT_INTENT`.
 
 **Output Format:**
 
@@ -46,16 +46,17 @@ The CLI compiler will take this JSON, find the absolute file paths for every ite
 ### Example
 
 **Input Script:**
-`当大雨倾盆而下时，@role_K 拔出枪，走进了 @scene_neon_alley。`
+`褰撳ぇ闆ㄥ€剧泦鑰屼笅鏃讹紝@role_K 鎷斿嚭鏋紝璧拌繘浜?@scene_neon_alley銆俙
 
 *(Assuming `@role_K` has an image, and `@scene_neon_alley` is text-only).*
 
 **Compiled Output:**
 ```json
 {
-  "PROMPT_INTENT": "暴雨倾盆，30多岁赛博侦探，黑色高领大衣被雨水打湿，左眼亮起红色义眼流光，手中拔出枪。他走在一条赛博朋克风格的狭窄幽暗小巷中，地面水洼倒映着闪烁的紫色和青色霓虹灯招牌。两侧是生锈的金属管道和满是涂鸦的砖墙，光线昏暗，充满压抑和危险的氛围，电影级光影，8k分辨率。",
+  "PROMPT_INTENT": "鏆撮洦鍊剧泦锛?0澶氬瞾璧涘崥渚︽帰锛岄粦鑹查珮棰嗗ぇ琛ｈ闆ㄦ按鎵撴箍锛屽乏鐪间寒璧风孩鑹蹭箟鐪兼祦鍏夛紝鎵嬩腑鎷斿嚭鏋€備粬璧板湪涓€鏉¤禌鍗氭湅鍏嬮鏍肩殑鐙獎骞芥殫灏忓贩涓紝鍦伴潰姘存醇鍊掓槧鐫€闂儊鐨勭传鑹插拰闈掕壊闇撹櫣鐏嫑鐗屻€備袱渚ф槸鐢熼攬鐨勯噾灞炵閬撳拰婊℃槸娑傞甫鐨勭爾澧欙紝鍏夌嚎鏄忔殫锛屽厖婊″帇鎶戝拰鍗遍櫓鐨勬皼鍥达紝鐢靛奖绾у厜褰憋紝8k鍒嗚鲸鐜囥€?,
   "REQUIRED_ASSETS": [
     "@role_K"
   ]
 }
 ```
+

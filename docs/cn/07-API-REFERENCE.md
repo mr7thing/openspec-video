@@ -1,52 +1,52 @@
-# OpsV 多模型 API 接口规范 (API Reference)
+﻿# OpsV 澶氭ā鍨?API 鎺ュ彛瑙勮寖 (API Reference)
 
-> 定义 OpsV 支持的各类生成模型的接口格式、数据类型及交互协议。
+> 瀹氫箟 OpsV 鏀寔鐨勫悇绫荤敓鎴愭ā鍨嬬殑鎺ュ彛鏍煎紡銆佹暟鎹被鍨嬪強浜や簰鍗忚銆?
 
 ---
 
-## 1. 核心交互模式
+## 1. 鏍稿績浜や簰妯″紡
 
-OpsV 采用 **"提交-轮询-下载"** 的异步模式：
+OpsV 閲囩敤 **"鎻愪氦-杞-涓嬭浇"** 鐨勫紓姝ユā寮忥細
 
 ```mermaid
 sequenceDiagram
     participant CLI as OpsV CLI
-    participant API as 模型 API
-    participant FS as 文件系统
+    participant API as 妯″瀷 API
+    participant FS as 鏂囦欢绯荤粺
 
-    CLI->>API: POST /submit (任务参数)
+    CLI->>API: POST /submit (浠诲姟鍙傛暟)
     API-->>CLI: { requestId: "xxx" }
-    loop 轮询
+    loop 杞
         CLI->>API: GET /status?id=xxx
         API-->>CLI: { status: "running" }
     end
     API-->>CLI: { status: "succeeded", url: "..." }
-    CLI->>FS: 下载并保存到 artifacts/drafts_N/
+    CLI->>FS: 涓嬭浇骞朵繚瀛樺埌 artifacts/drafts_N/
 ```
 
 ---
 
-## 2. 统一作业对象 (Internal Job Object)
+## 2. 缁熶竴浣滀笟瀵硅薄 (Internal Job Object)
 
-所有模型的任务在 OpsV 内部使用统一的 Job 格式：
+鎵€鏈夋ā鍨嬬殑浠诲姟鍦?OpsV 鍐呴儴浣跨敤缁熶竴鐨?Job 鏍煎紡锛?
 
 ```typescript
 interface Job {
-  id: string;                          // 唯一标识（如 "shot_1_element_role_K"）
+  id: string;                          // 鍞竴鏍囪瘑锛堝 "shot_1_element_role_K"锛?
   type: "image_generation" | "video_generation";
-  prompt_en: string;                   // 英文渲染提示词
-  reference_images?: string[];         // 参考图本地路径数组
-  output_path: string;                 // 输出绝对路径
+  prompt_en: string;                   // 鑻辨枃娓叉煋鎻愮ず璇?
+  reference_images?: string[];         // 鍙傝€冨浘鏈湴璺緞鏁扮粍
+  output_path: string;                 // 杈撳嚭缁濆璺緞
   payload: {
-    prompt: string;                    // 中文叙事上下文
-    duration?: string;                 // 视频时长
+    prompt: string;                    // 涓枃鍙欎簨涓婁笅鏂?
+    duration?: string;                 // 瑙嗛鏃堕暱
     global_settings: {
       quality: "480p" | "720p" | "1080p" | "2K" | "4K";
     };
     schema_0_3?: {
-      first_image?: string;            // 首帧参考图路径
-      last_image?: string;             // 尾帧参考图路径
-      reference_images?: string[];     // 角色特征参考图
+      first_image?: string;            // 棣栧抚鍙傝€冨浘璺緞
+      last_image?: string;             // 灏惧抚鍙傝€冨浘璺緞
+      reference_images?: string[];     // 瑙掕壊鐗瑰緛鍙傝€冨浘
     };
   };
 }
@@ -56,15 +56,15 @@ interface Job {
 
 ## 3. ByteDance Seedance 1.5 Pro
 
-### 3.1 提交接口 (Submit)
+### 3.1 鎻愪氦鎺ュ彛 (Submit)
 
-| 项目 | 值 |
+| 椤圭洰 | 鍊?|
 |------|---|
 | **Endpoint** | `https://ark.cn-beijing.volces.com/api/v3/video/submit` |
 | **Method** | `POST` |
-| **鉴权** | `Authorization: Bearer <VOLCENGINE_API_KEY>` |
+| **閴存潈** | `Authorization: Bearer <VOLCENGINE_API_KEY>` |
 
-**请求体**：
+**璇锋眰浣?*锛?
 ```json
 {
   "model": "doubao-seedance-1-5-pro",
@@ -79,26 +79,26 @@ interface Job {
 }
 ```
 
-| 参数 | 类型 | 必填 | 说明 |
+| 鍙傛暟 | 绫诲瀷 | 蹇呭～ | 璇存槑 |
 |------|------|------|------|
-| `model` | string | ✅ | 固定值 `doubao-seedance-1-5-pro` |
-| `prompt` | string | ✅ | 英文动态描述 |
-| `resolution` | string | ✅ | `480p` / `720p` / `1080p` |
+| `model` | string | 鉁?| 鍥哄畾鍊?`doubao-seedance-1-5-pro` |
+| `prompt` | string | 鉁?| 鑻辨枃鍔ㄦ€佹弿杩?|
+| `resolution` | string | 鉁?| `480p` / `720p` / `1080p` |
 | `aspect_ratio` | string | - | `16:9` / `9:16` / `1:1` / `4:3` / `3:4` / `21:9` / `adaptive` |
-| `duration` | integer | - | 整数秒 |
-| `fps` | integer | - | 固定 `24` |
-| `image` | string | - | 首帧 Base64（`data:image/jpeg;base64,...`） |
-| `last_image` | string | - | 尾帧 Base64 |
-| `sound` | boolean | - | 开启空间音频 |
+| `duration` | integer | - | 鏁存暟绉?|
+| `fps` | integer | - | 鍥哄畾 `24` |
+| `image` | string | - | 棣栧抚 Base64锛坄data:image/jpeg;base64,...`锛?|
+| `last_image` | string | - | 灏惧抚 Base64 |
+| `sound` | boolean | - | 寮€鍚┖闂撮煶棰?|
 
-### 3.2 状态查询 (Status)
+### 3.2 鐘舵€佹煡璇?(Status)
 
-| 项目 | 值 |
+| 椤圭洰 | 鍊?|
 |------|---|
 | **Endpoint** | `https://ark.cn-beijing.volces.com/api/v3/video/status?id=<requestId>` |
 | **Method** | `GET` |
 
-**响应体**：
+**鍝嶅簲浣?*锛?
 ```json
 {
   "status": "succeeded",
@@ -107,26 +107,26 @@ interface Job {
 }
 ```
 
-| status 值 | 含义 |
+| status 鍊?| 鍚箟 |
 |-----------|------|
-| `pending` | 排队中 |
-| `running` | 生成中 |
-| `succeeded` | 成功（包含 `video_url`） |
-| `failed` | 失败（包含 `error_message`） |
+| `pending` | 鎺掗槦涓?|
+| `running` | 鐢熸垚涓?|
+| `succeeded` | 鎴愬姛锛堝寘鍚?`video_url`锛?|
+| `failed` | 澶辫触锛堝寘鍚?`error_message`锛?|
 
 ---
 
 ## 4. SiliconFlow Wan 2.1
 
-### 4.1 提交接口 (Submit)
+### 4.1 鎻愪氦鎺ュ彛 (Submit)
 
-| 项目 | 值 |
+| 椤圭洰 | 鍊?|
 |------|---|
 | **Endpoint** | `https://api.siliconflow.cn/v1/video/submit` |
 | **Method** | `POST` |
-| **鉴权** | `Authorization: Bearer <SILICONFLOW_API_KEY>` |
+| **閴存潈** | `Authorization: Bearer <SILICONFLOW_API_KEY>` |
 
-**请求体**：
+**璇锋眰浣?*锛?
 ```json
 {
   "model": "wan-ai/Wan2.1-T2V-14B",
@@ -135,21 +135,21 @@ interface Job {
 }
 ```
 
-### 4.2 状态查询 (Status)
+### 4.2 鐘舵€佹煡璇?(Status)
 
-| 项目 | 值 |
+| 椤圭洰 | 鍊?|
 |------|---|
 | **Endpoint** | `https://api.siliconflow.cn/v1/video/status` |
 | **Method** | `POST` |
 
-**请求体**：
+**璇锋眰浣?*锛?
 ```json
 {
   "requestId": "..."
 }
 ```
 
-**响应体**：
+**鍝嶅簲浣?*锛?
 ```json
 {
   "status": "Succeed",
@@ -161,26 +161,26 @@ interface Job {
 }
 ```
 
-| status 值 | 含义 |
+| status 鍊?| 鍚箟 |
 |-----------|------|
-| `InQueue` | 排队中 |
-| `InProgress` | 生成中 |
-| `Succeed` | 成功 |
-| `Failed` | 失败 |
+| `InQueue` | 鎺掗槦涓?|
+| `InProgress` | 鐢熸垚涓?|
+| `Succeed` | 鎴愬姛 |
+| `Failed` | 澶辫触 |
 
 ---
 
-## 5. SeaDream 5.0 (图像生成)
+## 5. SeaDream 5.0 (鍥惧儚鐢熸垚)
 
-### 5.1 提交接口 (Submit)
+### 5.1 鎻愪氦鎺ュ彛 (Submit)
 
-| 项目 | 值 |
+| 椤圭洰 | 鍊?|
 |------|---|
 | **Endpoint** | `https://api.volcengine.com/visual/image_generation/2024-08-01` |
 | **Method** | `POST` |
-| **鉴权** | `Authorization: Bearer <VOLCENGINE_API_KEY>` |
+| **閴存潈** | `Authorization: Bearer <VOLCENGINE_API_KEY>` |
 
-**请求体**：
+**璇锋眰浣?*锛?
 ```json
 {
   "req_key": "high_definition_generation",
@@ -193,16 +193,16 @@ interface Job {
 }
 ```
 
-| 参数 | 类型 | 必填 | 说明 |
+| 鍙傛暟 | 绫诲瀷 | 蹇呭～ | 璇存槑 |
 |------|------|------|------|
-| `req_key` | string | ✅ | 固定值 `high_definition_generation` |
-| `prompt` | string | ✅ | 生成提示词 |
-| `model_version` | string | ✅ | 固定值 `seadream_5_0` |
-| `aspect_ratio` | string | - | 官方预设画幅 |
+| `req_key` | string | 鉁?| 鍥哄畾鍊?`high_definition_generation` |
+| `prompt` | string | 鉁?| 鐢熸垚鎻愮ず璇?|
+| `model_version` | string | 鉁?| 鍥哄畾鍊?`seadream_5_0` |
+| `aspect_ratio` | string | - | 瀹樻柟棰勮鐢诲箙 |
 | `size` | string | - | `2K` / `3K` / `4K` |
-| `width` / `height` | integer | - | 不使用 `size` 时的自定义像素 |
+| `width` / `height` | integer | - | 涓嶄娇鐢?`size` 鏃剁殑鑷畾涔夊儚绱?|
 
-### 5.2 响应格式
+### 5.2 鍝嶅簲鏍煎紡
 
 ```json
 {
@@ -213,27 +213,27 @@ interface Job {
 }
 ```
 
-> **注意**：SeaDream 是同步接口，无需轮询。
+> **娉ㄦ剰**锛歋eaDream 鏄悓姝ユ帴鍙ｏ紝鏃犻渶杞銆?
 
 ---
 
-## 6. 异常处理协议 (Defensive Protocol)
+## 6. 寮傚父澶勭悊鍗忚 (Defensive Protocol)
 
-所有 Provider 实现必须遵循以下三大防御性编程准则：
+鎵€鏈?Provider 瀹炵幇蹇呴』閬靛惊浠ヤ笅涓夊ぇ闃插尽鎬х紪绋嬪噯鍒欙細
 
-### 6.1 深度穿透解析 (Deep Penetrative Parsing)
+### 6.1 娣卞害绌块€忚В鏋?(Deep Penetrative Parsing)
 
-API 返回体的结构可能不一致。必须兼容多种嵌套：
+API 杩斿洖浣撶殑缁撴瀯鍙兘涓嶄竴鑷淬€傚繀椤诲吋瀹瑰绉嶅祵濂楋細
 
 ```typescript
-// 防御性提取
+// 闃插尽鎬ф彁鍙?
 const id = data?.id || data?.data?.id || data?.data?.[0]?.id;
 const result = Array.isArray(data) ? data[0] : data;
 ```
 
-### 6.2 强力证据式日志 (Evidential Logging)
+### 6.2 寮哄姏璇佹嵁寮忔棩蹇?(Evidential Logging)
 
-禁止返回模糊的 `undefined`。所有异常必须记录原始 JSON：
+绂佹杩斿洖妯＄硦鐨?`undefined`銆傛墍鏈夊紓甯稿繀椤昏褰曞師濮?JSON锛?
 
 ```typescript
 catch (error) {
@@ -245,17 +245,17 @@ catch (error) {
 }
 ```
 
-### 6.3 Axios 防空逻辑 (Axios Defensive Handling)
+### 6.3 Axios 闃茬┖閫昏緫 (Axios Defensive Handling)
 
-区分网络错误和业务错误：
+鍖哄垎缃戠粶閿欒鍜屼笟鍔￠敊璇細
 
 ```typescript
 catch (error) {
   if (!error.response) {
-    // 网络层错误（超时、DNS 失败等）
+    // 缃戠粶灞傞敊璇紙瓒呮椂銆丏NS 澶辫触绛夛級
     logger.error(`Network error: ${error.code}`); // ETIMEDOUT, ECONNREFUSED
   } else {
-    // 业务层错误（API 返回的错误码）
+    // 涓氬姟灞傞敊璇紙API 杩斿洖鐨勯敊璇爜锛?
     logger.error(`API error ${error.response.status}: ${JSON.stringify(error.response.data)}`);
   }
 }
@@ -263,30 +263,31 @@ catch (error) {
 
 ---
 
-## 7. 新模型接入指南
+## 7. 鏂版ā鍨嬫帴鍏ユ寚鍗?
 
-### Step 1：研究官方文档
-获取目标模型的 API 端点、鉴权方式、请求/响应格式。
+### Step 1锛氱爺绌跺畼鏂规枃妗?
+鑾峰彇鐩爣妯″瀷鐨?API 绔偣銆侀壌鏉冩柟寮忋€佽姹?鍝嶅簲鏍煎紡銆?
 
-### Step 2：更新配置
-在 `.env/api_config.yaml` 和 `templates/.env/api_config.yaml` 中添加模型配置。
+### Step 2锛氭洿鏂伴厤缃?
+鍦?`.env/api_config.yaml` 鍜?`templates/.env/api_config.yaml` 涓坊鍔犳ā鍨嬮厤缃€?
 
-### Step 3：实现 Provider
-在 `src/executor/providers/` 中创建新的 Provider 类，实现提交和轮询逻辑。
+### Step 3锛氬疄鐜?Provider
+鍦?`src/executor/providers/` 涓垱寤烘柊鐨?Provider 绫伙紝瀹炵幇鎻愪氦鍜岃疆璇㈤€昏緫銆?
 
-### Step 4：注册 Dispatcher
-在 `ImageModelDispatcher` 或 `VideoModelDispatcher` 中注册新 Provider 的映射。
+### Step 4锛氭敞鍐?Dispatcher
+鍦?`ImageModelDispatcher` 鎴?`VideoModelDispatcher` 涓敞鍐屾柊 Provider 鐨勬槧灏勩€?
 
-### Step 5：更新文档
-在本文档中添加新模型的接口描述。
+### Step 5锛氭洿鏂版枃妗?
+鍦ㄦ湰鏂囨。涓坊鍔犳柊妯″瀷鐨勬帴鍙ｆ弿杩般€?
 
-### Step 6：编写测试
-在 `test/` 目录下添加 Provider 的单元测试（使用 mock）。
+### Step 6锛氱紪鍐欐祴璇?
+鍦?`test/` 鐩綍涓嬫坊鍔?Provider 鐨勫崟鍏冩祴璇曪紙浣跨敤 mock锛夈€?
 
 > [!IMPORTANT]
-> 任何新模型的接口参数必须严格依据官方 API 文档，严禁凭空想象或沿用通用参数名。
+> 浠讳綍鏂版ā鍨嬬殑鎺ュ彛鍙傛暟蹇呴』涓ユ牸渚濇嵁瀹樻柟 API 鏂囨。锛屼弗绂佸嚟绌烘兂璞℃垨娌跨敤閫氱敤鍙傛暟鍚嶃€?
 
 ---
 
-> *"接口即合约，文档即保险。"*
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *"鎺ュ彛鍗冲悎绾︼紝鏂囨。鍗充繚闄┿€?*
+> *OpsV 0.4.3 | 鏈€鍚庢洿鏂? 2026-03-28*
+

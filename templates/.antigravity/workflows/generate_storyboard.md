@@ -1,4 +1,4 @@
-# Workflow: Generate Storyboard
+﻿# Workflow: Generate Storyboard
 
 This workflow orchestrates the end-to-end process of generating a storyboard from a script.
 
@@ -22,3 +22,4 @@ Proceed to run the **Executor Workflow** to process the generated jobs.
 Once execution is complete:
 1. List files in `artifacts/`
 2. Update the `videospec/stories/storyboard/` directory with the new images if approved.
+

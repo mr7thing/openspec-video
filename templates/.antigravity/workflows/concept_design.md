@@ -1,4 +1,4 @@
----
+﻿---
 description: Workflow for concept-first character design and group visualization
 ---
 
@@ -30,3 +30,4 @@ description: Workflow for concept-first character design and group visualization
     - Use the style established in the Group Shot.
     - Save to `videospec/assets/characters/[id]_sheet.png`.
 3.  **Link**: Update `videospec/assets/characters/[id].md` with the reference sheet.
+

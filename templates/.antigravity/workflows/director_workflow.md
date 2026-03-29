@@ -1,8 +1,8 @@
----
+﻿---
 description: OpenSpec-Video Director SOP
 ---
 
-# 🎬 OpenSpec-Video Director's SOP (Phase 9)
+# 馃幀 OpenSpec-Video Director's SOP (Phase 9)
 
 **Welcome to the strict OpenSpec-Video Production Pipeline.** This workflow enforces an asset-first, anti-hallucination process to guarantee visual consistency. 
 
@@ -48,3 +48,4 @@ Now, and ONLY now, do you draft the actual shot-by-shot script.
 
 > [!WARNING]
 > **Anti-Hallucination Reminder:** If the Agent starts writing `[Shot 1]` blocks inside `story.md`, stop it. Remind the Agent: "Shots belong in `videospec/shots/`. Do not write them in the story outline."
+

@@ -1,189 +1,189 @@
-# OpsV CLI 命令参考手册 (CLI Reference)
+﻿# OpsV CLI 鍛戒护鍙傝€冩墜鍐?(CLI Reference)
 
-> 覆盖全部 CLI 命令的语法、参数、选项和使用示例。
+> 瑕嗙洊鍏ㄩ儴 CLI 鍛戒护鐨勮娉曘€佸弬鏁般€侀€夐」鍜屼娇鐢ㄧず渚嬨€?
 
 ---
 
-## 命令速查表
+## 鍛戒护閫熸煡琛?
 
-| 命令 | 职责 | 关键选项 |
+| 鍛戒护 | 鑱岃矗 | 鍏抽敭閫夐」 |
 |------|------|---------|
-| `opsv init` | 初始化项目 | `[projectName]` |
-| `opsv serve` | 启动后台服务 | — |
-| `opsv start` | `serve` 别名 | — |
-| `opsv stop` | 停止后台服务 | — |
-| `opsv status` | 查看服务状态 | — |
-| `opsv generate` | 编译图像任务 | `--preview`, `--shots` |
-| `opsv gen-image` | 执行图像生成 | `--model`, `-c`, `--dry-run` |
-| `opsv review` | 回写文档 | `--all`, `[path]` |
-| `opsv animate` | 编译视频任务 | — |
-| `opsv gen-video` | 执行视频生成 | `--model`, `--dry-run` |
+| `opsv init` | 鍒濆鍖栭」鐩?| `[projectName]` |
+| `opsv serve` | 鍚姩鍚庡彴鏈嶅姟 | 鈥?|
+| `opsv start` | `serve` 鍒悕 | 鈥?|
+| `opsv stop` | 鍋滄鍚庡彴鏈嶅姟 | 鈥?|
+| `opsv status` | 鏌ョ湅鏈嶅姟鐘舵€?| 鈥?|
+| `opsv generate` | 缂栬瘧鍥惧儚浠诲姟 | `--preview`, `--shots` |
+| `opsv gen-image` | 鎵ц鍥惧儚鐢熸垚 | `--model`, `-c`, `--dry-run` |
+| `opsv review` | 鍥炲啓鏂囨。 | `--all`, `[path]` |
+| `opsv animate` | 缂栬瘧瑙嗛浠诲姟 | 鈥?|
+| `opsv gen-video` | 鎵ц瑙嗛鐢熸垚 | `--model`, `--dry-run` |
 
 ---
 
 ## 1. `opsv init [projectName]`
 
-初始化一个新的 OpsV 视频项目。
+鍒濆鍖栦竴涓柊鐨?OpsV 瑙嗛椤圭洰銆?
 
-### 语法
+### 璇硶
 ```bash
-opsv init              # 在当前目录初始化
-opsv init my-mv        # 创建并初始化 my-mv 目录
+opsv init              # 鍦ㄥ綋鍓嶇洰褰曞垵濮嬪寲
+opsv init my-mv        # 鍒涘缓骞跺垵濮嬪寲 my-mv 鐩綍
 ```
 
-### 交互流程
-执行后会弹出交互式选择菜单：
+### 浜や簰娴佺▼
+鎵ц鍚庝細寮瑰嚭浜や簰寮忛€夋嫨鑿滃崟锛?
 ```
 ? Select the AI assistants you want to support:
-  ◉ Gemini (Legacy - GEMINI.md)
-  ◯ OpenCode (AGENTS.md + .opencode)
-  ◯ Trae (AGENTS.md + .trae)
+  鈼?Gemini (Legacy - GEMINI.md)
+  鈼?OpenCode (AGENTS.md + .opencode)
+  鈼?Trae (AGENTS.md + .trae)
 ```
 
-### 执行动作
-1. 创建目标目录（如不存在）
-2. 复制基础模板：`.agent/`、`.antigravity/`、`.env/`
-3. 按选择复制 `GEMINI.md`、`AGENTS.md`、`.opencode/`、`.trae/`
-4. 创建规范目录结构：`videospec/stories|elements|scenes|shots`、`artifacts/`、`queue/`
+### 鎵ц鍔ㄤ綔
+1. 鍒涘缓鐩爣鐩綍锛堝涓嶅瓨鍦級
+2. 澶嶅埗鍩虹妯℃澘锛歚.agent/`銆乣.antigravity/`銆乣.env/`
+3. 鎸夐€夋嫨澶嶅埗 `GEMINI.md`銆乣AGENTS.md`銆乣.opencode/`銆乣.trae/`
+4. 鍒涘缓瑙勮寖鐩綍缁撴瀯锛歚videospec/stories|elements|scenes|shots`銆乣artifacts/`銆乣queue/`
 
-### 注意事项
-- 如果目标目录已存在，命令会报错终止
-- 模板来源于 npm 包内的 `templates/` 目录
+### 娉ㄦ剰浜嬮」
+- 濡傛灉鐩爣鐩綍宸插瓨鍦紝鍛戒护浼氭姤閿欑粓姝?
+- 妯℃澘鏉ユ簮浜?npm 鍖呭唴鐨?`templates/` 鐩綍
 
 ---
 
 ## 2. `opsv serve`
 
-启动 OpsV 后台 WebSocket 守护进程，并将当前项目注册到全局服务。
+鍚姩 OpsV 鍚庡彴 WebSocket 瀹堟姢杩涚▼锛屽苟灏嗗綋鍓嶉」鐩敞鍐屽埌鍏ㄥ眬鏈嶅姟銆?
 
-### 语法
+### 璇硶
 ```bash
 opsv serve
 ```
 
-### 行为
-1. 检查守护进程是否已运行（通过 `~/.opsv/daemon.pid` 文件）
-2. 如未运行，以 `detached` 模式启动 `daemon.js`
-3. 将当前项目注册到全局守护进程（WebSocket `ws://127.0.0.1:3061`）
+### 琛屼负
+1. 妫€鏌ュ畧鎶よ繘绋嬫槸鍚﹀凡杩愯锛堥€氳繃 `~/.opsv/daemon.pid` 鏂囦欢锛?
+2. 濡傛湭杩愯锛屼互 `detached` 妯″紡鍚姩 `daemon.js`
+3. 灏嗗綋鍓嶉」鐩敞鍐屽埌鍏ㄥ眬瀹堟姢杩涚▼锛圵ebSocket `ws://127.0.0.1:3061`锛?
 
-### PID 文件
-- 路径：`~/.opsv/daemon.pid`
-- 守护进程监听：`ws://127.0.0.1:3061`
+### PID 鏂囦欢
+- 璺緞锛歚~/.opsv/daemon.pid`
+- 瀹堟姢杩涚▼鐩戝惉锛歚ws://127.0.0.1:3061`
 
-> **`opsv start`** 是 `serve` 的完全等价别名。
+> **`opsv start`** 鏄?`serve` 鐨勫畬鍏ㄧ瓑浠峰埆鍚嶃€?
 
 ---
 
 ## 3. `opsv stop`
 
-停止 OpsV 后台守护进程。
+鍋滄 OpsV 鍚庡彴瀹堟姢杩涚▼銆?
 
-### 语法
+### 璇硶
 ```bash
 opsv stop
 ```
 
-### 行为
-1. 读取 `~/.opsv/daemon.pid` 获取进程 ID
-2. 发送 kill 信号终止进程
-3. 删除 PID 文件
+### 琛屼负
+1. 璇诲彇 `~/.opsv/daemon.pid` 鑾峰彇杩涚▼ ID
+2. 鍙戦€?kill 淇″彿缁堟杩涚▼
+3. 鍒犻櫎 PID 鏂囦欢
 
 ---
 
 ## 4. `opsv status`
 
-查看 OpsV 后台守护进程的运行状态。
+鏌ョ湅 OpsV 鍚庡彴瀹堟姢杩涚▼鐨勮繍琛岀姸鎬併€?
 
-### 语法
+### 璇硶
 ```bash
 opsv status
 ```
 
-### 输出示例
+### 杈撳嚭绀轰緥
 ```
-✅ OpsV Server is RUNNING (PID: 12345)
+鉁?OpsV Server is RUNNING (PID: 12345)
    Listening on: ws://127.0.0.1:3061
 ```
-或
+鎴?
 ```
-🔴 OpsV Server is STOPPED
+馃敶 OpsV Server is STOPPED
 ```
 
 ---
 
 ## 5. `opsv generate [targets...]`
 
-将 Markdown 叙事规范"编译"为 JSON 任务队列。这是图像生成管线的核心入口。
+灏?Markdown 鍙欎簨瑙勮寖"缂栬瘧"涓?JSON 浠诲姟闃熷垪銆傝繖鏄浘鍍忕敓鎴愮绾跨殑鏍稿績鍏ュ彛銆?
 
-### 语法
+### 璇硶
 ```bash
-opsv generate                     # 编译全部规范目录
-opsv generate videospec/elements  # 只编译资产目录
-opsv generate Script.md           # 只编译特定文件
+opsv generate                     # 缂栬瘧鍏ㄩ儴瑙勮寖鐩綍
+opsv generate videospec/elements  # 鍙紪璇戣祫浜х洰褰?
+opsv generate Script.md           # 鍙紪璇戠壒瀹氭枃浠?
 ```
 
-### 选项
+### 閫夐」
 
-| 选项 | 说明 |
+| 閫夐」 | 璇存槑 |
 |------|------|
-| `-p, --preview` | 预览模式：仅生成关键镜头/单张角色设定图 |
-| `--shots <list>` | 指定镜头 ID，逗号分隔（如 `--shots 1,5,12`） |
+| `-p, --preview` | 棰勮妯″紡锛氫粎鐢熸垚鍏抽敭闀滃ご/鍗曞紶瑙掕壊璁惧畾鍥?|
+| `--shots <list>` | 鎸囧畾闀滃ご ID锛岄€楀彿鍒嗛殧锛堝 `--shots 1,5,12`锛?|
 
-### 行为
-1. 解析目标路径下的 `.md` 文件
-2. 提取 YAML Frontmatter 中的镜头/资产定义
-3. 解析 `@` 引用，将实体特征注入提示词
-4. 注入 `project.md` 中 `global_style_postfix` 全局后缀
-5. 输出 `queue/jobs.json`
-6. 自动启动守护进程（如未运行）
-7. 注册项目到全局服务
+### 琛屼负
+1. 瑙ｆ瀽鐩爣璺緞涓嬬殑 `.md` 鏂囦欢
+2. 鎻愬彇 YAML Frontmatter 涓殑闀滃ご/璧勪骇瀹氫箟
+3. 瑙ｆ瀽 `@` 寮曠敤锛屽皢瀹炰綋鐗瑰緛娉ㄥ叆鎻愮ず璇?
+4. 娉ㄥ叆 `project.md` 涓?`global_style_postfix` 鍏ㄥ眬鍚庣紑
+5. 杈撳嚭 `queue/jobs.json`
+6. 鑷姩鍚姩瀹堟姢杩涚▼锛堝鏈繍琛岋級
+7. 娉ㄥ唽椤圭洰鍒板叏灞€鏈嶅姟
 
-### 使用示例
+### 浣跨敤绀轰緥
 
 ```bash
-# 编译全部，生成完整的 jobs.json
+# 缂栬瘧鍏ㄩ儴锛岀敓鎴愬畬鏁寸殑 jobs.json
 opsv generate
 
-# 预览模式，快速试看关键镜头
+# 棰勮妯″紡锛屽揩閫熻瘯鐪嬪叧閿暅澶?
 opsv generate --preview
 
-# 只编译第 1、3、7 号镜头
+# 鍙紪璇戠 1銆?銆? 鍙烽暅澶?
 opsv generate --shots 1,3,7
 
-# 只编译资产目录中的角色定义
+# 鍙紪璇戣祫浜х洰褰曚腑鐨勮鑹插畾涔?
 opsv generate videospec/elements
 ```
 
-### 产物
-- `queue/jobs.json` — 包含所有待执行的图像生成任务
+### 浜х墿
+- `queue/jobs.json` 鈥?鍖呭惈鎵€鏈夊緟鎵ц鐨勫浘鍍忕敓鎴愪换鍔?
 
 ---
 
 ## 6. `opsv gen-image`
 
-执行图像生成任务。读取 `queue/jobs.json` 中的图像任务，调用 AI 渲染引擎批量生成图像。
+鎵ц鍥惧儚鐢熸垚浠诲姟銆傝鍙?`queue/jobs.json` 涓殑鍥惧儚浠诲姟锛岃皟鐢?AI 娓叉煋寮曟搸鎵归噺鐢熸垚鍥惧儚銆?
 
-> **0.4.1 变更**：由 `execute-image` 重命名为 `gen-image`。旧命令仍可使用（隐藏别名）。
+> **0.4.3 鍙樻洿**锛氱敱 `execute-image` 閲嶅懡鍚嶄负 `gen-image`銆傛棫鍛戒护浠嶅彲浣跨敤锛堥殣钘忓埆鍚嶏級銆?
 
-### 语法
+### 璇硶
 ```bash
 opsv gen-image [options]
 ```
 
-### 选项
+### 閫夐」
 
-| 选项 | 默认值 | 说明 |
+| 閫夐」 | 榛樿鍊?| 璇存槑 |
 |------|--------|------|
 | `-m, --model <model>` | `all` | 目标渲染模型名称（默认自动横向遍历所有 `enabled: true` 的图像模型） |
 | `-c, --concurrency <num>` | `1` | 并发任务数 |
 | `-s, --skip-failed` | `false` | 单任务失败时继续执行 |
 | `--dry-run` | `false` | 仅校验任务结构，不实际执行 |
 
-### 前置条件
-- `queue/jobs.json` 必须存在（先执行 `opsv generate`）
-- API 密钥必须已配置（`SEADREAM_API_KEY` 或 `VOLCENGINE_API_KEY`）
+### 鍓嶇疆鏉′欢
+- `queue/jobs.json` 蹇呴』瀛樺湪锛堝厛鎵ц `opsv generate`锛?
+- API 瀵嗛挜蹇呴』宸查厤缃紙`SEADREAM_API_KEY` 鎴?`VOLCENGINE_API_KEY`锛?
 
-### 使用示例
+### 浣跨敤绀轰緥
 
 ```bash
 # 使用所有已启用的模型并发生成图像（默认行为）
@@ -192,78 +192,78 @@ opsv gen-image
 # 仅使用指定模型，2 并发
 opsv gen-image -m minimax-image-01 -c 2
 
-# 仅校验不执行（排查配置问题）
+# 浠呮牎楠屼笉鎵ц锛堟帓鏌ラ厤缃棶棰橈級
 opsv gen-image --dry-run
 
-# 容错模式：单个失败不中断整体
+# 瀹归敊妯″紡锛氬崟涓け璐ヤ笉涓柇鏁翠綋
 opsv gen-image --skip-failed -c 3
 ```
 
-### 产物
-- `artifacts/drafts_N/` — 第 N 批次的渲染图像
+### 浜х墿
+- `artifacts/drafts_N/` 鈥?绗?N 鎵规鐨勬覆鏌撳浘鍍?
 
-### 关联模型
-查看 `api_config.yaml` 中 `gen_command: "gen-image"` 的模型。
+### 鍏宠仈妯″瀷
+鏌ョ湅 `api_config.yaml` 涓?`gen_command: "gen-image"` 鐨勬ā鍨嬨€?
 
 ---
 
 ## 7. `opsv review [path]`
 
-将生成的图像/视频结果"反哺"回源 Markdown 文档，方便导演在 IDE 中直接审阅。
+灏嗙敓鎴愮殑鍥惧儚/瑙嗛缁撴灉"鍙嶅摵"鍥炴簮 Markdown 鏂囨。锛屾柟渚垮婕斿湪 IDE 涓洿鎺ュ闃呫€?
 
-### 语法
+### 璇硶
 ```bash
-opsv review              # 回写最新一批
-opsv review --all         # 回写所有历史批次
-opsv review Script.md     # 只处理特定文件
+opsv review              # 鍥炲啓鏈€鏂颁竴鎵?
+opsv review --all         # 鍥炲啓鎵€鏈夊巻鍙叉壒娆?
+opsv review Script.md     # 鍙鐞嗙壒瀹氭枃浠?
 ```
 
-### 选项
+### 閫夐」
 
-| 选项 | 说明 |
+| 閫夐」 | 璇存槑 |
 |------|------|
-| `--all` | 包含所有历史批次（不仅限于最新的） |
-| `[path]` | 指定要处理的文档路径 |
+| `--all` | 鍖呭惈鎵€鏈夊巻鍙叉壒娆★紙涓嶄粎闄愪簬鏈€鏂扮殑锛?|
+| `[path]` | 鎸囧畾瑕佸鐞嗙殑鏂囨。璺緞 |
 
-### 审阅方式
-回写完成后，在 IDE（如 VS Code、Cursor）中打开 `.md` 文件的预览模式，即可直接看到所有候选图像。
+### 瀹￠槄鏂瑰紡
+鍥炲啓瀹屾垚鍚庯紝鍦?IDE锛堝 VS Code銆丆ursor锛変腑鎵撳紑 `.md` 鏂囦欢鐨勯瑙堟ā寮忥紝鍗冲彲鐩存帴鐪嬪埌鎵€鏈夊€欓€夊浘鍍忋€?
 
 ---
 
 ## 8. `opsv animate`
 
-将 `Shotlist.md` 中的动态运镜指令编译为视频生成任务队列。
+灏?`Shotlist.md` 涓殑鍔ㄦ€佽繍闀滄寚浠ょ紪璇戜负瑙嗛鐢熸垚浠诲姟闃熷垪銆?
 
-### 语法
+### 璇硶
 ```bash
 opsv animate
 ```
 
-### 行为
-1. 读取 `videospec/shots/Shotlist.md` 的 YAML Frontmatter
-2. 提取每个 Shot 的 `motion_prompt_en`、`reference_image`、`duration` 等字段
-3. 将相对路径自动转换为绝对路径
-4. 支持多参考图（首帧、尾帧、特征图）的数组式传递
-5. 输出 `queue/video_jobs.json`
-6. 自动启动守护进程并注册项目
+### 琛屼负
+1. 璇诲彇 `videospec/shots/Shotlist.md` 鐨?YAML Frontmatter
+2. 鎻愬彇姣忎釜 Shot 鐨?`motion_prompt_en`銆乣reference_image`銆乣duration` 绛夊瓧娈?
+3. 灏嗙浉瀵硅矾寰勮嚜鍔ㄨ浆鎹负缁濆璺緞
+4. 鏀寔澶氬弬鑰冨浘锛堥甯с€佸熬甯с€佺壒寰佸浘锛夌殑鏁扮粍寮忎紶閫?
+5. 杈撳嚭 `queue/video_jobs.json`
+6. 鑷姩鍚姩瀹堟姢杩涚▼骞舵敞鍐岄」鐩?
 
-### 产物
-- `queue/video_jobs.json` — 包含所有待执行的视频生成任务
+### 浜х墿
+- `queue/video_jobs.json` 鈥?鍖呭惈鎵€鏈夊緟鎵ц鐨勮棰戠敓鎴愪换鍔?
 
 ---
 
 ## 9. `opsv gen-video`
 
-> **0.4.1 新增命令**。执行视频生成任务，调用 Seedance / SiliconFlow 等视频模型。
+> **0.4.3 鏂板鍛戒护**銆傛墽琛岃棰戠敓鎴愪换鍔★紝璋冪敤 Seedance / SiliconFlow 绛夎棰戞ā鍨嬨€?
 
-### 语法
+### 璇硶
 ```bash
 opsv gen-video [options]
 ```
 
-### 选项
+### 閫夐」
 
-| 选项 | 默认值 | 说明 |
+| 閫夐」 | 榛樿鍊?| 璇存槑 |
 |------|--------|------|
 | `-m, --model <model>` | `all` | 目标视频模型名称（默认自动横向遍历所有 `enabled: true` 的视频模型） |
 | `-s, --skip-failed` | `false` | 失败时的提示（单个视频生成管线为串行，不可跳过） |
@@ -275,14 +275,14 @@ opsv gen-video [options]
   - Seedance: `VOLCENGINE_API_KEY` 或 `SEEDANCE_API_KEY`
   - SiliconFlow: `SILICONFLOW_API_KEY`
 
-### 执行模式
-**串行执行**（非并发）。原因：视频任务间可能存在 `@FRAME` 依赖链——后一镜头的首帧需要截取前一镜头的尾帧。`VideoModelDispatcher` 会自动处理：
+### 鎵ц妯″紡
+**涓茶鎵ц**锛堥潪骞跺彂锛夈€傚師鍥狅細瑙嗛浠诲姟闂村彲鑳藉瓨鍦?`@FRAME` 渚濊禆閾锯€斺€斿悗涓€闀滃ご鐨勯甯ч渶瑕佹埅鍙栧墠涓€闀滃ご鐨勫熬甯с€俙VideoModelDispatcher` 浼氳嚜鍔ㄥ鐞嗭細
 
 ```
-shot_1 生成完毕 → 截取 shot_1_last.jpg → 注入 shot_2.first_image → shot_2 开始生成
+shot_1 鐢熸垚瀹屾瘯 鈫?鎴彇 shot_1_last.jpg 鈫?娉ㄥ叆 shot_2.first_image 鈫?shot_2 寮€濮嬬敓鎴?
 ```
 
-### 使用示例
+### 浣跨敤绀轰緥
 
 ```bash
 # 使用所有已启用的模型（如 Minimax、Seedance 等）生成视频
@@ -291,43 +291,43 @@ opsv gen-video
 # 仅使用指定模型
 opsv gen-video -m wan2.2-i2v
 
-# 仅校验不执行
+# 浠呮牎楠屼笉鎵ц
 opsv gen-video --dry-run
 ```
 
-### 产物
-- `artifacts/videos/` — 生成的视频文件（.mp4）
+### 浜х墿
+- `artifacts/videos/` 鈥?鐢熸垚鐨勮棰戞枃浠讹紙.mp4锛?
 
-### 关联模型
-查看 `api_config.yaml` 中 `gen_command: "gen-video"` 的模型。
+### 鍏宠仈妯″瀷
+鏌ョ湅 `api_config.yaml` 涓?`gen_command: "gen-video"` 鐨勬ā鍨嬨€?
 
 ---
 
-## 完整管线命令流
+## 瀹屾暣绠＄嚎鍛戒护娴?
 
 ```bash
-# 图像管线
-opsv generate → opsv gen-image → opsv review
+# 鍥惧儚绠＄嚎
+opsv generate 鈫?opsv gen-image 鈫?opsv review
 
-# 视频管线
-opsv animate  → opsv gen-video
+# 瑙嗛绠＄嚎
+opsv animate  鈫?opsv gen-video
 ```
 
 ---
 
-## 环境变量
+## 鐜鍙橀噺
 
-CLI 启动时按以下优先级加载环境变量：
+CLI 鍚姩鏃舵寜浠ヤ笅浼樺厛绾у姞杞界幆澧冨彉閲忥細
 
-| 优先级 | 路径 | 说明 |
+| 浼樺厛绾?| 璺緞 | 璇存槑 |
 |--------|------|------|
-| 1（最高） | `.env/secrets.env` | 推荐的密钥存放位置 |
-| 2 | `.env`（文件） | 标准 dotenv 文件（非目录） |
-| 3 | 系统环境变量 | `process.env` 兜底 |
+| 1锛堟渶楂橈級 | `.env/secrets.env` | 鎺ㄨ崘鐨勫瘑閽ュ瓨鏀句綅缃?|
+| 2 | `.env`锛堟枃浠讹級 | 鏍囧噯 dotenv 鏂囦欢锛堥潪鐩綍锛?|
+| 3 | 绯荤粺鐜鍙橀噺 | `process.env` 鍏滃簳 |
 
-### 关键环境变量
+### 鍏抽敭鐜鍙橀噺
 
-| 变量名 | 用途 | 关联命令 |
+| 鍙橀噺鍚?| 鐢ㄩ€?| 鍏宠仈鍛戒护 |
 |--------|------|---------|
 | `VOLCENGINE_API_KEY` | 火山引擎 API 密钥（SeaDream / Seedance 等火山系服务统一鉴权） | `gen-image` / `gen-video` |
 | `MINIMAX_API_KEY` | 稀宇科技 Minimax 海螺模型密钥 | `gen-image` / `gen-video` |

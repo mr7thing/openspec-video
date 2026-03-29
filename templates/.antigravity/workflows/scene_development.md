@@ -1,4 +1,4 @@
----
+﻿---
 description: Workflow for scene preview and batch generation
 ---
 
@@ -23,3 +23,4 @@ description: Workflow for scene preview and batch generation
 1.  **Refine**: Apply the approved style to all scene descriptions.
 2.  **Generate**: Batch generate final images for `videospec/assets/scenes/[id].png`.
 3.  **Link**: Create/Update `videospec/assets/scenes/[id].md`.
+

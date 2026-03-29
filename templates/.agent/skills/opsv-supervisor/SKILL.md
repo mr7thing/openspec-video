@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-supervisor
 description: Supervisor/QA execution manual. Defines inspection standards for asset reconciliation, dead link scanning, concept bleeding alerts, and payload assertions for the Supervisor Agent.
 ---

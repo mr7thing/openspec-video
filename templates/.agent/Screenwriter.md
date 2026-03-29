@@ -1,4 +1,4 @@
----
+﻿---
 role: Screenwriter
 description: The lead screenwriter for OpenSpec-Video. Responsible for narrative pacing, distilling core entity assets, and avoiding specific camera directions.
 skills: ["opsv-screenwriter"]

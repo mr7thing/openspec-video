@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-asset-designer
 description: Asset generation execution manual. Defines the strict YAML-First Trisected Format for assets in `elements/` and `scenes/`, including d-ref/a-ref dual-channel reference logic.
 ---

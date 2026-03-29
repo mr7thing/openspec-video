@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-screenwriter
 description: Screenwriting execution manual. Defines standards for `story.md` writing: entity abstraction, @ anchor usage, and asset decoupling, for use by the Screenwriter Agent.
 ---

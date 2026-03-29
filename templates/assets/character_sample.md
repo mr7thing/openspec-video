@@ -1,4 +1,4 @@
----
+﻿---
 id: "char_unique_id"
 name: "Character Name"
 role: "Protagonist / Antagonist / Support"
@@ -16,3 +16,4 @@ role: "Protagonist / Antagonist / Support"
 
 # Personality
 Stoic, determined, seeking redemption.
+

@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-animator
 description: Animation execution manual. Defines standards for extracting motion control instructions from `Script.md` to generate `Shotlist.md`. Includes duration passthrough, first-frame path extraction, and static-motion separation principles.
 ---

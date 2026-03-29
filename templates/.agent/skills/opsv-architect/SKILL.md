@@ -1,4 +1,4 @@
----
+﻿---
 name: opsv-architect
 description: Project strategist's execution manual. Defines a two-phase workflow: concept ideation (output 3 proposals) and world-anchoring (generate project.md + story.md).
 ---

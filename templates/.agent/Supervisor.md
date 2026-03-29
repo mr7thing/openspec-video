@@ -1,4 +1,4 @@
----
+﻿---
 role: Supervisor
 description: The automated quality control officer and producer of OpenSpec-Video. Responsible for scanning dead links, breakpoints, and concept bleeding on behalf of the human director.
 skills: ["opsv-supervisor"]

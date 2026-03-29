@@ -1,19 +1,19 @@
----
-# <!-- 强制：填写目标画幅比例，例如 "16:9" 或 "21:9" -->
+﻿---
+# <!-- 寮哄埗锛氬～鍐欑洰鏍囩敾骞呮瘮渚嬶紝渚嬪 "16:9" 鎴?"21:9" -->
 aspect_ratio: "21:9"
 
-# <!-- 强制：填写此 MV 的全局底座模型，例如 "nano_banana_pro" 或留空 -->
+# <!-- 寮哄埗锛氬～鍐欐 MV 鐨勫叏灞€搴曞骇妯″瀷锛屼緥濡?"nano_banana_pro" 鎴栫暀绌?-->
 engine: ""
 
-# <!-- 强制：填写全局设定/愿景描述。在首个生图任务中注入给大模型作为全局把控参考 -->
-vision: "我在创建一个写实电影感的MV，背景为中国古代风格，混合市井与仙味的艺术风格。"
+# <!-- 寮哄埗锛氬～鍐欏叏灞€璁惧畾/鎰挎櫙鎻忚堪銆傚湪棣栦釜鐢熷浘浠诲姟涓敞鍏ョ粰澶фā鍨嬩綔涓哄叏灞€鎶婃帶鍙傝€?-->
+vision: "鎴戝湪鍒涘缓涓€涓啓瀹炵數褰辨劅鐨凪V锛岃儗鏅负涓浗鍙や唬椋庢牸锛屾贩鍚堝競浜曚笌浠欏懗鐨勮壓鏈鏍笺€?
 
-# <!-- 强制：用于垫入每次生成的环境渲染光照修饰词，必须极度致密。包含时代背景、质感、光影、渲染器级别 -->
+# <!-- 寮哄埗锛氱敤浜庡灚鍏ユ瘡娆＄敓鎴愮殑鐜娓叉煋鍏夌収淇グ璇嶏紝蹇呴』鏋佸害鑷村瘑銆傚寘鍚椂浠ｈ儗鏅€佽川鎰熴€佸厜褰便€佹覆鏌撳櫒绾у埆 -->
 global_style_postfix: "high fantasy ancient chinese wuxia setting, dark and gritty aesthetic, worn textures, cinematic rim lighting, 8k resolution, ultra detailed masterpiece"
 ---
 
-# Asset Manifest (资产通讯录)
-<!-- 强制：后续所有使用 @ 的角色、场景、道具都必须在此挂号。这里是整个宇宙的点名册 -->
+# Asset Manifest (璧勪骇閫氳褰?
+<!-- 寮哄埗锛氬悗缁墍鏈変娇鐢?@ 鐨勮鑹层€佸満鏅€侀亾鍏烽兘蹇呴』鍦ㄦ鎸傚彿銆傝繖閲屾槸鏁翠釜瀹囧畽鐨勭偣鍚嶅唽 -->
 
 ## Main Characters
 - @TheWanderingSwordsman
@@ -28,3 +28,4 @@ global_style_postfix: "high fantasy ancient chinese wuxia setting, dark and grit
 ## Props
 - @RustyIronSword
 - @BrokenJadePendant
+

@@ -1,4 +1,4 @@
----
+﻿---
 role: Asset Designer
 description: The master constructor of the OpenSpec-Video ecosystem. Specialized in defining entity asset documents and establishing visual reference requirements.
 skills: ["opsv-asset-designer"]

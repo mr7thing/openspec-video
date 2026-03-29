@@ -1,5 +1,5 @@
----
-# 强制：所有的分镜数据必须定义在这个 YAML 数组中。正文区域大模型不会做结构化读取。
+﻿---
+# 寮哄埗锛氭墍鏈夌殑鍒嗛暅鏁版嵁蹇呴』瀹氫箟鍦ㄨ繖涓?YAML 鏁扮粍涓€傛鏂囧尯鍩熷ぇ妯″瀷涓嶄細鍋氱粨鏋勫寲璇诲彇銆?
 shots:
   - id: "shot_1"
     duration: 5
@@ -33,38 +33,39 @@ shots:
     prompt_en: "tracking shot behind a swordsman sprinting through rain towards a ruined temple, slashing enemies. shaky cam effect, motion blur, intense action"
 ---
 
-# 最终分镜脚本（人类阅读版）
-由于完整的机器可读数据已在顶部 YAML 定义，以下正文专供人类导演阅读和评审。
+# 鏈€缁堝垎闀滆剼鏈紙浜虹被闃呰鐗堬級
+鐢变簬瀹屾暣鐨勬満鍣ㄥ彲璇绘暟鎹凡鍦ㄩ《閮?YAML 瀹氫箟锛屼互涓嬫鏂囦笓渚涗汉绫诲婕旈槄璇诲拰璇勫銆?
 
-## Act 1: 降临
+## Act 1: 闄嶄复
 
 ### Shot 1 (5s)
-宽广的全景镜头，交代 [@RainyBambooForest](../videospec/scenes/RainyBambooForest.md)。暴雨如注，形成一层灰色的水雾。摄像机缓缓向下摇摄，露出正倚靠在竹子上的 [@TheWanderingSwordsman](../videospec/elements/TheWanderingSwordsman.md)。
+瀹藉箍鐨勫叏鏅暅澶达紝浜や唬 [@RainyBambooForest](../videospec/scenes/RainyBambooForest.md)銆傛毚闆ㄥ娉紝褰㈡垚涓€灞傜伆鑹茬殑姘撮浘銆傛憚鍍忔満缂撶紦鍚戜笅鎽囨憚锛岄湶鍑烘鍊氶潬鍦ㄧ瀛愪笂鐨?[@TheWanderingSwordsman](../videospec/elements/TheWanderingSwordsman.md)銆?
 
 #### Design References
-<!-- d-ref: 灵感图。指导本 Shot 的图片生成。 -->
-<!-- [参考构图](references/shot_1_comp.png) -->
+<!-- d-ref: 鐏垫劅鍥俱€傛寚瀵兼湰 Shot 鐨勫浘鐗囩敓鎴愩€?-->
+<!-- [鍙傝€冩瀯鍥綸(references/shot_1_comp.png) -->
 
 #### Approved References
-<!-- a-ref: 最终定档图。作为本 Shot 生成视频的首帧。 -->
-<!-- [定档预览图](artifacts/drafts_1/shot_1_draft_1.png) -->
+<!-- a-ref: 鏈€缁堝畾妗ｅ浘銆備綔涓烘湰 Shot 鐢熸垚瑙嗛鐨勯甯с€?-->
+<!-- [瀹氭。棰勮鍥綸(artifacts/drafts_1/shot_1_draft_1.png) -->
 
-### 🖼️ 视觉审阅廊 (备选区)
-| 画面 1 | 画面 2 |
+### 馃柤锔?瑙嗚瀹￠槄寤?(澶囬€夊尯)
+| 鐢婚潰 1 | 鐢婚潰 2 |
 |:---:|:---:|
-| (等待 opsv review 回写) | (等待 opsv review 回写) |
+| (绛夊緟 opsv review 鍥炲啓) | (绛夊緟 opsv review 鍥炲啓) |
 
 ---
 
 ### Shot 2 (3s)
-对 [@TheWanderingSwordsman](../videospec/elements/TheWanderingSwordsman.md) 的手部进行特写。雨水从他的指关节滴落，他搭在 [@RustyIronSword](../videospec/elements/RustyIronSword.md) 的剑柄上。
+瀵?[@TheWanderingSwordsman](../videospec/elements/TheWanderingSwordsman.md) 鐨勬墜閮ㄨ繘琛岀壒鍐欍€傞洦姘翠粠浠栫殑鎸囧叧鑺傛淮钀斤紝浠栨惌鍦?[@RustyIronSword](../videospec/elements/RustyIronSword.md) 鐨勫墤鏌勪笂銆?
 
 #### Design References
-<!-- d-ref: 等等待提供 -->
+<!-- d-ref: 绛夌瓑寰呮彁渚?-->
 
 #### Approved References
-<!-- a-ref: 最终定档图 -->
-<!-- [定档手部特写](artifacts/drafts_1/shot_2_draft_2.png) -->
+<!-- a-ref: 鏈€缁堝畾妗ｅ浘 -->
+<!-- [瀹氭。鎵嬮儴鐗瑰啓](artifacts/drafts_1/shot_2_draft_2.png) -->
 
 ---
-*(其余 Shot 格式以此类推)*
+*(鍏朵綑 Shot 鏍煎紡浠ユ绫绘帹)*
+
