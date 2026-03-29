@@ -37,6 +37,7 @@
 
 | Agent | File | Responsibility | Primary Skill |
 |-------|------|------|-----------|
+| **Director** | `Director.md` | Orchestrator: Drives the full pipeline from init to video synthesis. | `opsv-director` |
 | **Architect** | `Architect.md` | Strategist: Anchors inspiration into project worldview; generates `project.md` + `story.md`. | `opsv-architect` |
 | **Screenwriter** | `Screenwriter.md` | Writer: Drafts story outlines, identifies entities, and embeds `@` anchors. | `opsv-screenwriter` |
 | **AssetDesigner** | `AssetDesigner.md` | Designer: Creates entity definitions in `elements/` and `scenes/`. | `opsv-asset-designer` |

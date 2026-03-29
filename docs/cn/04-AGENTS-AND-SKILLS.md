@@ -1,4 +1,4 @@
-﻿# OpsV Agent 涓?Skill 浣撶郴 (Agents & Skills)
+# OpsV Agent 涓?Skill 浣撶郴 (Agents & Skills)
 
 > Agent 瀹氫箟"鍋氫粈涔?锛孲kill 瀹氫箟"鎬庝箞鍋?銆傜悊瑙ｈ繖涓ゅ眰鍒嗙鏄┚椹?OpsV 澶氳鑹插崗浣滅殑鍏抽敭銆?
 
@@ -37,6 +37,7 @@
 
 | Agent | 鏂囦欢 | 鑱岃矗 | 缁戝畾 Skill |
 |-------|------|------|-----------|
+| **Director** | `Director.md` | 策劃者与指挥家：负责跨 Agent 调度，驱动全自动工作流。 | `opsv-director` |
 | **Architect** | `Architect.md` | 鎬绘灦鏋勫笀锛氬皢鐏垫劅閿氬畾涓洪」鐩笘鐣岃锛岀敓鎴?`project.md` + `story.md` | `opsv-architect` |
 | **Screenwriter** | `Screenwriter.md` | 涓荤紪鍓э細鎾板啓鏁呬簨澶х翰锛屾彁绾疄浣撹祫浜э紝鍩嬭 `@` 鎸囬拡 | `opsv-screenwriter` |
 | **AssetDesigner** | `AssetDesigner.md` | 璧勪骇璁捐甯堬細鍒涘缓 `elements/` 鍜?`scenes/` 涓嬬殑瀹炰綋瀹氫箟 | `opsv-asset-designer` |
