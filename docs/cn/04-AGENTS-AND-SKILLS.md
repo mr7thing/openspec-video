@@ -1,196 +1,171 @@
-# OpsV Agent 涓?Skill 浣撶郴 (Agents & Skills)
+﻿# OpsV Agent 与 Skill 体系 (Agents & Skills)
 
-> Agent 瀹氫箟"鍋氫粈涔?锛孲kill 瀹氫箟"鎬庝箞鍋?銆傜悊瑙ｈ繖涓ゅ眰鍒嗙鏄┚椹?OpsV 澶氳鑹插崗浣滅殑鍏抽敭銆?
-
----
-
-## 鏋舵瀯鍝插
-
-```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
-鈹?                  瀵兼紨 (鏌掑彅)                      鈹?
-鈹?             鈫?鍙戝嚭鑷劧璇█鎸囦护                      鈹?
-鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
-鈹?Agent 灞?鈥?"浜烘牸涓庤亴璐?                             鈹?
-鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?      鈹?
-鈹?鈹侫rchitect 鈹?鈹係creenwr. 鈹?鈹侫ssetDesigner 鈹?...   鈹?
-鈹?鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?      鈹?
-鈹?     鈫?             鈫?             鈫?              鈹?
-鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
-鈹?Skill 灞?鈥?"鎿嶄綔鎵嬪唽涓庤鑼?                         鈹?
-鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹愨攤
-鈹?鈹俹psv-architect 鈹?鈹俹psv-screenwr.  鈹?鈹俹psv-a-d. 鈹傗攤
-鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹樷攤
-鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
-鈹?CLI 灞?鈥?"缂栬瘧涓庢墽琛?                               鈹?
-鈹?opsv generate 鈫?opsv execute-image 鈫?opsv review  鈹?
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
-```
-
-- **Agent**锛坄.agent/*.md`锛夛細瀹氫箟瑙掕壊韬唤銆佹牳蹇冭亴璐ｅ拰璋冪敤鍝簺 Skill
-- **Skill**锛坄.agent/skills/*/SKILL.md`锛夛細瀹氫箟鍏蜂綋鎵ц瑙勮寖銆佹牸寮忔ā鏉垮拰璐ㄩ噺闂ㄩ檺
-- **CLI**锛坄opsv` 鍛戒护锛夛細Agent 浜у嚭 Markdown 鍚庯紝鐢?CLI 缂栬瘧鎵ц
+> Agent 定义"做什么"，Skill 定义"怎么做"。理解这两层分离是驾驭 OpsV 多角色协作的关键。
 
 ---
 
-## Agent 瑙掕壊鐭╅樀
+## 架构哲学
 
-| Agent | 鏂囦欢 | 鑱岃矗 | 缁戝畾 Skill |
+```
+┌──────────────────────────────────────────────────┐
+│                   导演 (柒叔)                      │
+│              ↓ 发出自然语言指令                      │
+├──────────────────────────────────────────────────┤
+│ Agent 层 — "人格与职责"                             │
+│ ┌──────────┐ ┌──────────┐ ┌──────────────┐       │
+│ │Architect │ │Screenwr. │ │AssetDesigner │ ...   │
+│ └────┬─────┘ └────┬─────┘ └──────┬───────┘       │
+│      ↓              ↓              ↓               │
+├──────────────────────────────────────────────────┤
+│ Skill 层 — "操作手册与规范"                         │
+│ ┌───────────────┐ ┌────────────────┐ ┌──────────┐│
+│ │opsv-architect │ │opsv-screenwr.  │ │opsv-a-d. ││
+│ └───────────────┘ └────────────────┘ └──────────┘│
+├──────────────────────────────────────────────────┤
+│ CLI 层 — "编译与执行"                               │
+│ opsv generate → opsv execute-image → opsv review  │
+└──────────────────────────────────────────────────┘
+```
+
+- **Agent**（`.agent/*.md`）：定义角色身份、核心职责和调用哪些 Skill
+- **Skill**（`.agent/skills/*/SKILL.md`）：定义具体执行规范、格式模板和质量门限
+- **CLI**（`opsv` 命令）：Agent 产出 Markdown 后，由 CLI 编译执行
+
+---
+
+## Agent 角色矩阵
+
+| Agent | 文件 | 职责 | 绑定 Skill |
 |-------|------|------|-----------|
-| **CLI-Agent** | `Director.md` | 自动化执行官：跨 Agent 调度，驱动非交互式全自动 CLI 流程。 | `opsv-cli-agent` |
-| **Architect** | `Architect.md` | 鎬绘灦鏋勫笀锛氬皢鐏垫劅閿氬畾涓洪」鐩笘鐣岃锛岀敓鎴?`project.md` + `story.md` | `opsv-architect` |
-| **Screenwriter** | `Screenwriter.md` | 涓荤紪鍓э細鎾板啓鏁呬簨澶х翰锛屾彁绾疄浣撹祫浜э紝鍩嬭 `@` 鎸囬拡 | `opsv-screenwriter` |
-| **AssetDesigner** | `AssetDesigner.md` | 璧勪骇璁捐甯堬細鍒涘缓 `elements/` 鍜?`scenes/` 涓嬬殑瀹炰綋瀹氫箟 | `opsv-asset-designer` |
-| **ScriptDesigner** | `ScriptDesigner.md` | 鑴氭湰璁捐甯堬細灏嗘晠浜嬬炕璇戜负甯?YAML 鐨勭粨鏋勫寲鍒嗛暅 `Script.md` | `opsv-script-designer` |
-| **Animator** | `Animator.md` | 鍔ㄧ敾缂栧锛氭彁鍙栧姩鎬佹帶鍒舵寚浠わ紝鐢熸垚 `Shotlist.md` | `opsv-animator` |
-| **Supervisor** | `Supervisor.md` | 璐ㄦ鐩戝埗锛氳嚜鍔ㄥ寲瀹℃煡锛岃緭鍑?PASS/FAIL 鎶ュ憡 | `opsv-supervisor` |
+| **Architect** | `Architect.md` | 总架构师：将灵感锚定为项目世界观，生成 `project.md` + `story.md` | `opsv-architect` |
+| **Screenwriter** | `Screenwriter.md` | 主编剧：撰写故事大纲，提纯实体资产，埋设 `@` 指针 | `opsv-screenwriter` |
+| **AssetDesigner** | `AssetDesigner.md` | 资产设计师：创建 `elements/` 和 `scenes/` 下的实体定义 | `opsv-asset-designer` |
+| **ScriptDesigner** | `ScriptDesigner.md` | 脚本设计师：将故事翻译为带 YAML 的结构化分镜 `Script.md` | `opsv-script-designer` |
+| **Animator** | `Animator.md` | 动画编导：提取动态控制指令，生成 `Shotlist.md` | `opsv-animator` |
+| **Supervisor** | `Supervisor.md` | 质检监制：自动化审查，输出 PASS/FAIL 报告 | `opsv-supervisor` |
 
 ---
 
-## Skill 璇︾粏璇存槑
+## Skill 详细说明
 
-### 1. `opsv-architect` 鈥?椤圭洰鍐涘笀鎵嬪唽
+### 1. `opsv-architect` — 项目军师手册
 
-**瑙﹀彂鍦烘櫙**锛氫粠鏃犲埌鏈夊缓绔嬫柊瑙嗛椤圭洰
+**触发场景**：从无到有建立新视频项目
 
-**涓ら樁娈靛伐浣滄祦**锛?
+**两阶段工作流**：
 
-| 闃舵 | 杈撳叆 | 杈撳嚭 | 鏄惁鐢熸垚鏂囦欢 |
+| 阶段 | 输入 | 输出 | 是否生成文件 |
 |------|------|------|------------|
-| Phase 1: 姒傚康鍙戞暎 | 涓€鍙ユ瓕璇?妯＄硦姒傚康 | 3 涓樊寮傚寲鏁呬簨鏂规 | 鉂?浠呮枃瀛?|
-| Phase 2: 涓栫晫瑙傞敋瀹?| 瀵兼紨閫夋嫨鏂规 | `project.md` + `story.md` | 鉁?|
+| Phase 1: 概念发散 | 一句歌词/模糊概念 | 3 个差异化故事方案 | ❌ 仅文字 |
+| Phase 2: 世界观锚定 | 导演选择方案 | `project.md` + `story.md` | ✅ |
 
-**鍏抽敭瑙勫垯**锛?
-- 绂佹鍦ㄤ俊鎭笉瓒虫椂鐩存帴鐢熸垚 `project.md`
-- `vision` 瀛楁涓枃锛宍global_style_postfix` 瀛楁绾嫳鏂?
-- 3 涓柟妗堝繀椤婚鏍煎樊寮傚圲
+**关键规则**：
+- 禁止在信息不足时直接生成 `project.md`
+- `vision` 字段中文，`global_style_postfix` 字段纯英文
+- 3 个方案必须风格差异化
 
 ---
 
-### 0. `opsv-cli-agent` — Automation Execution Manual (v0.4.5+)
-- **第一阶段：Agent 零摩擦初始化**：利用 `-g/-o/-t` 标识实现静默部署。
-- **第二阶段：CLI 自动化调度**：串联剧作、分镜与动画的全量生成与校验。
-- **第三阶段：导演审查桥接**：为 Agent 提供强制性的人工介入点（Checkpoint）。
-- **第四阶段：视频合成流水线**：驱动 `opsv animate` 与 `execute-video` 完成交付。
+### 2. `opsv-screenwriter` — 编剧手册
+
+**触发场景**：充实故事血肉，撰写 `story.md`
+
+**核心任务**：
+1. **实体提纯**：识别高频出现的角色/场景/道具
+2. **资产声明**：写入 `elements/` 和 `scenes/` 目录，严守 `has_image` 二元法
+3. **代码化大纲**：用 `@实体名` 指针替代冗长的外貌描写
+
+**铁律**：
+- ❌ 错误："`@role_K` 那个穿着黑色破防风衣的男人走向吧台"
+- ✅ 正确："`@role_K` 走向吧台"（风衣颜色只在 `K.md` 里）
+- 绝不写任何 `Shot X` 等摄像机机位要求
+
+---
+
+### 3. `opsv-asset-designer` — 资产生成手册
+
+**触发场景**：创建角色、场景或道具的 `.md` 定义文件
+
+**五大准则**：
+1. **上下文为王**：先读 `project.md` 了解全局风格
+2. **超高精细度**：致密描写材质、光影、磨损度、情绪
+3. **has_image 默认 false**：仅导演确认后才可设为 true
+4. **母语友好**：正文中文，只有 `prompt_en` 字段英文
+5. **YAML-First**：所有数据进 YAML Frontmatter
 
 **三段式格式**：
-```yaml
----
-name: opsv-cli-agent
-description: Comprehensive guide for AI Agents to autonomously orchestrate the OpsV CLI pipeline. Supports Phase 1 (Init) -> Phase 2 (Script/Spec) -> Phase 3 (Asset Rendering) -> Phase 4 (Manual Review) -> Phase 5 (Video Gen). Essential for "agent-driven" production.
----
-
-# OpsV CLI Agent: Automation Execution Manual (v0.4.5+)
-
-## environment
-[鐜/鑳屾櫙锛屼腑鏂嘳
-
-## camera
-[鏅埆锛岃嫳鏂嘳
-```
-
----
-
-### 2. `opsv-screenwriter` 鈥?缂姈鎵嬪唽
-
-**瑙﹀彂鍦烘櫙**锛氬厖瀹炴晠浜嬭鑲夛紝鎾板啓 `story.md`
-
-**鏍稿績浠诲姟**锛?
-1. **瀹炰綋鎻愮函**锛氳瘑鍒珮棰戝嚭鐜扮殑瑙掕壊/鍦烘櫙/閬撳叿
-2. **璧勪骇澹版槑**锛氬啓鍏?`elements/` 鍜?`scenes/` 鐩綍锛屼弗瀹?`has_image` 浜屽厓娉?
-3. **浠ｇ爜鍖栧ぇ绾?*锛氭墍鏈夋暟鎹繘 YAML Frontmatter
-
-**閾佸緥**锛?
-- 鉂?閿欒锛?`@role_K` 閭ｄ釜绌跨潃榛戣壊鐮撮槻椋庤。鐨勭敺浜鸿蛋鍚戝惂鍙?
-- 鉁?姝ｇ‘锛?`@role_K` 璧板悜鍚у彴"锛堥琛ｉ鑹插彧鍦?`K.md` 閲柑锛?
-- 缁濅笉鐣欎换浣?`Shot X` 绛夋憚鍍忔満鏈轰綅瑕佹眰
-
----
-
-### 3. `opsv-asset-designer` 鈥?璧勪骇鐢熸垚鎵嬪唽
-
-**瑙﹀彂鍦烘櫙**锛氬垱寤鸿鑹层€佸満鏅垨閬撳叿鐨?`.md` 瀹氫箟鏂囦欢
-
-**浜斿ぇ鍑嗗垯**锛?
-1. **涓婁笅鏂囦负鐜?*锛氬厛璇?`project.md` 浜嗚В鍏ㄥ眬椋庢牸
-2. **瓒呴珮绮剧粏搴?*锛氳嚧瀵嗘弿鐣欐潗璐ㄣ€佸厜褰便€佺（鎹熷害銆佹儏缁?
-3. **has_image 榛樿 false**锛氫粎瀵兼紨纭鍚庢墠鍙涓?true
-4. **姣嶈鍙嬪ソ**锛氭鏂囦腑鏂囷紝鍙湁 `prompt_en` 瀛楁鑻辨枃
-5. **YAML-First**锛氭墍鏈夋暟鎹繘 YAML Frontmatter
-
-**涓夋寮忔牸寮?*锛?
 ```yaml
 ---
 name: "@AssetName"
 type: "character"       # character | scene | prop
 has_image: false
 detailed_description: >
-  [鑷村瘑鐨勪腑鏂囩壒寰佹弿鐣欙紝鑷冲皯3-5鍙ヨ瘽]
-brief_description: "[涓€鍙ヨ瘽绠€鐣ユ弿杩癩"
+  [致密的中文特征描写，至少3-5句话]
+brief_description: "[一句话简略描述]"
 prompt_en: >
   [Dense English prompt for image generation]
 ---
 
 ## subject
-[涓讳綋鎻忚堪锛屼腑鏂嘳
+[主体描述，中文]
 
 ## environment
-[鐜/鑳屾櫙锛屼腑鏂嘳
+[环境/背景，中文]
 
 ## camera
-[鏅埆锛岃嫳鏂嘳
+[景别，英文]
 ```
 
 ---
 
-### 4. `opsv-script-designer` 鈥?鍒嗛暅鑴氭湰鎵嬪唽
+### 4. `opsv-script-designer` — 分镜脚本手册
 
-**瑙﹀彂鍦烘櫙**锛氬皢 `story.md` 缈昏瘧涓虹粨鏋勫寲 `Script.md`
+**触发场景**：将 `story.md` 翻译为结构化 `Script.md`
 
-**鍥涘ぇ瑙勫垯**锛?
-1. **鏃堕棿缁濆绾︽潫**锛氭瘡涓?Shot 3-5 绉掞紝涓婇檺 15 绉?
-2. **瑙嗚璇█**锛氭弿杩?鎽勫儚鏈虹湅鍒扮殑鍐呭"锛岄潪鏂囧瓧鍙欎簨
-3. **YAML 浼樺厛**锛氭墍鏈?Shot 瀹氫箟鍦?`shots:` 鏁扮粍涓?
-4. **鍙岃鍒嗙**锛歚prompt_en` 绾嫳鏂囷紝鍏朵綑涓枃
+**四大规则**：
+1. **时间绝对约束**：每个 Shot 3-5 秒，上限 15 秒
+2. **视觉语言**：描述"摄像机看到的内容"，非文字叙事
+3. **YAML 优先**：所有 Shot 定义在 `shots:` 数组中
+4. **双语分离**：`prompt_en` 纯英文，其余中文
 
-**Script.md YAML 瀛楁**锛?
+**Script.md YAML 字段**：
 
-| 瀛楁 | 绫诲瀷 | 蹇呭～ | 璇存槑 |
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `id` | string | 鉁?| 濡?`shot_1` |
-| `duration` | integer | 鉁?| 绉掓暟 |
-| `camera` | string | 鉁?| 鏅埆涓庤繍闀?|
-| `environment` | string | 鉁?| 鍦烘櫙寮曠敤锛堝惈 @锛?|
-| `subject` | string | 鉁?| 涓讳綋鍔ㄤ綔锛堝惈 @锛?|
-| `prompt_en` | string | 鉁?| 鑻辨枃娓叉煋鎻愮ず璇?|
-| `first_image` | string | - | 棣栧抚鍙傝€冨浘璺緞 |
-| `last_image` | string | - | 灏惧抚鍙傝€冨浘璺緞 |
-| `target_last_prompt` | string | - | 闈跺悜琛ュ抚璇遍サ璇?|
+| `id` | string | ✅ | 如 `shot_1` |
+| `duration` | integer | ✅ | 秒数 |
+| `camera` | string | ✅ | 景别与运镜 |
+| `environment` | string | ✅ | 场景引用（含 @） |
+| `subject` | string | ✅ | 主体动作（含 @） |
+| `prompt_en` | string | ✅ | 英文渲染提示词 |
+| `first_image` | string | - | 首帧参考图路径 |
+| `last_image` | string | - | 尾帧参考图路径 |
+| `target_last_prompt` | string | - | 靶向补帧诱饵词 |
 
-**鐢诲粖瀹￠槄鍖?*锛氫负姣忎釜 Shot 棰勭暀瑙嗚瀹￠槄寤婏紝渚?`opsv review` 鍥炲啓鍥剧墖銆?
+**画廊审阅区**：为每个 Shot 预留视觉审阅廊，供 `opsv review` 回写图片。
 
 ---
 
-### 5. `opsv-animator` 鈥?鍔ㄧ敾鎵ц鎵嬪唽
+### 5. `opsv-animator` — 动画执行手册
 
-**瑙﹀彂鍦烘櫙**锛氫粠宸插闃呯殑 `Script.md` 鎻愬彇杩愬姩鎸囦护锛岀敓鎴?`Shotlist.md`
+**触发场景**：从已审阅的 `Script.md` 提取运动指令，生成 `Shotlist.md`
 
-**鍔ㄩ潤鍒嗙鍘熷垯**锛?
-- 鉂?涓嶆弿杩帮細瑙掕壊绌夸粈涔堣。鏈嶃€佺幆澧冮暱浠€涔堟牱
-- 鉁?鍙弿杩帮細闀滃ご鎬庝箞鍔紵瑙掕壊鎬庝箞鍔紵鍦烘櫙鏈変粈涔堝姩鎬佸彉鍖栵紵
-- `motion_prompt_en` 鍏ㄨ嫳鏂?
+**动静分离原则**：
+- ❌ 不描述：角色穿什么衣服、环境长什么样
+- ✅ 只描述：镜头怎么动？角色怎么动？场景有什么动态变化？
+- `motion_prompt_en` 全英文
 
-**Shotlist.md YAML 瀛楁**锛?
+**Shotlist.md YAML 字段**：
 
-| 瀛楁 | 绫诲瀷 | 蹇呭～ | 璇存槑 |
+| 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `id` | string | 鉁?| 濡?`shot_1` |
-| `duration` | string | 鉁?| 浠?Script.md 閫忎紶 |
-| `reference_image` | string | 鉁?| 瀵兼紨纭鐨勫簳鍥捐矾寰?|
-| `motion_prompt_en` | string | 鉁?| 绾姩鎬佽嫳鏂囨寚浠?|
-| `first_image` | string | - | 鍙敤 `@FRAME` 寤惰繜鎸囬拡 |
+| `id` | string | ✅ | 如 `shot_1` |
+| `duration` | string | ✅ | 从 Script.md 透传 |
+| `reference_image` | string | ✅ | 导演确认的底图路径 |
+| `motion_prompt_en` | string | ✅ | 纯动态英文指令 |
+| `first_image` | string | - | 可用 `@FRAME` 延迟指针 |
 
-**motion_prompt_en 绀轰緥**锛?
+**motion_prompt_en 示例**：
 ```
 "Slow dolly in, townsfolk walking across the alley,
  steam rising from food carts, cinematic motion."
@@ -198,11 +173,11 @@ prompt_en: >
 
 ---
 
-### 6. `opsv-supervisor` 鈥?璐ㄦ鐩戝埗鎵嬪唽
+### 6. `opsv-supervisor` — 质检监制手册
 
-**瑙﹀彂鏉′欢**锛歋lash 鍛戒护 `/opsv-qa`
+**触发条件**：Slash 命令 `/opsv-qa`
 
-| 鍛戒护 | 妫€鏌ュ唴瀹?| 鍒ゅ畾鏍囧噯 |
+| 命令 | 检查内容 | 判定标准 |
 |------|---------|---------|
 | `/opsv-qa act1` | 资产对账：文件与 `project.md` 花名册一致性 | 无黑户、无遗漏 |
 | `/opsv-qa act2` | 死链核查：`has_image: true` 的图片路径是否真实存在 | 文件存在且 >0 bytes |
@@ -210,83 +185,83 @@ prompt_en: >
 | `/opsv-qa act4` | 配置核查：检查 `api_config.yaml` 确保至少有一个模型 `enable: true` | 模型开关正确配置 |
 | `/opsv-qa final` | Payload 断言：`jobs.json` 的全局后缀注入和参考图路径 | 针脚对齐 |
 
-**杈撳嚭鏍煎紡**锛?
+**输出格式**：
 ```
-馃煝 PASS: 閽堣剼涓ヤ笣鍚堢紳
-馃敶 FAIL: 鎵嚭 2 涓湭鐧昏榛戞埛锛欯xxx, @yyy
+🟢 PASS: 针脚严丝合缝
+🔴 FAIL: 扫出 2 个未登记黑户：@xxx, @yyy
 ```
 
 ---
 
-### 7. `opsv-apply-change` 鈥?鍙樻洿鎵ц鎵嬪唽
+### 7. `opsv-apply-change` — 变更执行手册
 
-**瑙﹀彂鍦烘櫙**锛氭壒閲忓簲鐢ㄥ彉鏇存彁妗?
+**触发场景**：批量应用变更提案
 
-**宸ヤ綔娴?*锛?
-1. 璇诲彇 `videospec/changes/` 涓嬬殑鎻愭 `.md`
-2. 閫愰」鎵ц淇敼锛堝 "灏?K 鐨勫ぇ琛ｆ敼涓洪粦鑹?锛?
-3. 鏍囪瀹屾垚锛坄- [ ]` 鈫?`- [x]`锛?
-4. 鎻愮ず杩愯 `opsv generate` 鍒锋柊浠诲姟闃熷垪
+**工作流**：
+1. 读取 `videospec/changes/` 下的提案 `.md`
+2. 逐项执行修改（如 "将 K 的大衣改为黑色"）
+3. 标记完成（`- [ ]` → `- [x]`）
+4. 提示运行 `opsv generate` 刷新任务队列
 
 ---
 
-### 8. `opsv-asset-compiler` 鈥?璧勪骇缂栬瘧澶ц剳
+### 8. `opsv-asset-compiler` — 资产编译大脑
 
-**瑙﹀彂鍦烘櫙**锛氳В鏋愬惈 `@` 鏍囩鐨勫満鏅弿杩帮紝缂栬瘧涓?JSON Payload
+**触发场景**：解析含 `@` 标签的场景描述，编译为 JSON Payload
 
-**鏍稿績閫昏緫**锛?
-1. 璇嗗埆 `@` 瀹炰綋鏍囩
-2. 鏍规嵁 `has_image` 鐘舵€侀€夋嫨鎻愬彇绛栫暐锛堟瀬绠€ vs 璇﹀敖鎻忚堪锛?
-3. 铻嶅悎澶氬疄浣撶殑璇箟鍦烘櫙
-4. 杈撳嚭 `PROMPT_INTENT` + `REQUIRED_ASSETS` JSON
+**核心逻辑**：
+1. 识别 `@` 实体标签
+2. 根据 `has_image` 状态选择提取策略（极简 vs 详尽描述）
+3. 融合多实体的语义场景
+4. 输出 `PROMPT_INTENT` + `REQUIRED_ASSETS` JSON
 
-**杈撳嚭绀轰緥**锛?
+**输出示例**：
 ```json
 {
-  "PROMPT_INTENT": "鏆撮洦鍊剧泦锛?0澶氬瞾璧涘崥渚︽帰锛岄粦鑹查珮棰嗗ぇ琛ｈ闆ㄦ按鎵撴箍...",
+  "PROMPT_INTENT": "暴雨倾盆，30多岁赛博侦探，黑色高领大衣被雨水打湿...",
   "REQUIRED_ASSETS": ["@role_K"]
 }
 ```
 
 ---
 
-### 9. `opsv-auto-create` 鈥?鍏ㄨ嚜鍔ㄥ垱寤烘墜鍐?
+### 9. `opsv-auto-create` — 全自动创建手册
 
-**瑙﹀彂鍦烘櫙**锛氫粠姝岃瘝/姒傚康涓€娆℃€у睍寮€瀹屾暣椤圭洰
+**触发场景**：从歌词/概念一次性展开完整项目
 
-**娴佺▼**锛欼ntent 鍒嗘瀽 鈫?鑽夌鍓ф湰 鈫?瀹氫箟璧勪骇 鈫?鐢熸垚鍙傝€冨浘 鈫?鍏ㄥ眬鏍￠獙
+**流程**：Intent 分析 → 草稿剧本 → 定义资产 → 生成参考图 → 全局校验
 
-> **娉ㄦ剰**锛氶€傚悎蹇€熷睍寮€銆傜簿缁嗘帶鍒剁殑椤圭洰搴斾娇鐢?`opsv-architect` 鈫?`opsv-screenwriter` 鈫?`opsv-asset-designer` 閫愭杩囨浮銆?
-
----
-
-### 10. `opsv-seedance-expert` 鈥?Seedance 鎻愮ず璇嶅伐绋?
-
-**鐙珛 Skill**锛堟棤缁戝畾 Agent锛夛紝浣滀负 Seedance 1.5 Pro 瑙嗛鐢熸垚鐨勬彁绀鸿瘝浼樺寲鎸囧崡銆?
-
-**鏍稿績瑙勮寖**锛?
-- **杩愬姩鎻忚堪鑼冨紡**锛歚[Subject Action] + [Camera Movement] + [Lighting/Atmosphere]`
-- **棣栧熬甯ц鍒?*锛氭彁渚涢灏惧抚鏃讹紝prompt 搴旈噸鐐规弿杩?璺緞"鑰岄潪"鍐呭"
-- **鎺ㄨ崘璇嶆眹**锛?
-  - 鐩告満杩愬姩锛歚cinematic slow pan`, `dynamic dolly zoom`, `low-angle tracking shot`
-  - 涓讳綋鍔ㄤ綔锛歚flowing hair`, `subtle micro-expressions`, `graceful floating`
-
-**鏈€浣冲疄璺?*锛?
-- 閬垮厤璐熼潰璇嶏紝鐩存帴鎻忚堪鎯宠鐨勬晥鏋?
-- 浣跨敤鍙傝€冨浘鏃惰仛鐒︿簬"鍔ㄤ綔"鑰岄潪"闀跨浉"
-- `sound: true` 鍙紑鍚┖闂撮煶棰戯紝prompt 涓姞鍏ョ幆澧冮煶鎻忚堪
+> **注意**：适合快速展开。精细控制的项目应使用 `opsv-architect` → `opsv-screenwriter` → `opsv-asset-designer` 逐步过渡。
 
 ---
 
-## 澶氱 AI 鏀寔鐭╅樀
+### 10. `opsv-seedance-expert` — Seedance 提示词工程
 
-| AI 宸ュ叿 | 閰嶇疆鏂瑰紡 | 鍏ュ彛鏂囦欢 |
+**独立 Skill**（无绑定 Agent），作为 Seedance 1.5 Pro 视频生成的提示词优化指南。
+
+**核心规范**：
+- **运动描述范式**：`[Subject Action] + [Camera Movement] + [Lighting/Atmosphere]`
+- **首尾帧规则**：提供首尾帧时，prompt 应重点描述"路径"而非"内容"
+- **推荐词汇**：
+  - 相机运动：`cinematic slow pan`, `dynamic dolly zoom`, `low-angle tracking shot`
+  - 主体动作：`flowing hair`, `subtle micro-expressions`, `graceful floating`
+
+**最佳实践**：
+- 避免负面词，直接描述想要的效果
+- 使用参考图时聚焦于"动作"而非"长相"
+- `sound: true` 可开启空间音频，prompt 中加入环境音描述
+
+---
+
+## 多端 AI 支持矩阵
+
+| AI 工具 | 配置方式 | 入口文件 |
 |---------|---------|---------|
-| **Gemini** (Gemini Code Assist) | 鐩存帴璇诲彇鏍圭洰褰?`GEMINI.md` | `GEMINI.md` |
-| **OpenCode** | 璇诲彇 `.opencode/` 鐩綍 + `AGENTS.md` | `AGENTS.md` |
-| **Trae** | 鎵嬪姩灏?`AGENTS.md` 鍐呭澶嶅埗鍒?Trae 鏅鸿兘浣撹瀹?| `AGENTS.md` + `.trae/rules/` |
+| **Gemini** (Gemini Code Assist) | 直接读取根目录 `GEMINI.md` | `GEMINI.md` |
+| **OpenCode** | 读取 `.opencode/` 目录 + `AGENTS.md` | `AGENTS.md` |
+| **Trae** | 手动将 `AGENTS.md` 内容复制到 Trae 智能体设定 | `AGENTS.md` + `.trae/rules/` |
 
-涓夎€呭叡浜悓涓€濂?`.agent/skills/` 鎶€鑳藉簱锛屼粎鍏ㄥ眬浜烘牸閰嶇疆涓嶅悓銆?
+三者共享同一套 `.agent/skills/` 技能库，仅全局人格配置不同。
 
 ---
 

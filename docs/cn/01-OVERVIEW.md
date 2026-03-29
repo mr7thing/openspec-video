@@ -1,85 +1,85 @@
-﻿# OpsV 椤圭洰鍏ㄦ櫙 (Project Overview)
+# OpsV 项目全景 (Project Overview)
 
-> **OpenSpec-Video (OpsV) 0.4.3** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
+> **OpenSpec-Video (OpsV) 0.4.5** — 自动化影像生成的 Spec-as-Code 框架。叙事规范编译为视频/图像生成任务的自动化框架
 
 ---
 
-## 1. OpsV 鏄粈涔?
+## 1. OpsV 是什么
 
 OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演/PM/艺术总监）用 Markdown 撰写故事、定义资产、设计分镜，然后通过 CLI 命令将这些文本规范"编译"为可执行的 JSON 任务队列，最终驱动 AI 模型（SeaDream、Seedance、Minimax、SiliconFlow 等）并发批量生成图像与视频。
 
-**鏍稿績淇℃潯**锛?
+**核心信条**：
 
-- **浠ｇ爜鍗宠鑼?*锛歚.md` 鏂囦欢鏄敮涓€鐨勭湡鐩告簮锛屽浘鍍忓拰瑙嗛鏄叾缂栬瘧浜х墿
-- **璧勪骇鍏堣**锛氳鑹?鍦烘櫙/閬撳叿蹇呴』鍏堢嫭绔嬪缓妗ｏ紝鍒嗛暅涓彧鍏佽寮曠敤锛坄@` 璇硶锛?
-- **鍔ㄩ潤鍒嗙**锛氬浘鍍忕敓鎴愬拰瑙嗛鐢熸垚鏄袱鏉＄嫭绔嬬绾匡紝浜掍笉骞叉壈
-- **Markdown 椹卞姩**锛歒AML Frontmatter 瀛樺厓鏁版嵁锛孧arkdown Body 瀛樺弬鑰冨浘寮曠敤鍜屼汉绫诲闃呭唴瀹癸紝涓よ€呭崗鍚?
+- **代码即规范**：`.md` 文件是唯一的真相源，图像和视频是其编译产物
+- **资产先行**：角色/场景/道具必须先独立建档，分镜中只允许引用（`@` 语法）
+- **动静分离**：图像生成和视频生成是两条独立管线，互不干扰
+- **Markdown 驱动**：YAML Frontmatter 存元数据，Markdown Body 存参考图引用和人类审阅内容，两者协同
 
 ---
 
-## 2. 鎶€鏈爤
+## 2. 技术栈
 
-| 灞傜骇 | 鎶€鏈?| 鐢ㄩ€?|
+| 层级 | 技术 | 用途 |
 |------|------|------|
-| 璇█ | TypeScript | 鏍稿績浠ｇ爜 |
-| CLI 妗嗘灦 | Commander.js | 鍛戒护琛岀晫闈?|
-| 閫氳 | WebSocket (ws) | 鍚庡彴瀹堟姢杩涚▼ 鈫?娴忚鍣ㄦ彃浠?|
-| 閰嶇疆 | dotenv + js-yaml | 鐜鍙橀噺 + YAML 閰嶇疆 |
-| 鏍￠獙 | Zod | Job 浠诲姟缁撴瀯鏍￠獙 |
-| 鏃ュ織 | Winston | 缁熶竴鏃ュ織绯荤粺 |
-| 瑙ｆ瀽 | unified + remark | Markdown/YAML 瑙ｆ瀽 |
-| HTTP | Axios | API 璇锋眰 |
+| 语言 | TypeScript | 核心代码 |
+| CLI 框架 | Commander.js | 命令行界面 |
+| 通讯 | WebSocket (ws) | 后台守护进程 ↔ 浏览器插件 |
+| 配置 | dotenv + js-yaml | 环境变量 + YAML 配置 |
+| 校验 | Zod | Job 任务结构校验 |
+| 日志 | Winston | 统一日志系统 |
+| 解析 | unified + remark | Markdown/YAML 解析 |
+| HTTP | Axios | API 请求 |
 
 ---
 
-## 3. 鏍囧噯鐩綍缁撴瀯
+## 3. 标准目录结构
 
-`opsv init` 鍒涘缓鐨勯」鐩鏋讹細
+`opsv init` 创建的项目骨架：
 
 ```
 project/
-鈹溾攢鈹€ .agent/                     # AI Agent 閰嶇疆
-鈹?  鈹溾攢鈹€ Architect.md            # 鏋舵瀯甯堣鑹插畾涔?
-鈹?  鈹溾攢鈹€ Screenwriter.md         # 缂栧墽瑙掕壊瀹氫箟
-鈹?  鈹溾攢鈹€ AssetDesigner.md        # 璧勪骇璁捐甯堣鑹插畾涔?
-鈹?  鈹溾攢鈹€ ScriptDesigner.md       # 鍒嗛暅璁捐甯堣鑹插畾涔?
-鈹?  鈹溾攢鈹€ Animator.md             # 鍔ㄧ敾缂栧瑙掕壊瀹氫箟
-鈹?  鈹溾攢鈹€ Supervisor.md           # 璐ㄦ鐩戝埗瑙掕壊瀹氫箟
-鈹?  鈹斺攢鈹€ skills/                 # 鎶€鑳芥墜鍐屽簱锛?0 涓?Skill锛?
-鈹溾攢鈹€ .antigravity/               # Antigravity 宸ュ叿閰嶇疆
-鈹?  鈹溾攢鈹€ rules/                  # 琛屼负瑙勫垯
-鈹?  鈹斺攢鈹€ workflows/              # 宸ヤ綔娴佹ā鏉匡紙8 涓級
-鈹溾攢鈹€ .env/                       # 鐜閰嶇疆锛坓it 蹇界暐锛?
-鈹?  鈹溾攢鈹€ secrets.env             # API 瀵嗛挜
-鈹?  鈹斺攢鈹€ api_config.yaml         # 寮曟搸鍙傛暟閰嶇疆
-鈹溾攢鈹€ videospec/                  # 鏍稿績鍙欎簨璧勪骇锛堢湡鐩告簮锛?
-鈹?  鈹溾攢鈹€ project.md              # 椤圭洰鍏ㄥ眬閰嶇疆涓庤祫浜ц姳鍚嶅唽
-鈹?  鈹溾攢鈹€ stories/                # 鏁呬簨澶х翰
-鈹?  鈹?  鈹斺攢鈹€ story.md
-鈹?  鈹溾攢鈹€ elements/               # 瑙掕壊/閬撳叿璧勪骇瀹氫箟
-鈹?  鈹?  鈹溾攢鈹€ @role_hero.md
-鈹?  鈹?  鈹斺攢鈹€ @prop_sword.md
-鈹?  鈹溾攢鈹€ scenes/                 # 鍦烘櫙璧勪骇瀹氫箟
-鈹?  鈹?  鈹斺攢鈹€ @scene_forest.md
-鈹?  鈹斺攢鈹€ shots/                  # 鍒嗛暅涓庡姩鐢诲彴鏈?
-鈹?      鈹溾攢鈹€ Script.md           # 闈欐€佹瀯鍥惧垎闀?
-鈹?      鈹斺攢鈹€ Shotlist.md         # 鍔ㄦ€佽繍闀滃彴鏈?
-鈹溾攢鈹€ artifacts/                  # 鐢熸垚浜х墿
-鈹?  鈹斺攢鈹€ drafts_N/               # 绗?N 鎵规覆鏌撹崏鍥?
-鈹溾攢鈹€ queue/                      # 浠诲姟闃熷垪
-鈹?  鈹溾攢鈹€ jobs.json               # 鍥惧儚鐢熸垚浠诲姟
-鈹?  鈹斺攢鈹€ video_jobs.json         # 瑙嗛鐢熸垚浠诲姟
-鈹溾攢鈹€ GEMINI.md                   # Gemini 涓撶敤鍏ㄥ眬浜烘牸閰嶇疆
-鈹斺攢鈹€ AGENTS.md                   # OpenCode/Trae 缁熶竴鍗忚
+├── .agent/                     # AI Agent 配置
+│   ├── Architect.md            # 架构师角色定义
+│   ├── Screenwriter.md         # 编剧角色定义
+│   ├── AssetDesigner.md        # 资产设计师角色定义
+│   ├── ScriptDesigner.md       # 分镜设计师角色定义
+│   ├── Animator.md             # 动画编导角色定义
+│   ├── Supervisor.md           # 质检监制角色定义
+│   └── skills/                 # 技能手册库（10 个 Skill）
+├── .antigravity/               # Antigravity 工具配置
+│   ├── rules/                  # 行为规则
+│   └── workflows/              # 工作流模板（8 个）
+├── .env/                       # 环境配置（git 忽略）
+│   ├── secrets.env             # API 密钥
+│   └── api_config.yaml         # 引擎参数配置
+├── videospec/                  # 核心叙事资产（真相源）
+│   ├── project.md              # 项目全局配置与资产花名册
+│   ├── stories/                # 故事大纲
+│   │   └── story.md
+│   ├── elements/               # 角色/道具资产定义
+│   │   ├── @role_hero.md
+│   │   └── @prop_sword.md
+│   ├── scenes/                 # 场景资产定义
+│   │   └── @scene_forest.md
+│   └── shots/                  # 分镜与动画台本
+│       ├── Script.md           # 静态构图分镜
+│       └── Shotlist.md         # 动态运镜台本
+├── artifacts/                  # 生成产物
+│   └── drafts_N/               # 第 N 批渲染草图
+├── queue/                      # 任务队列
+│   ├── jobs.json               # 图像生成任务
+│   └── video_jobs.json         # 视频生成任务
+├── GEMINI.md                   # Gemini 专用全局人格配置
+└── AGENTS.md                   # OpenCode/Trae 统一协议
 ```
 
 ---
 
-## 4. 鏍稿績姒傚康璇嶅吀
+## 4. 核心概念词典
 
-| 姒傚康 | 鍚箟 |
+| 概念 | 含义 |
 |------|------|
-| **平行宇宙沙箱** | 0.4.3 引入，根据 `api_config.yaml` 启用的多模型并发执行，不同引擎的结果被严格隔离在 `artifacts/drafts_N/[引擎名]/` 中 |
+| **平行宇宙沙箱** | 0.4.5 引入，根据 `api_config.yaml` 启用的多模型并发执行，不同引擎的结果被严格隔离在 `artifacts/drafts_N/[引擎名]/` 中 |
 | **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码 |
 | **Asset-First** | 资产先于分镜存在，分镜只引用不描述 |
 | **d-ref (Design References)** | 生成输入参考图。`opsv generate` 生成本实体时作为 img2img 输入 |
@@ -93,47 +93,47 @@ project/
 
 ---
 
-## 5. 蹇€熷紑濮?
+## 5. 快速开始
 
 ```bash
-# 1. 鍏ㄥ眬瀹夎
+# 1. 全局安装
 npm install -g videospec
 
-# 2. 鍒涘缓鏂伴」鐩?
+# 2. 创建新项目
 opsv init my-mv-project
 
-# 3. 閰嶇疆 API 瀵嗛挜
+# 3. 配置 API 密钥
 echo "VOLCENGINE_API_KEY=your_key_here" > .env/secrets.env
 
-# 4. 缂栧啓璧勪骇鍜屽垎闀滐紙鍙傝€冨伐浣滄祦鏂囨。锛?
+# 4. 编写资产和分镜（参考工作流文档）
 
-# 5. 缂栬瘧骞剁敓鎴愬浘鍍?
+# 5. 编译并生成图像
 opsv generate
 opsv gen-image
 
-# 6. 灏嗙粨鏋滃洖鍐欐枃妗ｅ苟瀹￠槄
+# 6. 将结果回写文档并审阅
 opsv review
 
-# 7. 缂栬瘧骞剁敓鎴愯棰?
+# 7. 编译并生成视频
 opsv animate
 opsv gen-video
 ```
 
 ---
 
-## 6. 鐩稿叧鏂囨。
+## 6. 相关文档
 
-| 鏂囨。 | 璇存槑 |
+| 文档 | 说明 |
 |------|------|
-| [宸ヤ綔娴佺▼璇存槑](./02-WORKFLOW.md) | 浜旀寰幆瀹屾暣娴佺▼ |
-| [CLI 鍛戒护鍙傝€僝(./03-CLI-REFERENCE.md) | 鍏ㄩ儴 8 涓懡浠ょ殑璇︾粏鐢ㄦ硶 |
-| [Agent 涓?Skill 浣撶郴](./04-AGENTS-AND-SKILLS.md) | 6 涓鑹?+ 10 涓妧鑳?|
-| [鏂囨。鏍煎紡瑙勮寖](./05-DOCUMENT-STANDARDS.md) | YAML 妯℃澘銆丂 璇硶銆佸懡鍚嶇害瀹?|
-| [閰嶇疆浣撶郴](./06-CONFIGURATION.md) | .env 鐩綍涓庡紩鎿庡弬鏁?|
-| [API 鎺ュ彛瑙勮寖](./07-API-REFERENCE.md) | 澶氭ā鍨嬫帴鍙ｅ崗璁?|
-| [Schema 閫熸煡琛╙(./schema/QUICK_REFERENCE.md) | 瀛楁涓庢灇涓惧€奸€熸煡 |
+| [工作流程说明](./02-WORKFLOW.md) | 五步循环完整流程 |
+| [CLI 命令参考](./03-CLI-REFERENCE.md) | 全部 8 个命令的详细用法 |
+| [Agent 与 Skill 体系](./04-AGENTS-AND-SKILLS.md) | 6 个角色 + 10 个技能 |
+| [文档格式规范](./05-DOCUMENT-STANDARDS.md) | YAML 模板、@ 语法、命名约定 |
+| [配置体系](./06-CONFIGURATION.md) | .env 目录与引擎参数 |
+| [API 接口规范](./07-API-REFERENCE.md) | 多模型接口协议 |
+| [Schema 速查表](./schema/QUICK_REFERENCE.md) | 字段与枚举值速查 |
 
 ---
 
 > *"代码是写给人看的，只是顺便让机器运行。"*
-> *OpsV 0.4.3 | 最后更新: 2026-03-28*
+> *OpsV 0.4.5 | 最后更新: 2026-03-29*
