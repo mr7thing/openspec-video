@@ -1,4 +1,4 @@
-﻿# OpsV CLI 鍛戒护鍙傝€冩墜鍐?(CLI Reference)
+# OpsV CLI 鍛戒护鍙傝€冩墜鍐?(CLI Reference)
 
 > 瑕嗙洊鍏ㄩ儴 CLI 鍛戒护鐨勮娉曘€佸弬鏁般€侀€夐」鍜屼娇鐢ㄧず渚嬨€?
 
@@ -21,7 +21,7 @@
 
 ---
 
-## 1. `opsv init [projectName]`
+## 1. `opsv init [projectName] [options]`
 
 鍒濆鍖栦竴涓柊鐨?OpsV 瑙嗛椤圭洰銆?
 
@@ -29,6 +29,18 @@
 ```bash
 opsv init              # 鍦ㄥ綋鍓嶇洰褰曞垵濮嬪寲
 opsv init my-mv        # 鍒涘缓骞跺垵濮嬪寲 my-mv 鐩綍
+```
+
+### 自动化 / 非交互式初始化 (v0.4.4)
+你可以通过以下参数跳过交互式菜单，这对于 AI Agent 或 CI/CD 自动化流非常有用：
+- `-g, --gemini`: 启用 Gemini 支持 (`GEMINI.md`)。
+- `-o, --opencode`: 启用 OpenCode 支持 (`AGENTS.md` + `.opencode/`)。
+- `-t, --trae`: 启用 Trae 支持 (`AGENTS.md` + `.trae/`)。
+
+### 示例
+```bash
+# 自动化初始化并开启 Gemini 和 Trae 支持
+opsv init my-project --gemini --trae
 ```
 
 ### 浜や簰娴佺▼

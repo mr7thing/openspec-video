@@ -20,10 +20,21 @@
 
 ## 1. Project Initialization
 
-### `opsv init [projectName]`
-Sets up a new project skeleton.
+### `opsv init [projectName] [options]`
+Initializes a new project skeleton.
 - **Actions**: Creates directory structure, copies `.agent/` and `.env/` templates.
-- **Interactions**: Prompts to select AI assistant support (Gemini, OpenCode, or Trae).
+- **Interactions**: Prompts to select AI assistant support (Gemini, OpenCode, or Trae) if no flags are provided.
+
+### Automated / Non-Interactive Initialization
+You can bypass the interactive prompts by using specific flags. This is useful for AI Agents or CI/CD pipelines:
+- `-g, --gemini`: Enable Gemini support (`GEMINI.md`).
+- `-o, --opencode`: Enable OpenCode support (`AGENTS.md` + `.opencode/`).
+- `-t, --trae`: Enable Trae support (`AGENTS.md` + `.trae/`).
+
+Example:
+```bash
+opsv init my-project --gemini --trae
+```
 
 ---
 

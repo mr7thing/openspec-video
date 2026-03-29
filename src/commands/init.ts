@@ -9,7 +9,10 @@ export function registerInitCommand(program: Command, VERSION: string) {
     program
         .command('init [projectName]')
         .description('Initialize a new OpenSpec-Video project')
-        .action(async (projectName) => {
+        .option('-g, --gemini', 'Initialize with Gemini support (GEMINI.md)')
+        .option('-o, --opencode', 'Initialize with OpenCode support (AGENTS.md + .opencode)')
+        .option('-t, --trae', 'Initialize with Trae support (AGENTS.md + .trae)')
+        .action(async (projectName, options) => {
             let targetDir = process.cwd();
             if (projectName && projectName !== '.') {
                 targetDir = path.resolve(process.cwd(), projectName);
@@ -25,18 +28,29 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 return;
             }
 
-            const { tools } = await inquirer.prompt([
-                {
-                    type: 'checkbox',
-                    name: 'tools',
-                    message: 'Select the AI assistants you want to support:',
-                    choices: [
-                        { name: 'Gemini (Legacy - GEMINI.md)', value: 'gemini', checked: true },
-                        { name: 'OpenCode (AGENTS.md + .opencode)', value: 'opencode' },
-                        { name: 'Trae (AGENTS.md + .trae)', value: 'trae' }
-                    ]
-                }
-            ]);
+            let tools: string[] = [];
+
+            // 1. Check for CLI flags for automated/non-interactive use
+            if (options.gemini) tools.push('gemini');
+            if (options.opencode) tools.push('opencode');
+            if (options.trae) tools.push('trae');
+
+            // 2. If no flags provided, fall back to interactive prompt
+            if (tools.length === 0) {
+                const response = await inquirer.prompt([
+                    {
+                        type: 'checkbox',
+                        name: 'tools',
+                        message: 'Select the AI assistants you want to support:',
+                        choices: [
+                            { name: 'Gemini (Legacy - GEMINI.md)', value: 'gemini', checked: true },
+                            { name: 'OpenCode (AGENTS.md + .opencode)', value: 'opencode' },
+                            { name: 'Trae (AGENTS.md + .trae)', value: 'trae' }
+                        ]
+                    }
+                ]);
+                tools = response.tools;
+            }
 
             console.log(`Initializing project in ${targetDir}...`);
 
