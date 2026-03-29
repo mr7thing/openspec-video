@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.4.3
+# OpenSpec-Video (OpsV) 0.4.5
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
@@ -60,5 +60,19 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *"Code is for humans to read, and only incidentally for machines to execute."*
-> *OpsV 0.4.3 | 2026-03-28*
+> *OpsV 0.4.5 | 2026-03-29*
+
+---
+
+## 🆕 Release Notes / 更新说明 (v0.4.5)
+
+### 0.4.5 - Digital Archaeology & Recovery (2026-03-29)
+- **Document Restoration**: Restored corrupted Agent Skill reference files from Git history (v0.2/v0.3 reconciliation).
+- **Encoding Integrity**: Enforced UTF-8 encoding across all template assets to prevent character corruption.
+- **Skill Evolution**: Renamed `opsv-director` to `opsv-cli-agent` to emphasize non-interactive CLI automation.
+
+### 0.4.4 - Agentic Automation (2026-03-29)
+- **Non-Interactive Init**: Added `--gemini`, `--opencode`, and `--trae` flags to `opsv init` for silent deployment.
+- **Internationalization (i18n)**: Achieved 1:1 parity between English and Chinese documentation across all agents and skills.
+- **Director Role**: Introduced the `opsv-director` (now `opsv-cli-agent`) skill for full-pipeline orchestration.
+

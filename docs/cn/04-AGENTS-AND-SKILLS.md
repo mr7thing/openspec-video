@@ -62,28 +62,27 @@
 
 **鍏抽敭瑙勫垯**锛?
 - 绂佹鍦ㄤ俊鎭笉瓒虫椂鐩存帴鐢熸垚 `project.md`
-- `vision` 瀛楁涓枃锛宍global_style_postfix` 瀛楁绾嫳鏂?
-- 3 涓柟妗堝繀椤婚鏍煎樊寮傚寲
+- `vision` 瀛楁涓枃锛宍global_style_postfix` 瀛楁绾嫳鏂?
+- 3 涓柟妗堝繀椤婚鏍煎樊寮傚圲
 
 ---
 
-### 0. `opsv-cli-agent` — 非交互式全自动执行手册 (v0.4.4+)
+### 0. `opsv-cli-agent` — Automation Execution Manual (v0.4.5+)
 - **第一阶段：Agent 零摩擦初始化**：利用 `-g/-o/-t` 标识实现静默部署。
 - **第二阶段：CLI 自动化调度**：串联剧作、分镜与动画的全量生成与校验。
 - **第三阶段：导演审查桥接**：为 Agent 提供强制性的人工介入点（Checkpoint）。
 - **第四阶段：视频合成流水线**：驱动 `opsv animate` 与 `execute-video` 完成交付。
-锛氳瘑鍒珮棰戝嚭鐜扮殑瑙掕壊/鍦烘櫙/閬撳叿
-2. **璧勪骇澹版槑**锛氬啓鍏?`elements/` 鍜?`scenes/` 鐩綍锛屼弗瀹?`has_image` 浜屽厓娉?
-3. **浠ｇ爜鍖栧ぇ绾?*锛氭墍鏈夋暟鎹繘 YAML Frontmatter
 
-**涓夋寮忔牸寮?*锛?
+**三段式格式**：
 ```yaml
 ---
 name: opsv-cli-agent
 description: Comprehensive guide for AI Agents to autonomously orchestrate the OpsV CLI pipeline. Supports Phase 1 (Init) -> Phase 2 (Script/Spec) -> Phase 3 (Asset Rendering) -> Phase 4 (Manual Review) -> Phase 5 (Video Gen). Essential for "agent-driven" production.
 ---
 
-# OpsV CLI Agent: Automation Execution Manual (v0.4.4+)ironment
+# OpsV CLI Agent: Automation Execution Manual (v0.4.5+)
+
+## environment
 [鐜/鑳屾櫙锛屼腑鏂嘳
 
 ## camera
