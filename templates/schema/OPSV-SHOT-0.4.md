@@ -1,74 +1,79 @@
-# OPSV-SHOT-0.4 分镜与动画规格 (Shot/Animation Spec)
+# OPSV-SHOT-0.4 Shot & Animation Specification
 
-> 定义 OpsV 0.4 环境下的分镜语法、动态控制参数及长镜头继承逻辑。本版本强化了 **动静分离原则**，确保视频生成的特征一致性。
-
----
-
-## 1. 核心设计哲学
-
-- **@锚点解耦**：分镜中严禁出现“黑发、红瞳”等视觉描写，必须使用 `@role_K` 引用。
-- **动静分离**：视觉特征由 `Approved References` (a-ref) 提供；本规格仅负责：**镜头运镜**、**角色肢体动作**、**环境动态演变**。
-- **平行宇宙**：默认支持 `--model all`。编译器会自动为每个启用的引擎生成任务。
+> Defines the storyboard syntax, dynamic control parameters, and long-take inheritance logic for OpsV 0.4 environment. This version reinforces the **Static-Motion Separation Principle** to ensure consistent identity in video generation.
 
 ---
 
-## 2. YAML 结构定义
+## 1. Core Design Philosophy
 
-此结构适用于 `Script.md` (前中期) 与 `Shotlist.md` (后期动画控制)。
+- **@Anchor Decoupling**: Visual descriptions (e.g., "black hair", "red eyes") are strictly prohibited in storyboards; use `@role_K` references instead.
+- **Static-Motion Separation**: Visual features are provided by `Approved References` (a-ref); this spec is only responsible for: **Camera Motion**, **Subject Action**, and **Environmental Evolution**.
+- **Parallel Universe**: Default support for `--model all`. The compiler automatically generates tasks for each enabled engine.
+
+---
+
+## 2. YAML Structure Definition
+
+This structure applies to `Script.md` (Early/Mid stage) and `Shotlist.md` (Late-stage animation control).
 
 ```yaml
 shots:
   - id: "shot_1"
-    duration: 5s              # 建议时长 3-5s，上限 15s
-    # --- 视觉输入 (Static Input) ---
-    first_image: "artifacts/drafts_2/shot_1_draft_2.png" # 精确首帧路径，或 @FRAME:shot_0_last (长镜头继承)
-    reference_images:         # 自动由编译器从引用的 @entity a-ref 中提取，无需人工维护
+    duration: 5s              # Recommended 3-5s, max 15s
+    # --- Static Input ---
+    first_image: "artifacts/drafts_2/shot_1_draft_2.png" # Precise path or @FRAME:shot_0_last
+    reference_images:         # Auto-extracted by compiler from @entity a-ref
       - "artifacts/drafts_1/role_K_turnaround.png"
-    # --- 动态控制 (Motion Control) ---
-    camera_motion: "Extreme macro, slow push in"       # 运镜指令
-    motion_prompt_zh: "镜头极微距推进，蚕茧表面缓慢裂开"     # 中文意图
-    motion_prompt_en: >                                # 英文 API 核心指令 (给视频大模型)
+    # --- Motion Control ---
+    camera_motion: "Extreme macro, slow push in"       # Directional intent
+    motion_prompt_zh: "镜头极微距推进，蚕茧表面缓慢裂开"     # Chinese intent (optional)
+    motion_prompt_en: >                                # Primary API Instruction
       Macro shot, surface slowly cracking, morning dew trembling, 
       cinematic smooth motion, high frame rate quality.
-    # --- 质检标记 (QA Metadata) ---
-    entities: ["@role_butterfly", "@scene_cocoon"]     # 本镜头涉及的实体
+    # --- QA Metadata ---
+    entities: ["@role_butterfly", "@scene_cocoon"]     # Entities involved in this shot
 ```
 
 ---
 
-## 3. 关键字段深度说明
+## 3. Detailed Field Specifications
 
-### 3.1 `first_image` 与长镜头继承
-- **确指路径**：指向由 `opsv review` 确认后的最佳草图。
-- **继承指针 `@FRAME:<id>_last`**：
-  - 代表使用前一个 Shot 生成视频的最后一帧作为本镜头的首帧。
-  - 核心用途：保证同一段运动在不同分镜间的完美转场连贯性。
+### 3.1 `first_image` and Long-Take Inheritance
+- **Explicit Path**: Points to the best draft confirmed via `opsv review`.
+- **Inheritance Pointer `@FRAME:<id>_last`**:
+  - Represents using the last frame of the specified shot's video as the first frame of this shot.
+  - Core Use: Ensures perfect temporal continuity for continuous motion across multiple shots.
 
-### 3.2 `motion_prompt_en` (强制全英文)
-- **准则**：仅描述“变动的部分”。
-- **禁区**：禁止出现任何形容词性外貌描述。例如：
+### 3.2 `motion_prompt_en` (Mandatory English)
+- **Guideline**: Describe ONLY the "changing parts."
+- **Forbidden Zones**: Do not include appearance adjectives.
   - ❌ `A beautiful girl in red dress running...`
-  - ✅ `Subject running rapidly towards the light, hair fluttering in the wind...` (美不美、穿什么由首帧和参考图定)。
+  - ✅ `Subject running rapidly towards the light, hair fluttering in the wind...` (Appearance fixed by reference image).
 
 ---
 
-## 4. 目录与编译约束 (0.4.3+)
+## 4. Compilation Constraints (0.4.3+)
 
-- **任务生成**：`opsv animate` 将解析分镜文件。
-- **输出隔离**：视频产物严格按照模型引擎隔离存储：
+- **Task Generation**: `opsv animate` parses the storyboard files.
+- **Output Isolation**: Videos are stored strictly by engine name:
   - `artifacts/videos/[EngineName]/shot_1_v1.mp4`
-- **风格注入**：编译器会自动将 `project.md` 中的 `global_style_postfix` 注入每一个视频生成任务，确保全片调色与质感统一。
+- **Style Injection**: The compiler automatically appends `global_style_postfix` from `project.md` to every video task.
 
 ---
 
-## 5. 质检门禁 (Supervisor /opsv-qa)
+## 5. Quality Gates (Supervisor /opsv-qa)
 
-| 检查项 | 逻辑说明 |
+| Check Item | Logic |
 | :--- | :--- |
-| **特征泄漏检查** | 扫描 `motion_prompt_en` 是否含有颜色、外观等违禁词。 |
-| **参考图对齐** | 验证所引用的 `@entity` 是否拥有定档的 `Approved References`。 |
-| **首帧合法性** | 检查图片路径是否存在，或者 `@FRAME` 指针是否闭环。 |
+| **Feature Leakage** | Scan `motion_prompt_en` for color, appearance, or forbidden adjectives. |
+| **Reference Alignment** | Verify that cited `@entity` has valid `Approved References`. |
+| **First Frame Validity** | check if the image path exists or if the `@FRAME` pointer is closed. |
 
 ---
 
-> *OPSV-SHOT-0.4 | OpsV 0.4.3 | 最后更新: 2026-03-28*
+## 中文参考 (Chinese Reference)
+<!--
+定义 OpsV 0.4 环境下的分镜语法及动态控制逻辑。
+核心原则：动静分离，分镜中禁止容貌描写。
+支持 @FRAME 关键帧继承和多模型平行生成。
+-->
