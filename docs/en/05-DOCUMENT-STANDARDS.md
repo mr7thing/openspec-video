@@ -1,93 +1,208 @@
-# OpsV Document Standards
+# Document Standards (v0.5)
 
-> Formatting conventions, YAML templates, @ reference syntax, and naming standards for all `.md` files in OpsV.
+> OpenSpec-Video v0.5 adopts a **Four-Layer Specification System** to ensure deterministic document-as-code workflows.
 
----
+## 1. Four-Layer Architecture
 
-## 1. General Formatting Guidelines
-
-### 1.1 Mandatory YAML Frontmatter
-All OpsV documents (Assets, Storyboards, Projects) **must** begin with YAML Frontmatter:
-```yaml
----
-key: value
----
 ```
-- The compiler **only reads the YAML area**.
-- Markdown body is for human review and is ignored by the compiler.
-- YAML must be valid (check indentation and spaces after colons).
+Layer 1: @ Reference Syntax    → Standardized inter-document linking
+Layer 2: Frontmatter Schema    → YAML metadata type constraints
+Layer 3: Markdown Body         → Human-readable content conventions
+Layer 4: Execution Rules       → Compile-time + runtime semantic validation
+```
 
-### 1.2 Language Standards
-| Element | Language | Description |
-|---------|----------|-------------|
-| Body/Notes | User Preference | To reduce cognitive friction for the director. |
-| `prompt_en` | English | For image rendering models (SD/Flux/SeaDream). |
-| `motion_prompt_en` | English | For video models (Seedance/Wan 2.1). |
-| YAML Keys | English | For programming consistency. |
+## 2. Frontmatter Schema (v0.5)
 
----
+### 2.1 Element Documents (elements/*.md)
 
-## 2. Asset Documents (elements/ and scenes/)
-
-### 2.1 YAML Structure
 ```yaml
 ---
-name: "@role_hero"           # @ prefix + type + ID
-type: "character"             # character | scene | prop
-brief_description: "One-sentence summary"
-detailed_description: >       # Detailed features for non-image gen
-  Dense features, 3-5 sentences.
-prompt_en: >                  # Render prompt
-  Dense English prompt for diffusion models.
+type: character | prop | costume    # Asset type (required)
+status: drafting | approved         # Status (required)
+reference: elder_brother            # Variant dependency (optional)
+refs:                               # Referenced asset IDs (optional)
+  - elder_brother
+  - school_uniform
+reviews:                            # Review history (auto-appended)
+  - "2025-03-15: approved via review UI"
 ---
 ```
 
-### 2.2 Dual-Channel Reference System (d-ref / a-ref)
-- **Design References (d-ref)**: Input references for generating the entity itself (mood boards, sketches).
-- **Approved References (a-ref)**: Fixed outputs confirmed by the director. Used as inputs when **others** reference this entity.
+**Removed Fields** (v0.4 → v0.5 Breaking Changes):
+- ~~`has_image`~~ → Replaced by `status: approved` + `## Approved References`
+- ~~`visual_traits`~~ → Replaced by body text descriptions
+- ~~`brief_description`~~ → Replaced by first paragraph of body
+- ~~`detailed_description`~~ → Replaced by body content
 
----
+### 2.2 Scene Documents (scenes/*.md)
 
-## 3. Project Configuration (project.md)
+Same structure as element documents. `type: scene`.
+
+### 2.3 Shot Design Document (shots/Script.md)
+
 ```yaml
 ---
-aspect_ratio: "16:9"          # 16:9 | 9:16 | 1:1 | 21:9 | 4:3
-engine: "seedance"            # Default engine
-vision: "Global project vision"
-global_style_postfix: "cinematic, 8k, masterpiece"
-resolution: "2K"              # 720p | 1080p | 2K | 4K
+type: shot-design                   # Fixed value
+status: drafting | approved
+total_shots: 48                     # Total shot count
+refs:                               # All asset IDs referenced in this file
+  - elder_brother
+  - younger_brother
+  - classroom
 ---
 ```
 
+### 2.4 Shot Production Document (shots/Shotlist.md)
+
+```yaml
 ---
-
-## 4. Script & Shotlist Standards
-
-### 4.1 Script.md (Storyboard)
-- `shots` array in YAML.
-- Mandatory `id`, `duration` (3-15s), and `camera`.
-- Markdown body with visual gallery placeholders.
-
-### 4.2 Shotlist.md (Animation)
-- Passthrough `duration` from Script.md.
-- `motion_prompt_en`: **Pure motion only**, no appearance adjectives.
-- Supports `@FRAME:<id>_last` for temporal continuity.
-
+type: shot-production               # Fixed value
+status: drafting | approved
 ---
+```
 
-## 5. @ Reference Syntax
-- `@role_K`: References `videospec/elements/@role_K.md`.
-- `@scene_Forest`: References `videospec/scenes/@scene_Forest.md`.
-- `@prop_Sword`: References `videospec/elements/@prop_Sword.md`.
+### 2.5 Project Configuration (project.md)
 
+```yaml
 ---
-
-## 6. Glossary of Terms
-- **Shot Types**: EWS, WS, MS, MCU, CU, ECU.
-- **Angles**: Eye level, Low angle, High angle, Dutch angle.
-- **Movements**: Static, Dolly (in/out), Pan, Truck, Tilt, Orbit, Tracking.
-
+type: project
+engine: seedance-1.5-pro
+aspect_ratio: "16:9"
+resolution: "1920x1080"
+global_style_postfix: "cinematic lighting, film grain"
+vision: "A short film about brotherhood"
 ---
+```
 
-> *"Format is Law; YAML is Truth."*
-> *OpsV 0.4.3 | Latest Update: 2026-03-29*
+## 3. @ Reference Syntax
+
+### 3.1 Format
+
+```
+@asset_id           → Reference the default variant of an asset
+@asset_id:variant   → Reference a specific variant
+```
+
+### 3.2 Examples
+
+```markdown
+## Shot 01 - Classroom Reunion
+
+@elder_brother walks into the classroom, seeing @younger_brother by the window.
+The background is @classroom:morning with warm morning light.
+```
+
+### 3.3 Resolution Rules
+
+| Reference | Resolves To |
+|-----------|-------------|
+| `@elder_brother` | `default` variant in `## Approved References` of `elements/elder_brother.md` |
+| `@elder_brother:childhood` | `childhood` variant in the same section |
+| `@classroom:morning` | `morning` variant in `scenes/classroom.md` |
+
+### 3.4 Constraints
+
+- Target must exist in `elements/` or `scenes/` directory
+- Referenced variant must be approved in `## Approved References`
+- Unapproved dependencies are blocked by DependencyGraph
+
+## 4. Markdown Body Conventions
+
+### 4.1 Approved References Section
+
+Auto-appended when an asset passes `opsv review`:
+
+```markdown
+## Approved References
+
+### default
+![default](../../artifacts/elder_brother_default.png)
+
+### childhood
+![childhood](../../artifacts/elder_brother_childhood.png)
+```
+
+### 4.2 Design References Section (Optional)
+
+For external reference images (not generated):
+
+```markdown
+## Design References
+
+![ref1](../../ref/elder_brother_ref.jpg)
+```
+
+### 4.3 Script.md Body Structure
+
+v0.5 parses shots from **body `## Shot NN` headers**, not frontmatter `shots[]` arrays:
+
+```markdown
+## Shot 01 - Classroom Reunion
+
+@elder_brother pushes open the classroom door, morning light pouring in.
+Camera: Medium tracking shot, slow push-in.
+
+## Shot 02 - Window Gaze
+
+@younger_brother turns to look at the door, smiling.
+Camera: Close-up, shallow depth of field.
+```
+
+## 5. Execution Rules (Compile + Validate)
+
+### 5.1 Compile-Time Generic Validation
+
+- Quote sanitization (YAML → JSON boundary issues)
+- Required field checks (id, prompt, output_path)
+- Residual quote detection
+
+### 5.2 Runtime Model-Specific Validation
+
+```
+opsv gen-image --dry-run    # Validate only, no execution
+```
+
+Validation items:
+- Pixel constraints: model minimum/maximum pixel limits
+- Aspect ratio constraints: model-supported aspect_ratio whitelist
+- Prompt length: model token limits
+
+### 5.3 frame_ref (Replaces schema_0_3)
+
+Video generation jobs use `frame_ref`:
+
+```json
+{
+  "frame_ref": {
+    "first": "/path/to/first_frame.png",
+    "last": "/path/to/last_frame.png"
+  }
+}
+```
+
+**Removed**: `middle_image` (no API actually supports this parameter).
+
+## 6. Dependency Graph
+
+### 6.1 Dependency Sources
+
+- `reference` field: Variant dependency (younger_brother → elder_brother)
+- `refs` field: Content reference dependency
+
+### 6.2 Strict Mode
+
+```
+opsv deps    # View dependency graph analysis
+```
+
+During job generation, DependencyGraph auto-filters:
+- ✅ All dependencies approved → Executable
+- ⏸️ Dependencies not approved → Blocked
+
+### 6.3 Topological Sort
+
+```
+Batch 1: elder_brother, classroom    (no dependencies)
+Batch 2: younger_brother             (depends on elder_brother)
+Batch 3: shot_01, shot_02           (depends on multiple assets)
+```

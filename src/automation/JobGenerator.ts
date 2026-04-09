@@ -1,622 +1,384 @@
 import fs from 'fs';
 import path from 'path';
-import { z } from 'zod';
 import { AssetManager } from '../core/AssetManager';
-import { SpecParser } from '../core/SpecParser';
-import { ShotManager } from '../core/ShotManager';
-import { AssetCompiler, CompiledIntent } from '../core/AssetCompiler';
-import { Job, JobSchema, PromptPayload } from '../types/PromptSchema';
+import { AssetCompiler } from '../core/AssetCompiler';
+import { FrontmatterParser } from '../core/FrontmatterParser';
+import { RefResolver, RefResult } from '../core/RefResolver';
+import { ApprovedRefReader } from '../core/ApprovedRefReader';
+import { DependencyGraph } from '../core/DependencyGraph';
+import { JobValidator } from './JobValidator';
+import { ShotDesignFrontmatterSchema } from '../types/FrontmatterSchema';
+import { Job, PromptPayload } from '../types/PromptSchema';
 import { logger } from '../utils/logger';
+
+// ============================================================================
+// v0.5 任务生成器（图像编译管线）
+// 核心变更:
+//   1. Script.md 从正文 ## Shot NN 解析
+//   2. @ 引用由 RefResolver 处理
+//   3. 集成 DependencyGraph 严格模式
+//   4. 编译期通用校验
+// ============================================================================
+
+interface ParsedShot {
+    id: string;
+    title: string;
+    body: string;
+    refs: RefResult[];
+}
 
 export class JobGenerator {
     private projectRoot: string;
     private assetManager: AssetManager;
-    private specParser: SpecParser;
     private assetCompiler: AssetCompiler;
-    private jobCount: number = 0;
+    private refResolver: RefResolver;
+    private approvedRefReader: ApprovedRefReader;
+    private jobValidator: JobValidator;
     private currentDraftDir: string = '';
-
-    private findGeneratedRef(baseName: string): string | null {
-        const artifactsDir = path.join(this.projectRoot, 'artifacts');
-        if (!fs.existsSync(artifactsDir)) return null;
-
-        const folders = fs.readdirSync(artifactsDir)
-            .filter(f => f.startsWith('drafts_'))
-            .sort((a, b) => {
-                const numA = parseInt(a.replace('drafts_', ''), 10);
-                const numB = parseInt(b.replace('drafts_', ''), 10);
-                return numB - numA;
-            });
-
-        for (const folder of folders) {
-            const p = path.join(artifactsDir, folder, `${baseName}.png`);
-            if (fs.existsSync(p)) return p;
-        }
-
-        // Fallback
-        const elemPath = path.join(artifactsDir, 'elements', `${baseName}.png`);
-        if (fs.existsSync(elemPath)) return elemPath;
-
-        const scenePath = path.join(artifactsDir, 'scenes', `${baseName}.png`);
-        if (fs.existsSync(scenePath)) return scenePath;
-
-        return null;
-    }
+    private batchIndex: number = 1;
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
-        this.assetManager = new AssetManager(projectRoot);
-        this.specParser = new SpecParser(projectRoot);
-        this.assetCompiler = new AssetCompiler(projectRoot);
+        this.assetManager = new AssetManager(this.projectRoot);
+        this.assetCompiler = new AssetCompiler(this.projectRoot);
+        this.approvedRefReader = new ApprovedRefReader(this.projectRoot);
+        this.refResolver = new RefResolver(this.projectRoot, this.approvedRefReader);
+        this.jobValidator = new JobValidator();
     }
 
-    async generateJobs(targets: string[], options: { preview?: boolean, shots?: string[] } = {}): Promise<Job[]> {
+    async generateJobs(
+        targets: string[],
+        options: { preview?: boolean; shots?: string[] } = {}
+    ): Promise<Job[]> {
+        // ---- 初始化 ----
         await this.assetManager.loadAssets();
-        const projectConfig = await this.specParser.parseProjectConfig();
-        const shotManager = new ShotManager(this.projectRoot);
-
-        // Load 0.3.2 AssetCompiler and global configurations
         this.assetCompiler.loadProjectConfig();
-        this.assetCompiler.indexAssets();
-        this.jobCount = 0;
+        const globalConfig = this.assetCompiler.getProjectConfig();
 
-        let jobs: Job[] = [];
-
-        // 1. Calculate dynamic batched drafts directory
-        let batchIndex = 1;
-        while (fs.existsSync(path.join(this.projectRoot, `artifacts/drafts_${batchIndex}`))) {
-            batchIndex++;
+        // ---- 计算批次目录 ----
+        this.batchIndex = 1;
+        while (fs.existsSync(path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`))) {
+            this.batchIndex++;
         }
-        this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${batchIndex}`);
+        this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`);
         fs.mkdirSync(this.currentDraftDir, { recursive: true });
 
-        // If no targets provided, default to scanning all normative folders
+        // ---- 构建依赖图（每次 generate 前重新构建，确保最新） ----
+        const depGraph = DependencyGraph.buildFromProject(this.projectRoot);
+        logger.info(depGraph.prettyPrint(this.approvedRefReader));
+
+        // ---- 扫描目标目录 ----
         if (!targets || targets.length === 0) {
             targets = [
                 path.join(this.projectRoot, 'videospec/elements'),
                 path.join(this.projectRoot, 'videospec/scenes'),
-                path.join(this.projectRoot, 'videospec/shots')
+                path.join(this.projectRoot, 'videospec/shots'),
             ];
         }
 
+        let allJobs: Job[] = [];
         for (const target of targets) {
             const targetPath = path.resolve(this.projectRoot, target);
-            if (!fs.existsSync(targetPath)) {
-                console.warn(`Warning: Target path not found: ${targetPath}`);
-                continue;
-            }
+            if (!fs.existsSync(targetPath)) continue;
 
             const stats = fs.statSync(targetPath);
             if (stats.isDirectory()) {
                 const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
                 for (const file of files) {
                     const filePath = path.join(targetPath, file);
-                    const fileJobs = await this.processFile(filePath, projectConfig, options, shotManager);
-                    jobs = jobs.concat(fileJobs);
+                    const jobs = await this.processFile(filePath, globalConfig, options);
+                    allJobs = allJobs.concat(jobs);
                 }
             } else if (stats.isFile() && targetPath.endsWith('.md')) {
-                const fileJobs = await this.processFile(targetPath, projectConfig, options, shotManager);
-                jobs = jobs.concat(fileJobs);
+                const jobs = await this.processFile(targetPath, globalConfig, options);
+                allJobs = allJobs.concat(jobs);
             }
         }
 
-        // Save to primary queue for daemon processing
+        // ---- 编译期通用校验 + 清洗 ----
+        const { valid, errors, sanitized } = this.jobValidator.validateAndSanitize(allJobs);
+        if (!valid) {
+            logger.warn(`\n⚠️ 编译期校验发现 ${errors.length} 个问题:`);
+            for (const err of errors) {
+                logger.warn(`  ❌ ${err.jobId}.${err.field}: ${err.message}`);
+            }
+        }
+        allJobs = sanitized || allJobs;
+
+        // ---- 依赖图严格模式: 仅保留可执行的任务 ----
+        const { executable, blocked, reasons } = depGraph.filterExecutable(allJobs, this.approvedRefReader);
+        if (blocked.length > 0) {
+            logger.warn(`\n⚠️ ${blocked.length} 个任务因依赖未就绪被暂缓:`);
+            for (const [id, reason] of reasons) {
+                logger.warn(`  ⏸️ ${id}: ${reason}`);
+            }
+        }
+
+        // ---- 写入 queue ----
         const queueDir = path.join(this.projectRoot, 'queue');
         if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
 
+        // 主任务队列
         fs.writeFileSync(
             path.join(queueDir, 'jobs.json'),
-            JSON.stringify(jobs, null, 2)
+            JSON.stringify(executable, null, 2)
         );
 
-        // Save a historical backup to the specific batch directory for ComfyUI reuse
+        // 带批次号的备份（用于 review 时按批次检索）
         fs.writeFileSync(
-            path.join(this.currentDraftDir, 'jobs.json'),
-            JSON.stringify(jobs, null, 2)
+            path.join(this.currentDraftDir, `jobs_batch_${this.batchIndex}.json`),
+            JSON.stringify(executable, null, 2)
         );
 
-        return jobs;
+        logger.info(
+            `\n✅ 编译完成: ${executable.length} 个可执行任务` +
+            (blocked.length > 0 ? ` (${blocked.length} 个等待依赖)` : '')
+        );
+
+        return executable;
     }
 
-    private async processFile(filePath: string, config: any, options: { preview?: boolean, shots?: string[] }, shotManager: ShotManager): Promise<Job[]> {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const fileName = path.basename(filePath);
-        // Normalize slashes for robust path checking
+    // ================================================================
+    // 文件分流
+    // ================================================================
+
+    private async processFile(
+        filePath: string,
+        globalConfig: any,
+        options: { preview?: boolean; shots?: string[] }
+    ): Promise<Job[]> {
         const normalizedPath = filePath.replace(/\\/g, '/');
 
         if (normalizedPath.includes('/elements/') || normalizedPath.includes('/scenes/')) {
-            return this.processAssetFile(filePath, content, config);
+            return this.processAssetFile(filePath, globalConfig);
         } else if (normalizedPath.includes('/shots/')) {
-            return this.processShotFile(filePath, content, config, options, shotManager);
+            // v0.5: 只处理 Script.md（shot-design），跳过 Shotlist.md（shot-production）
+            if (path.basename(filePath).toLowerCase() === 'shotlist.md') {
+                logger.info(`跳过 Shotlist.md（视频编译管线专用）`);
+                return [];
+            }
+            return this.processShotDesignFile(filePath, globalConfig, options);
         }
 
-        console.warn(`Warning: File ${fileName} is not in a normative directory (elements, scenes, shots). Skipping generation for this file.`);
+        logger.warn(`跳过非规范目录文件: ${filePath}`);
         return [];
     }
 
-    private async processAssetFile(filePath: string, content: string, config: any): Promise<Job[]> {
-        const jobs: Job[] = [];
+    // ================================================================
+    // 资产文件处理（elements/*.md, scenes/*.md）
+    // ================================================================
 
-        // ---- Phase 1: Parse YAML frontmatter ----
-        const parts = content.split(/^---$/m);
-        if (parts.length < 3) return jobs;
+    private async processAssetFile(filePath: string, globalConfig: any): Promise<Job[]> {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const id = path.parse(filePath).name.replace(/^@/, '');
 
         let frontmatter: any;
+        let body: string;
         try {
-            const yaml = require('js-yaml');
-            frontmatter = yaml.load(parts[1]);
-        } catch { return jobs; }
-
-        const id = frontmatter.name?.replace(/^@/, '') || path.parse(filePath).name;
-        const name = frontmatter.name || id;
-        const hasImage = frontmatter.has_image === true;
-
-        // Read descriptions directly from YAML (no regex hacking)
-        const detailedDesc = frontmatter.detailed_description || '';
-        const briefDesc = frontmatter.brief_description || '';
-        let promptEn = frontmatter.prompt_en || '';
-
-        // Use brief desc if reference confirmed, otherwise detailed
-        const description = hasImage ? briefDesc : detailedDesc;
-
-        console.log(`  Found Asset: ${id} - ${name}`);
-
-        // ---- Phase 2: Parse markdown body for payload sections ----
-        const body = parts.slice(2).join('---');
-        const subjectMatch = body.match(/^## subject\s*\n([\s\S]*?)(?=\n## |\n$)/im);
-        const envMatch = body.match(/^## environment\s*\n([\s\S]*?)(?=\n## |\n$)/im);
-        const cameraMatch = body.match(/^## camera\s*\n([\s\S]*?)(?=\n## |\n$)/im);
-
-        const subjectDesc = subjectMatch ? subjectMatch[1].trim() : description;
-        const envDesc = envMatch ? envMatch[1].trim() : '';
-        const cameraDesc = cameraMatch ? cameraMatch[1].trim() : '';
-
-        // ---- Phase 3: Extract reference images ----
-        const referenceImages: string[] = [];
-        
-        // Use AssetManager's parsed references if available
-        const asset = this.assetManager.getElement(id) || this.assetManager.getScene(id);
-        if (asset && asset.design_references && asset.design_references.length > 0) {
-            referenceImages.push(...asset.design_references);
-        } else if (asset && asset.reference_images && asset.reference_images.length > 0) {
-            referenceImages.push(...asset.reference_images);
-        } else {
-            const refImgMatch = body.match(/\[.*?\]\((.*?)\)/);
-            if (refImgMatch && refImgMatch[1]) {
-                const absPath = path.resolve(path.dirname(filePath), refImgMatch[1]);
-                if (fs.existsSync(absPath)) referenceImages.push(absPath);
-            }
+            const parsed = FrontmatterParser.parseRaw(content);
+            frontmatter = parsed.frontmatter;
+            body = parsed.body;
+        } catch {
+            return [];
         }
 
-        // ---- Phase 4: Build payload.prompt (中文叙事) ----
-        const ar = config.context?.style?.aspect_ratio || "16:9";
-        const res = config.context?.style?.resolution || "2K";
-
-        const globalConfig = this.assetCompiler.getProjectConfig();
-        const stylePostfix = globalConfig.global_style_postfix || config.context?.style?.visual_style;
-        if (stylePostfix && promptEn) {
-            promptEn = `${promptEn}, ${stylePostfix}`;
+        // v0.5: 如果 status 已经是 approved，跳过图像生成
+        if (frontmatter.status === 'approved') {
+            logger.info(`  跳过已 approved 资产: ${id}`);
+            return [];
         }
 
-        let payloadPrompt = "";
-        if (this.jobCount === 0) {
-            const vision = globalConfig.vision;
-            if (vision) payloadPrompt += `${vision} `;
-            payloadPrompt += `请帮我生成以下角色/物品设定图片：\n\n`;
-        }
-        this.jobCount++;
-        payloadPrompt += `[角色/场景设定: @${id}]\n${description}`;
+        logger.info(`  处理资产: ${id} (type: ${frontmatter.type}, status: ${frontmatter.status})`);
 
-        if (referenceImages.length > 0) {
-            payloadPrompt += `\n参考图：`;
-            referenceImages.forEach((_, idx) => { payloadPrompt += `[image${idx + 1}] `; });
-        }
+        // ---- 从正文提取描述和 prompt ----
+        const asset = this.assetManager.getAsset(id);
+        const description = asset?.description || this.extractFirstParagraph(body);
 
-        // ---- Phase 5: Assemble output path ----
-        if (!this.currentDraftDir) {
-            this.currentDraftDir = path.join(this.projectRoot, 'artifacts', 'drafts_1');
-            if (!fs.existsSync(this.currentDraftDir)) fs.mkdirSync(this.currentDraftDir, { recursive: true });
-        }
-        const outputDir = this.currentDraftDir;
+        // ---- 从正文中的 @ 引用组装 prompt ----
+        const { prompt, attachments } = this.assetCompiler.assembleAssetPrompt(id, body);
 
-        let baseName = id;
-        let ext = '.png';
-        let finalOutputPath = path.join(outputDir, `${baseName}_draft_1${ext}`);
-        let counter = 1;
-        while (fs.existsSync(finalOutputPath)) {
-            counter++;
-            finalOutputPath = path.join(outputDir, `${baseName}_draft_${counter}${ext}`);
-        }
+        // ---- 全局配置 ----
+        const ar = globalConfig.aspect_ratio || '16:9';
+        const res = globalConfig.resolution || '1920x1080';
 
-        // ---- Phase 6: Build the Job object (dual-channel) ----
+        // ---- 输出路径 ----
+        const outputPath = this.nextOutputPath(id);
+
+        // ---- 构建 Job ----
         const payload: PromptPayload = {
-            prompt: payloadPrompt,
+            prompt: `[资产设计: ${id}]\n${description}`,
             global_settings: { aspect_ratio: ar, quality: res },
-            subject: { description: subjectDesc }
+            subject: { description },
         };
-        if (envDesc) payload.environment = { description: envDesc };
-        if (cameraDesc) payload.camera = { type: cameraDesc };
 
         const job: Job = {
             id,
             type: 'image_generation',
-            prompt_en: promptEn || undefined,
+            prompt_en: prompt || undefined,
             payload,
-            reference_images: referenceImages.length > 0 ? referenceImages : undefined,
-            output_path: finalOutputPath
+            reference_images: attachments.length > 0 ? attachments : undefined,
+            output_path: outputPath,
+            _meta: { batch: `batch_${this.batchIndex}`, source: filePath },
         };
-        jobs.push(job);
 
-        return jobs;
+        return [job];
     }
 
-    private async processShotFile(filePath: string, content: string, config: any, options: { preview?: boolean, shots?: string[] }, shotManager: ShotManager): Promise<Job[]> {
+    // ================================================================
+    // Script.md 处理（从正文 ## Shot NN 解析）
+    // ================================================================
+
+    private async processShotDesignFile(
+        filePath: string,
+        globalConfig: any,
+        options: { preview?: boolean; shots?: string[] }
+    ): Promise<Job[]> {
+        const content = fs.readFileSync(filePath, 'utf-8');
         const jobs: Job[] = [];
 
-        // ---- Phase 1: Parse YAML frontmatter ----
-        const parts = content.split(/^---$/m);
-        if (parts.length < 3) return jobs;
-
-        let frontmatter: any;
+        let body: string;
         try {
-            const yaml = require('js-yaml');
-            frontmatter = yaml.load(parts[1]);
+            const parsed = FrontmatterParser.parseRaw(content);
+            body = parsed.body;
         } catch (e) {
-            console.error(`  Failed to parse YAML in shot file: ${filePath}`);
-            return jobs;
+            logger.error(`Script.md 解析失败: ${(e as Error).message}`);
+            return [];
         }
 
-        const shots = frontmatter.shots;
-        if (!shots || !Array.isArray(shots)) {
-            console.error(`  No 'shots' array found in YAML frontmatter for: ${filePath}`);
-            return jobs;
-        }
+        // ---- v0.5 核心: 从正文 ## Shot NN 标题解析 shots ----
+        const shots = this.parseShotsFromBody(body);
+        logger.info(`  Script.md 解析到 ${shots.length} 个分镜`);
 
-        // ---- Phase 2: Process each shot ----
         for (const shot of shots) {
-            const shotId = shot.id;
-            const shotNumStr = shotId.replace('shot_', '');
-
-            let shouldGenerate = true;
+            // ---- 过滤: preview 模式或指定 shots ----
             if (options.shots && options.shots.length > 0) {
-                shouldGenerate = options.shots.includes(shotId) || options.shots.includes(shotNumStr);
+                const shotNum = shot.id.replace('shot_', '');
+                if (!options.shots.includes(shot.id) && !options.shots.includes(shotNum)) {
+                    continue;
+                }
             } else if (options.preview) {
-                shouldGenerate = (shotNumStr === '1');
+                if (shot.id !== 'shot_01') continue;
             }
 
-            if (!shouldGenerate) continue;
-            if (shotManager) shotManager.updateShotStatus(shotId, 'Draft');
-
-            // Format location/environment
-            const location = shot.environment ? shot.environment.trim() : 'Unknown Location';
-
-            // Build the body description out of camera + subject + environment
-            const cameraPart = shot.camera ? `Camera: ${shot.camera}\n` : '';
-            const envPart = shot.environment ? `Environment: ${shot.environment}\n` : '';
-            const subjectPart = shot.subject ? `Subject: ${shot.subject}` : '';
-            const compiledBody = `${cameraPart}${envPart}${subjectPart}`.trim();
-
-            // Extract the shot's approved reference image from the markdown body
-            const shotRefs: string[] = [];
-            // Regex matches ![...](...shotId.png) or ![...](...shotId_1.png)
-            const shotImgRegex = new RegExp(`!\\[.*?\\]\\((.*?${shotId}(?:_\\d+)?\\.(?:png|jpg|jpeg|webp))\\)`, 'gi');
-            let match;
-            while ((match = shotImgRegex.exec(content)) !== null) {
-                const relativePath = match[1];
-                try {
-                    const absPath = path.resolve(path.dirname(filePath), relativePath);
-                    if (fs.existsSync(absPath)) {
-                        shotRefs.push(absPath);
-                    }
-                } catch (e) { }
-            }
-
-            const job = this.parseShotToJob(
-                shotId,
-                location,
-                compiledBody,
-                config,
-                null,
-                shot.prompt_en,
-                shotRefs
+            // ---- 解析 @ 引用并展开 ----
+            const { expandedText, attachments } = this.refResolver.expandRefsInText(
+                shot.body, shot.refs
             );
 
-            if (job) {
-                jobs.push(job);
+            // ---- 全局配置 ----
+            const ar = globalConfig.aspect_ratio || '16:9';
+            const res = globalConfig.resolution || '1920x1080';
+            const stylePostfix = globalConfig.global_style_postfix || '';
 
-                // --- 0.3.2 Keyframe Resolution Protocol: 靶向生成 ---
-                if (shot.target_last_prompt) {
-                    const lastFrameJob = this.parseShotToJob(
-                        `${shotId}_last`,
-                        location,
-                        `${compiledBody}\nLast Frame Target: ${shot.target_last_prompt}`,
-                        config,
-                        null,
-                        shot.target_last_prompt,
-                        shotRefs
-                    );
-                    if (lastFrameJob) jobs.push(lastFrameJob);
-                }
-            }
+            // ---- 组装 prompt ----
+            let promptEn = this.cleanMarkdown(expandedText);
+            if (stylePostfix) promptEn += `, ${stylePostfix}`;
+
+            // ---- 输出路径 ----
+            const outputPath = this.nextOutputPath(shot.id);
+
+            const payload: PromptPayload = {
+                prompt: `[分镜: ${shot.id} - ${shot.title}]\n${shot.body}`,
+                global_settings: { aspect_ratio: ar, quality: res },
+            };
+
+            const job: Job = {
+                id: shot.id,
+                type: 'image_generation',
+                prompt_en: promptEn,
+                payload,
+                reference_images: attachments.length > 0 ? attachments : undefined,
+                output_path: outputPath,
+                _meta: { batch: `batch_${this.batchIndex}`, source: filePath },
+            };
+
+            jobs.push(job);
         }
 
         return jobs;
     }
 
-    private parseShotToJob(id: string, location: string, body: string, config: any, workflow?: any, promptEn?: string, shotRefs: string[] = []): Job | null {
-        let subjectDesc = body;
-        const assetRefs: string[] = [...shotRefs];
-        const refRegex = /\[(.*?)\]/g;
-        let refMatch;
-        const refs = new Set<string>();
+    // ================================================================
+    // 正文 ## Shot NN 解析器
+    // ================================================================
 
-        while ((refMatch = refRegex.exec(body)) !== null) {
-            refs.add(refMatch[1]);
+    private parseShotsFromBody(body: string): ParsedShot[] {
+        const shots: ParsedShot[] = [];
+
+        // 匹配 ## Shot 01 - 标题 或 ## Shot 1 标题
+        const shotRegex = /^##\s+Shot\s+(\d+)\s*[-–—]?\s*(.*)/gm;
+        const sections: { id: string; title: string; startIdx: number }[] = [];
+
+        let match;
+        while ((match = shotRegex.exec(body)) !== null) {
+            sections.push({
+                id: `shot_${match[1].padStart(2, '0')}`,
+                title: match[2].trim(),
+                startIdx: match.index + match[0].length,
+            });
         }
 
-        for (const refId of refs) {
-            // Check Elements (Characters/Props/Costumes)
-            const char = this.assetManager.getElement(refId);
-            if (char) {
-                let foundRef = false;
-                // 1. Look for Document-Driven References (Highest Priority)
-                if (char.approved_references && char.approved_references.length > 0) {
-                    assetRefs.push(char.approved_references[0]);
-                    foundRef = true;
-                } else if (char.reference_images && char.reference_images.length > 0) {
-                    assetRefs.push(char.reference_images[0]); // Pick first registered reference
-                    foundRef = true;
-                } else {
-                    const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-                    if (fs.existsSync(approvedRef)) {
-                        assetRefs.push(approvedRef);
-                        foundRef = true;
-                    } else {
-                        const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef((char as any).name || '');
-                        if (generatedRef) {
-                            console.warn(`[WARN] Relying on unverified auto-fallback for @${char.id}. Please run 'opsv review' to append references to documentation.`);
-                            assetRefs.push(generatedRef);
-                            foundRef = true;
-                        }
-                    }
-                }
-
-                if (foundRef) {
-                    subjectDesc = subjectDesc.split(`[${refId}]`).join(`${char.name} [image${assetRefs.length}]`);
-                } else {
-                    subjectDesc = subjectDesc.split(`[${refId}]`).join(char.name);
+        for (let i = 0; i < sections.length; i++) {
+            const start = sections[i].startIdx;
+            // 到下一个 ## Shot 或下一个 ## 标题或文档结尾
+            let end = body.length;
+            for (let j = start + 1; j < body.length; j++) {
+                if (body[j] === '#' && body[j + 1] === '#' && (j === 0 || body[j - 1] === '\n')) {
+                    end = j;
+                    break;
                 }
             }
+            const shotBody = body.slice(start, end).trim();
 
-            // Check Scenes
-            const scene = this.assetManager.getScene(refId);
-            if (scene) {
-                let foundRef = false;
-                if (scene.approved_references && scene.approved_references.length > 0) {
-                    assetRefs.push(scene.approved_references[0]);
-                    foundRef = true;
-                } else if (scene.reference_images && scene.reference_images.length > 0) {
-                    assetRefs.push(scene.reference_images[0]);
-                    foundRef = true;
-                } else {
-                    const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
-                    if (fs.existsSync(approvedRef)) {
-                        assetRefs.push(approvedRef);
-                        foundRef = true;
-                    } else {
-                        const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef((scene as any).name || '');
-                        if (sceneRef) {
-                            console.warn(`[WARN] Relying on unverified auto-fallback for @${scene.id}. Please run 'opsv review' to append references to documentation.`);
-                            assetRefs.push(sceneRef);
-                            foundRef = true;
-                        }
-                    }
-                }
+            // 解析正文中的 @ 引用
+            const refs = this.refResolver.parseAll(shotBody);
 
-                if (foundRef) {
-                    subjectDesc = subjectDesc.split(`[${refId}]`).join(`${scene.name} [image${assetRefs.length}]`);
-                } else {
-                    subjectDesc = subjectDesc.split(`[${refId}]`).join(scene.name);
-                }
-            }
+            shots.push({
+                id: sections[i].id,
+                title: sections[i].title,
+                body: shotBody,
+                refs,
+            });
         }
 
-        // Support @Ref syntax (e.g. @Momo) without brackets
-        const atRefs = body.match(/@([a-zA-Z0-9_-]+)/g);
-        if (atRefs) {
-            for (const atRef of atRefs) {
-                const name = atRef.substring(1);
-
-                // Case-insensitive lookup
-                let char = this.assetManager.getElement(name);
-                if (!char) {
-                    char = this.assetManager.getAllElements().find(e => e.id?.toLowerCase() === name.toLowerCase() || e.name?.toLowerCase() === name.toLowerCase());
-                }
-
-                if (char) {
-                    let foundRef = false;
-                    if (char.approved_references && char.approved_references.length > 0) {
-                        assetRefs.push(char.approved_references[0]);
-                        foundRef = true;
-                    } else if (char.reference_images && char.reference_images.length > 0) {
-                        assetRefs.push(char.reference_images[0]);
-                        foundRef = true;
-                    } else {
-                        const approvedRef = path.join(this.projectRoot, `videospec/elements/${char.id}_ref.png`);
-                        if (fs.existsSync(approvedRef)) {
-                            assetRefs.push(approvedRef);
-                            foundRef = true;
-                        } else {
-                            const generatedRef = this.findGeneratedRef(char.id || '') || this.findGeneratedRef(char.name || '');
-                            if (generatedRef) {
-                                console.warn(`[WARN] Relying on unverified auto-fallback for @${char.id}. Please run 'opsv review' to append references to documentation.`);
-                                assetRefs.push(generatedRef);
-                                foundRef = true;
-                            }
-                        }
-                    }
-
-                    const replacementText = foundRef ? `${char.name} [image${assetRefs.length}]` : char.name;
-                    subjectDesc = subjectDesc.split(atRef).join(replacementText);
-                    if (promptEn) promptEn = promptEn.split(atRef).join(char.name || name); // Strip @ for english prompt
-                    continue; // Skip checking scenes if it's a character
-                }
-
-                let scene = this.assetManager.getScene(name);
-                if (!scene) {
-                    // We need a helper for getting all scenes, but since it's not exposed, 
-                    // we'll try lowercase/uppercase fallback, or we can just hope ID matches.
-                    scene = this.assetManager.getScene(name) || this.assetManager.getScene(name.charAt(0).toUpperCase() + name.slice(1));
-                }
-
-                if (scene) {
-                    let foundRef = false;
-                    if (scene.approved_references && scene.approved_references.length > 0) {
-                        assetRefs.push(scene.approved_references[0]);
-                        foundRef = true;
-                    } else if (scene.reference_images && scene.reference_images.length > 0) {
-                        assetRefs.push(scene.reference_images[0]);
-                        foundRef = true;
-                    } else {
-                        const approvedRef = path.join(this.projectRoot, `videospec/scenes/${scene.id}_ref.png`);
-                        if (fs.existsSync(approvedRef)) {
-                            assetRefs.push(approvedRef);
-                            foundRef = true;
-                        } else {
-                            const sceneRef = this.findGeneratedRef(scene.id || '') || this.findGeneratedRef(scene.name || '');
-                            if (sceneRef) {
-                                console.warn(`[WARN] Relying on unverified auto-fallback for @${scene.id}. Please run 'opsv review' to append references to documentation.`);
-                                assetRefs.push(sceneRef);
-                                foundRef = true;
-                            }
-                        }
-                    }
-
-                    const replacementText = foundRef ? `${scene.name} [image${assetRefs.length}]` : scene.name;
-                    subjectDesc = subjectDesc.split(atRef).join(replacementText);
-                    if (promptEn) promptEn = promptEn.split(atRef).join(scene.name || name);
-                } else {
-                    // Replace anyway to remove @ if not found
-                    subjectDesc = subjectDesc.split(atRef).join(name);
-                    if (promptEn) promptEn = promptEn.split(atRef).join(name);
-                }
-            }
-        }
-
-        const cleanDesc = subjectDesc
-            .replace(/\*Audio:.*?\*/g, '')
-            .replace(/^## Act \d+.*$/gm, '')
-            .replace(/^\*\(Lyrics:.*\)\*$/gm, '')
-            .trim();
-
-        const globalConfig = this.assetCompiler.getProjectConfig();
-        const ar = globalConfig.aspect_ratio || config.context?.style?.aspect_ratio || "16:9";
-        const res = globalConfig.resolution || config.context?.style?.resolution || "2K";
-
-        let fullPrompt = "";
-
-        if (this.jobCount === 0) {
-            const vision = this.assetCompiler.getProjectConfig().vision;
-            if (vision) {
-                fullPrompt += `${vision} 请帮我生成MV的分镜图片，第一条需求如下：\n\n`;
-            } else {
-                fullPrompt += `请帮我生成MV的分镜图片，第一条需求如下：\n\n`;
-            }
-        }
-
-        this.jobCount++;
-
-        fullPrompt += `[视频分镜设定: ${id}]\n比例: ${ar} (分辨率: ${res})\n运镜: ${body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0] || "标准"}\n场景: ${location}\n描述: ${cleanDesc}`;
-
-        const stylePostfix = globalConfig.global_style_postfix || config.context?.style?.visual_style;
-        if (stylePostfix && promptEn) {
-            promptEn = `${promptEn}, ${stylePostfix}`;
-        }
-
-
-        const cameraMatch = body.match(/(Tracking Shot|Close(-|)Up|Wide Shot|Low Angle|High Angle|POV)/i)?.[0];
-        const payload: PromptPayload = {
-            prompt: fullPrompt,
-            global_settings: workflow?.settings || {
-                aspect_ratio: config.context.style.aspect_ratio || "16:9",
-                quality: config.context.style.resolution || "2K"
-            },
-            subject: { description: cleanDesc }
-        };
-
-        if (location && location !== 'Unknown Location') {
-            payload.environment = { description: location };
-        }
-
-        if (cameraMatch) {
-            payload.camera = { type: cameraMatch };
-        }
-
-        // Phase 6: Route all generation drafts to a unified folder to simplify extensions and integrations
-        if (!this.currentDraftDir) {
-            this.currentDraftDir = path.join(this.projectRoot, 'artifacts', 'drafts_1');
-            if (!fs.existsSync(this.currentDraftDir)) fs.mkdirSync(this.currentDraftDir, { recursive: true });
-        }
-        const artifactsDraftDir = this.currentDraftDir;
-
-        // Non-destructive filename logic
-        // 0.3.2 统一使用 draft 后缀，除非是明确的 target 补帧
-        const isTargetLast = id.endsWith('_last');
-        const namingBase = isTargetLast ? id.replace('_last', '_target_last') : `${id}_draft`;
-
-        let ext = '.png';
-        let finalOutputPath = path.join(artifactsDraftDir, `${namingBase}_1${ext}`);
-        let counter = 1;
-        while (fs.existsSync(finalOutputPath)) {
-            counter++;
-            finalOutputPath = path.join(artifactsDraftDir, `${namingBase}_${counter}${ext}`);
-        }
-
-        // Save the generated prompt trace for reference
-        const promptLogPath = path.join(artifactsDraftDir, `${namingBase}_prompt.txt`);
-        fs.writeFileSync(promptLogPath, fullPrompt);
-
-        if (assetRefs.length === 0 && (refs.size > 0 || (atRefs && atRefs.length > 0))) {
-            console.warn(`WARNING: Shot ${id} requested references but no approved / draft images were found.Generating blindly.`);
-        }
-
-        const job: Job = {
-            id,
-            type: 'image_generation',
-            prompt_en: promptEn || undefined,
-            payload: payload,
-            reference_images: assetRefs, // Absolute paths array for Comfy UI
-            output_path: finalOutputPath
-        };
-        return job;
+        return shots;
     }
 
-    private extractAssetsFromMarkdown(content: string, baseDir: string): string[] {
-        const assets: string[] = [];
-        // Match ![alt](path)
-        const regex = /!\[.*?\]\((.*?)\)/g;
-        let match;
-        while ((match = regex.exec(content)) !== null) {
-            let relativePath = match[1];
-            console.log(`Debug Asset: Found link ${relativePath} `);
+    // ================================================================
+    // 工具方法
+    // ================================================================
 
-            // Handle ./ manually if needed, but path.resolve handles it
-            try {
-                const absolutePath = path.resolve(baseDir, relativePath);
-                console.log(`Debug Asset: Resolved to ${absolutePath} `);
-
-                if (fs.existsSync(absolutePath)) {
-                    // Convert back to project relative for consistency in jobs.json
-                    const projectRelative = path.relative(this.projectRoot, absolutePath);
-                    assets.push(projectRelative);
-                    console.log(`Debug Asset: Added ${projectRelative} `);
-                } else {
-                    console.warn(`Warning: Asset file not found: ${absolutePath} `);
-                }
-            } catch (e) {
-                console.warn(`Warning: Could not resolve asset path: ${relativePath} `);
-            }
+    /**
+     * 生成不重复的输出路径
+     */
+    private nextOutputPath(baseName: string): string {
+        let counter = 1;
+        let outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
+        while (fs.existsSync(outputPath)) {
+            counter++;
+            outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
         }
-        return assets;
+        return outputPath;
+    }
+
+    private extractFirstParagraph(body: string): string {
+        const lines = body.split('\n');
+        for (const line of lines) {
+            const t = line.trim();
+            if (!t || t.startsWith('#') || t.startsWith('!') || t.startsWith('<!--') || t.match(/^[-=]{3,}$/)) continue;
+            return t;
+        }
+        return '(无描述)';
+    }
+
+    private cleanMarkdown(text: string): string {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\*(.*?)\*/g, '$1')
+            .replace(/!\[.*?\]\(.*?\)/g, '')
+            .replace(/^[-*]\s+/gm, '')
+            .replace(/---+/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
     }
 }

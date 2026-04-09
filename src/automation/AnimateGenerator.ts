@@ -1,11 +1,15 @@
 import fs from 'fs';
 import path from 'path';
-import yaml from 'js-yaml';
-import { Job } from '../types/PromptSchema';
+import { Job, PromptPayload } from '../types/PromptSchema';
 import { AssetCompiler } from '../core/AssetCompiler';
+import { FrontmatterParser } from '../core/FrontmatterParser';
+import { logger } from '../utils/logger';
 
-// 拓展原有的 Job 接口适配 0.3.2 的动态数据透传，或在此直接添加任何自定义 Payload 给下游使用
-
+// ============================================================================
+// v0.5 视频编译管线
+// 核心: 读 Shotlist.md (shot-production) → 生成 video_jobs.json
+// 变更: schema_0_3 → frame_ref，删除 middle_image
+// ============================================================================
 
 export class AnimateGenerator {
     private projectRoot: string;
@@ -19,137 +23,244 @@ export class AnimateGenerator {
     async generateAnimationJobs(): Promise<Job[]> {
         const shotlistPath = path.join(this.projectRoot, 'videospec/shots/Shotlist.md');
         if (!fs.existsSync(shotlistPath)) {
-            console.error(`❌ Error: Shotlist.md not found at ${shotlistPath}`);
-            console.error(`   Please run the opsv-animator agent first to generate dynamic shotlists.`);
+            logger.error(`❌ 未找到 Shotlist.md: ${shotlistPath}`);
+            logger.error(`   请先通过 opsv-animator agent 生成动态分镜表`);
             return [];
         }
 
         const content = fs.readFileSync(shotlistPath, 'utf-8');
-        const parts = content.split(/^---$/m);
 
-        if (parts.length < 3) {
-            console.error('❌ Error: Shotlist.md is missing YAML frontmatter.');
-            return [];
-        }
-
+        // ---- 解析 Shotlist.md ----
         let frontmatter: any;
+        let body: string;
         try {
-            frontmatter = yaml.load(parts[1]);
+            const parsed = FrontmatterParser.parseRaw(content);
+            frontmatter = parsed.frontmatter;
+            body = parsed.body;
         } catch (e) {
-            console.error(`❌ Error: Failed to parse YAML in Shotlist.md`, e);
+            logger.error(`❌ Shotlist.md 解析失败: ${(e as Error).message}`);
             return [];
         }
 
-        const shots = frontmatter.shots;
-        if (!shots || !Array.isArray(shots)) {
-            console.error(`❌ Error: No 'shots' array found in Shotlist.md frontmatter.`);
+        // v0.5: 从正文 ## Shot NN 解析 shotlist
+        const shotSections = this.parseShotSections(body);
+        if (shotSections.length === 0) {
+            // 兼容 frontmatter shots[] 模式
+            if (frontmatter.shots && Array.isArray(frontmatter.shots)) {
+                return this.processLegacyShots(frontmatter.shots);
+            }
+            logger.error(`❌ Shotlist.md 中未找到 ## Shot NN 区域`);
             return [];
         }
 
-        // Load project config for resolutions/aspect ratios
+        // ---- 加载全局配置 ----
         this.assetCompiler.loadProjectConfig();
         const globalConfig = this.assetCompiler.getProjectConfig();
-        const ar = globalConfig.aspect_ratio || "16:9";
-        const res = globalConfig.resolution || "2K";
+        const ar = globalConfig.aspect_ratio || '16:9';
+        const res = globalConfig.resolution || '1920x1080';
+
+        // ---- 输出目录 ----
+        const videoOutDir = path.join(this.projectRoot, 'artifacts', 'videos');
+        if (!fs.existsSync(videoOutDir)) fs.mkdirSync(videoOutDir, { recursive: true });
 
         const jobs: Job[] = [];
 
-        // Define an output directory for videos
-        const videoOutDir = path.join(this.projectRoot, 'artifacts', 'videos');
-        if (!fs.existsSync(videoOutDir)) {
-            fs.mkdirSync(videoOutDir, { recursive: true });
+        for (const section of shotSections) {
+            // 从正文中提取 Markdown 链接 [首帧](path) [尾帧](path) 等
+            const firstImage = this.extractLink(section.body, '首帧') || this.extractLink(section.body, 'first');
+            const lastImage = this.extractLink(section.body, '尾帧') || this.extractLink(section.body, 'last');
+            const referenceImages = this.extractAllLinks(section.body, '参考图');
+
+            // 解析为绝对路径
+            const absFirst = this.resolvePath(firstImage);
+            const absLast = this.resolvePath(lastImage);
+            const absRefs = referenceImages.map(r => this.resolvePath(r)).filter(Boolean) as string[];
+
+            if (!absFirst) {
+                logger.warn(`⚠️ Shot ${section.id}: 缺少首帧，跳过`);
+                continue;
+            }
+
+            // 检查 @FRAME 指针
+            if (absFirst && !absFirst.startsWith('@FRAME:') && !fs.existsSync(absFirst)) {
+                logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
+                continue;
+            }
+
+            // 提取动作描述
+            const motionPrompt = this.extractMotionPrompt(section.body);
+            const outputPath = path.join(videoOutDir, `${section.id}.mp4`);
+
+            const payload: PromptPayload = {
+                prompt: `[视频生成: ${section.id}]\n${motionPrompt}`,
+                global_settings: { aspect_ratio: ar, quality: res },
+                camera: { motion: motionPrompt },
+                duration: section.duration || '5s',
+                // v0.5: frame_ref 替代 schema_0_3
+                frame_ref: {
+                    first: absFirst || null,
+                    last: absLast || null,
+                },
+            };
+
+            const job: Job = {
+                id: section.id,
+                type: 'video_generation',
+                prompt_en: motionPrompt,
+                payload,
+                reference_images: absRefs.length > 0
+                    ? absRefs
+                    : (absFirst ? [absFirst] : undefined),
+                output_path: outputPath,
+            };
+            jobs.push(job);
         }
+
+        // ---- 写入队列 ----
+        if (jobs.length > 0) {
+            const queueDir = path.join(this.projectRoot, 'queue');
+            if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
+
+            fs.writeFileSync(
+                path.join(queueDir, 'video_jobs.json'),
+                JSON.stringify(jobs, null, 2)
+            );
+            logger.info(`✅ 编译 ${jobs.length} 个视频生成任务 → queue/video_jobs.json`);
+        } else {
+            logger.info(`ℹ️ 无有效的视频生成任务`);
+        }
+
+        return jobs;
+    }
+
+    // ================================================================
+    // 正文解析
+    // ================================================================
+
+    private parseShotSections(body: string): { id: string; body: string; duration?: string }[] {
+        const sections: { id: string; body: string; duration?: string }[] = [];
+        const shotRegex = /^##\s+Shot\s+(\d+)/gm;
+        const matches: { id: string; startIdx: number }[] = [];
+
+        let match;
+        while ((match = shotRegex.exec(body)) !== null) {
+            matches.push({
+                id: `shot_${match[1].padStart(2, '0')}`,
+                startIdx: match.index + match[0].length,
+            });
+        }
+
+        for (let i = 0; i < matches.length; i++) {
+            const start = matches[i].startIdx;
+            const end = i + 1 < matches.length
+                ? body.lastIndexOf('##', matches[i + 1].startIdx)
+                : body.length;
+            const shotBody = body.slice(start, end).trim();
+
+            // 提取时长
+            const durationMatch = shotBody.match(/时长[：:]\s*(\d+s?)/i)
+                || shotBody.match(/duration[：:]\s*(\d+s?)/i);
+
+            sections.push({
+                id: matches[i].id,
+                body: shotBody,
+                duration: durationMatch?.[1],
+            });
+        }
+
+        return sections;
+    }
+
+    private extractLink(body: string, label: string): string | null {
+        const regex = new RegExp(`\\[${label}\\]\\(([^)]+)\\)`, 'i');
+        const match = body.match(regex);
+        return match ? match[1] : null;
+    }
+
+    private extractAllLinks(body: string, label: string): string[] {
+        const regex = new RegExp(`\\[${label}[^\\]]*\\]\\(([^)]+)\\)`, 'gi');
+        const results: string[] = [];
+        let match;
+        while ((match = regex.exec(body)) !== null) {
+            results.push(match[1]);
+        }
+        return results;
+    }
+
+    private extractMotionPrompt(body: string): string {
+        // 提取 Motion: 或 动作: 行
+        const motionMatch = body.match(/(?:Motion|动作|运动)[：:]\s*(.+)/i);
+        if (motionMatch) return motionMatch[1].trim();
+
+        // 回退: 取第一段非链接文本
+        const lines = body.split('\n').filter(l => {
+            const t = l.trim();
+            return t && !t.startsWith('[') && !t.startsWith('!') && !t.startsWith('#');
+        });
+        return lines[0]?.trim() || '';
+    }
+
+    private resolvePath(p: string | null): string | null {
+        if (!p || p.trim() === '') return null;
+        if (p.startsWith('@FRAME:')) return p; // 保留管线指针
+        return path.resolve(this.projectRoot, p);
+    }
+
+    // ================================================================
+    // Legacy: frontmatter shots[] 兼容（过渡期）
+    // ================================================================
+
+    private processLegacyShots(shots: any[]): Job[] {
+        logger.warn('⚠️ 使用 frontmatter shots[] 数组模式（v0.5 建议迁移到正文 ## Shot NN）');
+
+        this.assetCompiler.loadProjectConfig();
+        const globalConfig = this.assetCompiler.getProjectConfig();
+        const ar = globalConfig.aspect_ratio || '16:9';
+        const res = globalConfig.resolution || '1920x1080';
+
+        const videoOutDir = path.join(this.projectRoot, 'artifacts', 'videos');
+        if (!fs.existsSync(videoOutDir)) fs.mkdirSync(videoOutDir, { recursive: true });
+
+        const jobs: Job[] = [];
 
         for (const shot of shots) {
             if (!shot.id && !shot.shot) continue;
-
-            // 兼容旧版 shot.id 或新版 shot: 1
             const shotId = shot.id || `shot_${shot.shot}`;
 
-            // --- 0.3.2 Schema 解析图像锚点 ---
-            const resolvePath = (p: string | undefined): string | undefined => {
-                if (!p || p.trim() === "") return undefined;
-                if (p.startsWith('@FRAME:')) return p; // Preserve pipeline pointer
-                return path.resolve(this.projectRoot, p);
-            };
+            const absFirst = this.resolvePath(shot.first_image || shot.reference_image);
+            const absLast = this.resolvePath(shot.last_image);
 
-            const absFirstImage = resolvePath(shot.first_image || shot.reference_image);
-            const absMiddleImage = resolvePath(shot.middle_image);
-            const absLastImage = resolvePath(shot.last_image);
+            if (!absFirst) continue;
+            if (!absFirst.startsWith('@FRAME:') && !fs.existsSync(absFirst)) continue;
 
-            const referenceImages = Array.isArray(shot.reference_images)
-                ? shot.reference_images.map(resolvePath).filter((p: string | undefined): p is string => !!p)
-                : [];
-
-            if (!absFirstImage) {
-                console.warn(`⚠️ Warning: Shot ${shotId} is missing a first_image. Skipping animation job.`);
-                continue;
-            }
-
-            if (!absFirstImage) {
-                console.warn(`⚠️ Warning: Shot ${shotId} is missing a first_image. Skipping animation job.`);
-                continue;
-            }
-
-            if (!absFirstImage.startsWith('@FRAME:') && !fs.existsSync(absFirstImage)) {
-                console.error(`❌ Error: First image not found for ${shotId} at ${absFirstImage}. Skipping.`);
-                continue;
-            }
-
-            // --- 0.3.2 Schema 解析文本 ---
             const motionPrompt = shot.motion_prompt_en || '';
-            const motionPromptZh = shot.motion_prompt_zh || '';
 
-            if (motionPrompt.trim() === '') {
-                console.warn(`⚠️ Warning: Shot ${shotId} has an empty motion_prompt_en.`);
-            }
-
-            // duration
-            const durationLiteral = shot.duration || '5s';
-
-            const payload = {
-                prompt: `[视频动态生成: ${shotId}]\n动作意图: ${motionPromptZh}\nMotion: ${motionPrompt}`,
+            const payload: PromptPayload = {
+                prompt: `[视频生成: ${shotId}]\n${motionPrompt}`,
                 global_settings: { aspect_ratio: ar, quality: res },
                 camera: { motion: motionPrompt },
-                duration: durationLiteral, // 提供给下游 API
-                schema_0_3_2: {
-                    first_image: absFirstImage,
-                    middle_image: absMiddleImage,
-                    last_image: absLastImage,
-                    reference_images: referenceImages
+                duration: shot.duration || '5s',
+                frame_ref: {
+                    first: absFirst,
+                    last: absLast || null,
                 },
-                schema_0_3: { // Legacy Support
-                    first_image: absFirstImage,
-                    middle_image: absMiddleImage,
-                    last_image: absLastImage,
-                    reference_images: referenceImages
-                }
             };
 
-            const outputPath = path.join(videoOutDir, `${shotId}.mp4`);
-
-            const job: Job = {
+            jobs.push({
                 id: shotId,
                 type: 'video_generation',
                 prompt_en: motionPrompt,
-                payload: payload,
-                output_path: outputPath,
-                // 为了向后兼容，我们将最重要的 first_image 塞入老字段，让不支持 0.3+ 的老生态不报错
-                reference_images: [absFirstImage!]
-                // 新的 API Client 应当越过 reference_images，直接去 payload.schema_0_3_2 里读取组装好的 0.3.2 绝对路径对象
-            };
-            jobs.push(job);
+                payload,
+                reference_images: [absFirst!],
+                output_path: path.join(videoOutDir, `${shotId}.mp4`),
+            });
         }
 
         if (jobs.length > 0) {
             const queueDir = path.join(this.projectRoot, 'queue');
             if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
-
-            const outPath = path.join(queueDir, 'video_jobs.json');
-            fs.writeFileSync(outPath, JSON.stringify(jobs, null, 2));
-            console.log(`✅ successfully compiled ${jobs.length} video animation jobs to ${outPath}`);
-        } else {
-            console.log(`ℹ️ No valid video jobs to compile.`);
+            fs.writeFileSync(path.join(queueDir, 'video_jobs.json'), JSON.stringify(jobs, null, 2));
+            logger.info(`✅ 编译 ${jobs.length} 个视频任务 (legacy 模式)`);
         }
 
         return jobs;

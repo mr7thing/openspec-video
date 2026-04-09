@@ -1,283 +1,187 @@
 import fs from 'fs';
 import path from 'path';
-import yaml from 'js-yaml';
-import { z } from 'zod';
+import { FrontmatterParser } from './FrontmatterParser';
+import { ApprovedRefReader, ApprovedRef } from './ApprovedRefReader';
+import { BaseFrontmatter } from '../types/FrontmatterSchema';
+import { logger } from '../utils/logger';
 
-// Define Schemas for Assets
-const CharacterSchema = z.object({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    type: z.string().optional(),
-    has_image: z.boolean().optional(),
-    role: z.string().optional(),
-    description: z.string().optional(),
-    visual_traits: z.object({
-        eye_color: z.string().optional(),
-        hair_style: z.string().optional(),
-        clothing: z.string().optional(),
-        distinctive_features: z.array(z.string()).optional()
-    }).optional(),
-    reference_images: z.array(z.string()).optional(), // Legacy support
-    design_references: z.array(z.string()).optional(),
-    approved_references: z.array(z.string()).optional()
-}).passthrough(); // Allow unknown keys
+// ============================================================================
+// v0.5 资产管理器
+// 核心变更: 去掉 has_image / visual_traits / brief_description
+// 用 status + ApprovedRefReader 替代
+// ============================================================================
 
-const SceneSchema = z.object({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    type: z.string().optional(),
-    has_image: z.boolean().optional(),
-    description: z.string().optional(),
-    lighting: z.string().optional(),
-    atmosphere: z.string().optional(),
-    reference_images: z.array(z.string()).optional(), // Legacy support
-    design_references: z.array(z.string()).optional(),
-    approved_references: z.array(z.string()).optional()
-}).passthrough();
-
-export type Element = z.infer<typeof CharacterSchema>;
-export type Scene = z.infer<typeof SceneSchema>;
+export interface Asset {
+    id: string;
+    type: string;
+    status: string;
+    reference?: string;
+    refs: string[];
+    description: string;
+    approvedRefs: ApprovedRef[];
+    designRefs: string[];
+    filePath: string;
+}
 
 export class AssetManager {
     private elementsRoot: string;
     private scenesRoot: string;
-    private elements: Map<string, Element> = new Map();
-    private scenes: Map<string, Scene> = new Map();
+    private assets: Map<string, Asset> = new Map();
+    private approvedRefReader: ApprovedRefReader;
 
     constructor(projectRoot: string) {
-        this.elementsRoot = path.join(path.resolve(projectRoot), 'videospec', 'elements');
-        this.scenesRoot = path.join(path.resolve(projectRoot), 'videospec', 'scenes');
-    }
-
-    private extractLinksFromSection(body: string, sectionTitleRegex: RegExp, rootPath: string): string[] {
-        const lines = body.split('\n');
-        let inSection = false;
-        const images: string[] = [];
-        
-        for (const line of lines) {
-            if (line.match(/^##\s+.+/)) {
-                inSection = sectionTitleRegex.test(line);
-                continue;
-            }
-            if (inSection) {
-                const imgRegex = /!\[.*?\]\((.*?)\)/g;
-                let imgMatch;
-                while ((imgMatch = imgRegex.exec(line)) !== null) {
-                    try {
-                        const absPath = path.resolve(rootPath, imgMatch[1]);
-                        if (fs.existsSync(absPath)) images.push(absPath);
-                    } catch (e) {
-                        // ignore invalid paths
-                    }
-                }
-            }
-        }
-        return images;
+        const root = path.resolve(projectRoot);
+        this.elementsRoot = path.join(root, 'videospec', 'elements');
+        this.scenesRoot = path.join(root, 'videospec', 'scenes');
+        this.approvedRefReader = new ApprovedRefReader(root);
     }
 
     async loadAssets(): Promise<void> {
-        await this.loadElements();
-        await this.loadScenes();
+        await this.loadDirectory(this.elementsRoot);
+        await this.loadDirectory(this.scenesRoot);
     }
 
-    private async loadElements() {
-        if (!fs.existsSync(this.elementsRoot)) return;
+    private async loadDirectory(dirPath: string): Promise<void> {
+        if (!fs.existsSync(dirPath)) return;
 
-        // Support both .yaml (legacy) and .md (new standard)
-        const files = fs.readdirSync(this.elementsRoot).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
+        // v0.5: 仅支持 .md 文件
+        const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
 
         for (const file of files) {
-            const content = fs.readFileSync(path.join(this.elementsRoot, file), 'utf-8');
+            const filePath = path.join(dirPath, file);
             try {
-                let raw: any;
-                if (file.endsWith('.md')) {
-                    const parts = content.split(/^---$/m);
-                    if (parts.length < 3) throw new Error('Invalid Markdown Frontmatter');
-                    raw = yaml.load(parts[1]);
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-                    // Parse Markdown Body for additional fields
-                    const body = parts.slice(2).join('---');
+                const id = file.replace(/^@/, '').replace(/\.md$/, '');
 
-                    // 1. Extract Description (all text that isn't a header or key-value pair)
-                    // Simple heuristic: Take the first paragraph that doesn't start with # or *
-                    const descriptionMatch = body.match(/^(?![#*])\s*(\S.*)/m);
-                    if (!raw.description && descriptionMatch) {
-                        raw.description = descriptionMatch[1].trim();
-                    } else if (!raw.description) {
-                        raw.description = "Imported from Markdown";
-                    }
+                // 描述从正文第一段提取（非标题、非图片的纯文本）
+                const description = this.extractFirstParagraph(body);
 
-                    // 2. Extract Visual Traits from **Key**: Value
-                    if (!raw.visual_traits) raw.visual_traits = {};
+                // Approved Refs 从 Markdown 正文的 ## Approved References 区读取
+                const approvedRefs = this.approvedRefReader.getAll(filePath);
 
-                    const traitMap: Record<string, string> = {
-                        'Eye Color': 'eye_color',
-                        'Eyes': 'eye_color',
-                        'Hair': 'hair_style',
-                        'Hair Style': 'hair_style',
-                        'Clothing': 'clothing',
-                        'Outfit': 'clothing',
-                        'Distinctive Features': 'distinctive_features'
-                    };
+                // Design Refs 从 Markdown 正文的 ## Design References 区读取
+                const designRefs = this.extractDesignRefs(body, filePath);
 
-                    const regex = /\*\*(.*?)\*\*:\s*(.*)/g;
-                    let match;
-                    while ((match = regex.exec(body)) !== null) {
-                        const key = match[1].trim();
-                        const value = match[2].trim();
-                        const schemaKey = traitMap[key];
+                const asset: Asset = {
+                    id,
+                    type: frontmatter.type || 'other',
+                    status: frontmatter.status || 'drafting',
+                    reference: frontmatter.reference,
+                    refs: frontmatter.refs || [],
+                    description,
+                    approvedRefs,
+                    designRefs,
+                    filePath,
+                };
 
-                        if (schemaKey) {
-                            if (schemaKey === 'distinctive_features') {
-                                raw.visual_traits[schemaKey] = [value];
-                            } else {
-                                raw.visual_traits[schemaKey] = value;
-                            }
-                        }
-                    }
+                this.assets.set(id, asset);
+                logger.info(`资产加载: ${id} (${asset.type}, ${asset.status}) ` +
+                    `approved: ${approvedRefs.length}张`);
 
-                    // Fallback for name if missing
-                    if (!raw.name) raw.name = raw.id;
-
-                } else {
-                    raw = yaml.load(content);
-                }
-
-                // Ensure visual_traits exists to pass schema
-                if (!raw.visual_traits) raw.visual_traits = {};
-
-                // Extract reference images from markdown links ![...](path)
-                if (file.endsWith('.md')) {
-                    const body = content.split(/^---$/m).slice(2).join('---');
-
-                    // Extract Design References and Approved References
-                    const dRefs = this.extractLinksFromSection(body, /Design References|d-ref/i, this.elementsRoot);
-                    const aRefs = this.extractLinksFromSection(body, /Approved References|a-ref/i, this.elementsRoot);
-                    
-                    if (dRefs.length > 0) raw.design_references = dRefs;
-                    if (aRefs.length > 0) raw.approved_references = aRefs;
-
-                    // Fallback to unstructured references if strict sections not found
-                    if (dRefs.length === 0 && aRefs.length === 0) {
-                        const imgRegex = /!\[.*?\]\((.*?)\)/g;
-                        const images = [];
-                        let imgMatch;
-                        while ((imgMatch = imgRegex.exec(body)) !== null) {
-                            try {
-                                const absPath = path.resolve(this.elementsRoot, imgMatch[1]);
-                                if (fs.existsSync(absPath)) images.push(absPath);
-                            } catch (e) {
-                                // ignore invalid paths
-                            }
-                        }
-                        if (images.length > 0) raw.reference_images = images;
-                    }
-                }
-
-                const asset = CharacterSchema.parse(raw);
-                if (!asset.id) asset.id = file.replace(/\.(md|yaml|yml)$/, '');
-                this.elements.set(asset.id, asset);
-                console.log(`Loaded Element: ${asset.name} (${asset.id}) via ${file}`);
             } catch (err) {
-                console.warn(`Failed to validate character asset ${file}:`, err);
+                logger.warn(`资产解析失败 ${file}: ${(err as Error).message}`);
             }
         }
     }
 
-    private async loadScenes() {
-        if (!fs.existsSync(this.scenesRoot)) return;
+    // ---- 访问方法 ----
 
-        const files = fs.readdirSync(this.scenesRoot).filter(f => f.endsWith('.md') || f.endsWith('.yaml') || f.endsWith('.yml'));
+    getAsset(id: string): Asset | undefined {
+        return this.assets.get(id);
+    }
 
-        for (const file of files) {
-            const content = fs.readFileSync(path.join(this.scenesRoot, file), 'utf-8');
-            try {
-                let raw: any;
-                if (file.endsWith('.md')) {
-                    const parts = content.split(/^---$/m);
-                    if (parts.length < 3) throw new Error('Invalid Markdown Frontmatter');
-                    raw = yaml.load(parts[1]);
+    getElement(id: string): Asset | undefined {
+        const asset = this.assets.get(id);
+        return asset && ['character', 'prop', 'costume'].includes(asset.type)
+            ? asset : undefined;
+    }
 
-                    // Parse Markdown Body
-                    const body = parts.slice(2).join('---');
-                    // 1. Extract Description
-                    const descriptionMatch = body.match(/^(?![#*])\s*(\S.*)/m);
-                    if (!raw.description && descriptionMatch) {
-                        raw.description = descriptionMatch[1].trim();
-                    } else if (!raw.description) {
-                        raw.description = "Imported from Markdown";
-                    }
-                    console.log(`DEBUG: ${file} parsed description: "${raw.description}"`);
+    getScene(id: string): Asset | undefined {
+        const asset = this.assets.get(id);
+        return asset?.type === 'scene' ? asset : undefined;
+    }
 
-                    // 2. Extract Atmosphere/Lighting
-                    const traitMap: Record<string, string> = {
-                        'Lighting': 'lighting',
-                        'Atmosphere': 'atmosphere'
-                    };
+    getAllAssets(): Asset[] {
+        return Array.from(this.assets.values());
+    }
 
-                    const regex = /\*\*(.*?)\*\*:\s*(.*)/g;
-                    let match;
-                    while ((match = regex.exec(body)) !== null) {
-                        const key = match[1].trim();
-                        const value = match[2].trim();
-                        const schemaKey = traitMap[key];
-                        if (schemaKey) raw[schemaKey] = value;
-                    }
+    getAllElements(): Asset[] {
+        return this.getAllAssets().filter(a =>
+            ['character', 'prop', 'costume'].includes(a.type)
+        );
+    }
 
-                    if (!raw.name) raw.name = raw.id;
+    getAllScenes(): Asset[] {
+        return this.getAllAssets().filter(a => a.type === 'scene');
+    }
 
-                    // Extract reference images from markdown links ![...](path)
-                    // Extract Design References and Approved References
-                    const dRefs = this.extractLinksFromSection(body, /Design References|d-ref/i, this.scenesRoot);
-                    const aRefs = this.extractLinksFromSection(body, /Approved References|a-ref/i, this.scenesRoot);
-                    
-                    if (dRefs.length > 0) raw.design_references = dRefs;
-                    if (aRefs.length > 0) raw.approved_references = aRefs;
+    /**
+     * 获取资产的第一个 approved 图的绝对路径
+     * 替代旧的 has_image + image_path 模式
+     */
+    getApprovedImagePath(id: string): string | null {
+        const asset = this.assets.get(id);
+        if (!asset || asset.approvedRefs.length === 0) return null;
+        return asset.approvedRefs[0].filePath;
+    }
 
-                    // Fallback to unstructured references if strict sections not found
-                    if (dRefs.length === 0 && aRefs.length === 0) {
-                        const imgRegex = /!\[.*?\]\((.*?)\)/g;
-                        const images = [];
-                        let imgMatch;
-                        while ((imgMatch = imgRegex.exec(body)) !== null) {
-                            try {
-                                const absPath = path.resolve(this.scenesRoot, imgMatch[1]);
-                                if (fs.existsSync(absPath)) images.push(absPath);
-                            } catch (e) {
-                                // ignore invalid paths
-                            }
-                        }
-                        if (images.length > 0) raw.reference_images = images;
-                    }
+    // ---- 内部方法 ----
 
-                } else {
-                    raw = yaml.load(content);
-                }
+    /**
+     * 提取正文第一段纯文本（排除标题、图片、HTML 注释）
+     */
+    private extractFirstParagraph(body: string): string {
+        const lines = body.split('\n');
+        const paragraphLines: string[] = [];
+        let foundContent = false;
 
-                const asset = SceneSchema.parse(raw);
-                if (!asset.id) asset.id = file.replace(/\.(md|yaml|yml)$/, '');
-                this.scenes.set(asset.id, asset);
-                console.log(`Loaded Scene: ${asset.name} (${asset.id}) via ${file}`);
-            } catch (err) {
-                console.warn(`Failed to validate scene asset ${file}:`, err);
+        for (const line of lines) {
+            const trimmed = line.trim();
+            // 跳过空行（段前）
+            if (!foundContent && !trimmed) continue;
+            // 跳过标题行
+            if (trimmed.startsWith('#')) {
+                if (foundContent) break; // 遇到下一个标题就停
+                continue;
+            }
+            // 跳过图片行
+            if (trimmed.startsWith('![')) continue;
+            // 跳过 HTML 注释
+            if (trimmed.startsWith('<!--')) continue;
+            // 跳过分隔线
+            if (trimmed.match(/^[-=]{3,}$/)) continue;
+
+            if (trimmed) {
+                foundContent = true;
+                paragraphLines.push(trimmed);
+            } else if (foundContent) {
+                break; // 段后空行 → 段落结束
             }
         }
+
+        return paragraphLines.join(' ').trim() || '(无描述)';
     }
 
-    getElement(id: string): Element | undefined {
-        return this.elements.get(id);
-    }
+    /**
+     * 从 ## Design References 区提取图片路径
+     */
+    private extractDesignRefs(body: string, docPath: string): string[] {
+        const sectionMatch = body.match(
+            /##\s*Design\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i
+        );
+        if (!sectionMatch) return [];
 
-    getScene(id: string): Scene | undefined {
-        return this.scenes.get(id);
-    }
-
-    // Deprecated alias
-    getLocation(id: string): Scene | undefined {
-        return this.getScene(id);
-    }
-
-    getAllElements(): Element[] {
-        return Array.from(this.elements.values());
+        const refs: string[] = [];
+        const imgRegex = /!\[.*?\]\(([^)]+)\)/g;
+        let match;
+        while ((match = imgRegex.exec(sectionMatch[1])) !== null) {
+            const absPath = path.isAbsolute(match[1])
+                ? match[1]
+                : path.resolve(path.dirname(docPath), match[1]);
+            refs.push(absPath);
+        }
+        return refs;
     }
 }

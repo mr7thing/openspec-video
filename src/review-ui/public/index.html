@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpsV Review</title>
+    <style>
+        :root {
+            --bg: #0f0f0f;
+            --surface: #1a1a2e;
+            --card: #16213e;
+            --accent: #0f3460;
+            --green: #22c55e;
+            --yellow: #eab308;
+            --red: #ef4444;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ---- 顶栏 ---- */
+        .header {
+            background: var(--surface);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+        .header .status { display: flex; gap: 16px; align-items: center; }
+        .header .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+        .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+        /* ---- 工具栏 ---- */
+        .toolbar {
+            padding: 16px 32px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--green);
+            color: #000;
+        }
+        .btn-primary:hover { background: #16a34a; }
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: var(--accent);
+            color: var(--text);
+        }
+        .btn-secondary:hover { background: #1a4a7e; }
+        .selected-count { color: var(--muted); font-size: 14px; }
+
+        /* ---- 候选图网格 ---- */
+        .groups { padding: 0 32px 32px; }
+        .group {
+            margin-bottom: 32px;
+            background: var(--surface);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .group-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .group-header h3 { font-size: 16px; font-weight: 500; }
+        .group-header .source { color: var(--muted); font-size: 12px; }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 12px;
+            padding: 16px;
+        }
+        .image-card {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .image-card:hover { border-color: var(--accent); transform: scale(1.02); }
+        .image-card.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+        .image-card.approved { border-color: var(--green); opacity: 0.7; }
+        .image-card img {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+            display: block;
+        }
+        .image-card .model-tag {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.7);
+            color: var(--text);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .image-card .check {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--green);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .image-card.selected .check { display: flex; }
+
+        /* ---- 弹窗 ---- */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 24px;
+            width: 480px;
+            max-width: 90vw;
+        }
+        .modal h2 { margin-bottom: 16px; font-size: 18px; }
+        .modal label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--muted); }
+        .modal input, .modal textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            background: var(--card);
+            color: var(--text);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .modal textarea { height: 80px; resize: vertical; }
+        .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+        /* ---- 格式检查面板 ---- */
+        .format-panel {
+            padding: 16px 32px;
+            display: none;
+        }
+        .format-panel.visible { display: block; }
+        .format-issue {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+        }
+        .format-issue .file { font-weight: 500; margin-bottom: 4px; }
+        .format-issue .issue { color: var(--yellow); font-size: 13px; }
+
+        /* ---- 大图预览 ---- */
+        .preview-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            cursor: zoom-out;
+        }
+        .preview-overlay.active { display: flex; }
+        .preview-overlay img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 OpsV Review</h1>
+        <div class="status">
+            <span class="badge badge-green" id="totalCount">0 张候选</span>
+            <span class="badge badge-yellow" id="formatStatus">格式检查中...</span>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn btn-primary" id="approveBtn" disabled onclick="openApproveModal()">
+            ✅ Approve 选中 (<span id="selectedCount">0</span>)
+        </button>
+        <button class="btn btn-secondary" onclick="toggleFormatPanel()">📋 格式检查</button>
+        <button class="btn btn-secondary" onclick="location.reload()">🔄 刷新</button>
+    </div>
+
+    <div class="format-panel" id="formatPanel"></div>
+    <div class="groups" id="groups"></div>
+
+    <!-- Approve 弹窗 -->
+    <div class="modal-overlay" id="approveModal">
+        <div class="modal">
+            <h2>Approve 确认</h2>
+            <label>变体名称（留空使用默认序号）</label>
+            <input type="text" id="variantInput" placeholder="例如: portrait, full_body, childhood">
+            <label>Review 意见</label>
+            <textarea id="reviewNote" placeholder="记录审阅意见..."></textarea>
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="closeApproveModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitApprove()">确认 Approve</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 大图预览 -->
+    <div class="preview-overlay" id="previewOverlay" onclick="this.classList.remove('active')">
+        <img id="previewImg">
+    </div>
+
+    <script>
+        let allCandidates = [];
+        let selectedImages = new Set(); // Set of { jobId, imagePath }
+
+        async function loadCandidates() {
+            const res = await fetch('/api/candidates');
+            const json = await res.json();
+            if (json.success) {
+                allCandidates = json.data;
+                renderGroups();
+            }
+        }
+
+        function renderGroups() {
+            const container = document.getElementById('groups');
+            let totalImages = 0;
+            let html = '';
+
+            for (const group of allCandidates) {
+                totalImages += group.images.length;
+                html += `
+                    <div class="group">
+                        <div class="group-header">
+                            <h3>${group.jobId}</h3>
+                            <span class="source">${group.source}</span>
+                        </div>
+                        <div class="image-grid">
+                            ${group.images.map(img => {
+                                const key = `${group.jobId}|${img.path}`;
+                                const isSelected = selectedImages.has(key);
+                                return `
+                                    <div class="image-card ${isSelected ? 'selected' : ''}"
+                                         onclick="toggleSelect('${group.jobId}', '${img.path.replace(/\\/g, '\\\\')}')"
+                                         ondblclick="previewImage('/${img.relativePath}')">
+                                        <img src="/${img.relativePath}" loading="lazy" alt="${group.jobId}">
+                                        <span class="model-tag">${img.model}</span>
+                                        <span class="check">✓</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            document.getElementById('totalCount').textContent = `${totalImages} 张候选`;
+        }
+
+        function toggleSelect(jobId, imagePath) {
+            const key = `${jobId}|${imagePath}`;
+            if (selectedImages.has(key)) {
+                selectedImages.delete(key);
+            } else {
+                selectedImages.add(key);
+            }
+            updateSelectedUI();
+            renderGroups();
+        }
+
+        function updateSelectedUI() {
+            const count = selectedImages.size;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('approveBtn').disabled = count === 0;
+        }
+
+        function previewImage(src) {
+            document.getElementById('previewImg').src = src;
+            document.getElementById('previewOverlay').classList.add('active');
+        }
+
+        function openApproveModal() {
+            if (selectedImages.size === 0) return;
+            document.getElementById('approveModal').classList.add('active');
+        }
+
+        function closeApproveModal() {
+            document.getElementById('approveModal').classList.remove('active');
+        }
+
+        async function submitApprove() {
+            const variant = document.getElementById('variantInput').value.trim();
+            const reviewNote = document.getElementById('reviewNote').value.trim();
+
+            const selections = [];
+            for (const key of selectedImages) {
+                const [jobId, imagePath] = key.split('|');
+                selections.push({ jobId, imagePath, variant: variant || undefined });
+            }
+
+            const res = await fetch('/api/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ selections, reviewNote })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                alert(`✅ 已 Approve ${selections.length} 张图片`);
+                selectedImages.clear();
+                closeApproveModal();
+                loadCandidates();
+            } else {
+                alert(`❌ Approve 失败: ${json.error}`);
+            }
+        }
+
+        async function loadFormatCheck() {
+            const res = await fetch('/api/format-check');
+            const json = await res.json();
+            if (json.success) {
+                const issues = json.data;
+                const el = document.getElementById('formatStatus');
+                if (issues.length === 0) {
+                    el.textContent = '✅ 格式合规';
+                    el.className = 'badge badge-green';
+                } else {
+                    el.textContent = `⚠️ ${issues.length} 个问题`;
+                    el.className = 'badge badge-yellow';
+                }
+                renderFormatPanel(issues);
+            }
+        }
+
+        function renderFormatPanel(issues) {
+            const panel = document.getElementById('formatPanel');
+            if (issues.length === 0) {
+                panel.innerHTML = '<p style="color:var(--green)">✅ 所有文档格式合规</p>';
+                return;
+            }
+            panel.innerHTML = issues.map(item =>
+                `<div class="format-issue">
+                    <div class="file">📄 ${item.file}</div>
+                    ${item.issues.map(i => `<div class="issue">⚠️ ${i}</div>`).join('')}
+                </div>`
+            ).join('');
+        }
+
+        function toggleFormatPanel() {
+            document.getElementById('formatPanel').classList.toggle('visible');
+        }
+
+        // 初始化
+        loadCandidates();
+        loadFormatCheck();
+    </script>
+</body>
+</html>

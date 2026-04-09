@@ -2,46 +2,45 @@ import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
 import { JobGenerator } from '../automation/JobGenerator';
-
-// Start Daemon logic is needed if Daemon is to be started inline. 
-// We will import it from a new daemon utility.
 import { isDaemonRunning, startDaemon, registerProject } from '../utils/daemonUtils';
+import { logger } from '../utils/logger';
+
+// ============================================================================
+// opsv generate — 图像编译管线入口
+// v0.5: 集成依赖图 + 编译期校验（已内置到 JobGenerator）
+// ============================================================================
 
 export function registerGenerateCommand(program: Command, VERSION: string) {
     program
         .command('generate [targets...]')
-        .description('Generate jobs from specific files, directories, or all normative folders by default')
-        .option('-p, --preview', 'Generate preview only (key shots / single char sheet)', false)
-        .option('--shots <list>', 'Comma-separated list of shot IDs (e.g. 1,5,12)', (val) => val.split(','))
+        .description('编译 Markdown 文档为图像生成任务 (jobs.json)')
+        .option('-p, --preview', '预览模式（仅生成第一个分镜）', false)
+        .option('--shots <list>', '指定分镜 ID（逗号分隔: 1,5,12）', (val) => val.split(','))
         .action(async (targets, options) => {
             try {
                 const projectRoot = process.cwd();
 
-                console.log(`Generating jobs for targets: ${targets && targets.length > 0 ? targets.join(', ') : 'All normative folders'}...`);
-                if (options.preview) console.log('👀 Preview Mode Active');
-                if (options.shots) console.log(`🎯 Generating specific shots: ${options.shots.join(', ')}`);
+                logger.info(`\n🔧 OpsV Generate v${VERSION}`);
+                logger.info(`   目标: ${targets && targets.length > 0 ? targets.join(', ') : '全部规范目录'}`);
+                if (options.preview) logger.info('   👀 预览模式');
+                if (options.shots) logger.info(`   🎯 指定分镜: ${options.shots.join(', ')}`);
 
                 const generator = new JobGenerator(projectRoot);
-
                 const jobs = await generator.generateJobs(targets, {
                     preview: options.preview,
-                    shots: options.shots
+                    shots: options.shots,
                 });
 
-                console.log(`Successfully generated ${jobs.length} jobs in queue/jobs.json`);
-
                 if (!isDaemonRunning()) {
-                    console.log('Auto-starting OpsV Global Server for processing...');
+                    logger.info('自动启动 OpsV Server...');
                     startDaemon();
                     await new Promise(resolve => setTimeout(resolve, 1000));
-                } else {
-                    console.log('OpsV Global Server is already running. Ready for browser extension.');
                 }
 
                 registerProject(projectRoot);
-
             } catch (err) {
-                console.error('Generation failed:', err);
+                logger.error(`编译失败: ${(err as Error).message}`);
+                process.exit(1);
             }
         });
 }

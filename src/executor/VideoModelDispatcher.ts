@@ -7,6 +7,7 @@ import { SeedanceProvider } from './providers/SeedanceProvider';
 import { MinimaxVideoProvider } from './providers/MinimaxVideoProvider';
 import { FrameExtractor } from './FrameExtractor';
 import { ConfigLoader, ApiConfig } from '../utils/configLoader';
+import { logger } from '../utils/logger';
 
 export class VideoModelDispatcher {
     private projectRoot: string;
@@ -61,15 +62,13 @@ export class VideoModelDispatcher {
             throw new Error(`[Dispatcher] Unsupported provider: '${providerName}' for model '${targetModel}'.`);
         }
 
-        // 根据支持能力裁减 Job 中的数据
+        // v0.5: 根据支持能力裁减 frame_ref
         const sanitizedJob = JSON.parse(JSON.stringify(job)) as Job;
-        const schema = (sanitizedJob.payload as any)?.schema_0_3;
+        const frameRef = sanitizedJob.payload?.frame_ref;
 
-        if (schema) {
-            if (!modelConf.supports_first_image) schema.first_image = undefined;
-            if (!modelConf.supports_middle_image) schema.middle_image = undefined;
-            if (!modelConf.supports_last_image) schema.last_image = undefined;
-            if (!modelConf.supports_reference_images) schema.reference_images = [];
+        if (frameRef) {
+            if (!modelConf.supports_first_image) frameRef.first = null;
+            if (!modelConf.supports_last_image) frameRef.last = null;
         }
 
         // 注入配置中的额外字段 (如 api_url, resolution)
@@ -88,11 +87,11 @@ export class VideoModelDispatcher {
         // 通过 ConfigLoader 统一处理
         const apiKey = this.configLoader.getResolvedApiKey(targetModel);
 
-        console.log(`[Dispatcher] 🚀 Dispatching job [${job.id}] to model [${targetModel}] via Provider [${providerName}]...`);
+        logger.info(`[Dispatcher] 🚀 派发任务 [${job.id}] → 模型 [${targetModel}] (${providerName})`);
 
         // 1. 发送请求，获得请求凭证
         const requestId = await provider.submitJob(sanitizedJob, targetModel, apiKey);
-        console.log(`[Dispatcher]   Request submitted successfully. Tracking ID: ${requestId}`);
+        logger.info(`[Dispatcher]   请求已提交，追踪 ID: ${requestId}`);
 
         // 2. 预测绝对存放路径
         const baseOutputPath = path.isAbsolute(job.output_path)
@@ -114,10 +113,10 @@ export class VideoModelDispatcher {
         const finalOutputPath = this.getUniqueVideoPath(path.join(targetDir, fileName));
 
         // 3. 阻塞挂起：轮询并等待落盘
-        console.log(`[Dispatcher]   Waiting for job to finish remotely...`);
+        logger.info(`[Dispatcher]   等待远程任务完成...`);
         await provider.pollAndDownload(requestId, apiKey, finalOutputPath);
 
-        console.log(`[Dispatcher] 🎉 Job [${job.id}] completed cleanly at [${finalOutputPath}]`);
+        logger.info(`[Dispatcher] 🎉 任务 [${job.id}] 完成 → ${finalOutputPath}`);
         return finalOutputPath;
     }
 
@@ -131,33 +130,30 @@ export class VideoModelDispatcher {
         const completedJobs = new Set<string>();
 
         for (const job of jobs) {
-            // 拦截与分析 schema 里的 @FRAME 指针
-            const schema = (job.payload as any)?.schema_0_3;
-            let firstImage = schema?.first_image as string | undefined;
+            // v0.5: 从 frame_ref 读取帧引用
+            const frameRef = job.payload?.frame_ref;
+            let firstImage = frameRef?.first as string | null | undefined;
 
             if (firstImage && firstImage.startsWith('@FRAME:')) {
-                // e.g. @FRAME:shot_1_last
                 const parts = firstImage.replace('@FRAME:', '').split('_');
-                const frameType = parts.pop(); // 'last'
-                const sourceJobId = parts.join('_'); // 'shot_1'
+                const frameType = parts.pop();
+                const sourceJobId = parts.join('_');
 
-                console.log(`[Dispatcher] ⏳ 命中跨维依赖！任务 [${job.id}] 依赖于源视频截帧 [${sourceJobId}]. 正在验证源状态...`);
+                logger.info(`[Dispatcher] ⏳ 跨帧依赖: [${job.id}] → [${sourceJobId}]`);
 
                 if (!completedJobs.has(sourceJobId) || !jobResults.has(sourceJobId)) {
-                    throw new Error(`[Dispatcher] 依赖链断裂: 任务 [${job.id}] 前置需要的产物 [${sourceJobId}] 尚未渲染完备。请检查视频 JSON 排列是否有误。`);
+                    throw new Error(`[Dispatcher] 依赖断裂: [${job.id}] 前置产物 [${sourceJobId}] 未就绪`);
                 }
 
                 const sourceVideoPath = jobResults.get(sourceJobId)!;
                 const frameFilename = `${sourceJobId}_${frameType}.jpg`;
-                // 落盘于对应的模型子文件夹的父文件夹的临时草稿区 (统一下降到 artifacts/drafts_frame_cache/)
                 const extractedFramePath = path.join(this.projectRoot, 'artifacts', 'drafts_frame_cache', frameFilename);
 
-                // 注入幽灵组件执行提取
                 await FrameExtractor.extractLastFrame(sourceVideoPath, extractedFramePath);
 
-                // ✨ 变量塌缩 ✨
-                schema.first_image = extractedFramePath;
-                console.log(`[Dispatcher] 💥 因果变数消解: 【${firstImage}】 塌缩为绝对路径 【${extractedFramePath}】`);
+                // v0.5: 写回 frame_ref.first
+                if (frameRef) frameRef.first = extractedFramePath;
+                logger.info(`[Dispatcher] ✅ 帧引用消解: ${firstImage} → ${extractedFramePath}`);
             }
 
             try {
@@ -166,11 +162,11 @@ export class VideoModelDispatcher {
                 jobResults.set(job.id, finalPath);
                 completedJobs.add(job.id);
             } catch (e: any) {
-                console.error(`[Dispatcher] ❌ 管线阻塞：任务 [${job.id}] 宣告失败终止: ${e.message}`);
+                logger.error(`[Dispatcher] ❌ 任务 [${job.id}] 失败: ${e.message}`);
                 throw e;
             }
         }
 
-        console.log(`\n[Dispatcher] ✨ 所有 ${jobs.length} 个任务已成功走完生命周期！`);
+        logger.info(`\n[Dispatcher] ✨ ${jobs.length} 个视频任务全部完成`);
     }
 }

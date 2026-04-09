@@ -45,11 +45,11 @@ export class SeedanceProvider implements VideoProvider {
         const aspectRatio = job.payload.global_settings.aspect_ratio || '16:9';
 
         // 3. 构造 Payload (针对 Seedance 1.5 Pro 官方文档)
-        const schemaExtra = job.payload.schema_0_3;
-        // 获取可能作为参考的首帧图
+        // v0.5: 从 frame_ref 读取首帧
+        const frameRef = job.payload.frame_ref;
         let imageArg = undefined;
-        if (schemaExtra && schemaExtra.first_image) {
-            imageArg = this.getBase64Image(schemaExtra.first_image);
+        if (frameRef && frameRef.first) {
+            imageArg = this.getBase64Image(frameRef.first);
         } else if (job.reference_images && job.reference_images.length > 0) {
             imageArg = this.getBase64Image(job.reference_images[0]);
         }

@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework to transform narrative specs into production-ready creative intents.",
   "main": "dist/index.js",
   "bin": {
@@ -47,6 +47,7 @@
     "axios": "^1.13.6",
     "commander": "^13.1.0",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
     "fs-extra": "^11.3.3",
     "inquirer": "^8.2.7",
     "js-yaml": "^4.1.1",
@@ -58,6 +59,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^8.2.12",
     "@types/jest": "^29.5.0",
@@ -79,4 +81,3 @@
     ]
   }
 }
-

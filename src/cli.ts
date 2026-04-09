@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
@@ -10,6 +10,7 @@ import { registerReviewCommand } from './commands/review';
 import { registerAnimateCommand } from './commands/animate';
 import { registerGenImageCommand } from './commands/genImage';
 import { registerGenVideoCommand } from './commands/genVideo';
+import { registerDepsCommand } from './commands/deps';
 
 const projectRoot = process.cwd();
 const envSubDir = path.join(projectRoot, '.env');
@@ -40,10 +41,11 @@ program
 registerDaemonCommands(program, VERSION);
 registerInitCommand(program, VERSION);
 registerGenerateCommand(program, VERSION);
-registerReviewCommand(program, VERSION);
+registerReviewCommand(program);
 registerAnimateCommand(program, VERSION);
 registerGenImageCommand(program, VERSION);
 registerGenVideoCommand(program, VERSION);
+registerDepsCommand(program);
 
 program.parse(process.argv);
 

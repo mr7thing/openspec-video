@@ -20,16 +20,14 @@ export class MinimaxVideoProvider implements VideoProvider {
                 resolution: (job as any).resolution || "1080P"
             };
 
-            const schema = (job.payload as any)?.schema_0_3;
-            if (schema) {
-                if (schema.first_image) {
-                     // Check if local file vs URL. For Minimax, typically file needs to be a specific format or URL.
-                     // The documentation shows "first_frame_image" for image-to-video.
-                     // Assuming we pass it directly or the framework manages HTTP conversions elsewhere.
-                     payload.first_frame_image = schema.first_image;
+            // v0.5: 从 frame_ref 读取帧引用
+            const frameRef = job.payload.frame_ref;
+            if (frameRef) {
+                if (frameRef.first) {
+                     payload.first_frame_image = frameRef.first;
                 }
-                if (schema.last_image) {
-                     payload.last_frame_image = schema.last_image;
+                if (frameRef.last) {
+                     payload.last_frame_image = frameRef.last;
                 }
             }
 

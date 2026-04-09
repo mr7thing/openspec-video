@@ -30,14 +30,13 @@ export class SiliconFlowProvider implements VideoProvider {
     async submitJob(job: Job, modelName: string, apiKey: string): Promise<string> {
         const url = 'https://api.siliconflow.cn/v1/video/submit';
 
-        // 解析 0.3 Schema 中的 first_image
-        const schema03 = (job.payload as any)?.schema_0_3;
+        // v0.5: 从 frame_ref 读取首帧
+        const frameRef = job.payload.frame_ref;
         let imageArg = undefined;
 
-        if (schema03 && schema03.first_image) {
-            imageArg = this.getBase64Image(schema03.first_image);
+        if (frameRef && frameRef.first) {
+            imageArg = this.getBase64Image(frameRef.first);
         } else if (job.reference_images && job.reference_images.length > 0) {
-            // 后备方案
             imageArg = this.getBase64Image(job.reference_images[0]);
         }
 

@@ -1,105 +1,142 @@
-# OpsV CLI Reference
+# CLI Reference (v0.5)
 
-> Standardized command-line interface for the OpenSpec-Video production pipeline (v0.4.3).
+## Command Overview
 
----
+| Command | Description | Phase |
+|---------|-------------|-------|
+| `opsv init` | Initialize project structure | Setup |
+| `opsv generate` | Compile documents to image generation jobs | Image Pipeline |
+| `opsv gen-image` | Execute image generation (call APIs) | Image Pipeline |
+| `opsv review` | Launch Review page service | Review |
+| `opsv deps` | Analyze asset dependency graph | Analysis |
+| `opsv animate` | Compile Shotlist to video jobs | Video Pipeline |
+| `opsv gen-video` | Execute video generation (call APIs) | Video Pipeline |
+| `opsv daemon` | Global background service management | Infrastructure |
 
-## Command Quick Reference
+## opsv init
 
-| Command | Responsibility | Key Options |
-|---------|----------------|-------------|
-| `opsv init` | Initialize project | `[projectName]` |
-| `opsv serve` | Start background service | — |
-| `opsv generate` | Compile image jobs | `--preview`, `--shots` |
-| `opsv gen-image` | Execute image generation | `--model`, `--dry-run` |
-| `opsv review` | Write results back to docs | `--all` |
-| `opsv animate` | Compile video jobs | — |
-| `opsv gen-video` | Execute video generation | `--model`, `--dry-run` |
+Initialize OpsV project structure.
 
----
-
-## 1. Project Initialization
-
-### `opsv init [projectName] [options]`
-Initializes a new project skeleton.
-- **Actions**: Creates directory structure, copies `.agent/` and `.env/` templates.
-- **Interactions**: Prompts to select AI assistant support (Gemini, OpenCode, or Trae) if no flags are provided.
-
-### Automated / Non-Interactive Initialization
-You can bypass the interactive prompts by using specific flags. This is useful for AI Agents or CI/CD pipelines:
-- `-g, --gemini`: Enable Gemini support (`GEMINI.md`).
-- `-o, --opencode`: Enable OpenCode support (`AGENTS.md` + `.opencode/`).
-- `-t, --trae`: Enable Trae support (`AGENTS.md` + `.trae/`).
-
-Example:
 ```bash
-opsv init my-project --gemini --trae
+opsv init
 ```
 
----
+## opsv generate
 
-## 2. Background Service (Daemon)
+Compile Markdown documents into image generation jobs (`jobs.json`).
 
-### `opsv serve` / `opsv start`
-Starts the OpsV background WebSocket daemon (`ws://127.0.0.1:3061`).
-- Used for global task tracking and project registration.
+```bash
+opsv generate                        # Compile all normative directories
+opsv generate videospec/elements     # Compile specific directory
+opsv generate -p                     # Preview mode (first shot only)
+opsv generate --shots 1,5,12         # Specific shots
+```
 
-### `opsv stop`
-Stops the daemon using the PID file in `~/.opsv/daemon.pid`.
+**v0.5 Changes**:
+- Integrated DependencyGraph strict mode — unapproved dependencies are auto-blocked
+- Integrated compile-time validation (quote sanitization, required field checks)
+- Script.md parsed from body `## Shot NN` headers, not frontmatter `shots[]`
+- Outputs batch-numbered `jobs_batch_N.json`
 
----
+| Option | Description |
+|--------|-------------|
+| `-p, --preview` | Preview mode, first shot only |
+| `--shots <list>` | Comma-separated shot IDs |
 
-## 3. Image Pipeline
+## opsv gen-image
 
-### `opsv generate [targets...]`
-Compiles Markdown specifications into a JSON task queue (`queue/jobs.json`).
-- **Options**:
-    - `-p, --preview`: Only generate key shots or single character sketches.
-    - `--shots 1,5`: Generate jobs for specific shot IDs.
-- **Principle**: Injects `@entity` details and `global_style_postfix` into prompts.
+Execute image generation jobs.
 
-### `opsv gen-image`
-Executes image rendering.
-- **Parallel Universe Mode**: By default (`--model all`), it runs all enabled models concurrently.
-- **Output**: `artifacts/drafts_N/[EngineName]/`.
-- **Dry Run**: Use `--dry-run` to validate configurations without spending credits.
+```bash
+opsv gen-image                       # All enabled models
+opsv gen-image -m flux-pro           # Specific model
+opsv gen-image -m flux-pro,sdxl      # Multiple models
+opsv gen-image --dry-run             # Validate only
+opsv gen-image -s                    # Skip failed, continue
+```
 
----
+**v0.5 Changes**:
+- New `--dry-run` mode for two-stage validation only
+- Auto model-specific validation before API dispatch (pixel limits, aspect ratios, prompt length)
+- Comma-separated multi-model specification
 
-## 4. Video Pipeline
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-m, --model <model>` | Target model(s), comma-separated or "all" | `all` |
+| `-c, --concurrency <num>` | Concurrency | `1` |
+| `-s, --skip-failed` | Skip failed jobs | `false` |
+| `--dry-run` | Validate only | `false` |
 
-### `opsv animate`
-Compiles `Shotlist.md` into video job queue (`queue/video_jobs.json`).
-- Translates `motion_prompt_en` and `reference_image` into absolute paths.
+## opsv review
 
-### `opsv gen-video`
-Executes video rendering.
-- **Serial Execution**: Unlike image generation, video tasks run serially if `@FRAME` inheritance is used (requiring the last frame of the previous video).
-- **Output**: `artifacts/videos/[EngineName]/`.
+**v0.5 New**: Launch local Review page service.
 
----
+```bash
+opsv review                          # Default port 3456
+opsv review -p 8080                  # Custom port
+opsv review -b 3                     # Specific batch
+```
 
-## 5. Review & Feedback
+Review Page Features:
+- 📸 Candidate images grouped by job (multi-model comparison)
+- ✅ Multi-select approve (custom variant name or auto-numbered)
+- 📋 Format check (detect missing frontmatter fields)
+- 🔄 Automatic `git commit`
 
-### `opsv review [path]`
-Scans generation artifacts and writes links/previews back into Markdown files (e.g., `Script.md`).
-- **Options**:
-    - `--all`: Includes all historical drafting batches.
+Approve auto-executes:
+1. Copy selected image to `artifacts/` with new name
+2. Write-back `## Approved References` to source document
+3. Update `status: approved`
+4. Append `reviews` record
+5. Execute `git add . && git commit`
 
----
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --port <port>` | Service port | `3456` |
+| `-b, --batch <num>` | Batch number (default: latest) | latest |
 
-## 6. Environment & Variables
+## opsv deps
 
-CLI loads variables in this priority:
-1. `.env/secrets.env` (Recommended)
-2. `.env` file (Root)
-3. System Environment Variables
+**v0.5 New**: Analyze asset dependencies and display recommended generation order.
 
-| Variable | Usage |
-|----------|-------|
-| `VOLCENGINE_API_KEY` | Unified key for SeaDream and Seedance. |
-| `SILICONFLOW_API_KEY` | For Wan 2.1 video models. |
+```bash
+opsv deps
+```
 
----
+## opsv animate
 
-> *OpsV 0.4.3 | Latest Update: 2026-03-29*
+Compile Shotlist.md to video generation jobs.
+
+```bash
+opsv animate
+```
+
+**v0.5 Changes**: Uses `frame_ref` instead of `schema_0_3`. Removed `middle_image`.
+
+## opsv gen-video
+
+Execute video generation jobs.
+
+```bash
+opsv gen-video                       # All enabled video models
+opsv gen-video -m seedance           # Specific model
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-m, --model <model>` | Target model | `all` |
+| `-s, --skip-failed` | Skip failed jobs | `false` |
+
+## Typical Workflow
+
+```bash
+opsv init                            # 1. Initialize
+# Write documents (elements/*.md, scenes/*.md, Script.md)
+opsv deps                            # 3. Analyze dependencies
+opsv generate                        # 4. Compile jobs
+opsv gen-image --dry-run             # 5a. Validate
+opsv gen-image                       # 5b. Execute
+opsv review                          # 6. Review & Approve
+opsv animate                         # 7. Video pipeline
+opsv gen-video                       # 8. Generate videos
+```
