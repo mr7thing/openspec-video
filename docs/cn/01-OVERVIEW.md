@@ -1,19 +1,20 @@
-﻿# OpsV 项目全景 (Project Overview)
+# OpsV 项目全景 (Project Overview)
 
-> **OpenSpec-Video (OpsV) 0.4.3** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
+> **OpenSpec-Video (OpsV) 0.5.0** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
 
 ---
 
 ## 1. OpsV 是什么
 
-OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演/PM/艺术总监）用 Markdown 撰写故事、定义资产、设计分镜，然后通过 CLI 命令将这些文本规范"编译"为可执行的 JSON 任务队列，最终驱动 AI 模型（SeaDream、Seedance、Minimax、SiliconFlow 等）并发批量生成图像与视频。
+OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演/PM/艺术总监）用 Markdown 撰写故事、独立定义资产（角色/场景/道具）、设计分镜，然后通过 CLI 命令将这些文本规范"编译"为可执行的 JSON 任务队列。
+经过 v0.5 重构，OpsV 完全步入 **Spec-First** 时代，通过 **依赖图拓扑排序** 和 **执行期双阶段校验** 构建了坚若磐石的自动化生成引擎。
 
 **核心信条**：
 
-- **代码即规范**：`.md` 文件是唯一的真相源，图像和视频是其编译产物
-- **资产先行**：角色/场景/道具必须先独立建档，分镜中只允许引用（`@` 语法）
+- **文档即代码**：`.md` 文件是唯一的真相源，图像和视频仅仅是它的编译产物
+- **依赖驱动**：依靠 `## Approved References` 建立实体间的因果律约束
+- **格式审查**：通过 Review UI 保障元数据与产物的 100% 同步
 - **动静分离**：图像生成和视频生成是两条独立管线，互不干扰
-- **Markdown 驱动**：YAML Frontmatter 存元数据，Markdown Body 存参考图引用和人类审阅内容，两者协同
 
 ---
 
@@ -79,17 +80,13 @@ project/
 
 | 概念 | 含义 |
 |------|------|
-| **平行宇宙沙箱** | 0.4.3 引入，根据 `api_config.yaml` 启用的多模型并发执行，不同引擎的结果被严格隔离在 `artifacts/drafts_N/[引擎名]/` 中 |
-| **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码 |
-| **Asset-First** | 资产先于分镜存在，分镜只引用不描述 |
-| **d-ref (Design References)** | 生成输入参考图。`opsv generate` 生成本实体时作为 img2img 输入 |
-| **a-ref (Approved References)** | 定档输出参考图。其他实体通过 `@` 引用时，提供此参考图 |
-| **变体链** | 将 A 的 a-ref 作为 B 的 d-ref，生成基于 A 的新变体（如老年版、卡通版） |
-| **@ 引用语法** | 用 `@role_K`、`@scene_bar` 等标签引用独立的资产文件 |
-| **global_style_postfix** | 在 `project.md` 中定义的全局渲染风格后缀，编译器自动注入每个任务 |
-| **动静分离** | 图像管线（Script.md → jobs.json）与视频管线（Shotlist.md → video_jobs.json）互相独立 |
-| **关键帧塌缩** | `@FRAME:<shot_id>_last` 延迟指针，后一镜头首帧自动继承前一镜头尾帧 |
-| **特征泄漏 (Concept Bleeding)** | 分镜中不慎描述了角色外貌细节，导致渲染冲突 |
+| **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码。 |
+| **Dependency Graph** | `v0.5 引入`，在编译期进行拓扑解析，如果前置资产没有被 Approved 会被阻断。 |
+| **Review UI** | `v0.5 引入`，本地 Express Web 页面（取代旧 CLI 逻辑），实现可视化的图像筛选、命名、和元数据写回。 |
+| **@ 引用语法** | 用 `@role_K`、`@scene_bar` 或 `@asset:variant` 等标签调用已 approved 的资产变体。 |
+| **动静分离** | 图像管线（Script.md + Generator）与视频管线（Shotlist.md + Animator）互相独立。 |
+| **frame_ref** | `v0.5 引入`，取代 schema_0_3。向模型传递首/尾帧参考图像（first/last）的标准数据结构。 |
+| **两阶段校验** | `v0.5 引入`，编译期格式检查，加上执行期的宽限/拒绝等硬约束（像素、宽高、模型参数上限）。 |
 
 ---
 
@@ -107,11 +104,16 @@ echo "VOLCENGINE_API_KEY=your_key_here" > .env/secrets.env
 
 # 4. 编写资产和分镜（参考工作流文档）
 
-# 5. 编译并生成图像
+# 3. 依赖图检查
+opsv deps
+
+# 4. 编译任务
 opsv generate
+
+# 5. 执行图像生成
 opsv gen-image
 
-# 6. 将结果回写文档并审阅
+# 6. Web 模式审阅
 opsv review
 
 # 7. 编译并生成视频
@@ -128,12 +130,11 @@ opsv gen-video
 | [工作流程说明](./02-WORKFLOW.md) | 五步循环完整流程 |
 | [CLI 命令参考](./03-CLI-REFERENCE.md) | 全部 8 个命令的详细用法 |
 | [Agent 与 Skill 体系](./04-AGENTS-AND-SKILLS.md) | 6 个角色 + 10 个技能 |
-| [文档格式规范](./05-DOCUMENT-STANDARDS.md) | YAML 模板、@ 语法、命名约定 |
+| [文档格式规范](./05-DOCUMENT-STANDARDS.md) | 四层架构、YAML 模板、@ 语法（v0.5） |
 | [配置体系](./06-CONFIGURATION.md) | .env 目录与引擎参数 |
 | [API 接口规范](./07-API-REFERENCE.md) | 多模型接口协议 |
-| [Schema 速查表](./schema/QUICK_REFERENCE.md) | 字段与枚举值速查 |
 
 ---
 
 > *"代码是写给人看的，只是顺便让机器运行。"*
-> *OpsV 0.4.3 | 最后更新: 2026-03-28*
+> *OpsV 0.5.0 | 最后更新: 2026-04-09*

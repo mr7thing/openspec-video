@@ -1,19 +1,20 @@
-﻿# OpsV Project Panorama
+# OpsV Project Panorama
 
-> **OpenSpec-Video (OpsV) 0.4.3** 鈥?An automation framework that compiles Markdown/YAML narratives into video/image generation tasks.
+> **OpenSpec-Video (OpsV) 0.5.0** — An automation framework that compiles Markdown/YAML narratives into video/image generation tasks.
 
 ---
 
 ## 1. What is OpsV?
 
-OpsV is a **Spec-as-Code** video production pipeline. It allows creators (directors, PMs, art directors) to write stories, define assets, and design shots in Markdown. The CLI then "compiles" these text specifications into executable JSON job queues, driving AI models like **SeaDream, Seedance, Minimax, and SiliconFlow** to generate visual content concurrently.
+OpsV is a **Spec-as-Code** video production pipeline. It allows creators (directors, PMs, art directors) to write stories, independently define assets (characters/scenes/props), and design shots in Markdown. The CLI then "compiles" these text specifications into executable JSON job queues.
+With the v0.5 refactoring, OpsV has fully moved into the **Spec-First** era. It now leverages **Dependency Graph Topological Sorting** and **Two-Stage Runtime Validation** to ensure a rock-solid automation engine.
 
 **Core Principles**:
 
-- **Spec-as-Code**: `.md` files are the single source of truth; images and videos are compilation artifacts.
-- **Asset-First**: Characters, scenes, and props must be defined independently before being referenced in shots via `@` syntax.
-- **Motion-Static Separation**: Decouples visual appearance from animation instructions to maintain consistency.
-- **Dual-Channel References**: Uses `Design References` (d-ref) for generation input and `Approved References` (a-ref) for fixed output references.
+- **Spec-as-Code**: `.md` files are the single source of truth; images and videos are merely compilation artifacts.
+- **Dependency-Driven**: Relies on `## Approved References` to establish causal constraints between entities.
+- **Format Review**: Ensures 100% synchronization between metadata and output artifacts via the Review UI.
+- **Motion-Static Separation**: Decouples image generation from video generation pipelines to maintain consistency.
 
 ---
 
@@ -69,13 +70,13 @@ project/
 
 | Concept | Definition |
 |------|------|
-| **Parallel Universe Sandbox** | Concurrent execution across multiple models; results isolated by engine name in `artifacts/`. |
 | **Spec-as-Code** | Using structured Markdown as the source code for video production. |
-| **Asset-First** | Assets exist before shots; shots reference but do not describe assets. |
-| **d-ref (Design References)** | Reference images for generation input (img2img). |
-| **a-ref (Approved References)** | Approved images used as references when an entity is cited (feature stability). |
-| **Concept Bleeding** | When character appearance details leak into shot descriptions, causing rendering conflicts. |
-| **Keyframe Collapse** | `@FRAME:<shot_id>_last` pointer to inherit the last frame of a previous shot. |
+| **Dependency Graph** | `New in v0.5`. Performs topological parsing at compile time. Blocks generation if prerequisite assets are not formally approved. |
+| **Review UI** | `New in v0.5`. Local Express Web interface replacing legacy CLI logic, allowing visual image selection, naming, and automated metadata writebacks. |
+| **@ Reference Syntax** | Invokes approved asset variants using tags like `@role_K` or `@scene_bar:morning`. |
+| **Motion-Static Separation** | Image pipeline (Script.md + Generator) and Video pipeline (Shotlist.md + Animator) are strictly independent. |
+| **frame_ref** | `New in v0.5`. Replaces schema_0_3. Standard data payload to pass first/last frame reference images to models. |
+| **Two-Stage Validation** | `New in v0.5`. Compile-time format checks combined with runtime hard-constraints (pixel sizes, aspect ratios, model token limits). |
 
 ---
 
@@ -91,14 +92,19 @@ opsv init my-project
 # 3. Configure
 echo "VOLCENGINE_API_KEY=your_key" > .env/secrets.env
 
-# 4. Generate
+# 3. Analyze dependencies
+opsv deps
+
+# 4. Generate jobs
 opsv generate
+
+# 5. Image generation
 opsv gen-image
 
-# 5. Review
+# 6. Web Review
 opsv review
 
-# 6. Animate
+# 7. Animate & generate video
 opsv animate
 opsv gen-video
 ```
@@ -115,4 +121,4 @@ opsv gen-video
 ---
 
 > *"Code is for humans to read, and only incidentally for machines to execute."*
-> *OpsV 0.4.3 | Latest Update: 2026-03-28*
+> *OpsV 0.5.0 | Latest Update: 2026-04-09*

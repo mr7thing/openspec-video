@@ -85,6 +85,7 @@ opsv init [projectName]
 ### 4.1 Scripting
 - **Responsible Agent**: **ScriptDesigner**.
 - Reads `story.md` and converts narrative into structured shot language in `Script.md`.
+- **Pure Markdown body format**, no YAML configuration array needed.
 - No character descriptions; use `@entity` tags only.
 
 ### 4.2 Image Generation
@@ -93,11 +94,11 @@ opsv generate        # Compile Spec -> JSON jobs
 opsv gen-image       # Render images (Parallel Universe Sandbox)
 ```
 
-### 4.3 Review
+### 4.3 Web UI Review
 ```bash
-opsv review          # Update Markdown with latest generation results
+opsv review          # Start local Review server
 ```
-Director selects the best drafts in the IDE preview and annotates confirmation.
+This opens a dark-themed Web UI (e.g., `localhost:3456`) where directors can visually select the best rendering drafts (grid view), name variants (e.g., `morning`), and click "Approve" to automatically write the approved images back into the `Script.md` and entity files as `Approved References`.
 
 ---
 
@@ -128,4 +129,4 @@ opsv gen-video       # Render videos across enabled models
 ---
 
 > *"Let creativity flow like water, let specification be the dam."*
-> *OpsV 0.4.3 | Latest Update: 2026-03-28*
+> *OpsV 0.5.0 | Latest Update: 2026-04-09*
