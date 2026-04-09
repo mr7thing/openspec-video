@@ -1,0 +1,208 @@
+# 文档规范 (v0.5)
+
+> OpenSpec-Video v0.5 采用 **四层规范体系**，确保文档即代码的确定性。
+
+## 一、四层规范架构
+
+```
+Layer 1: @ 引用语法        → 文档间链接的标准化表达
+Layer 2: Frontmatter Schema → YAML 元数据的类型约束
+Layer 3: Markdown Body      → 人类可读的正文区域规范
+Layer 4: Execution Rules    → 编译期 + 执行期的语义校验
+```
+
+## 二、Frontmatter Schema (v0.5)
+
+### 2.1 元素文档 (elements/*.md)
+
+```yaml
+---
+type: character | prop | costume    # 资产类型（必填）
+status: drafting | approved         # 状态（必填）
+reference: elder_brother            # 变体依赖（可选）
+refs:                               # 引用的其他资产 ID（可选）
+  - elder_brother
+  - school_uniform
+reviews:                            # 审阅记录（自动追加）
+  - "2025-03-15: approved via review UI"
+---
+```
+
+**已删除字段**（v0.4 → v0.5 Breaking Changes）:
+- ~~`has_image`~~ → 由 `status: approved` + `## Approved References` 替代
+- ~~`visual_traits`~~ → 由正文描述替代
+- ~~`brief_description`~~ → 由正文第一段替代
+- ~~`detailed_description`~~ → 由正文主体替代
+
+### 2.2 场景文档 (scenes/*.md)
+
+与元素文档结构相同。`type: scene`。
+
+### 2.3 分镜设计文档 (shots/Script.md)
+
+```yaml
+---
+type: shot-design                   # 固定值
+status: drafting | approved
+total_shots: 48                     # 分镜总数
+refs:                               # 本文件引用的所有资产 ID
+  - elder_brother
+  - younger_brother
+  - classroom
+---
+```
+
+### 2.4 动态分镜表 (shots/Shotlist.md)
+
+```yaml
+---
+type: shot-production               # 固定值
+status: drafting | approved
+---
+```
+
+### 2.5 项目配置 (project.md)
+
+```yaml
+---
+type: project
+engine: seedance-1.5-pro
+aspect_ratio: "16:9"
+resolution: "1920x1080"
+global_style_postfix: "cinematic lighting, film grain"
+vision: "一个关于兄弟情的短片"
+---
+```
+
+## 三、@ 引用语法
+
+### 3.1 基本格式
+
+```
+@asset_id           → 引用资产的默认变体
+@asset_id:variant   → 引用资产的指定变体
+```
+
+### 3.2 示例
+
+```markdown
+## Shot 01 - 教室重逢
+
+@elder_brother 走进教室，看到 @younger_brother 坐在窗边。
+背景是 @classroom:morning 的晨光氛围。
+```
+
+### 3.3 解析规则
+
+| 引用 | 解析目标 |
+|------|---------|
+| `@elder_brother` | `elements/elder_brother.md` 的 `## Approved References` 中 `default` 变体 |
+| `@elder_brother:childhood` | 同上，`childhood` 变体 |
+| `@classroom:morning` | `scenes/classroom.md` 的 `morning` 变体 |
+
+### 3.4 约束
+
+- 引用目标必须存在于 `elements/` 或 `scenes/` 目录
+- 引用的变体必须在 `## Approved References` 区域中已 approve
+- 未 approve 的依赖会被 DependencyGraph 阻塞
+
+## 四、Markdown Body 规范
+
+### 4.1 Approved References 区域
+
+当资产被 `opsv review` 审批通过后，自动在正文末尾追加：
+
+```markdown
+## Approved References
+
+### default
+![default](../../artifacts/elder_brother_default.png)
+
+### childhood
+![childhood](../../artifacts/elder_brother_childhood.png)
+```
+
+### 4.2 Design References 区域（可选）
+
+外部参考图（非生成图）放置于此区域：
+
+```markdown
+## Design References
+
+![参考1](../../ref/elder_brother_ref.jpg)
+```
+
+### 4.3 Script.md 正文结构
+
+v0.5 的分镜信息从 **正文 `## Shot NN` 标题** 解析，不再使用 frontmatter `shots[]` 数组：
+
+```markdown
+## Shot 01 - 教室重逢
+
+@elder_brother 推开教室门，晨光洒入走廊。
+Camera: 中景跟拍，缓慢推进。
+
+## Shot 02 - 窗边对视
+
+@younger_brother 回头看向门口，微笑。
+Camera: 特写，浅景深。
+```
+
+## 五、Execution Rules (编译 + 校验)
+
+### 5.1 编译期通用校验
+
+- 双引号清洗（YAML → JSON 边界问题）
+- 必填字段检查（id, prompt, output_path）
+- 残留引号检测
+
+### 5.2 执行期模型特定校验
+
+```
+opsv gen-image --dry-run    # 仅校验不执行
+```
+
+校验项目：
+- 像素约束：模型最低/最高像素限制
+- 宽高比约束：模型支持的 aspect_ratio 白名单
+- Prompt 长度：模型 token 上限
+
+### 5.3 frame_ref (替代 schema_0_3)
+
+视频生成任务使用 `frame_ref` 结构：
+
+```json
+{
+  "frame_ref": {
+    "first": "/path/to/first_frame.png",
+    "last": "/path/to/last_frame.png"
+  }
+}
+```
+
+**已删除**: `middle_image`（无实际 API 支持此参数）。
+
+## 六、依赖图
+
+### 6.1 依赖关系来源
+
+- `reference` 字段：变体依赖（younger_brother → elder_brother）
+- `refs` 字段：内容引用依赖
+
+### 6.2 严格模式
+
+```
+opsv deps    # 查看依赖图分析
+```
+
+生成任务时，DependencyGraph 自动过滤：
+- ✅ 依赖全部 approved → 可执行
+- ⏸️ 依赖未 approved → 阻塞等待
+
+### 6.3 拓扑排序
+
+```
+第1批: elder_brother, classroom    (无依赖)
+第2批: younger_brother             (依赖 elder_brother)
+第3批: shot_01, shot_02           (依赖多个资产)
+```

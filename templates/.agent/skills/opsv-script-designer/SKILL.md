@@ -1,95 +1,34 @@
-﻿---
+---
 name: opsv-script-designer
-description: Storyboard and script design execution manual. Translates story outlines into YAML-structured `Script.md` files, including rigorous timing constraints and gallery templates. Supports d-ref/a-ref logic.
+description: OpenSpec-Video (OpsV) 核心框架技能：分镜设计师。用于将撰写的故事根据大纲拆解成独立的短镜头语言，组装为 Script.md。
 ---
 
-# OpsV Script Designer — Execution Manual (v0.4.3)
+# OpsV 分镜设计师 (OpsV Script Designer)
 
-This manual defines the execution standards for the `ScriptDesigner Agent` when generating `videospec/shots/Script.md` within the OpenSpec-Video framework. The input is `story.md`, and the output is a compilation-ready storyboard script driven by YAML.
+对于 OpsV 0.5 架构的静态图像基底，分镜必须极其规范。你的职责是把自由撰写的情节，转变为可以被机器解析的 Markdown。
 
-## Core Principles (v0.4.3)
+## 协同工作流 (非常重要)
 
-**Principle 1: Timing is an Absolute Constraint.** 
-Every Shot MUST have a clear `duration`. Ideal length is 3-5s, with an **upper limit of 15s**. Shots exceeding 15s must be split.
-
-**Principle 2: Visual Language, Not Narrative.** 
-Describe "what the camera sees": positions, movements, subject actions, lighting.
-
-**Principle 3: YAML-First (Mandatory Rule).** 
-All Shot definitions MUST be placed in the `shots:` YAML array within the document frontmatter. The Markdown body is for human review only.
-
-**Principle 4: Bilingual/Bipolar Output.** 
-- Technical Schema & Instructions: **English**.
-- Narrative Description (YAML & Body): **Chinese/English** (Based on user preference).
-- `prompt_en`: **Pure English** (Dense image generation prompts).
-
-**Principle 5: d-ref & a-ref Boundaries.** 
-Storyboards primarily reference an entity's `Approved References (a-ref)`. Shot-specific rendering confirmations are handled in the `Script.md` gallery.
+因为你是“模具封装者”，你应当：
+1. 先要求用户使用**通用创作技能**（如 `mv-creator-architect` 或基于短剧体系的剧本作家）构思好大纲或分镜框架。
+2. 拿到草稿后，严格按照下一节的规范重写输出。
 
 ---
 
-## Workflow Execution
+## 严禁特征泄漏 (Concept Bleeding)
 
-### Phase 1: Context Acquisition
-Read `videospec/project.md` (style/aspect ratio) and `videospec/stories/*.md` (narrative beats).
-
-### Phase 2: Thinking & Reasoning
-Output a `<thinking>` block before generation:
-```xml
-<thinking>
-1. Source Material: [Act/Scene] to convert.
-2. Timing Budget: Total duration and split into visual moments (e.g., Shot 1: 4s, Shot 2: 3s).
-3. Entities: Carry over all `@` tags from stories into YAML/Body.
-4. Prompt Formulation: Translate actions into dense `prompt_en`.
-</thinking>
-```
-
-### Phase 3: Generation
-Use `write_to_file` to create/append `videospec/shots/Script.md`.
-**CRITICAL**: Strictly follow `references/example-script.md`. Use `[@entity](../path/to/entity.md)` for links.
+OpsV 最核心的机制是 **动静分离与实体复用**。
+- **错误写法**（特征泄漏）：`@role_hero 穿着红色的皮衣在这奔跑`。一旦包含了“红色的皮衣”，图像生成时会产生 Prompt 冲突！
+- **正确写法**：`@role_hero 在这里奔跑`。容貌必须交由外部独立实体（在 elements/ 目录下的 a-ref）决定。
 
 ---
 
-## Technical Specifications (YAML Array)
+## 文档输出规范
 
-Every item in the `shots:` array MUST have:
-- `id`: e.g., "shot_1"
-- `duration`: integer (seconds)
-- `camera`: Camera motion description.
-- `environment`: Background description (preserve `@` entities).
-- `subject`: Subject action (preserve `@` entities).
-- `prompt_en`: **Pure English** dense image generation prompts.
+生成文件位于 `videospec/shots/Script.md`。参考示范见 `references/script_template.md`。
 
----
-
-## Keyframe & Animation Protocols
-
-### Long-Take Inheritance
-Use **`first_image: "@FRAME:<prev_shot_id>_last"`** for seamless motion transitions. The executor uses FFmpeg to capture the last frame of the previous video as the first frame of the next.
-
-### Targeted Keyframing (`target_last_prompt`)
-If a shot has dynamic changes (e.g., 180° orbit), provide a `target_last_prompt`. The system generates a `<shot_id>_last` image task.
-
----
-
-## Visual Review & Gallery Standard
-
-Markdown Body layout:
-```markdown
-## Shot [ID] ([Duration]s)
-[Visual description with [@entity](../links)]
-
-### 🖼️ Visual Gallery
-| Frame 1 | Frame 2 |
-|:---:|:---:|
-| (Await opsv review write-back) | (Await opsv review write-back) |
-```
-
----
-
-## 中文参考 (Chinese Reference)
-<!--
-定义分镜脚本执行手册：将故事大纲翻译为 Script.md。
-核心原则：YAML 驱动、严谨时长限制（上限 15s）、机位语言描述。
-支持关键帧塌缩 (@FRAME:last) 和动态补帧 (target_last_prompt)。
--->
+**核心约束（v0.5）**：
+- **废除 YAML！** v0.5 绝对不再使用 `shots: []` 的 YAML 对象数组！整个文件纯粹是 Markdown 编写！
+- **镜头定义**：每个镜头的起始是由 `## Shot NN (<xx>s)` 为标记。
+- **实体引用**：正文叙述中必须包含用 `@` 引用的已经定义好的实体名称和对应链接，如 `[@role_hero](../elements/@role_hero.md)`。这叫做明确锚点。
+- **必须提供英文 Prompt**：每一个 Shot 的结尾，必须提炼一句**纯英文**画面的提示词，并且格式必须是 `**Prompt:** The English description...`！这是机器引擎用来发配给 AI 模型的核心指令。

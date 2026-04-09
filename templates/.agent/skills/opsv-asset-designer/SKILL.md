@@ -1,96 +1,29 @@
-﻿---
+---
 name: opsv-asset-designer
-description: Asset generation execution manual. Defines the strict YAML-First Trisected Format for assets in `elements/` and `scenes/`, including d-ref/a-ref dual-channel reference logic.
+description: OpenSpec-Video (OpsV) 核心框架技能：资产设计师。负责基于花名册构建独立的实体定义文件，或者根据变更草案更新实体。
 ---
 
-# OpsV Asset Designer — Execution Manual (v0.4.3)
+# OpsV 资产设计师 (OpsV Asset Designer)
 
-This manual defines the execution standards for the `AssetDesigner Agent` when creating assets in the `videospec/elements/` and `videospec/scenes/` directories under the OpenSpec-Video framework.
+在 OpsV (v0.5) 架构中，资产文件具备极高的优先级。所有的角色、道具和场景必须预先在此独立定义。
 
-## Core Principles (v0.4.3)
+## 协同工作流 (非常重要)
 
-**Principle 1: Context is King.** 
-Always read `videospec/project.md` before designing any asset to align with the project's era, tone, and global style.
+因为你只是“铸模者”，你不负责实际产生优美的 Prompt。你应该按以下流程作业：
 
-**Principle 2: High Density Descriptions.** 
-Never output sparse descriptions. Provide dense details on materials, lighting, wear and tear, emotions, and composition.
-
-**Principle 3: Dual-Channel Reference System.** 
-Uses `## Design References` (d-ref: inspiration/base for generation) and `## Approved References` (a-ref: finalized reference for future shots). 
-
-**Principle 4: Output Language Hierarchy.** 
-- Primary Instructions & Manual: **English**.
-- Asset Descriptions & Body: **Chinese/English** (Based on user preference/context).
-- `prompt_en` field: **Pure English**.
-
-**Principle 5: YAML-First & Single Source of Truth (SSOT).** 
-Metadata like `prompt_en` resides in the YAML Frontmatter. Resource paths (images) must ONLY be listed under `## Design References` or `## Approved References` in the Markdown body.
+1. **调用通用创作技能获取配方**：例如你可以先调用 `visual-concept-artist`，把用户想要的模糊概念“帮我设计一下那个大反派的视觉”喂给它。
+2. **提取并转换**：拿到 `visual-concept-artist` 书写的绝佳的外貌提示词与短句后。
+3. **格式化落盘**：严格采用 OpsV v0.5 标准，写回 `videospec/elements/` 或 `videospec/scenes/` 目录。
 
 ---
 
-## Document Format (CRITICAL)
+## 文档输出规范：双通道参考图体系
 
-All generated `.md` files MUST follow the **YAML-First Trisected Format**:
+详见 `references/element_template.md` 和 `references/scene_template.md`，两者的语法是互通的。
 
-```yaml
----
-name: "@AssetName"
-type: "character"        # character | scene | prop
-brief_description: "[One-sentence summary]"
-detailed_description: >
-  [Dense description, at least 3-5 sentences.
-  Include materials, lighting, emotions, etc.]
-prompt_en: >
-  [Dense English prompt for image generation models.
-  Include composition, lighting, texture, resolution, style...]
----
-
-# Body (Machine-Readable Payload)
-
-## subject
-[One-sentence description of the subject]
-
-## environment
-[Shooting environment/background. Empty for pure props.]
-
-## camera
-[Camera position/angle in English. e.g., Close-Up, Macro, Wide Shot]
-
-## Design References
-<!-- d-ref: Inspiration/Base for generating THIS asset -->
-<!-- Format: [Description](Image_Path) -->
-
-## Approved References
-<!-- a-ref: Finalized image for reference in shots -->
-<!-- Format: [Version/Note](Image_Path) -->
-```
-
----
-
-## Workflow Execution
-
-### Phase 1: Context Acquisition
-Read `videospec/project.md` and check `global_style_postfix`, `vision`, and comments.
-
-### Phase 2: Thinking & Reasoning
-You MUST output a `<thinking>` block before generation:
-```xml
-<thinking>
-1. Project Context: [Setting/Vibe]
-2. Asset Intent: [Name/Purpose]
-3. Aesthetic Translation: [Materials, lighting, history details]
-4. Reference Strategy: [Which refs to use for d-ref/a-ref]
-</thinking>
-```
-
-### Phase 3: Generation
-Use `write_to_file` to create the Markdown file in `videospec/elements/` or `videospec/scenes/`.
-
----
-
-## 中文参考 (Chinese Reference)
-<!--
-定义资产生成的三段式格式：YAML 元数据、Markdown 正文、d-ref/a-ref 双通道参考图。
-d-ref: 灵感图，生成前参考。
-a-ref: 定档图，供后续镜头引用锁定。
--->
+**硬性约束**：
+- 顶部必须由符合规范的 YAML 字典组成。
+- `name` 字段必须精确匹配花名册里的标签（如 `@role_boss`）。
+- **废除 `has_image`**：v0.5 中不再使用 `has_image`，而是采用 `status: approved` 代表实体已经定档可用。如果是刚起草的文件，`status` 应当为 `draft`。
+- 必须设立 `## Design References` 下的列表。用于存放你在画这张角色图时的输入参考图（支持网络 URL 或本地盘路径）。
+- 必须设立 `## Approved References` 下的列表。**定档后的视觉形象将存放在这里（通常在执行 opsv review 命令后被框架自动写入）**。当这里有图片链接时，系统认定资产已定档。
