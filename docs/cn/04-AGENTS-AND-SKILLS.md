@@ -1,4 +1,4 @@
-﻿# OpsV Agent 与 Skill 体系 (Agents & Skills)
+# OpsV Agent 与 Skill 体系 (Agents & Skills)
 
 > Agent 定义"做什么"，Skill 定义"怎么做"。理解这两层分离是驾驭 OpsV 多角色协作的关键。
 
@@ -17,13 +17,16 @@
 │ └────┬─────┘ └────┬─────┘ └──────┬───────┘       │
 │      ↓              ↓              ↓               │
 ├──────────────────────────────────────────────────┤
-│ Skill 层 — "操作手册与规范"                         │
+│ Skill 层 — "标准与创意解耦"                         │
 │ ┌───────────────┐ ┌────────────────┐ ┌──────────┐│
-│ │opsv-architect │ │opsv-screenwr.  │ │opsv-a-d. ││
-│ └───────────────┘ └────────────────┘ └──────────┘│
+│ │ opsv-规范技能  │ │ comic-创作技能 │ │  其他... ││
+│ └───────┬───────┘ └───────┬────────┘ └────┬─────┘│
+│         │                 │               │      │
+│         └────────┬────────┴───────────────┘      │
+│                  ↓                               │
 ├──────────────────────────────────────────────────┤
-│ CLI 层 — "编译与执行"                               │
-│ opsv generate → opsv execute-image → opsv review  │
+│ CLI 层 — "编译与安装"                               │
+│ opsv init → opsv addons install → opsv generate   │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -40,8 +43,9 @@
 | **Architect** | `Architect.md` | 总架构师：将灵感锚定为项目世界观，生成 `project.md` + `story.md` | `opsv-architect` |
 | **Screenwriter** | `Screenwriter.md` | 主编剧：撰写故事大纲，提纯实体资产，埋设 `@` 指针 | `opsv-screenwriter` |
 | **AssetDesigner** | `AssetDesigner.md` | 资产设计师：创建 `elements/` 和 `scenes/` 下的实体定义 | `opsv-asset-designer` |
-| **ScriptDesigner** | `ScriptDesigner.md` | 脚本设计师：将故事翻译为带 YAML 的结构化分镜 `Script.md` | `opsv-script-designer` |
-| **Animator** | `Animator.md` | 动画编导：提取动态控制指令，生成 `Shotlist.md` | `opsv-animator` |
+| **ScriptDesigner** | `ScriptDesigner.md` | 脚本分镜：将故事翻译为 Markdown 结构化分镜 `Script.md` | `opsv-script-designer` (规范), `comic-drama-storyboarder` (创意) |
+| **Animator** | `Animator.md` | 动画编导：提取动态控制指令，生成 `Shotlist.md` | `opsv-animator` (规范), `comic-drama-animator` (创意) |
+| **PostEditor** | `PostEditor.md` | 后期统筹：负责成片拼装、命名规范与音画对齐 | `comic-drama-post-editor` |
 | **Supervisor** | `Supervisor.md` | 质检监制：自动化审查，输出 PASS/FAIL 报告 | `opsv-supervisor` |
 
 ---
@@ -253,17 +257,25 @@ prompt_en: >
 
 ---
 
-## 多端 AI 支持矩阵
+## 扩展体系：Addons (v0.5 新增)
 
-| AI 工具 | 配置方式 | 入口文件 |
-|---------|---------|---------|
-| **Gemini** (Gemini Code Assist) | 直接读取根目录 `GEMINI.md` | `GEMINI.md` |
-| **OpenCode** | 读取 `.opencode/` 目录 + `AGENTS.md` | `AGENTS.md` |
-| **Trae** | 手动将 `AGENTS.md` 内容复制到 Trae 智能体设定 | `AGENTS.md` + `.trae/rules/` |
+从 v0.5 开始，创作在大脑（创意技能）与管线模具（规范技能）实现了彻底解耦。
 
-三者共享同一套 `.agent/skills/` 技能库，仅全局人格配置不同。
+### 1. 技能解耦哲学
+- **规范技能 (opsv-*)**：定义“盒子”的形状。如：Script.md 该怎么排版，jobs.json 该怎么嵌套。这部分是工业化的刚性标准。
+- **创意技能 (comic-drama-* / mv-*)**：定义“灵魂”的厚度。如：漫剧该怎么分镜， Prompt 该怎么写效果才爆。这部分是可拔插、可进化的。
+
+### 2. Addons 插件包安装
+用户可以通过 `opsv addons` 命令动态扩展 Agent 的能力：
+
+```bash
+# 安装漫剧专业插件包
+opsv addons install ./addons/comic-drama-v0.5.zip
+```
+
+安装后，`Agent` 的配置文件会自动映射到这些新增的创作专家。
 
 ---
 
-> *"Agent 是灵魂，Skill 是技法，CLI 是双手。"*
-> *OpsV 0.4.3 | 最后更新: 2026-03-28*
+> *"Agent 是灵魂，规范 Skill 是骨架，创意 Skill 是血肉，CLI 是双手。"*
+> *OpsV 0.5.0 | 最后更新: 2026-04-10*

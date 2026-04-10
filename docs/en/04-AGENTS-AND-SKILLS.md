@@ -1,4 +1,4 @@
-﻿# OpsV Agents & Skills
+# OpsV Agents & Skills
 
 > Agents define **"What to do"**, and Skills define **"How to do it"**. Understanding this separation is key to mastering multi-role collaboration in OpsV.
 
@@ -8,9 +8,18 @@
 
 ```
 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                  Director (User)                 鈹?鈹?             鈫?Natural Language Command           鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Agent Layer 鈥?"Personality & Responsibility"     鈹?鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?      鈹?鈹?鈹侫rchitect 鈹?鈹係creenwr. 鈹?鈹侫ssetDesigner 鈹?...   鈹?鈹?鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹?      鈹?鈹?     鈫?             鈫?             鈫?              鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Skill Layer 鈥?"Manuals & Specifications"          鈹?鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹愨攤
-鈹?鈹俹psv-architect 鈹?鈹俹psv-screenwr.  鈹?鈹俹psv-a-d. 鈹傗攤
-鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹樷攤
-鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?CLI Layer 鈥?"Compilation & Execution"            鈹?鈹?opsv generate 鈫?opsv gen-image 鈫?opsv review     鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+├──────────────────────────────────────────────────┤
+│ Skill Layer — "Normative & Creative Decoupling"     │
+│ ┌───────────────┐ ┌────────────────┐ ┌────────────┐│
+│ │ opsv-Normative│ │ comic-Creative │ │  Others... ││
+│ └───────┬───────┘ └───────┬────────┘ └─────┬──────┘│
+│         │                 │                │      │
+│         └────────┬────────┴────────────────┘      │
+│                  ↓                                │
+├──────────────────────────────────────────────────┤
+│ CLI Layer — "Compilation & Addons"                 │
+│ opsv init → opsv addons install → opsv generate    │
+└──────────────────────────────────────────────────┘```
 
 - **Agent** (`.agent/*.md`): Defines the persona, core duties, and which Skills to invoke.
 - **Skill** (`.agent/skills/*/SKILL.md`): Defines execution standards, formatting templates, and quality gates.
@@ -26,8 +35,9 @@
 | **Architect** | `Architect.md` | Strategist: Anchors inspiration into project worldview; generates `project.md` + `story.md`. | `opsv-architect` |
 | **Screenwriter** | `Screenwriter.md` | Writer: Drafts story outlines, identifies entities, and embeds `@` anchors. | `opsv-screenwriter` |
 | **AssetDesigner** | `AssetDesigner.md` | Designer: Creates entity definitions in `elements/` and `scenes/`. | `opsv-asset-designer` |
-| **ScriptDesigner** | `ScriptDesigner.md` | Storyboarder: Translates stories into structured YAML-driven `Script.md`. | `opsv-script-designer` |
-| **Animator** | `Animator.md` | Animator: Extracts motion instructions and generates `Shotlist.md`. | `opsv-animator` |
+| **ScriptDesigner** | `ScriptDesigner.md` | Storyboard: Translates stories into Markdown-based `Script.md`. | `opsv-script-designer` (Norm), `comic-drama-storyboarder` (Creative) |
+| **Animator** | `Animator.md` | Motion: Extracts movement instructions; generates `Shotlist.md`. | `opsv-animator` (Norm), `comic-drama-animator` (Creative) |
+| **PostEditor** | `PostEditor.md` | Editor: Final assembly, naming conventions, and audio sync. | `comic-drama-post-editor` |
 | **Supervisor** | `Supervisor.md` | QA Officer: Performs automated inspections and provides PASS/FAIL reports. | `opsv-supervisor` |
 
 ---
@@ -66,5 +76,25 @@
 
 ---
 
-> *"Agents are the soul, Skills are the technique, and CLI is the hands."*
-> *OpsV 0.4.3 | Latest Update: 2026-03-28*
+## Addons Ecosystem (v0.5 New)
+
+As of v0.5, the "Creative Brain" (Creative Skills) is decoupled from the "Pipeline Template" (Normative Skills).
+
+### 1. Decoupling Philosophy
+- **Normative Skills (opsv-*)**: Define the shape of the "mold". How `Script.md` is formatted, how `jobs.json` is structured. These are fixed industrial standards.
+- **Creative Skills (comic-drama-* / mv-*)**: Define the depth of the "soul". How a mini-drama should be storyboarded, or which prompt styles work best. these are pluggable and user-updatable.
+
+### 2. Addon Installation
+Users can dynamically expand Agent capabilities via the `opsv addons` command:
+
+```bash
+# Install the professional Comic-Drama pack
+opsv addons install ./addons/comic-drama-v0.5.zip
+```
+
+Once installed, Agent profiles will automatically map to these expert creative skills.
+
+---
+
+> *"Agents are the soul, Normative Skills are the skeleton, Creative Skills are the flesh, and CLI is the hands."*
+> *OpsV 0.5.0 | Latest Update: 2026-04-10*

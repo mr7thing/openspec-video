@@ -11,6 +11,7 @@
 | `opsv deps` | 分析资产依赖关系 | 分析 |
 | `opsv animate` | 编译 Shotlist 为视频任务 | 视频管线 |
 | `opsv gen-video` | 执行视频生成（调用 API） | 视频管线 |
+| `opsv addons` | 管理扩展插件与技能包 | 扩展 |
 | `opsv daemon` | 全局后台服务管理 | 基础设施 |
 
 ## opsv init
@@ -198,6 +199,20 @@ opsv daemon start    # 启动
 opsv daemon stop     # 停止
 opsv daemon status   # 查看状态
 ```
+
+## opsv addons
+
+**v0.5 新增**: 管理项目扩展插件与领域技能包（如：漫剧专用技能、MV 创作大脑等）。
+
+```bash
+# 安装插件包 (.zip)
+opsv addons install ./addons/comic-drama-v0.5.zip
+```
+
+安装行为：
+- 自动校验当前目录是否为有效的 OpsV 项目。
+- 将 Zip 包中的 `.agent/` 目录合并到当前项目（包含新的 Skills 和 Agent 配置）。
+- 成功后自动列出新增的专家技能列表。
 
 ## 典型工作流
 

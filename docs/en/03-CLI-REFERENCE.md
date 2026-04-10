@@ -11,6 +11,7 @@
 | `opsv deps` | Analyze asset dependency graph | Analysis |
 | `opsv animate` | Compile Shotlist to video jobs | Video Pipeline |
 | `opsv gen-video` | Execute video generation (call APIs) | Video Pipeline |
+| `opsv addons` | Manage extension packs and skills | Extensions |
 | `opsv daemon` | Global background service management | Infrastructure |
 
 ## opsv init
@@ -126,6 +127,21 @@ opsv gen-video -m seedance           # Specific model
 |--------|-------------|---------|
 | `-m, --model <model>` | Target model | `all` |
 | `-s, --skip-failed` | Skip failed jobs | `false` |
+| `--dry-run` | Validate only | `false` |
+
+## opsv addons
+
+**v0.5 New**: Manage project extensions and domain-specific skill packs (e.g., Comic-Drama SOPs, Music Video brains).
+
+```bash
+# Install addon pack (.zip)
+opsv addons install ./addons/comic-drama-v0.5.zip
+```
+
+Installation Logic:
+- Validates that the current directory is an active OpsV project.
+- Merges the `.agent/` directory from the Zip pack into the project root.
+- Lists the newly installed expert skills and agent roles upon completion.
 
 ## Typical Workflow
 
