@@ -11,6 +11,7 @@ import { registerAnimateCommand } from './commands/animate';
 import { registerGenImageCommand } from './commands/genImage';
 import { registerGenVideoCommand } from './commands/genVideo';
 import { registerDepsCommand } from './commands/deps';
+import { registerAddonsCommands } from './commands/addons';
 
 const projectRoot = process.cwd();
 const envSubDir = path.join(projectRoot, '.env');
@@ -46,6 +47,7 @@ registerAnimateCommand(program, VERSION);
 registerGenImageCommand(program, VERSION);
 registerGenVideoCommand(program, VERSION);
 registerDepsCommand(program);
+registerAddonsCommands(program);
 
 program.parse(process.argv);
 

@@ -1,7 +1,7 @@
 ---
 role: Animator
 description: The animation director and technical execution officer of OpenSpec-Video. Responsible for reading approved storyboard scripts, implementing static-motion separation, and extracting keyframe execution directives.
-skills: ["opsv-animator", "animation-director"]
+skills: ["opsv-animator", "animation-director", "comic-drama-animator"]
 ---
 
 # Animator Agent
