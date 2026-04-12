@@ -1,53 +1,38 @@
-﻿# Workflow: Auto Executor (Batch Processing)
+# Workflow: Auto Executor (Batch Processing) - v0.5.1
 
-This workflow guides the Agent to execute video/image generation tasks defined in the `queue/jobs.json`.
+This workflow explains how the OpenSpec-Video pipeline handles batch processing of image and video generations without any external browser automation. **Everything runs natively via internal API dispatcher paths.**
 
 ## Prerequisites
-- The `queue/jobs.json` file must be generated via `npx opsv generate`.
-- The Agent must have access to `browser_subagent`.
+- Generation strictly depends on the compiler creating `queue/jobs.json` or `queue/video_jobs.json`.
+- The `api_config.yaml` and `.env` files must be populated with appropriate API keys (`VOLCENGINE_API_KEY`, `SILICONFLOW_API_KEY`, etc.).
 
 ## Execution Steps
 
-### 1. Load Job Queue
-1. Read the file `queue/jobs.json`.
-2. Parse the JSON content to get a list of jobs.
-3. Identify jobs where `output_path` does not exist (Pending Jobs).
+### 1. Job Queue Generation
+- Compile the Markdown specification into actionable jobs using:
+  ```bash
+  npx opsv parse
+  ```
+- The `JobGenerator` automatically reads all valid markdown documents and resolves the `@` entity references.
 
-### 2. Job Execution Loop
-For each **Pending Job**:
+### 2. Batch Dispatch
+**To generate images** (Storyboards, Elements, Scenes):
+```bash
+npx opsv gen --model <target_model>
+```
+*Note: Options like SeaDream or Minimax exist under `target_model` bindings specified in api_config.*
 
-#### A. Analyze Job Payload
-- **Type**: Check if it is `image_generation` (`nano_banana_pro`) or `video_generation` (`veo_3_1`).
-- **Assets**: Note the absolute paths of `assets` (Reference Sheets).
-- **Prompt**: Extract the `subject`, `environment`, and `global_settings` from `payload`.
+**To generate videos** (Seedance Pro, Wan 2.1, etc.):
+```bash
+npx opsv video --model <target_model> --skip-failed
+```
 
-#### B. Browser Interaction (Nano Banana Pro)
-If `target_tool` is `nano_banana_pro`:
-1. **Launch**: Open Browser and navigate to the generation tool URL (Mock: `https://higgsfield.ai/nano-banana-2-intro` or internal URL).
-2. **Setup**:
-   - Locate the "Prompt" input area.
-   - Locate the "Upload Reference" button.
-3. **Action**:
-   - Type the constructed prompt: `[Subject Description] [Action] in [Environment]`.
-   - Upload the reference image(s) from `assets` list.
-   - Click "Generate".
-4. **Capture**:
-   - Wait for the generation to complete (look for progress bar or result).
-   - Click the image to view full size.
-   - Take a screenshot or download the image.
-   - **CRITICAL**: Save the result to the `output_path` defined in the job.
+### 3. Under the Hood (The v0.5.1 Architecture)
+- The Dispatchers (`ImageModelDispatcher` / `VideoModelDispatcher`) iterate through queued jobs continuously.
+- Each API `Provider` implements a unified, native `generateAndDownload` promise contract.
+- The system polls the API directly through native integrations, downloads the returned data/buffer, and logs execution to `artifacts/`.
+- **NO BROWSER SUBAGENTS** are required or allowed. All web GUI mockups (e.g. Nano Banana Pro mockings) have been deprecated globally.
 
-#### C. Browser Interaction (Veo 3.1)
-If `target_tool` is `veo_3_1`:
-1. **Launch**: Navigate to Veo console.
-2. **Setup**: Select "Image-to-Video" mode.
-3. **Action**:
-   - Upload the *Source Image* (this might be the output of a previous `image_generation` job).
-   - Enter the motion prompt from `camera.motion`.
-   - Click "Generate".
-4. **Capture**: Save the video file to `output_path`.
-
-### 3. Verification
-- After processing all jobs, list the `artifacts/` directory to confirm file creation.
-- Update `task.md` or a log file to mark jobs as "Done".
-
+### 4. Verification Checkpoint
+- Rerun `npx opsv parse` at any time to print the Dependency Graph.
+- A green checkmark ✅ clearly indicates a completed visual sequence node.
