@@ -1,5 +1,5 @@
-import fs from 'fs';
 import path from 'path';
+import { FileUtils } from '../utils/fileUtils';
 import { FrontmatterParser } from './FrontmatterParser';
 import { RefResolver, RefResult } from './RefResolver';
 import { ApprovedRefReader } from './ApprovedRefReader';
@@ -8,6 +8,7 @@ import { ProjectFrontmatterSchema, ProjectFrontmatter } from '../types/Frontmatt
 // ============================================================================
 // v0.5 资产编译器
 // 核心变更: 去掉 has_image，用 RefResolver 解析 @ 引用
+// 文件操作已全部异步化
 // ============================================================================
 
 export interface ProjectConfig {
@@ -37,12 +38,13 @@ export class AssetCompiler {
     /**
      * 从 project.md 加载全局配置
      */
-    public loadProjectConfig(): void {
+    public async loadProjectConfig(): Promise<void> {
         const projectFile = path.join(this.projectRoot, 'videospec', 'project.md');
-        if (!fs.existsSync(projectFile)) return;
+        const exists = await FileUtils.exists(projectFile);
+        if (!exists) return;
 
         try {
-            const content = fs.readFileSync(projectFile, 'utf-8');
+            const content = await FileUtils.readFile(projectFile);
             const { frontmatter } = FrontmatterParser.parse(content, ProjectFrontmatterSchema);
             this.projectConfig = {
                 aspect_ratio: frontmatter.aspect_ratio,
@@ -62,9 +64,9 @@ export class AssetCompiler {
      * 2. 展开引用文本 → 生成 prompt
      * 3. 附加全局样式后缀
      */
-    public assemblePrompt(markdown: string): CompiledPrompt {
+    public async assemblePrompt(markdown: string): Promise<CompiledPrompt> {
         // 1. 解析所有 @ 引用
-        const refs = this.refResolver.parseAll(markdown);
+        const refs = await this.refResolver.parseAll(markdown);
 
         // 2. 展开引用为 prompt 文本 + 收集附件
         const { expandedText, attachments } = this.refResolver.expandRefsInText(markdown, refs);
@@ -83,8 +85,8 @@ export class AssetCompiler {
     /**
      * 从资产描述组装 prompt（用于元素/场景的图像生成）
      */
-    public assembleAssetPrompt(assetId: string, description: string): CompiledPrompt {
-        const refs = this.refResolver.parseAll(description);
+    public async assembleAssetPrompt(assetId: string, description: string): Promise<CompiledPrompt> {
+        const refs = await this.refResolver.parseAll(description);
         const { expandedText, attachments } = this.refResolver.expandRefsInText(description, refs);
 
         let prompt = this.cleanMarkdown(expandedText);

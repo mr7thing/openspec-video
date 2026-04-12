@@ -9,14 +9,40 @@ import { FrameExtractor } from './FrameExtractor';
 import { ConfigLoader, ApiConfig } from '../utils/configLoader';
 import { logger } from '../utils/logger';
 
+// ============================================================================
+// 类型定义
+// ============================================================================
+
+export type DispatchStatus = 'success' | 'failed' | 'timeout';
+
+export interface DispatchResult {
+    jobId: string;
+    status: DispatchStatus;
+    outputPath?: string;  // success 时有效
+    error?: string;       // failed/timeout 时有效
+}
+
+export interface DispatchSummary {
+    total: number;
+    succeeded: number;
+    failed: number;
+    results: DispatchResult[];
+}
+
 export class VideoModelDispatcher {
     private projectRoot: string;
     private configLoader: ConfigLoader;
     private config: ApiConfig;
     private providers: Map<string, VideoProvider>;
+    /** failFast: true 时，一个任务失败即终止整个队列；false 时记录错误后继续 */
+    private failFast: boolean;
+    /** 单任务超时时间（毫秒），默认 5 分钟 */
+    private jobTimeoutMs: number;
 
-    constructor(projectRoot: string) {
+    constructor(projectRoot: string, options: { failFast?: boolean; jobTimeoutMs?: number } = {}) {
         this.projectRoot = projectRoot;
+        this.failFast = options.failFast ?? false;
+        this.jobTimeoutMs = options.jobTimeoutMs ?? 300_000; // 5 分钟
         this.configLoader = ConfigLoader.getInstance();
         this.config = this.configLoader.loadConfig(this.projectRoot);
 
@@ -124,12 +150,16 @@ export class VideoModelDispatcher {
      * 批量派发流水线与长镜头依赖图谱解析
      * @param jobs 任务队列
      * @param targetModel 全局指定的大模型名称
+     * @returns 执行摘要，包含每个任务的成功/失败状态
      */
-    async dispatchAll(jobs: Job[], targetModel: string): Promise<void> {
+    async dispatchAll(jobs: Job[], targetModel: string): Promise<DispatchSummary> {
         const jobResults = new Map<string, string>();
         const completedJobs = new Set<string>();
+        const dispatchResults: DispatchResult[] = [];
 
-        for (const job of jobs) {
+        for (const [index, job] of jobs.entries()) {
+            logger.info(`[Dispatcher] [${index + 1}/${jobs.length}] 开始处理任务: ${job.id}`);
+
             // v0.5: 从 frame_ref 读取帧引用
             const frameRef = job.payload?.frame_ref;
             let firstImage = frameRef?.first as string | null | undefined;
@@ -142,7 +172,11 @@ export class VideoModelDispatcher {
                 logger.info(`[Dispatcher] ⏳ 跨帧依赖: [${job.id}] → [${sourceJobId}]`);
 
                 if (!completedJobs.has(sourceJobId) || !jobResults.has(sourceJobId)) {
-                    throw new Error(`[Dispatcher] 依赖断裂: [${job.id}] 前置产物 [${sourceJobId}] 未就绪`);
+                    const errMsg = `依赖断裂: [${job.id}] 前置产物 [${sourceJobId}] 未就绪`;
+                    logger.error(`[Dispatcher] ❌ ${errMsg}`);
+                    dispatchResults.push({ jobId: job.id, status: 'failed', error: errMsg });
+                    if (this.failFast) break;
+                    continue;
                 }
 
                 const sourceVideoPath = jobResults.get(sourceJobId)!;
@@ -157,16 +191,51 @@ export class VideoModelDispatcher {
             }
 
             try {
-                // 逐个下发真实的 API 生命周期
-                const finalPath = await this.dispatchJob(job, targetModel);
+                const finalPath = await this.dispatchWithTimeout(job, targetModel);
                 jobResults.set(job.id, finalPath);
                 completedJobs.add(job.id);
-            } catch (e: any) {
-                logger.error(`[Dispatcher] ❌ 任务 [${job.id}] 失败: ${e.message}`);
-                throw e;
+                dispatchResults.push({ jobId: job.id, status: 'success', outputPath: finalPath });
+            } catch (e: unknown) {
+                const isTimeout = e instanceof Error && e.message.includes('超时');
+                const status: DispatchStatus = isTimeout ? 'timeout' : 'failed';
+                const errMsg = e instanceof Error ? e.message : String(e);
+
+                logger.error(`[Dispatcher] ❌ 任务 [${job.id}] ${status}: ${errMsg}`);
+                dispatchResults.push({ jobId: job.id, status, error: errMsg });
+
+                if (this.failFast) {
+                    logger.warn(`[Dispatcher] failFast 已启用，终止后续 ${jobs.length - index - 1} 个任务`);
+                    break;
+                }
             }
         }
 
-        logger.info(`\n[Dispatcher] ✨ ${jobs.length} 个视频任务全部完成`);
+        // 生成执行摘要
+        const summary: DispatchSummary = {
+            total: jobs.length,
+            succeeded: dispatchResults.filter(r => r.status === 'success').length,
+            failed: dispatchResults.filter(r => r.status !== 'success').length,
+            results: dispatchResults,
+        };
+
+        logger.info(`\n[Dispatcher] ✨ 执行完成: ${summary.succeeded}/${summary.total} 成功, ${summary.failed} 失败`);
+        return summary;
+    }
+
+    /**
+     * 带超时的单任务派发
+     * 超过 jobTimeoutMs 后抛出超时错误
+     */
+    private dispatchWithTimeout(job: Job, targetModel: string): Promise<string> {
+        return Promise.race([
+            this.dispatchJob(job, targetModel),
+            new Promise<never>((_, reject) =>
+                setTimeout(
+                    () => reject(new Error(`任务超时 (>${this.jobTimeoutMs}ms): ${job.id}`)),
+                    this.jobTimeoutMs
+                )
+            ),
+        ]);
     }
 }
+

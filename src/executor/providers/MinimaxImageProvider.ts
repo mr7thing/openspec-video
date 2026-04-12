@@ -1,16 +1,12 @@
 import axios from 'axios';
 import fs from 'fs-extra';
 import { Job } from '../../types/PromptSchema';
-import { ImageProvider, ImageGenerationResult } from './ImageProvider';
+import { ImageProvider } from './ImageProvider';
 import { logger } from '../../utils/logger';
 import { ErrorFactory } from '../../errors/OpsVError';
 
 export class MinimaxImageProvider implements ImageProvider {
     public providerName = 'minimax';
-
-    async generateImage(job: Job, targetModel: string, apiKey: string): Promise<ImageGenerationResult> {
-        throw new Error('Method not supported explicitly. Use generateAndDownload instead.');
-    }
 
     async generateAndDownload(job: Job, targetModel: string, apiKey: string, outputPath: string): Promise<void> {
         try {

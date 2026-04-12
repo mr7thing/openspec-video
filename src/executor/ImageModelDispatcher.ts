@@ -14,38 +14,19 @@ import { MinimaxImageProvider } from './providers/MinimaxImageProvider';
 import { logger } from '../utils/logger';
 import { ErrorFactory, OpsVError } from '../errors/OpsVError';
 import { ConfigLoader, ApiConfig, ModelConfig } from '../utils/configLoader';
-
-/**
- * 执行统计
- */
-interface ExecutionStats {
-    total: number;
-    success: number;
-    failed: number;
-    skipped: number;
-    totalTime: number;
-}
+import { PromptPayload } from '../types/PromptSchema';
 
 export class ImageModelDispatcher {
     private projectRoot: string;
     private configLoader: ConfigLoader;
     private config: ApiConfig;
     private providers: Map<string, ImageProvider>;
-    private stats: ExecutionStats;
 
     constructor(projectRoot: string) {
         this.projectRoot = projectRoot;
         this.configLoader = ConfigLoader.getInstance();
         this.config = this.configLoader.loadConfig(this.projectRoot);
         this.providers = new Map();
-        this.stats = {
-            total: 0,
-            success: 0,
-            failed: 0,
-            skipped: 0,
-            totalTime: 0
-        };
-
         this.registerProviders();
     }
 
@@ -142,21 +123,15 @@ export class ImageModelDispatcher {
         // 获取 API Key
         const apiKey = this.configLoader.getResolvedApiKey(targetModel);
 
-        // 注入模型特定配置到 payload 以便提供商读取
-        // 优先级：任务自带设置 > api_config.yaml 里的 defaults > 固定默认值
-        const settings = job.payload.global_settings as any;
-        if (settings) {
-            const defaults = modelConfig.defaults || {};
-            
-            // 穿透注入
-            settings.max_images = settings.max_images || defaults.max_images || 1;
-            settings.quality = settings.quality || defaults.quality || '2K';
-            settings.steps = settings.steps || defaults.steps || 30;
-            settings.cfg_scale = settings.cfg_scale || defaults.cfg_scale || 7.5;
-            settings.negative_prompt = settings.negative_prompt || defaults.negative_prompt;
-            
-            settings.model = modelConfig.model || targetModel;
-        }
+        // 注入模型特定配置到 payload（优先级：任务设置 > yaml defaults > 固定默认值）
+        const settings = job.payload.global_settings as PromptPayload['global_settings'] & Record<string, unknown>;
+        const defaults = modelConfig.defaults || {};
+        settings.max_images = (settings.max_images as number) || (defaults.max_images as number) || 1;
+        settings.quality = settings.quality || (defaults.quality as string) || '2K';
+        settings.steps = (settings.steps as number) || (defaults.steps as number) || 30;
+        settings.cfg_scale = (settings.cfg_scale as number) || (defaults.cfg_scale as number) || 7.5;
+        settings.negative_prompt = settings.negative_prompt || (defaults.negative_prompt as string);
+        settings.model = (modelConfig.model as string) || targetModel;
 
         // 计算输出路径：如果是 Gemini 等默认情况存入根，API模型存入子目录
         const baseOutputPath = path.isAbsolute(job.output_path)
@@ -186,40 +161,27 @@ export class ImageModelDispatcher {
         const startTime = Date.now();
 
         try {
-            // 执行生成
-            if (provider instanceof SeaDreamProvider || provider instanceof MinimaxImageProvider) {
-                await provider.generateAndDownload(job, targetModel, apiKey, finalOutputPath);
-            } else {
-                // 通用提供商接口
-                const result = await provider.generateImage(job, targetModel, apiKey);
-                // 处理结果保存...
-            }
+            // 统一调用接口方法（方案A：无分支，无 instanceof）
+            await provider.generateAndDownload(job, targetModel, apiKey, finalOutputPath);
 
             const duration = Date.now() - startTime;
-            this.stats.success++;
-            this.stats.totalTime += duration;
-
-            logger.logExecution(job.id, 'COMPLETED', { 
+            logger.logExecution(job.id, 'COMPLETED', {
                 duration: `${duration}ms`,
                 output: finalOutputPath
             });
 
             return finalOutputPath;
 
-        } catch (error: any) {
-            this.stats.failed++;
-            
-            logger.logExecution(job.id, 'FAILED', { 
-                error: error.message 
+        } catch (error: unknown) {
+            logger.logExecution(job.id, 'FAILED', {
+                error: error instanceof Error ? error.message : String(error)
             });
 
-            if (error instanceof OpsVError) {
-                throw error;
-            }
-            
+            if (error instanceof OpsVError) throw error;
+
             throw ErrorFactory.apiError(
                 modelConfig.provider,
-                error.message,
+                error instanceof Error ? error.message : String(error),
                 job.id
             );
         }
@@ -233,14 +195,13 @@ export class ImageModelDispatcher {
         onProgress?: (completed: number, total: number) => void;
         skipFailed?: boolean;
     } = {}): Promise<{ results: string[]; errors: Array<{ jobId: string; error: string }> }> {
-        
+
         const { concurrency = 1, onProgress, skipFailed = false } = options;
-        
-        this.stats.total = jobs.length;
-        this.stats.success = 0;
-        this.stats.failed = 0;
-        this.stats.skipped = 0;
-        this.stats.totalTime = 0;
+
+        // stats 局部化，避免多次并发调用时竞争条件
+        let successCount = 0;
+        let failedCount = 0;
+        let totalTime = 0;
 
         const results: string[] = [];
         const errors: Array<{ jobId: string; error: string }> = [];
@@ -255,15 +216,19 @@ export class ImageModelDispatcher {
             for (let i = 0; i < jobs.length; i++) {
                 const job = jobs[i];
                 
+                const t0 = Date.now();
                 try {
                     const result = await this.dispatchJob(job, targetModel);
                     results.push(result);
-                } catch (error: any) {
-                    errors.push({ jobId: job.id, error: error.message });
-                    
-                    if (!skipFailed) {
-                        throw error;
-                    }
+                    successCount++;
+                    totalTime += Date.now() - t0;
+                } catch (error: unknown) {
+                    failedCount++;
+                    errors.push({
+                        jobId: job.id,
+                        error: error instanceof Error ? error.message : String(error)
+                    });
+                    if (!skipFailed) throw error;
                 }
 
                 onProgress?.(i + 1, jobs.length);
@@ -302,14 +267,11 @@ export class ImageModelDispatcher {
         }
 
         // 输出统计
-        const avgTime = this.stats.success > 0 
-            ? Math.round(this.stats.totalTime / this.stats.success) 
-            : 0;
-
+        const avgTime = successCount > 0 ? Math.round(totalTime / successCount) : 0;
         logger.info('Image generation pipeline completed', {
-            total: this.stats.total,
-            success: this.stats.success,
-            failed: this.stats.failed,
+            total: jobs.length,
+            success: successCount,
+            failed: failedCount,
             avgTime: `${avgTime}ms`
         });
 
@@ -325,13 +287,6 @@ export class ImageModelDispatcher {
             chunks.push(array.slice(i, i + size));
         }
         return chunks;
-    }
-
-    /**
-     * 获取执行统计
-     */
-    getStats(): ExecutionStats {
-        return { ...this.stats };
     }
 
     /**

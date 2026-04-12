@@ -1,5 +1,6 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
+import { FileUtils } from '../utils/fileUtils';
 
 // ============================================================================
 // Approved References 区域解析器
@@ -17,16 +18,16 @@ export class ApprovedRefReader {
     /**
      * 获取指定变体的图片绝对路径
      */
-    getVariant(docPath: string, variant: string): string | null {
-        const refs = this.parseApprovedRefs(docPath);
+    async getVariant(docPath: string, variant: string): Promise<string | null> {
+        const refs = await this.parseApprovedRefs(docPath);
         return refs.get(variant) || null;
     }
 
     /**
      * 获取第一个 approved 图片的绝对路径
      */
-    getFirst(docPath: string): string | null {
-        const refs = this.parseApprovedRefs(docPath);
+    async getFirst(docPath: string): Promise<string | null> {
+        const refs = await this.parseApprovedRefs(docPath);
         const first = refs.entries().next();
         return first.done ? null : first.value[1];
     }
@@ -34,8 +35,8 @@ export class ApprovedRefReader {
     /**
      * 获取所有 approved 引用
      */
-    getAll(docPath: string): ApprovedRef[] {
-        const refs = this.parseApprovedRefs(docPath);
+    async getAll(docPath: string): Promise<ApprovedRef[]> {
+        const refs = await this.parseApprovedRefs(docPath);
         return Array.from(refs.entries()).map(([variant, filePath]) => ({
             variant, filePath
         }));
@@ -45,20 +46,21 @@ export class ApprovedRefReader {
      * 检查资产是否有任何 approved 图
      * 通过 assetId 自动查找文档路径
      */
-    hasAnyApproved(assetId: string): boolean {
-        const docPath = this.findDocPath(assetId);
+    async hasAnyApproved(assetId: string): Promise<boolean> {
+        const docPath = await this.findDocPath(assetId);
         if (!docPath) return false;
-        const refs = this.parseApprovedRefs(docPath);
+        const refs = await this.parseApprovedRefs(docPath);
         return refs.size > 0;
     }
 
     /**
      * 向文档的 Approved References 区追加图片
      */
-    appendApprovedRef(docPath: string, variant: string, imagePath: string): void {
-        if (!fs.existsSync(docPath)) return;
+    async appendApprovedRef(docPath: string, variant: string, imagePath: string): Promise<void> {
+        const exists = await FileUtils.exists(docPath);
+        if (!exists) return;
 
-        let content = fs.readFileSync(docPath, 'utf-8');
+        let content = await FileUtils.readFile(docPath);
         const relPath = path.relative(path.dirname(docPath), imagePath).replace(/\\/g, '/');
         const newEntry = `![${variant}](${relPath})`;
 
@@ -75,7 +77,7 @@ export class ApprovedRefReader {
             content += `\n\n## Approved References\n\n${newEntry}\n`;
         }
 
-        fs.writeFileSync(docPath, content, 'utf-8');
+        await FileUtils.writeFile(docPath, content);
     }
 
     // ---- 内部方法 ----
@@ -83,11 +85,14 @@ export class ApprovedRefReader {
     /**
      * 解析文档中 ## Approved References 区域的所有 ![variant](path)
      */
-    parseApprovedRefs(docPath: string): Map<string, string> {
+    private async parseApprovedRefs(docPath: string): Promise<Map<string, string>> {
         const refs = new Map<string, string>();
-        if (!docPath || !fs.existsSync(docPath)) return refs;
+        if (!docPath) return refs;
 
-        const content = fs.readFileSync(docPath, 'utf-8');
+        const exists = await FileUtils.exists(docPath);
+        if (!exists) return refs;
+
+        const content = await FileUtils.readFile(docPath);
 
         // 定位 ## Approved References 区域（到下一个 ## 或文档结尾）
         const sectionMatch = content.match(
@@ -115,14 +120,15 @@ export class ApprovedRefReader {
     /**
      * 通过 assetId 查找文档路径
      */
-    private findDocPath(assetId: string): string | null {
+    private async findDocPath(assetId: string): Promise<string | null> {
         const dirs = ['elements', 'scenes'];
         const prefixes = ['@', ''];
 
         for (const dir of dirs) {
             for (const prefix of prefixes) {
                 const p = path.join(this.projectRoot, 'videospec', dir, `${prefix}${assetId}.md`);
-                if (fs.existsSync(p)) return p;
+                const exists = await FileUtils.exists(p);
+                if (exists) return p;
             }
         }
         return null;

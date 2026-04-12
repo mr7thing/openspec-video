@@ -85,6 +85,37 @@ export class FrontmatterParser {
 
     // ---- 内部方法 ----
 
+    /**
+     * 提取正文第一段纯文本（DRY 公共工具）
+     * 排除：标题行(#)、图片行(![ )、HTML 注释(<!-- )、分隔线(---/===)
+     */
+    static extractFirstParagraph(body: string): string {
+        const lines = body.split('\n');
+        const paragraphLines: string[] = [];
+        let foundContent = false;
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!foundContent && !trimmed) continue;
+            if (trimmed.startsWith('#')) {
+                if (foundContent) break;
+                continue;
+            }
+            if (trimmed.startsWith('![')) continue;
+            if (trimmed.startsWith('<!--')) continue;
+            if (trimmed.match(/^[-=]{3,}$/)) continue;
+
+            if (trimmed) {
+                foundContent = true;
+                paragraphLines.push(trimmed);
+            } else if (foundContent) {
+                break;
+            }
+        }
+
+        return paragraphLines.join(' ').trim() || '(无描述)';
+    }
+
     private static split(content: string): { rawYaml: string; body: string } {
         // 匹配 --- 分隔的 frontmatter
         const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);

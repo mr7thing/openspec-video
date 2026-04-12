@@ -8,10 +8,18 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { ImageProvider, ImageGenerationResult } from './ImageProvider';
+import { ImageProvider } from './ImageProvider';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
 import { ErrorFactory, ExecutionError } from '../../errors/OpsVError';
+
+// 内部类型（接口升格后 ImageGenerationResult 不再公开导出）
+interface ImageGenerationResult {
+    images: Array<{ url?: string; base64?: string; seed?: number }>;
+    generationTime?: number;
+    model?: string;
+}
+
 
 /**
  * SeaDream API 响应格式
@@ -221,9 +229,9 @@ export class SeaDreamProvider implements ImageProvider {
     }
 
     /**
-     * 生成图像
+     * 内部生成图像（私有方法）
      */
-    async generateImage(job: Job, modelName: string, apiKey: string): Promise<ImageGenerationResult> {
+    private async generateImage(job: Job, modelName: string, apiKey: string): Promise<ImageGenerationResult> {
         const requestBody = this.buildRequestBody(job, modelName);
         
         logger.logExecution(job.id, 'SEADREAM_SUBMIT', { 
@@ -332,7 +340,7 @@ export class SeaDreamProvider implements ImageProvider {
     /**
      * 生成并下载图像 (0.3.14 支持多图下载)
      */
-    async generateAndDownload(job: Job, modelName: string, apiKey: string, outputPath: string): Promise<string> {
+    async generateAndDownload(job: Job, modelName: string, apiKey: string, outputPath: string): Promise<void> {
         const result = await this.generateImage(job, modelName, apiKey);
         const downloadedPaths: string[] = [];
 
@@ -371,8 +379,7 @@ export class SeaDreamProvider implements ImageProvider {
             
             downloadedPaths.push(finalOutputPath);
         }
-
-        return downloadedPaths[0]; // 返回第一张作为主要结果
+        // void 返回（接口升格后无需返回路径，由 Dispatcher 管理输出路径）
     }
 
     /**

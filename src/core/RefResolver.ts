@@ -26,7 +26,7 @@ export class RefResolver {
      * 解析 Markdown 正文中的所有 @ 引用
      * 语法: @asset_id 描述文本 | @asset_id:variant 描述文本 | @FRAME:shot_id_frame 描述文本
      */
-    parseAll(markdown: string): RefResult[] {
+    async parseAll(markdown: string): Promise<RefResult[]> {
         const results: RefResult[] = [];
 
         // v0.5 唯一合法语法:
@@ -40,7 +40,7 @@ export class RefResolver {
             const trimmedLabel = label.trim();
             if (!trimmedLabel) continue;
 
-            results.push(this.resolve(identifier, trimmedLabel));
+            results.push(await this.resolve(identifier, trimmedLabel));
         }
 
         return results;
@@ -49,7 +49,7 @@ export class RefResolver {
     /**
      * 解析单个引用标识符
      */
-    resolve(identifier: string, label: string = ''): RefResult {
+    async resolve(identifier: string, label: string = ''): Promise<RefResult> {
         // ---- 1. @FRAME:shot_01_last ----
         if (identifier.startsWith('FRAME:')) {
             return this.resolveFrame(identifier, label);
@@ -65,8 +65,8 @@ export class RefResolver {
 
         if (targetDoc) {
             resolvedImagePath = variant
-                ? this.approvedRefReader.getVariant(targetDoc, variant) || undefined
-                : this.approvedRefReader.getFirst(targetDoc) || undefined;
+                ? (await this.approvedRefReader.getVariant(targetDoc, variant)) || undefined
+                : (await this.approvedRefReader.getFirst(targetDoc)) || undefined;
         }
 
         return {

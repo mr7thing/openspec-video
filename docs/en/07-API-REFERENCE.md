@@ -1,104 +1,150 @@
-# OpsV Multi-Model API Reference
+# OpsV Image Provider Interface Specification (v0.5.2)
 
-> Defines the interface formats, data types, and interaction protocols for all generative models supported by OpsV.
+> Defines the mandatory interface contract for all image generation Providers in OpsV.
 
 ---
 
-## 1. Core Interaction Pattern
+## 1. Design Philosophy (Scheme A: Mandatory Interface)
 
-OpsV uses an asynchronous **"Submit-Poll-Download"** pattern:
+**Since v0.5.2, `generateAndDownload` is the ONLY required method for all ImageProviders.**
 
-```mermaid
-sequenceDiagram
-    participant CLI as OpsV CLI
-    participant API as Model API
-    participant FS as File System
+The old two-step pattern (`generateImage` returns URL → Dispatcher manually downloads) has been deprecated. Each Provider is now a complete "Submit-Poll-Download" execution unit. The Dispatcher doesn't need to know implementation details — it calls one method, holds one promise.
 
-    CLI->>API: POST /submit (Parameters)
-    API-->>CLI: { requestId: "xxx" }
-    loop Polling
-        CLI->>API: GET /status?id=xxx
-        API-->>CLI: { status: "running" }
-    end
-    API-->>CLI: { status: "succeeded", url: "..." }
-    CLI->>FS: Download to artifacts/videos/
+```
+Before (Deprecated):
+  Dispatcher → provider.generateImage() → result.url
+  Dispatcher → download(result.url) → write to disk
+  Problem: Dispatcher must know each Provider's save strategy → instanceof dead code
+
+After (Current):
+  Dispatcher → provider.generateAndDownload(job, model, apiKey, outputPath)
+  Provider handles internally: Submit + Poll + Download + Write to disk
+  Benefit: Interface is the contract, no instanceof, no branches, zero-intrusion for new Providers
 ```
 
 ---
 
-## 2. Unified Job Object (Internal)
-
-All model tasks are transformed into a unified Job format internally:
+## 2. Interface Definition
 
 ```typescript
-interface Job {
-  id: string;                          // Unique ID (e.g., "shot_1")
-  type: "image_generation" | "video_generation";
-  prompt_en: string;                   // English render prompt
-  reference_images?: string[];         // Local paths to reference images
-  output_path: string;                 // Destination path
-  payload: {
-    duration?: number;
-    quality: string;
-    aspect_ratio: string;
-    first_image?: string;
-    last_image?: string;
-  };
+export interface ImageProvider {
+    /** Unique identifier, matches the `provider` field in api_config.yaml */
+    providerName: string;
+
+    /**
+     * Execute the complete image generation → write-to-disk flow (ONLY required method)
+     *
+     * Success: File has been written to outputPath, function resolves normally
+     * Failure: Throw an Error (or OpsVError) with detailed information
+     * Timeout: Throw an Error containing "超时" or "timeout" keyword
+     *          (Dispatcher relies on this keyword to distinguish timeout vs failed status)
+     */
+    generateAndDownload(
+        job: Job,
+        modelName: string,
+        apiKey: string,
+        outputPath: string
+    ): Promise<void>;
+
+    /** Optional: Capability probe */
+    supportsFeature?(feature: string): boolean;
 }
 ```
 
 ---
 
-## 3. ByteDance Seedance 1.5 Pro
+## 3. Existing Providers
 
-### 3.1 Submission (Submit)
+| Provider Class | File | Task Type | Status |
+|----------------|------|-----------|--------|
+| `SeaDreamProvider` | providers/SeaDreamProvider.ts | image_generation | ✅ generateAndDownload implemented |
+| `MinimaxImageProvider` | providers/MinimaxImageProvider.ts | image_generation | ✅ generateAndDownload implemented |
+
+---
+
+## 4. New Provider Requirements (MANDATORY)
+
+### 4.1 Three Defensive Coding Standards
+
+1. **Deep Penetrative Parsing**: Never assume a single response structure. Handle `data.id`, `data.data.id`, and other variants defensively.
+2. **Evidential Logging**: Never return `undefined`. Always use `JSON.stringify(rawResponse)` to log the complete payload on any non-2xx response or suspected format error.
+3. **Axios Defensive Handling**: Distinguish between `error.response` (API business error) and `error.code` (e.g., `ETIMEDOUT`, network interruption).
+
+### 4.2 Integration Checklist
+
+```
+Must implement:
+  ✅ providerName: string (must match api_config.yaml provider field)
+  ✅ generateAndDownload(job, modelName, apiKey, outputPath): Promise<void>
+
+  ✅ Internal responsibilities:
+     1. Read parameters from job.payload
+     2. POST submit request (per official API format)
+     3. Poll until completion (recommended: 3-5s interval, throw on timeout)
+     4. Download image buffer, write to outputPath
+     5. Verify file exists and size > 0
+
+Must register:
+  ✅ Add to ImageModelDispatcher.registerProviders()
+  ✅ Configure provider field in api_config.yaml
+
+Prohibited:
+  ❌ Using instanceof to detect other Providers inside your Provider
+  ❌ Returning ImageGenerationResult (old interface, deprecated)
+  ❌ Exposing URL download logic to the Dispatcher
+```
+
+### 4.3 Timeout Convention
+
+```typescript
+// Providers must manage their own timeout
+const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const deadline = Date.now() + TIMEOUT_MS;
+
+while (Date.now() < deadline) {
+    const status = await pollStatus(requestId);
+    if (status === 'completed') break;
+    await sleep(3000);
+}
+
+if (Date.now() >= deadline) {
+    throw new Error(`Generation timeout (${TIMEOUT_MS / 1000}s): ${job.id}`);
+    // ↑ Contains "timeout" keyword, recognized by Dispatcher for stats
+}
+```
+
+---
+
+## 5. Dispatcher Calling Protocol (Internal Reference)
+
+The Dispatcher's only responsibility: **Route + Inject Config + Aggregate Stats**.
+
+```typescript
+// ImageModelDispatcher.dispatchJob pseudo-code
+await provider.generateAndDownload(job, targetModel, apiKey, finalOutputPath);
+// That's it. No instanceof. No branches.
+```
+
+---
+
+## 6. Core API Specifications
+
+### 6.1 ByteDance Seedance 1.5 Pro (Video)
 - **Endpoint**: `https://ark.cn-beijing.volces.com/api/v3/video/submit`
-- **Method**: `POST`
 - **Auth**: `Authorization: Bearer <VOLCENGINE_API_KEY>`
+- **Key Parameters**: `model: "doubao-seedance-1-5-pro"`, `resolution: "480p|720p|1080p"`, `image` (Base64 first frame)
 
-**Key Parameters**:
-- `model`: `doubao-seedance-1-5-pro`
-- `prompt`: English motion description.
-- `resolution`: `480p`, `720p`, `1080p`.
-- `image`: Base64 of the first frame.
-- `last_image`: Base64 of the last frame.
-
----
-
-## 4. SiliconFlow Wan 2.1
-
-### 4.1 Submission (Submit)
-- **Endpoint**: `https://api.siliconflow.cn/v1/video/submit`
-- **Auth**: `Authorization: Bearer <SILICONFLOW_API_KEY>`
-
-**Key Parameters**:
-- `model`: `wan-ai/Wan2.1-T2V-14B`
-- `prompt`: Narrative/Motion description.
-
----
-
-## 5. SeaDream 5.0 (Image Gen)
-
-### 5.1 Submission (Submit)
+### 6.2 SeaDream 5.0 (Image Generation)
 - **Endpoint**: `https://api.volcengine.com/visual/image_generation/2024-08-01`
 - **Auth**: `Authorization: Bearer <VOLCENGINE_API_KEY>`
+- **Key Parameters**: `req_key: "high_definition_generation"`, `model_version: "seadream_5_0"`, `aspect_ratio`
 
-**Key Parameters**:
-- `req_key`: `high_definition_generation`
-- `model_version`: `seadream_5_0`
-- `aspect_ratio`: `16:9`, `1:1`, etc.
-
----
-
-## 6. Defensive Protocols
-
-All Providers must implement these three defensive coding standards:
-
-1. **Deep Penetrative Parsing**: Handle inconsistent nested response bodies (`data.id`, `data.data.id`, etc.).
-2. **Evidential Logging**: Never return `undefined`; always log the raw JSON payload on error.
-3. **Axios Defensive Handling**: Distinguish between network-level errors (ETIMEDOUT) and business-level API errors.
+### 6.3 SiliconFlow Wan 2.1 (Video)
+- **Endpoint**: `https://api.siliconflow.cn/v1/video/submit`
+- **Auth**: `Authorization: Bearer <SILICONFLOW_API_KEY>`
+- **Key Parameters**: `model: "wan-ai/Wan2.1-T2V-14B"`, `prompt`
 
 ---
 
-> *"The Interface is the Contract; Documentation is the Insurance."*
-> *OpsV 0.4.3 | Latest Update: 2026-03-29*
+> *"The Interface is the Contract; Documentation is the Insurance; Tests are the Proof."*
+> *OpsV v0.5.2 | Updated: 2026-04-12*

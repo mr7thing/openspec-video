@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { logger } from '../utils/logger';
@@ -82,14 +82,24 @@ export class ReviewServer {
                     results.push(result);
                 }
 
-                // 自动 git commit
+                // 自动 git commit（使用参数数组防止命令注入）
                 try {
-                    const jobIds = selections.map((s: any) => s.jobId).join(', ');
-                    execSync(
-                        `git add . && git commit -m "approve: ${jobIds}"`,
-                        { cwd: this.projectRoot, stdio: 'pipe' }
-                    );
-                    logger.info(`✅ Git commit: approve ${jobIds}`);
+                    // 白名单校验所有 jobId，只允许字母/数字/下划线/连字符
+                    const SAFE_JOB_ID = /^[a-zA-Z0-9_-]+$/;
+                    const validatedIds = selections.map((s: any) => {
+                        if (typeof s.jobId !== 'string' || !SAFE_JOB_ID.test(s.jobId)) {
+                            throw new Error(`非法 jobId，拒绝提交: ${String(s.jobId).substring(0, 50)}`);
+                        }
+                        return s.jobId;
+                    });
+                    const commitMsg = `approve: ${validatedIds.join(', ')}`;
+                    execFileSync('git', ['add', '.'], { cwd: this.projectRoot, stdio: 'pipe' });
+                    execFileSync('git', ['commit', '-m', commitMsg], {
+                        cwd: this.projectRoot,
+                        encoding: 'utf-8',
+                        stdio: 'pipe'
+                    });
+                    logger.info(`✅ Git commit: ${commitMsg}`);
                 } catch (e) {
                     logger.warn(`Git commit 失败: ${(e as Error).message}`);
                 }
@@ -198,7 +208,7 @@ export class ReviewServer {
 
         // 默认命名: 未输入变体名 → 用 jobId 加序号
         if (!variant) {
-            const existingCount = this.countExistingApproved(jobId);
+            const existingCount = await this.countExistingApproved(jobId);
             variant = existingCount === 0 ? 'default' : `variant_${existingCount + 1}`;
         }
 
@@ -228,10 +238,11 @@ export class ReviewServer {
         return { jobId, approvedPath };
     }
 
-    private countExistingApproved(jobId: string): number {
+    private async countExistingApproved(jobId: string): Promise<number> {
         const docPath = this.findSourceDoc(jobId);
         if (!docPath) return 0;
-        return this.approvedRefReader.getAll(docPath).length;
+        const approvedRefs = await this.approvedRefReader.getAll(docPath);
+        return approvedRefs.length;
     }
 
     private findSourceDoc(jobId: string): string | null {

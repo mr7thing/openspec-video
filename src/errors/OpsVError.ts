@@ -1,6 +1,6 @@
 /**
  * OpenSpec-Video 标准化错误处理体系
- * 
+ *
  * 提供统一的错误码、错误上下文和结构化错误信息
  */
 
@@ -37,8 +37,9 @@ export enum OpsVErrorCode {
     WEBSOCKET_ERROR = 'E5004',
 
     // 验证错误 (6xxx)
-    VALIDATION_SCHEMA_FAILED = 'E6001',
-    VALIDATION_TYPE_MISMATCH = 'E6002',
+    VALIDATION_ERROR = 'E6001',
+    VALIDATION_SCHEMA_FAILED = 'E6002',
+    VALIDATION_TYPE_MISMATCH = 'E6003',
 
     // 未知错误 (9xxx)
     UNKNOWN_ERROR = 'E9999'
@@ -54,14 +55,14 @@ export interface ErrorContext {
     /** 相关的任务ID */
     jobId?: string;
     /** 额外的上下文数据 */
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     /** 原始错误对象 */
     cause?: Error;
 }
 
 /**
  * OpsV 基础错误类
- * 
+ *
  * 所有 OpsV 错误都应继承此类，确保统一的错误处理体验
  */
 export class OpsVError extends Error {
@@ -111,13 +112,13 @@ export class OpsVError extends Error {
      */
     toUserMessage(): string {
         const baseMessage = `[${this.code}] ${this.message}`;
-        
+
         if (this.context.filePath) {
             return `${baseMessage}\n  位置: ${this.context.filePath}${
                 this.context.position ? `:${this.context.position}` : ''
             }`;
         }
-        
+
         return baseMessage;
     }
 }

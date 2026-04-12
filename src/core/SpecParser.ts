@@ -1,10 +1,10 @@
-import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkFrontmatter from 'remark-frontmatter';
 import { z } from 'zod';
+import { FileUtils } from '../utils/fileUtils';
+
+// SpecParser - 异步化版本
+// 所有文件操作使用 FileUtils 异步 API
 
 // Define the schema for Project Configuration
 // This matches the structure expected in project.md frontmatter or inferred sections
@@ -43,7 +43,8 @@ export class SpecParser {
     async parseProjectConfig(): Promise<ProjectConfig> {
         const projectPath = path.join(this.videospecRoot, 'project.md');
 
-        if (!fs.existsSync(projectPath)) {
+        const exists = await FileUtils.exists(projectPath);
+        if (!exists) {
             console.warn(`[SpecParser] project.md not found at ${projectPath}. Using default configuration.`);
             return ProjectSchema.parse({
                 name: "Untitled Project",
@@ -57,11 +58,7 @@ export class SpecParser {
             });
         }
 
-        const content = fs.readFileSync(projectPath, 'utf-8');
-
-        // We can use unified pipeline to parse AST, but for this "Spec" format 
-        // which relies heavily on H1/H2 headers, a manual section parser might be more robust
-        // combined with YAML frontmatter if present.
+        const content = await FileUtils.readFile(projectPath);
 
         const config = this.extractSections(content);
         console.log("DEBUG: SpecParser Config:", JSON.stringify(config, null, 2));

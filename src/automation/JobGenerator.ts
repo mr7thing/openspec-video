@@ -65,7 +65,7 @@ export class JobGenerator {
 
         // ---- 构建依赖图（每次 generate 前重新构建，确保最新） ----
         const depGraph = DependencyGraph.buildFromProject(this.projectRoot);
-        logger.info(depGraph.prettyPrint(this.approvedRefReader));
+        logger.info(await depGraph.prettyPrint(this.approvedRefReader));
 
         // ---- 扫描目标目录 ----
         if (!targets || targets.length === 0) {
@@ -106,7 +106,7 @@ export class JobGenerator {
         allJobs = sanitized || allJobs;
 
         // ---- 依赖图严格模式: 仅保留可执行的任务 ----
-        const { executable, blocked, reasons } = depGraph.filterExecutable(allJobs, this.approvedRefReader);
+        const { executable, blocked, reasons } = await depGraph.filterExecutable(allJobs, this.approvedRefReader);
         if (blocked.length > 0) {
             logger.warn(`\n⚠️ ${blocked.length} 个任务因依赖未就绪被暂缓:`);
             for (const [id, reason] of reasons) {
@@ -192,10 +192,10 @@ export class JobGenerator {
 
         // ---- 从正文提取描述和 prompt ----
         const asset = this.assetManager.getAsset(id);
-        const description = asset?.description || this.extractFirstParagraph(body);
+        const description = asset?.description || FrontmatterParser.extractFirstParagraph(body);
 
         // ---- 从正文中的 @ 引用组装 prompt ----
-        const { prompt, attachments } = this.assetCompiler.assembleAssetPrompt(id, body);
+        const { prompt, attachments } = await this.assetCompiler.assembleAssetPrompt(id, body);
 
         // ---- 全局配置 ----
         const ar = globalConfig.aspect_ratio || '16:9';
@@ -330,14 +330,11 @@ export class JobGenerator {
             }
             const shotBody = body.slice(start, end).trim();
 
-            // 解析正文中的 @ 引用
-            const refs = this.refResolver.parseAll(shotBody);
-
             shots.push({
                 id: sections[i].id,
                 title: sections[i].title,
                 body: shotBody,
-                refs,
+                refs: [], // refs 将异步解析
             });
         }
 
@@ -359,16 +356,6 @@ export class JobGenerator {
             outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
         }
         return outputPath;
-    }
-
-    private extractFirstParagraph(body: string): string {
-        const lines = body.split('\n');
-        for (const line of lines) {
-            const t = line.trim();
-            if (!t || t.startsWith('#') || t.startsWith('!') || t.startsWith('<!--') || t.match(/^[-=]{3,}$/)) continue;
-            return t;
-        }
-        return '(无描述)';
     }
 
     private cleanMarkdown(text: string): string {

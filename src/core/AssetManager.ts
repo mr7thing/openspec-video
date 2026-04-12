@@ -1,5 +1,5 @@
-import fs from 'fs';
 import path from 'path';
+import { FileUtils } from '../utils/fileUtils';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader, ApprovedRef } from './ApprovedRefReader';
 import { BaseFrontmatter } from '../types/FrontmatterSchema';
@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 // v0.5 资产管理器
 // 核心变更: 去掉 has_image / visual_traits / brief_description
 // 用 status + ApprovedRefReader 替代
+// 文件操作已全部异步化
 // ============================================================================
 
 export interface Asset {
@@ -42,24 +43,26 @@ export class AssetManager {
     }
 
     private async loadDirectory(dirPath: string): Promise<void> {
-        if (!fs.existsSync(dirPath)) return;
+        const dirExists = await FileUtils.exists(dirPath);
+        if (!dirExists) return;
 
         // v0.5: 仅支持 .md 文件
-        const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+        const entries = await FileUtils.readDir(dirPath);
+        const files = entries.filter(e => !e.isDirectory && e.name.endsWith('.md'));
 
-        for (const file of files) {
-            const filePath = path.join(dirPath, file);
+        for (const fileEntry of files) {
+            const filePath = fileEntry.path;
             try {
-                const content = fs.readFileSync(filePath, 'utf-8');
+                const content = await FileUtils.readFile(filePath);
                 const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-                const id = file.replace(/^@/, '').replace(/\.md$/, '');
+                const id = fileEntry.name.replace(/^@/, '').replace(/\.md$/, '');
 
                 // 描述从正文第一段提取（非标题、非图片的纯文本）
-                const description = this.extractFirstParagraph(body);
+                const description = FrontmatterParser.extractFirstParagraph(body);
 
                 // Approved Refs 从 Markdown 正文的 ## Approved References 区读取
-                const approvedRefs = this.approvedRefReader.getAll(filePath);
+                const approvedRefs = await this.approvedRefReader.getAll(filePath);
 
                 // Design Refs 从 Markdown 正文的 ## Design References 区读取
                 const designRefs = this.extractDesignRefs(body, filePath);
@@ -81,7 +84,7 @@ export class AssetManager {
                     `approved: ${approvedRefs.length}张`);
 
             } catch (err) {
-                logger.warn(`资产解析失败 ${file}: ${(err as Error).message}`);
+                logger.warn(`资产解析失败 ${fileEntry.name}: ${(err as Error).message}`);
             }
         }
     }
@@ -127,46 +130,7 @@ export class AssetManager {
         return asset.approvedRefs[0].filePath;
     }
 
-    // ---- 内部方法 ----
 
-    /**
-     * 提取正文第一段纯文本（排除标题、图片、HTML 注释）
-     */
-    private extractFirstParagraph(body: string): string {
-        const lines = body.split('\n');
-        const paragraphLines: string[] = [];
-        let foundContent = false;
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            // 跳过空行（段前）
-            if (!foundContent && !trimmed) continue;
-            // 跳过标题行
-            if (trimmed.startsWith('#')) {
-                if (foundContent) break; // 遇到下一个标题就停
-                continue;
-            }
-            // 跳过图片行
-            if (trimmed.startsWith('![')) continue;
-            // 跳过 HTML 注释
-            if (trimmed.startsWith('<!--')) continue;
-            // 跳过分隔线
-            if (trimmed.match(/^[-=]{3,}$/)) continue;
-
-            if (trimmed) {
-                foundContent = true;
-                paragraphLines.push(trimmed);
-            } else if (foundContent) {
-                break; // 段后空行 → 段落结束
-            }
-        }
-
-        return paragraphLines.join(' ').trim() || '(无描述)';
-    }
-
-    /**
-     * 从 ## Design References 区提取图片路径
-     */
     private extractDesignRefs(body: string, docPath: string): string[] {
         const sectionMatch = body.match(
             /##\s*Design\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i

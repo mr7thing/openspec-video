@@ -100,14 +100,14 @@ export class DependencyGraph {
      * 核心方法: 根据 Approved References 就绪状态分解任务
      * 严格模式: 只返回依赖已全部就绪（有 approved 图）的任务
      */
-    filterExecutable<T extends { id: string }>(
+    async filterExecutable<T extends { id: string }>(
         allJobs: T[],
         approvedRefReader: ApprovedRefReader
-    ): {
+    ): Promise<{
         executable: T[];
         blocked: T[];
         reasons: Map<string, string>;
-    } {
+    }> {
         const approved = new Set<string>();
         const executable: T[] = [];
         const blocked: T[] = [];
@@ -115,7 +115,8 @@ export class DependencyGraph {
 
         // 1. 收集所有已有 approved 图的资产 ID
         for (const id of this.graph.keys()) {
-            if (approvedRefReader.hasAnyApproved(id)) {
+            const hasApproved = await approvedRefReader.hasAnyApproved(id);
+            if (hasApproved) {
                 approved.add(id);
             }
         }
@@ -152,17 +153,21 @@ export class DependencyGraph {
 
     /**
      * 输出人类可读的依赖分析
+     * 异步方法：内部需要 await 检查 approved 状态
      */
-    prettyPrint(approvedRefReader?: ApprovedRefReader): string {
+    async prettyPrint(approvedRefReader?: ApprovedRefReader): Promise<string> {
         const { batches, cycles } = this.topologicalSort();
-        const lines: string[] = ['📊 依赖图分析:\n'];
+        const lines: string[] = ['\ud83d\udcca 依赖图分析:\n'];
 
         for (const [id, deps] of this.graph) {
             const depStr = deps.size === 0
                 ? '(无依赖)'
                 : `(依赖 ${[...deps].join(', ')})`;
-            const statusIcon = approvedRefReader?.hasAnyApproved(id)
-                ? '✅' : '⚠️';
+            // 正确使用 await，避免 Promise 对象常量为 truthy 的错误
+            const hasApproved = approvedRefReader
+                ? await approvedRefReader.hasAnyApproved(id)
+                : false;
+            const statusIcon = hasApproved ? '\u2705' : '\u26a0\ufe0f';
             lines.push(`  ${statusIcon} ${id} ${depStr}`);
         }
 
@@ -175,7 +180,7 @@ export class DependencyGraph {
         }
 
         if (cycles.length > 0) {
-            lines.push(`\n⚠️ 循环依赖: ${cycles.join(', ')}`);
+            lines.push(`\n\u26a0\ufe0f 循环依赖: ${cycles.join(', ')}`);
         }
 
         return lines.join('\n');

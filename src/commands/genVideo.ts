@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
-import { VideoModelDispatcher } from '../executor/VideoModelDispatcher';
+import { VideoModelDispatcher, DispatchSummary } from '../executor/VideoModelDispatcher';
 import { ConfigLoader } from '../utils/configLoader';
 import { showEnvCheck } from './utils';
 
@@ -71,28 +71,35 @@ export function registerGenVideoCommand(program: Command, VERSION: string) {
                     modelsToRun = [options.model];
                 }
 
-                const dispatcher = new VideoModelDispatcher(projectRoot);
+                const dispatcher = new VideoModelDispatcher(projectRoot, {
+                    failFast: !options.skipFailed,  // --skip-failed = 失败后继续
+                });
 
                 const startTime = Date.now();
-                
+                const allSummaries: DispatchSummary[] = [];
+
                 for (const targetModel of modelsToRun) {
                     console.log(`\n▶ Starting video generation pipeline for model: [${targetModel}]...\n`);
-                    await dispatcher.dispatchAll(videoJobs, targetModel);
-                    console.log(`✅ Video pipeline completed for ${targetModel}!`);
+                    const summary = await dispatcher.dispatchAll(videoJobs, targetModel);
+                    allSummaries.push(summary);
+                    if (summary.failed > 0) {
+                        console.warn(`   ⚠️  [${targetModel}] ${summary.failed} failed, ${summary.succeeded} succeeded`);
+                    } else {
+                        console.log(`   ✅ [${targetModel}] All ${summary.succeeded} jobs completed!`);
+                    }
                 }
 
                 const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-                console.log(`\n✅ All Video pipelines completed!`);
+                const totalFailed = allSummaries.reduce((acc, s) => acc + s.failed, 0);
+                const totalSucceeded = allSummaries.reduce((acc, s) => acc + s.succeeded, 0);
+
+                console.log(`\n${totalFailed > 0 ? '⚠️ ' : '✅'} All Video pipelines completed!`);
                 console.log(`   Duration: ${duration}s`);
-                console.log(`   Jobs per model: ${videoJobs.length}`);
+                console.log(`   Succeeded: ${totalSucceeded} / Failed: ${totalFailed}`);
                 console.log(`\n📁 Generated videos saved to: artifacts/videos/`);
 
-            } catch (err: any) {
-                console.error('\n❌ Video generation failed:', err.message);
-                if (options.skipFailed) {
-                    console.log('   --skip-failed is set, but video pipeline requires sequential execution.');
-                    console.log('   The @FRAME dependency chain was broken. Fix the failing job and retry.');
-                }
+            } catch (err: unknown) {
+                console.error('\n❌ Video generation failed:', err instanceof Error ? err.message : String(err));
                 process.exit(1);
             }
         });
