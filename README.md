@@ -1,3 +1,9 @@
+# OpenSpec-Video (OpsV) 0.5.1
+ 
+ fixed some problems in 0.5.0
+
+
+
 # OpenSpec-Video (OpsV) 0.5.0
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
@@ -54,13 +60,13 @@ opsv gen-video       # Render Videos
 
 ## 📜 Documentation / 文档目录
 
-| Topic / 主题 | English | 中文 |
-| :--- | :--- | :--- |
-| **Overview** / 项目全景 | [Link](./docs/en/01-OVERVIEW.md) | [链接](./docs/cn/01-OVERVIEW.md) |
-| **Workflow** / 工作流程 | [Link](./docs/en/02-WORKFLOW.md) | [链接](./docs/cn/02-WORKFLOW.md) |
-| **CLI Reference** / 命令参考 | [Link](./docs/en/03-CLI-REFERENCE.md) | [链接](./docs/cn/03-CLI-REFERENCE.md) |
-| **Agents & Skills** / 角色与技能 | [Link](./docs/en/04-AGENTS-AND-SKILLS.md) | [链接](./docs/cn/04-AGENTS-AND-SKILLS.md) |
-| **Spec Standards** / 规范标准 | [Link](./docs/en/05-DOCUMENT-STANDARDS.md) | [链接](./docs/cn/05-DOCUMENT-STANDARDS.md) |
+| Topic / 主题                     | English                                    | 中文                                       |
+| :------------------------------- | :----------------------------------------- | :----------------------------------------- |
+| **Overview** / 项目全景          | [Link](./docs/en/01-OVERVIEW.md)           | [链接](./docs/cn/01-OVERVIEW.md)           |
+| **Workflow** / 工作流程          | [Link](./docs/en/02-WORKFLOW.md)           | [链接](./docs/cn/02-WORKFLOW.md)           |
+| **CLI Reference** / 命令参考     | [Link](./docs/en/03-CLI-REFERENCE.md)      | [链接](./docs/cn/03-CLI-REFERENCE.md)      |
+| **Agents & Skills** / 角色与技能 | [Link](./docs/en/04-AGENTS-AND-SKILLS.md)  | [链接](./docs/cn/04-AGENTS-AND-SKILLS.md)  |
+| **Spec Standards** / 规范标准    | [Link](./docs/en/05-DOCUMENT-STANDARDS.md) | [链接](./docs/cn/05-DOCUMENT-STANDARDS.md) |
 
 ---
 
