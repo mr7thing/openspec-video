@@ -3,292 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpsV Review</title>
+    <title>OpsV Review - 创意决策中心</title>
     <style>
         :root {
-            --bg: #0f0f0f;
-            --surface: #1a1a2e;
-            --card: #16213e;
-            --accent: #0f3460;
-            --green: #22c55e;
-            --yellow: #eab308;
+            --bg: #0a0a0c;
+            --surface: #141418;
+            --card: #1c1c22;
+            --accent: #3b82f6;
+            --green: #10b981;
+            --yellow: #f59e0b;
             --red: #ef4444;
-            --text: #e2e8f0;
-            --muted: #94a3b8;
-            --radius: 12px;
+            --text: #f8fafc;
+            --muted: #64748b;
+            --border: rgba(255,255,255,0.08);
+            --radius-lg: 16px;
+            --radius: 8px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Inter', -apple-system, sans-serif;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
 
         /* ---- 顶栏 ---- */
         .header {
             background: var(--surface);
-            padding: 16px 32px;
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            position: sticky;
-            top: 0;
+            border-bottom: 1px solid var(--border);
             z-index: 100;
         }
-        .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-        .header .status { display: flex; gap: 16px; align-items: center; }
-        .header .badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
+        .header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
+        .header .status { display: flex; gap: 12px; align-items: center; }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
         }
-        .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
-        .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+        .badge-green { background: rgba(16,185,129,0.1); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+        .badge-yellow { background: rgba(245,158,11,0.1); color: var(--yellow); border: 1px solid rgba(245,158,11,0.2); }
 
-        /* ---- 工具栏 ---- */
-        .toolbar {
-            padding: 16px 32px;
+        /* ---- 主容器 ---- */
+        .main {
             display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .btn {
-            padding: 8px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-primary {
-            background: var(--green);
-            color: #000;
-        }
-        .btn-primary:hover { background: #16a34a; }
-        .btn-primary:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        .btn-secondary {
-            background: var(--accent);
-            color: var(--text);
-        }
-        .btn-secondary:hover { background: #1a4a7e; }
-        .selected-count { color: var(--muted); font-size: 14px; }
-
-        /* ---- 候选图网格 ---- */
-        .groups { padding: 0 32px 32px; }
-        .group {
-            margin-bottom: 32px;
-            background: var(--surface);
-            border-radius: var(--radius);
+            flex: 1;
             overflow: hidden;
         }
-        .group-header {
-            padding: 16px 20px;
+
+        /* ---- 左侧：Job 列表 ---- */
+        .sidebar {
+            width: 280px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-item {
+            padding: 14px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+        .sidebar-item:hover { background: rgba(255,255,255,0.03); }
+        .sidebar-item.active { background: var(--accent); color: white; }
+        .sidebar-item .id { font-size: 14px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-item .meta { font-size: 11px; color: var(--muted); }
+        .sidebar-item.active .meta { color: rgba(255,255,255,0.7); }
+
+        /* ---- 中间：内容详情 ---- */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        /* 顶部工具栏 */
+        .toolbar {
+            padding: 12px 24px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
-        .group-header h3 { font-size: 16px; font-weight: 500; }
-        .group-header .source { color: var(--muted); font-size: 12px; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary { background: var(--green); color: #000; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: #25252e; }
+
+        /* 子容器视格 */
+        .viewport {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 左栏：文档正文 */
+        .doc-section {
+            width: 35%;
+            padding: 32px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+            background: #111114;
+            line-height: 1.6;
+        }
+        .doc-section h2 { font-size: 1.5rem; margin-bottom: 1rem; color: var(--text); }
+        .doc-section p { margin-bottom: 1rem; color: #cbd5e1; font-size: 14px; }
+        .doc-section code { background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: var(--yellow); }
+        .doc-section blockquote { border-left: 4px solid var(--accent); padding-left: 1rem; font-style: italic; color: var(--muted); margin: 1rem 0; }
+
+        /* 右栏：图片网格 */
+        .images-section {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            background: var(--bg);
+        }
+        .batch-group { margin-bottom: 32px; }
+        .batch-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .batch-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
         .image-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 12px;
-            padding: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
         }
         .image-card {
-            position: relative;
-            border-radius: 8px;
+            background: var(--card);
+            border-radius: var(--radius);
             overflow: hidden;
-            cursor: pointer;
             border: 2px solid transparent;
-            transition: all 0.2s;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
-        .image-card:hover { border-color: var(--accent); transform: scale(1.02); }
-        .image-card.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
-        .image-card.approved { border-color: var(--green); opacity: 0.7; }
-        .image-card img {
-            width: 100%;
-            aspect-ratio: 16/9;
-            object-fit: cover;
-            display: block;
-        }
-        .image-card .model-tag {
+        .image-card:hover { transform: translateY(-4px); border-color: rgba(59, 130, 246, 0.5); }
+        .image-card.selected { border-color: var(--green); ring: 4px solid rgba(16,185,129,0.2); }
+        
+        .image-card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+        .image-info { padding: 12px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
+        .image-info .model { font-size: 11px; font-weight: 600; color: #94a3b8; }
+        .image-info .batch-label { font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+
+        .image-card .selection-icon {
             position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(0,0,0,0.7);
-            color: var(--text);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-        }
-        .image-card .check {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
+            top: 10px; right: 10px;
+            width: 24px; height: 24px;
             background: var(--green);
+            border-radius: 50%;
             display: none;
-            align-items: center;
-            justify-content: center;
-            color: #000;
-            font-weight: bold;
-            font-size: 14px;
+            align-items: center; justify-content: center;
+            color: #000; font-weight: bold; font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
-        .image-card.selected .check { display: flex; }
+        .image-card.selected .selection-icon { display: flex; }
 
         /* ---- 弹窗 ---- */
         .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.7);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 500;
         }
         .modal-overlay.active { display: flex; }
         .modal {
             background: var(--surface);
-            border-radius: var(--radius);
-            padding: 24px;
-            width: 480px;
-            max-width: 90vw;
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            width: 500px;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
-        .modal h2 { margin-bottom: 16px; font-size: 18px; }
-        .modal label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--muted); }
+        .modal h2 { margin-bottom: 20px; font-size: 20px; }
         .modal input, .modal textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            background: var(--card);
-            color: var(--text);
-            font-size: 14px;
-            margin-bottom: 16px;
+            width: 100%; padding: 12px;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius); color: white; margin-bottom: 20px;
+            font-family: inherit;
         }
-        .modal textarea { height: 80px; resize: vertical; }
-        .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
 
-        /* ---- 格式检查面板 ---- */
-        .format-panel {
-            padding: 16px 32px;
-            display: none;
-        }
-        .format-panel.visible { display: block; }
-        .format-issue {
-            background: var(--card);
-            border-radius: 8px;
-            padding: 12px 16px;
-            margin-bottom: 8px;
-        }
-        .format-issue .file { font-weight: 500; margin-bottom: 4px; }
-        .format-issue .issue { color: var(--yellow); font-size: 13px; }
-
-        /* ---- 大图预览 ---- */
+        /* 预览层 */
         .preview-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 300;
-            cursor: zoom-out;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; cursor: zoom-out;
         }
         .preview-overlay.active { display: flex; }
-        .preview-overlay img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
+        .preview-overlay img { max-width: 95vw; max-height: 95vh; object-fit: contain; }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+        /* 空状态 */
+        .empty-state {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            gap: 16px;
+        }
+        .empty-state svg { width: 64px; height: 64px; opacity: 0.2; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🔍 OpsV Review</h1>
+        <h1>🎬 OpsV Review <span style="font-weight: 300; opacity: 0.5;">| 创意决策中心</span></h1>
         <div class="status">
-            <span class="badge badge-green" id="totalCount">0 张候选</span>
-            <span class="badge badge-yellow" id="formatStatus">格式检查中...</span>
+            <span class="badge badge-green" id="batchBadge">批次已就绪</span>
+            <span class="badge badge-yellow" id="formatBadge">检查文档中...</span>
         </div>
     </div>
 
-    <div class="toolbar">
-        <button class="btn btn-primary" id="approveBtn" disabled onclick="openApproveModal()">
-            ✅ Approve 选中 (<span id="selectedCount">0</span>)
-        </button>
-        <button class="btn btn-secondary" onclick="toggleFormatPanel()">📋 格式检查</button>
-        <button class="btn btn-secondary" onclick="location.reload()">🔄 刷新</button>
-    </div>
+    <div class="main">
+        <!-- 第1栏：Job 快速导航 -->
+        <div class="sidebar" id="jobList">
+            <!-- 由 JS 填充 -->
+        </div>
 
-    <div class="format-panel" id="formatPanel"></div>
-    <div class="groups" id="groups"></div>
+        <!-- 第2栏：核心内容区 -->
+        <div class="content">
+            <div class="toolbar">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button class="btn btn-primary" id="approveBtn" disabled onclick="openApproveModal()">
+                        ✅ Approve 选中 (<span id="selectedCount">0</span>)
+                    </button>
+                    <span style="font-size: 12px; color: var(--muted);" id="currentId">未选择任务</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="location.reload()">🔄 刷新</button>
+                </div>
+            </div>
 
-    <!-- Approve 弹窗 -->
-    <div class="modal-overlay" id="approveModal">
-        <div class="modal">
-            <h2>Approve 确认</h2>
-            <label>变体名称（留空使用默认序号）</label>
-            <input type="text" id="variantInput" placeholder="例如: portrait, full_body, childhood">
-            <label>Review 意见</label>
-            <textarea id="reviewNote" placeholder="记录审阅意见..."></textarea>
-            <div class="actions">
-                <button class="btn btn-secondary" onclick="closeApproveModal()">取消</button>
-                <button class="btn btn-primary" onclick="submitApprove()">确认 Approve</button>
+            <div class="viewport">
+                <!-- 左：文档预览 -->
+                <div class="doc-section" id="docViewer">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <p>请从左侧选择一个任务以查看文档内容</p>
+                    </div>
+                </div>
+
+                <!-- 右：图片对比 -->
+                <div class="images-section" id="imageViewer">
+                    <!-- 由 JS 填充 -->
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 大图预览 -->
+    <!-- Modals -->
+    <div class="modal-overlay" id="approveModal">
+        <div class="modal">
+            <h2>🎉 决定资产转正</h2>
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px;">选中的图片将作为正式参考图回写到源码文档中。</p>
+            <label style="font-size: 12px; color: var(--muted);">变体名称（例如: default, wide, closeup）</label>
+            <input type="text" id="variantInput" placeholder="默认为序号名...">
+            <label style="font-size: 12px; color: var(--muted);">导演意见</label>
+            <textarea id="reviewNote" rows="3" placeholder="可选: 记录调整建议或通过理由..."></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn btn-secondary" onclick="closeApproveModal()">再想想</button>
+                <button class="btn btn-primary" onclick="submitApprove()">确认批准</button>
+            </div>
+        </div>
+    </div>
+
     <div class="preview-overlay" id="previewOverlay" onclick="this.classList.remove('active')">
         <img id="previewImg">
     </div>
 
     <script>
-        let allCandidates = [];
-        let selectedImages = new Set(); // Set of { jobId, imagePath }
+        let groups = [];
+        let currentJob = null;
+        let selectedImages = new Set(); // jobId|path
 
-        async function loadCandidates() {
+        async function init() {
             const res = await fetch('/api/candidates');
             const json = await res.json();
             if (json.success) {
-                allCandidates = json.data;
-                renderGroups();
+                groups = json.data;
+                renderJobList();
+                checkFormats();
             }
         }
 
-        function renderGroups() {
-            const container = document.getElementById('groups');
-            let totalImages = 0;
-            let html = '';
+        function renderJobList() {
+            const list = document.getElementById('jobList');
+            list.innerHTML = groups.map(g => `
+                <div class="sidebar-item" id="item-${g.jobId}" onclick="selectJob('${g.jobId}')">
+                    <div class="id">${g.jobId}</div>
+                    <div class="meta">${g.images.length} 张候选图 | ${g.source}</div>
+                </div>
+            `).join('');
+        }
 
-            for (const group of allCandidates) {
-                totalImages += group.images.length;
+        async function selectJob(jobId) {
+            // UI 切换
+            if (currentJob) {
+                document.getElementById(`item-${currentJob}`).classList.remove('active');
+            }
+            currentJob = jobId;
+            document.getElementById(`item-${currentJob}`).classList.add('active');
+            document.getElementById('currentId').textContent = jobId;
+
+            // 加载文档
+            const docRes = await fetch(`/api/document/${jobId}`);
+            const docJson = await docRes.json();
+            const viewer = document.getElementById('docViewer');
+            if (docJson.success) {
+                viewer.innerHTML = `<h2>${jobId}</h2>` + simpleMarkdown(docJson.data);
+            } else {
+                viewer.innerHTML = `<p style="color:var(--red)">❌ 文档加载失败</p>`;
+            }
+
+            // 加载图片组 (跨批次聚合)
+            renderImages(jobId);
+        }
+
+        function renderImages(jobId) {
+            const group = groups.find(g => g.jobId === jobId);
+            const viewer = document.getElementById('imageViewer');
+            if (!group) return;
+
+            // 按 Batch 分组
+            const batchMap = {};
+            group.images.forEach(img => {
+                if (!batchMap[img.batchId]) batchMap[img.batchId] = [];
+                batchMap[img.batchId].push(img);
+            });
+
+            let html = '';
+            for (const bId in batchMap) {
                 html += `
-                    <div class="group">
-                        <div class="group-header">
-                            <h3>${group.jobId}</h3>
-                            <span class="source">${group.source}</span>
-                        </div>
+                    <div class="batch-group">
+                        <div class="batch-title">📦 产出包: ${bId}</div>
                         <div class="image-grid">
-                            ${group.images.map(img => {
-                                const key = `${group.jobId}|${img.path}`;
+                            ${batchMap[bId].map(img => {
+                                const key = `${jobId}|${img.path}`;
                                 const isSelected = selectedImages.has(key);
                                 return `
-                                    <div class="image-card ${isSelected ? 'selected' : ''}"
-                                         onclick="toggleSelect('${group.jobId}', '${img.path.replace(/\\/g, '\\\\')}')"
+                                    <div class="image-card ${isSelected ? 'selected' : ''}" 
+                                         onclick="toggleSelect('${jobId}', '${img.path.replace(/\\/g, '\\\\')}')"
                                          ondblclick="previewImage('/${img.relativePath}')">
-                                        <img src="/${img.relativePath}" loading="lazy" alt="${group.jobId}">
-                                        <span class="model-tag">${img.model}</span>
-                                        <span class="check">✓</span>
+                                        <img src="/${img.relativePath}" loading="lazy">
+                                        <div class="selection-icon">✓</div>
+                                        <div class="image-info">
+                                            <span class="model">${img.model}</span>
+                                            <span class="batch-label">${img.batchId}</span>
+                                        </div>
                                     </div>
                                 `;
                             }).join('')}
@@ -296,26 +388,30 @@
                     </div>
                 `;
             }
-
-            container.innerHTML = html;
-            document.getElementById('totalCount').textContent = `${totalImages} 张候选`;
+            viewer.innerHTML = html;
         }
 
-        function toggleSelect(jobId, imagePath) {
-            const key = `${jobId}|${imagePath}`;
+        function toggleSelect(jobId, path) {
+            const key = `${jobId}|${path}`;
             if (selectedImages.has(key)) {
                 selectedImages.delete(key);
             } else {
                 selectedImages.add(key);
             }
-            updateSelectedUI();
-            renderGroups();
+            document.getElementById('selectedCount').textContent = selectedImages.size;
+            document.getElementById('approveBtn').disabled = selectedImages.size === 0;
+            renderImages(jobId);
         }
 
-        function updateSelectedUI() {
-            const count = selectedImages.size;
-            document.getElementById('selectedCount').textContent = count;
-            document.getElementById('approveBtn').disabled = count === 0;
+        function simpleMarkdown(text) {
+            // 简单处理：过滤 YAML 同时处理换行和加粗
+            const body = text.replace(/^---[\s\S]*?---\n*/, '');
+            return body
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/^# (.*)/gm, '<h2>$1</h2>')
+                .replace(/^## (.*)/gm, '<h3>$1</h3>')
+                .replace(/^> (.*)/gm, '<blockquote>$1</blockquote>');
         }
 
         function previewImage(src) {
@@ -323,24 +419,16 @@
             document.getElementById('previewOverlay').classList.add('active');
         }
 
-        function openApproveModal() {
-            if (selectedImages.size === 0) return;
-            document.getElementById('approveModal').classList.add('active');
-        }
-
-        function closeApproveModal() {
-            document.getElementById('approveModal').classList.remove('active');
-        }
+        function openApproveModal() { document.getElementById('approveModal').classList.add('active'); }
+        function closeApproveModal() { document.getElementById('approveModal').classList.remove('active'); }
 
         async function submitApprove() {
             const variant = document.getElementById('variantInput').value.trim();
             const reviewNote = document.getElementById('reviewNote').value.trim();
-
-            const selections = [];
-            for (const key of selectedImages) {
-                const [jobId, imagePath] = key.split('|');
-                selections.push({ jobId, imagePath, variant: variant || undefined });
-            }
+            const selections = Array.from(selectedImages).map(k => {
+                const [jobId, imagePath] = k.split('|');
+                return { jobId, imagePath, variant: variant || undefined };
+            });
 
             const res = await fetch('/api/approve', {
                 method: 'POST',
@@ -350,53 +438,28 @@
 
             const json = await res.json();
             if (json.success) {
-                alert(`✅ 已 Approve ${selections.length} 张图片`);
+                alert(`✅ Approve 成功！文档已回写。`);
                 selectedImages.clear();
                 closeApproveModal();
-                loadCandidates();
-            } else {
-                alert(`❌ Approve 失败: ${json.error}`);
+                location.reload();
             }
         }
 
-        async function loadFormatCheck() {
+        async function checkFormats() {
             const res = await fetch('/api/format-check');
             const json = await res.json();
+            const el = document.getElementById('formatBadge');
             if (json.success) {
-                const issues = json.data;
-                const el = document.getElementById('formatStatus');
-                if (issues.length === 0) {
-                    el.textContent = '✅ 格式合规';
+                if (json.data.length === 0) {
+                    el.textContent = '✅ 文档合规';
                     el.className = 'badge badge-green';
                 } else {
-                    el.textContent = `⚠️ ${issues.length} 个问题`;
-                    el.className = 'badge badge-yellow';
+                    el.textContent = `⚠️ ${json.data.length} 个规范警告`;
                 }
-                renderFormatPanel(issues);
             }
         }
 
-        function renderFormatPanel(issues) {
-            const panel = document.getElementById('formatPanel');
-            if (issues.length === 0) {
-                panel.innerHTML = '<p style="color:var(--green)">✅ 所有文档格式合规</p>';
-                return;
-            }
-            panel.innerHTML = issues.map(item =>
-                `<div class="format-issue">
-                    <div class="file">📄 ${item.file}</div>
-                    ${item.issues.map(i => `<div class="issue">⚠️ ${i}</div>`).join('')}
-                </div>`
-            ).join('');
-        }
-
-        function toggleFormatPanel() {
-            document.getElementById('formatPanel').classList.toggle('visible');
-        }
-
-        // 初始化
-        loadCandidates();
-        loadFormatCheck();
+        init();
     </script>
 </body>
 </html>

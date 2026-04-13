@@ -190,12 +190,12 @@ export class JobGenerator {
 
         logger.info(`  处理资产: ${id} (type: ${frontmatter.type}, status: ${frontmatter.status})`);
 
-        // ---- 从正文提取描述和 prompt ----
-        const asset = this.assetManager.getAsset(id);
-        const description = asset?.description || FrontmatterParser.extractFirstParagraph(body);
+        // v0.5.6: YAML 强约束，正文仅用于参考或 @ 引用展开
+        const description = (frontmatter as any).brief_description || "(无描述)";
+        const yamlPrompt = (frontmatter as any).prompt_en;
 
-        // ---- 从正文中的 @ 引用组装 prompt ----
-        const { prompt, attachments } = await this.assetCompiler.assembleAssetPrompt(id, body);
+        // 虽然主 Prompt 来自 YAML，但我们仍需解析正文中的 @ 引用以获取附件
+        const { attachments } = await this.assetCompiler.assembleAssetPrompt(id, body);
 
         // ---- 全局配置 ----
         const ar = globalConfig.aspect_ratio || '16:9';
@@ -214,7 +214,7 @@ export class JobGenerator {
         const job: Job = {
             id,
             type: 'image_generation',
-            prompt_en: prompt || undefined,
+            prompt_en: yamlPrompt || undefined,
             payload,
             reference_images: attachments.length > 0 ? attachments : undefined,
             output_path: outputPath,

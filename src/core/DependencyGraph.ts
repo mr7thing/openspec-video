@@ -13,7 +13,6 @@ export interface ParsedDocument {
     id: string;
     filePath: string;
     frontmatter: {
-        reference?: string;
         refs?: string[];
         status?: string;
     };
@@ -40,12 +39,7 @@ export class DependencyGraph {
         for (const doc of documents) {
             const deps = new Set<string>();
 
-            // reference 字段: 变体依赖（如 younger_brother 依赖 elder_brother）
-            if (doc.frontmatter.reference) {
-                deps.add(doc.frontmatter.reference);
-            }
-
-            // refs 字段: 引用依赖（本文档引用的所有资产）
+            // 变体与内容依赖统一在 refs 数组中
             if (doc.frontmatter.refs) {
                 for (const ref of doc.frontmatter.refs) {
                     // 排除自引用

@@ -108,8 +108,31 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 await fs.ensureDir(path.join(targetDir, 'artifacts'));
                 await fs.ensureDir(path.join(targetDir, 'queue'));
 
-                console.log('Project structure created successfully.');
-                console.log(`Tools configured: ${tools.join(', ')}`);
+                // 5. Create .gitignore and initialize Git
+                const gitignoreSrc = path.join(TEMPLATE_DIR, 'assets/.gitignore');
+                const gitignoreDest = path.join(targetDir, '.gitignore');
+                if (fs.existsSync(gitignoreSrc)) {
+                    await fs.copy(gitignoreSrc, gitignoreDest);
+                }
+
+                const { execSync } = require('child_process');
+                try {
+                    // Check if git is installed
+                    execSync('git --version', { stdio: 'ignore' });
+                    
+                    if (!fs.existsSync(path.join(targetDir, '.git'))) {
+                        execSync('git init', { cwd: targetDir, stdio: 'ignore' });
+                        execSync('git add .', { cwd: targetDir, stdio: 'ignore' });
+                        execSync('git commit -m "chore: initial project structure by OpsV"', { cwd: targetDir, stdio: 'ignore' });
+                        console.log('✅ Git repository initialized with .gitignore');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Git not found or failed to initialize. Please install git for asset tracking.');
+                }
+
+                console.log('\n🚀 Project structure created successfully.');
+                console.log(`   Tools configured: ${tools.join(', ')}`);
+                console.log(`   Location: ${targetDir}\n`);
             } catch (err) {
                 console.error('Failed to initialize project:', err);
             }

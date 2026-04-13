@@ -14,10 +14,17 @@ import { logger } from '../utils/logger';
 //   - 格式检查 API
 // ============================================================================
 
+interface Candidate {
+    model: string;
+    path: string;
+    relativePath: string;
+    batchId: string;
+}
+
 interface CandidateGroup {
     jobId: string;
     source: string;
-    images: { model: string; path: string; relativePath: string }[];
+    images: Candidate[];
 }
 
 export class ReviewServer {
@@ -25,7 +32,7 @@ export class ReviewServer {
 
     constructor(
         private projectRoot: string,
-        private batchDir: string
+        private batchDirs: string[]
     ) {
         this.approvedRefReader = new ApprovedRefReader(projectRoot);
     }
@@ -65,6 +72,20 @@ export class ReviewServer {
             try {
                 const candidates = this.resolveBatchCandidates();
                 res.json({ success: true, data: candidates });
+            } catch (e) {
+                res.status(500).json({ success: false, error: (e as Error).message });
+            }
+        });
+
+        // ---- API: 获取文档内容 ----
+        app.get('/api/document/:jobId', (req: any, res: any) => {
+            try {
+                const docPath = this.findSourceDoc(req.params.jobId);
+                if (docPath && fs.existsSync(docPath)) {
+                    res.json({ success: true, data: fs.readFileSync(docPath, 'utf-8') });
+                } else {
+                    res.status(404).json({ success: false, error: '文档不存在' });
+                }
             } catch (e) {
                 res.status(500).json({ success: false, error: (e as Error).message });
             }
@@ -140,32 +161,35 @@ export class ReviewServer {
     private resolveBatchCandidates(): CandidateGroup[] {
         const groups = new Map<string, CandidateGroup>();
 
-        if (!fs.existsSync(this.batchDir)) return [];
+        for (const dir of this.batchDirs) {
+            if (!fs.existsSync(dir)) continue;
+            const batchId = path.basename(dir);
 
-        // 读取批次 jobs json 获取任务元信息
-        const jobsJsonFiles = fs.readdirSync(this.batchDir).filter(f => f.startsWith('jobs_batch'));
-        let jobMeta: Record<string, string> = {};
-        if (jobsJsonFiles.length > 0) {
-            try {
-                const jobs = JSON.parse(fs.readFileSync(path.join(this.batchDir, jobsJsonFiles[0]), 'utf-8'));
-                for (const job of jobs) {
-                    jobMeta[job.id] = job._meta?.source || '';
+            // 读取批次 jobs json 获取任务元信息
+            const jobsJsonFiles = fs.readdirSync(dir).filter(f => f.startsWith('jobs_batch'));
+            let jobMeta: Record<string, string> = {};
+            if (jobsJsonFiles.length > 0) {
+                try {
+                    const jobs = JSON.parse(fs.readFileSync(path.join(dir, jobsJsonFiles[0]), 'utf-8'));
+                    for (const job of jobs) {
+                        jobMeta[job.id] = job._meta?.source || '';
+                    }
+                } catch {}
+            }
+
+            // 遍历批次目录下所有子目录（每个子目录对应一个模型）
+            const entries = fs.readdirSync(dir);
+            for (const entry of entries) {
+                const entryPath = path.join(dir, entry);
+                const stat = fs.statSync(entryPath);
+
+                if (stat.isDirectory()) {
+                    // 模型子目录
+                    this.scanModelDir(entryPath, entry, batchId, groups, jobMeta);
+                } else if (stat.isFile() && /\.(png|jpg|webp)$/i.test(entry)) {
+                    // 直接在批次根目录的图片
+                    this.addCandidate(groups, entry, entryPath, 'default', batchId, jobMeta);
                 }
-            } catch {}
-        }
-
-        // 遍历批次目录下所有子目录（每个子目录对应一个模型）
-        const entries = fs.readdirSync(this.batchDir);
-        for (const entry of entries) {
-            const entryPath = path.join(this.batchDir, entry);
-            const stat = fs.statSync(entryPath);
-
-            if (stat.isDirectory()) {
-                // 模型子目录
-                this.scanModelDir(entryPath, entry, groups, jobMeta);
-            } else if (stat.isFile() && /\.(png|jpg|webp)$/i.test(entry)) {
-                // 直接在批次根目录的图片
-                this.addCandidate(groups, entry, entryPath, 'default', jobMeta);
             }
         }
 
@@ -175,13 +199,14 @@ export class ReviewServer {
     private scanModelDir(
         dirPath: string,
         modelName: string,
+        batchId: string,
         groups: Map<string, CandidateGroup>,
         jobMeta: Record<string, string>
     ): void {
         const files = fs.readdirSync(dirPath).filter(f => /\.(png|jpg|webp)$/i.test(f));
         for (const file of files) {
             const filePath = path.join(dirPath, file);
-            this.addCandidate(groups, file, filePath, modelName, jobMeta);
+            this.addCandidate(groups, file, filePath, modelName, batchId, jobMeta);
         }
     }
 
@@ -190,9 +215,9 @@ export class ReviewServer {
         fileName: string,
         filePath: string,
         modelName: string,
+        batchId: string,
         jobMeta: Record<string, string>
     ): void {
-        // 从文件名提取 jobId: elder_brother_draft_1.png → elder_brother
         const match = fileName.match(/^(.+?)_draft_\d+\.(png|jpg|webp)$/i);
         if (!match) return;
 
@@ -210,6 +235,7 @@ export class ReviewServer {
             model: modelName,
             path: filePath,
             relativePath,
+            batchId
         });
     }
 

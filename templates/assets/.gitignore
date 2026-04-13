@@ -1,0 +1,27 @@
+# OpenSpec-Video Project Ignored Files
+.env
+.env.project
+node_modules/
+dist/
+
+# Assets & Artifacts
+# We ignore drafts to keep repo clean, but we usually KEEP artifacts/ (Approved assets)
+artifacts/drafts_*
+
+# Agent & IDE Configurations
+.agent/
+.antigravity/
+.trae/
+.opencode/
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -19,20 +19,20 @@ Layer 4: Execution Rules    → 编译期 + 执行期的语义校验
 ---
 type: character | prop | costume    # 资产类型（必填）
 status: drafting | approved         # 状态（必填）
-reference: elder_brother            # 变体依赖（可选）
-refs:                               # 引用的其他资产 ID（可选）
+brief_description: "角色简短描述"      # 列表展示用简述
+detailed_description: "角色详细特征描述" # 核心特征链条（v0.5.6-v2 引入）
+prompt_en: "Core MJ/SD Prompt"      # 基于 detailed_description 编写
+refs:                               # 引用与变体依赖（数组，首位通常为父级）
   - elder_brother
-  - school_uniform
 reviews:                            # 审阅记录（自动追加）
-  - "2025-03-15: approved via review UI"
+  - "2025-03-15: approved"
 ---
 ```
 
-**已删除字段**（v0.4 → v0.5 Breaking Changes）:
-- ~~`has_image`~~ → 由 `status: approved` + `## Approved References` 替代
-- ~~`visual_traits`~~ → 由正文描述替代
-- ~~`brief_description`~~ → 由正文第一段替代
-- ~~`detailed_description`~~ → 由正文主体替代
+**核心变更 (v0.5.6 SSOT 2.0)**:
+- **三位一体描述**：`brief` (简述) -> `detailed` (详述) -> `prompt_en` (最终指令)。
+- **依赖合并**：`reference` 已被合并入 `refs` 数组，简化依赖追踪。
+- **正文作用**：存放原始创意和附件路径。规范约定的 ## 标题必须保留（即使为空）。
 
 ### 2.2 场景文档 (scenes/*.md)
 
@@ -122,15 +122,15 @@ vision: "一个关于兄弟情的短片"
 ![childhood](../../artifacts/elder_brother_childhood.png)
 ```
 
-### 4.2 Design References 区域（可选）
+### 4.2 规范标题（必须保留）
 
-外部参考图（非生成图）放置于此区域：
+以下标题是文档的“骨架”，即使没有内容也必须保留：
 
-```markdown
-## Design References
+- `## Vision`: 记录导演的艺术直觉。
+- `## Design References`: 设计参考与附件。
+- `## Approved References`: 审批回写区域。
 
-![参考1](../../ref/elder_brother_ref.jpg)
-```
+用户可以在其下方自由增加自定义标题（如 `## Backstory`, `## Notes`），这些内容可供 Agent 在更新 YAML 时参考。旋照
 
 ### 4.3 Script.md 正文结构
 

@@ -20,9 +20,13 @@ export type Status = z.infer<typeof StatusEnum>;
 export const BaseFrontmatterSchema = z.object({
     type: AssetTypeEnum,
     status: StatusEnum,
-    // 依赖资产 ID（如弟弟依赖哥哥）
-    reference: z.string().optional(),
-    // 本文档引用的所有资产 ID 列表
+    // 基础简述（用于列表展示）
+    brief_description: z.string().optional(),
+    // 详细特征描述（用于驱动 prompt_en 生成，v0.5.6 引入）
+    detailed_description: z.string().optional(),
+    // 最终渲染 Prompt（YAML 驱动）
+    prompt_en: z.string().optional(),
+    // 资产引用与变体依赖（合并为统一数组，第一个通常为变体父级）
     refs: z.array(z.string()).optional(),
     // 审阅记录 "YYYY-MM-DD: 描述"
     reviews: z.array(z.string()).optional(),

@@ -19,20 +19,20 @@ Layer 4: Execution Rules       → Compile-time + runtime semantic validation
 ---
 type: character | prop | costume    # Asset type (required)
 status: drafting | approved         # Status (required)
-reference: elder_brother            # Variant dependency (optional)
-refs:                               # Referenced asset IDs (optional)
+brief_description: "Short summary"  # For list display
+detailed_description: "Detailed characteristics" # Core feature chain (v0.5.6-v2)
+prompt_en: "Core MJ/SD Prompt"      # Derived from detailed_description
+refs:                               # Refs & variants (Array, 1st is usually parent)
   - elder_brother
-  - school_uniform
 reviews:                            # Review history (auto-appended)
-  - "2025-03-15: approved via review UI"
+  - "2025-03-15: approved"
 ---
 ```
 
-**Removed Fields** (v0.4 → v0.5 Breaking Changes):
-- ~~`has_image`~~ → Replaced by `status: approved` + `## Approved References`
-- ~~`visual_traits`~~ → Replaced by body text descriptions
-- ~~`brief_description`~~ → Replaced by first paragraph of body
-- ~~`detailed_description`~~ → Replaced by body content
+**Core Changes (v0.5.6 SSOT 2.0)**:
+- **Trinity of Description**: `brief` (summary) -> `detailed` (details) -> `prompt_en` (execution).
+- **Dependency Merger**: `reference` is merged into `refs` array for simpler tracking.
+- **Body Skeleton**: Core `##` headers must be preserved (even if empty).
 
 ### 2.2 Scene Documents (scenes/*.md)
 
@@ -122,15 +122,15 @@ Auto-appended when an asset passes `opsv review`:
 ![childhood](../../artifacts/elder_brother_childhood.png)
 ```
 
-### 4.2 Design References Section (Optional)
+### 4.2 Standard Headers (Mandatory)
 
-For external reference images (not generated):
+The following headers form the document "skeleton" and must be preserved:
 
-```markdown
-## Design References
+- `## Vision`: Director's artistic intuition.
+- `## Design References`: Reference images and attachments.
+- `## Approved References`: Post-review write-back area.
 
-![ref1](../../ref/elder_brother_ref.jpg)
-```
+Users can add custom headers below these (e.g., `## Backstory`, `## Notes`) to provide context for AI agents when updating YAML.旋照
 
 ### 4.3 Script.md Body Structure
 
