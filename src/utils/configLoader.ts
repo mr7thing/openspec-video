@@ -23,6 +23,9 @@ export interface ModelConfig {
     supports_middle_image?: boolean;
     supports_last_image?: boolean;
     supports_reference_images?: boolean;
+    max_reference_images?: number;
+    supports_audio?: boolean;
+    supports_video_ref?: boolean;
 }
 
 export interface ApiConfig {

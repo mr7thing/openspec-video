@@ -97,6 +97,50 @@ export class VideoModelDispatcher {
             if (!modelConf.supports_last_image) frameRef.last = null;
         }
 
+        // v0.5.14: 优雅降级与动态质检 (Dynamic QC & Graceful Downgrade)
+        // 1. 附加参考图降级
+        if (sanitizedJob.reference_images && sanitizedJob.reference_images.length > 0) {
+            const maxRefs = modelConf.max_reference_images || 0;
+            if (maxRefs === 0) {
+                logger.warn(`⚠️ 警告: [${targetModel}] 不支持额外参考图，已自动剥离 ${sanitizedJob.reference_images.length} 张图`);
+                sanitizedJob.reference_images = undefined;
+            } else if (sanitizedJob.reference_images.length > maxRefs) {
+                logger.warn(`⚠️ 警告: [${targetModel}] 最多支持 ${maxRefs} 张参考图，已截断超出的部分`);
+                sanitizedJob.reference_images = sanitizedJob.reference_images.slice(0, maxRefs);
+            }
+        }
+
+        // 2. 多模态资源降级 (音频/视频)
+        if (sanitizedJob.payload?.extra?.media_refs) {
+            const mediaRefs = sanitizedJob.payload.extra.media_refs;
+            const validRefs: string[] = [];
+            const strippedRefs: string[] = [];
+
+            for (const ref of mediaRefs) {
+                const ext = path.extname(ref).toLowerCase();
+                if ((ext === '.mp3' || ext === '.wav') && !modelConf.supports_audio) {
+                    strippedRefs.push(ref);
+                } else if (ext === '.mp4' && !modelConf.supports_video_ref) {
+                    strippedRefs.push(ref);
+                } else {
+                    validRefs.push(ref);
+                }
+            }
+
+            if (strippedRefs.length > 0) {
+                logger.warn(`⚠️ 警告: [${targetModel}] 能力受限，已剥离多模态资源: ${strippedRefs.map(r => path.basename(r)).join(', ')}`);
+            }
+            
+            if (validRefs.length > 0) {
+                sanitizedJob.payload.extra.media_refs = validRefs;
+            } else {
+                delete sanitizedJob.payload.extra.media_refs;
+                if (Object.keys(sanitizedJob.payload.extra).length === 0) {
+                    sanitizedJob.payload.extra = undefined;
+                }
+            }
+        }
+
         // 注入配置中的额外字段 (如 api_url, resolution)
         (sanitizedJob as any).api_url = modelConf.api_url;
         

@@ -74,10 +74,17 @@ opsv gen-video       # Render Videos
 
 ## 🆕 Release Notes / 更新说明
 
-### 0.5.12 - Annotative & Shot-Local Refs (2026-04-13)
+## 🚀 最新更新 (v0.5.13)
+
+### 显式账本图纸 (Explicit Ledger Paradigm)
+- **绝对透明**：视频管线摒弃黑盒运行时拼接，所有大模型依赖的视觉设定与运镜动作（`Video Prompt`）必须由 Agent 在撰写 `Shotlist.md` 时显式组合并写明。
+- **状态驱动混写**：`Shotlist.md` 下每一镜引入局部 `YAML` 块进行状态驱动追踪（`pending | completed`），完美保留外部的 Markdown 文本供人类随性批注。
+- **双轨审查环 (Dual Review)**：在原本的图像审查之外，正式升级基于 `Shotlist.md` 的视频审查，`opsv review` 能自动捕捉生成的关联视频并写回文档供导演验收。
+
+## 🚀 历史更新 (v0.5.12)
 - **Annotative Referencing**: Introduced support for `(@id)` bracketed syntax, allowing IDs to serve as semantic annotations without disrupting narrative flow.
 - **Shot-Local References**: Enabled direct embedding of Markdown images within `Script.md` shots. These images are automatically归集 as reference images for the specific job, eliminating the need for global asset modeling for one-off visual cues.
-- **Improved Parsing**: Enhanced `RefResolver` and `JobGenerator` to robustly handle both annotative and embedded reference types.旋照照照照照照照照照照照照照照照照照照照照照照照照
+- **Improved Parsing**: Enhanced `RefResolver` and `JobGenerator` to robustly handle both annotative and embedded reference types.
 
 ### 0.5.11 - Narrative Grammar Standardization (2026-04-13)
 - **Natural Language Priority**: Updated `Story` and `Script` templates to enforce complete, human-readable grammar.

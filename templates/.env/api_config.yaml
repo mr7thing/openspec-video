@@ -70,6 +70,9 @@ models:
     supports_middle_image: false
     supports_last_image: false
     supports_reference_images: false
+    max_reference_images: 0
+    supports_audio: false
+    supports_video_ref: false
 
   # ==========================================
   # 视频模型：Seedance 1.5 Pro (火山引擎)
@@ -105,6 +108,9 @@ models:
     supports_middle_image: false
     supports_last_image: true
     supports_reference_images: true
+    max_reference_images: 9
+    supports_audio: true
+    supports_video_ref: true
 
   # ==========================================
   # 图像模型：MiniMax Image 01
@@ -140,3 +146,6 @@ models:
     supports_middle_image: false
     supports_last_image: true
     supports_reference_images: true
+    max_reference_images: 1
+    supports_audio: false
+    supports_video_ref: false

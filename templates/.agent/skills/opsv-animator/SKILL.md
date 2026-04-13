@@ -17,12 +17,18 @@ description: OpenSpec-Video (OpsV) 核心框架技能：动画管线设计师。
 
 ## 文档输出规范
 
-生成文件位于 `videospec/shots/Shotlist.md`。参考示范见 `references/shotlist_template.md`。
+生成文件位于 `videospec/shots/Shotlist.md`。参考示范见 `references/example-shotlist.md`。
 
-**核心约束（v0.5）**：
-- **废除 YAML 数组！** v0.5 阶段也已废除 `Shotlist.md` 的 YAML 列表模式。采用 `## Shot NN` 章节级纯 Markdown。
-- **纯粹的动作提取**：把剧本的情节，转写为纯英文的机位运镜语录，如 `**Motion Prompt:** Camera Dolly in, protagonist slowly turns back...`。这行文本会被引擎提取喂给 AI 视频大模型。如果你不会写，你应该交给 `animation-director` 来写。
-- **参考图链路引用**：每个镜头段落必须明确指明“这镜视频是用哪张首帧/尾帧起版的”。格式强制为无序列表，链接的文本为 `首帧`（first）或 `尾帧`（last），链接的路径指向确切的图片或帧指针。
+**核心约束（v0.5.13 所见即所得模式）**：
+- **混合状态图纸 (Hybrid Shot Block)**：每个 `## Shot NN` 必须严格分为“机器状态追踪 yaml 区”和“人类文案编辑 Markdown 区”。这也是“双轨审查流水线”的核心。
+- **显式 Video Prompt**：严禁只写 `Motion`（如"镜头拉近"）。模型最终收到的 Prompt 仅来源于此文件。因此你要把 `Script.md` 中的“场景角色客观描述”与你新设计的“镜头运动”**融合并且完整地写在 Markdown 正文里**（参见 `Video Prompt:` 区）。人类只有在这里看到全貌，才能安心审查。
+- **YAML 追踪块**：每个分镜必须拥有如下 YAML 代码块，用于状态流转。你生成时状态一律填 `pending`。
+  ```yaml
+  id: shot_NN
+  status: pending
+  first_frame: "指向定稿的参考图，若是继承则用 @FRAME:shot_XX_last"
+  ```
+- **多模态扩展库**：若有环境音效、参考视频建议，放置在 `> [!note] 附加资源` 区域中，这将在未来被多模态大模型消费，且便于导演做最终定调。
 
 **关键帧塌缩 (@FRAME)**：
-这是 OpsV 特有的长镜头无缝机制。如果是连续的镜头，后续镜头的首帧无需去渲染，而是应当重用上一个镜头的尾帧。写法：`- [首帧](@FRAME:shot_01_last)`。
+如果是连贯分镜，你的首帧不该引向静态图，而应是上镜的尾帧。写法：`first_frame: "@FRAME:shot_01_last"`。

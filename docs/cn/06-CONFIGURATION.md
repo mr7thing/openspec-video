@@ -226,7 +226,14 @@ models:
       duration: 5
     supports_first_image: true
     supports_last_image: false
-```
+    max_reference_images: 0
+    supports_audio: false
+    supports_video_ref: false
+
+### 模型边界与优雅降级 (v0.5.14)
+调度器会在派发前进行动态的资源边界测试 (Graceful Degradation):
+- `max_reference_images`: 如果输入参考图超载，引擎将自动截断并抛出黄色警告。
+- `supports_audio` / `supports_video_ref`: 如果输入多模态音频或视频引用而设定为 false，派发器将自动剔除它们以免执行错误。
 
 ### `required_env` / `fallback_env` 字段
 
@@ -240,4 +247,4 @@ models:
 ---
 
 > *"配置即命令，参数即纪律。"*
-> *OpsV 0.4.1 | 最后更新: 2026-03-23*
+> *OpsV 0.5.14 | 最后更新: 2026-04-13*
