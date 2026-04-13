@@ -1,4 +1,4 @@
-# 文档规范 (v0.5)
+# 文档规范 (v0.5.8)
 
 > OpenSpec-Video v0.5 采用 **四层规范体系**，确保文档即代码的确定性。
 
@@ -19,20 +19,23 @@ Layer 4: Execution Rules    → 编译期 + 执行期的语义校验
 ---
 type: character | prop | costume    # 资产类型（必填）
 status: drafting | approved         # 状态（必填）
-brief_description: "角色简短描述"      # 列表展示用简述
-detailed_description: "角色详细特征描述" # 核心特征链条（v0.5.6-v2 引入）
-prompt_en: "Core MJ/SD Prompt"      # 基于 detailed_description 编写
-refs:                               # 引用与变体依赖（数组，首位通常为父级）
+visual_brief: >
+  视觉描述简述（折叠块语法）
+visual_detailed: >
+  视觉详细特征描述。支持双引号内容如 "Cinematic Lighting" 而不报错。
+prompt_en: >
+  Core MJ/SD Prompt. Derived from visual_detailed.
+refs:                               # 引用与变体依赖
   - elder_brother
-reviews:                            # 审阅记录（自动追加）
+reviews:                            # 审阅记录
   - "2025-03-15: approved"
 ---
 ```
 
-**核心变更 (v0.5.6 SSOT 2.0)**:
-- **三位一体描述**：`brief` (简述) -> `detailed` (详述) -> `prompt_en` (最终指令)。
-- **依赖合并**：`reference` 已被合并入 `refs` 数组，简化依赖追踪。
-- **正文作用**：存放原始创意和附件路径。规范约定的 ## 标题必须保留（即使为空）。
+**核心变更 (v0.5.8 架构鲁棒性重构)**:
+- **全量块语法**：长文本字段强制使用折叠块语法 (`>`)，彻底消除引号冲突问题。
+- **视觉专用字段**：`visual_brief` 和 `visual_detailed` 语义化职能定型。
+- **YAML 生成闭环**：确立正文启发 -> YAML 固化 -> Review 校准的工作流。旋照照
 
 ### 2.2 场景文档 (scenes/*.md)
 

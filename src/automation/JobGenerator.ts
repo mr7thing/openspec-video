@@ -190,8 +190,8 @@ export class JobGenerator {
 
         logger.info(`  处理资产: ${id} (type: ${frontmatter.type}, status: ${frontmatter.status})`);
 
-        // v0.5.6: YAML 强约束，正文仅用于参考或 @ 引用展开
-        const description = (frontmatter as any).brief_description || "(无描述)";
+        // v0.5.7: YAML 强约束，职责清晰化：仅关注视觉属性
+        const description = (frontmatter as any).visual_brief || "(无描述)";
         const yamlPrompt = (frontmatter as any).prompt_en;
 
         // 虽然主 Prompt 来自 YAML，但我们仍需解析正文中的 @ 引用以获取附件

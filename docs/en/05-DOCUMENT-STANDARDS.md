@@ -1,4 +1,4 @@
-# Document Standards (v0.5)
+# Document Standards (v0.5.8)
 
 > OpenSpec-Video v0.5 adopts a **Four-Layer Specification System** to ensure deterministic document-as-code workflows.
 
@@ -19,20 +19,23 @@ Layer 4: Execution Rules       → Compile-time + runtime semantic validation
 ---
 type: character | prop | costume    # Asset type (required)
 status: drafting | approved         # Status (required)
-brief_description: "Short summary"  # For list display
-detailed_description: "Detailed characteristics" # Core feature chain (v0.5.6-v2)
-prompt_en: "Core MJ/SD Prompt"      # Derived from detailed_description
-refs:                               # Refs & variants (Array, 1st is usually parent)
+visual_brief: >
+  Short visual summary (Folded Block Style)
+visual_detailed: >
+  Detailed visual features. Supports "Double Quotes" without errors.
+prompt_en: >
+  Core MJ/SD Prompt. Derived from visual_detailed.
+refs:                               # Refs & variants
   - elder_brother
-reviews:                            # Review history (auto-appended)
+reviews:                            # Review history
   - "2025-03-15: approved"
 ---
 ```
 
-**Core Changes (v0.5.6 SSOT 2.0)**:
-- **Trinity of Description**: `brief` (summary) -> `detailed` (details) -> `prompt_en` (execution).
-- **Dependency Merger**: `reference` is merged into `refs` array for simpler tracking.
-- **Body Skeleton**: Core `##` headers must be preserved (even if empty).
+**Core Changes (v0.5.8 Architectural Robustness)**:
+- **Universal Block Style**: Long-form fields are forced into Folded Block Style (`>`) to eliminate quote-parsing conflicts.
+- **Visual-Specific Fields**: Refined semantic labels for `visual_brief` and `visual_detailed`.
+- **SSOT Workflow**: Established Body-first -> YAML generation workflow.旋照照
 
 ### 2.2 Scene Documents (scenes/*.md)
 

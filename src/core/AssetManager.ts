@@ -58,8 +58,8 @@ export class AssetManager {
 
                 const id = fileEntry.name.replace(/^@/, '').replace(/\.md$/, '');
 
-                // v0.5.6: 优先使用 YAML 中的描述，不再默认抓取正文第一段
-                const description = (frontmatter as any).brief_description || FrontmatterParser.extractFirstParagraph(body);
+                // v0.5.7: 视觉简述优先
+                const description = (frontmatter as any).visual_brief || FrontmatterParser.extractFirstParagraph(body);
 
                 // Approved Refs 从 Markdown 正文的 ## Approved References 区读取
                 const approvedRefs = await this.approvedRefReader.getAll(filePath);

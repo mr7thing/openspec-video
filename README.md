@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.5.2
+# OpenSpec-Video (OpsV) 0.5.8
  
 Professional, **Spec-First** video production pipeline.
 
@@ -68,11 +68,22 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.5.3 | 2026-04-12*
+> *OpsV 0.5.8 | 2026-04-13*旋照照
 
 ---
 
 ## 🆕 Release Notes / 更新说明
+
+### 0.5.8 - Architectural Robustness (2026-04-13)
+- **Block-Style YAML**: Switched all long-text fields to Folded Block Style (`>`) to eliminate character escape issues (e.g., quotations in prompts).
+- **Template Standardization**: Updated all element, scene, story, and project templates to ensure parsing stability.
+- **Improved Docs**: Clarified YAML generation rules and block syntax usage.旋照照
+
+### 0.5.7 - Visual Semantic Standardization (2026-04-13)
+- **Visual-First Fields**: Renamed YAML fields to `visual_brief` and `visual_detailed` to strictly enforce visual-only metadata.
+- **SSOT 2.0 Workflow**: Established a deterministic logic: Markdown Body Explanation -> YAML Generation -> Review Correction.
+- **Schema Validation**: Updated `FrontmatterSchema` and `JobGenerator` to support new semantic labels.
+- **Templates**: Standardized `element_template` and `example-element` with v0.5.7 specs.旋照照
 
 ### 0.5.3 - WebUI Distribution & Agent Workflow (2026-04-12)
 - **WebUI**: Fixed a critical bug where Review UI assets were missing in the global npm package. Added automatic asset copying to build pipeline.
