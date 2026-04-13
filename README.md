@@ -68,19 +68,23 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.5.2 | 2026-04-12*
+> *OpsV 0.5.3 | 2026-04-12*
 
 ---
 
-## 🆕 Release Notes / 更新说明 (v0.5.2)
+## 🆕 Release Notes / 更新说明
+
+### 0.5.3 - WebUI Distribution & Agent Workflow (2026-04-12)
+- **WebUI**: Fixed a critical bug where Review UI assets were missing in the global npm package. Added automatic asset copying to build pipeline.
+- **Server**: Enhanced `ReviewServer` with dynamic static resource path detection and robust error reporting.
+- **Agent Roles**: Updated `AGENTS.md` with strict QA gatekeeping, mandatory `opsv parse` validation after writing, and flexible Markdown header support for creative freedom.
+- **CLI**: Optimized `opsv review` startup reliability across different OS environments.
 
 ### 0.5.2 - Security & Provider Architecture Stability (2026-04-12)
 - **Architecture**: Promoted `ImageProvider` interface. Unified all generation logic into a single `generateAndDownload` contract.
 - **Security**: Fixed OS command injection vulnerabilities in CLI parameters.
 - **Stability**: Fixed a critical async bug in `DependencyGraph` where task nodes were incorrectly marked as completed.
-- **CLI**: Re-enabled `--skip-failed` flag in video production pipe.
 - **Refactoring**: Eliminated duplicate logic across `AssetManager` and `JobGenerator` using `FrontmatterParser`.
-- **Docs**: Synchronized full API reference documentation for image/video providers (CN/EN).
 
 ### 0.5.0 - Spec-First & Addons Evolution (2026-04-10)
 - **Architecture**: Migrated to a **Dependency Graph** driven engine. Non-linear task resolution.
