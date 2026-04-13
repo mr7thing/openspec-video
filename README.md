@@ -68,13 +68,20 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.5.12 | 2026-04-13*旋照照照照照照照照照照照照照照照照照照照照照照照照
+> *OpsV 0.5.14 | 2026-04-13*
 
 ---
 
 ## 🆕 Release Notes / 更新说明
 
-## 🚀 最新更新 (v0.5.13)
+## 🚀 最新更新 (v0.5.14)
+### 纯净规范与动态降级池 (Pure Spec & Dynamic Degradation)
+- **绝对纯净**：彻查并禁止任何特定模型/本地参数（如 `target_model`, `comfy_workflow`）硬编码至 `Shotlist.md` 等设计文档，捍卫需求端跨平台可复用性。
+- **能力边界扩展**：于 `api_config.yaml` 统一定义大模型核心能力边界，包括：`max_reference_images`（最高支持参考图数量）、`supports_audio`以及`supports_video_ref`。
+- **派发级质检网**：在 `VideoModelDispatcher` 内置动态剔除手术刀。面对超参数注入（如往不支持音频的模型喂了环境音轨），系统将拦截脏数据并**优雅降级**(Graceful Downgrade)，抛出黄色预警而非执行级崩溃。
+- **指令倒置哲学**：确立了复杂的私有跑法（特化本地ComfyUI/重型插件）由 Agent Addon 或 CLI runtime 控制介入执行，完美分离“本词意愿”与“法术实现”。
+
+## 🚀 历史更新 (v0.5.13)
 
 ### 显式账本图纸 (Explicit Ledger Paradigm)
 - **绝对透明**：视频管线摒弃黑盒运行时拼接，所有大模型依赖的视觉设定与运镜动作（`Video Prompt`）必须由 Agent 在撰写 `Shotlist.md` 时显式组合并写明。
@@ -89,28 +96,28 @@ opsv gen-video       # Render Videos
 ### 0.5.11 - Narrative Grammar Standardization (2026-04-13)
 - **Natural Language Priority**: Updated `Story` and `Script` templates to enforce complete, human-readable grammar.
 - **Semantic Reference Embedding**: Defined the `@id` usage as a semantic anchor embedded within natural sentences, rather than as a standalone bracketed tag.
-- **Execution-Ready Literacy**: Ensured that the text remains logical and descriptive before and after automated reference replacement.旋照照照照照照照照
+- **Execution-Ready Literacy**: Ensured that the text remains logical and descriptive before and after automated reference replacement.
 
 ### 0.5.10 - Reference Logic Standardization (2026-04-13)
 - **Unified @ Syntax**: Standardized the use of `@` prefix across both Markdown body and YAML `refs`.
 - **Granular Referencing**: Added support for `@id:variant` syntax in `refs` to point to specific approved images while maintaining document-level safety.
-- **Dependency Intelligence**: Enhanced the `DependencyGraph` to automatically resolve complex reference strings back to their core document dependencies.旋照照照
+- **Dependency Intelligence**: Enhanced the `DependencyGraph` to automatically resolve complex reference strings back to their core document dependencies.
 
 ### 0.5.9 - ID-Naming De-duplication (2026-04-13)
 - **Unified ID Logic**: Removed the redundant `name` field from YAML headers. Asset IDs are now strictly mapped from file names (e.g., `@broken_sword.md` -> `broken_sword`).
 - **Template Cleanup**: Streamlined all element and scene templates for a minimal, non-redundant metadata structure.
-- **Architectural Purity**: Enforced a single source of truth for IDs to prevent metadata drift and naming conflicts.旋照照照
+- **Architectural Purity**: Enforced a single source of truth for IDs to prevent metadata drift and naming conflicts.
 
 ### 0.5.8 - Architectural Robustness (2026-04-13)
 - **Block-Style YAML**: Switched all long-text fields to Folded Block Style (`>`) to eliminate character escape issues (e.g., quotations in prompts).
 - **Template Standardization**: Updated all element, scene, story, and project templates to ensure parsing stability.
-- **Improved Docs**: Clarified YAML generation rules and block syntax usage.旋照照
+- **Improved Docs**: Clarified YAML generation rules and block syntax usage.
 
 ### 0.5.7 - Visual Semantic Standardization (2026-04-13)
 - **Visual-First Fields**: Renamed YAML fields to `visual_brief` and `visual_detailed` to strictly enforce visual-only metadata.
 - **SSOT 2.0 Workflow**: Established a deterministic logic: Markdown Body Explanation -> YAML Generation -> Review Correction.
 - **Schema Validation**: Updated `FrontmatterSchema` and `JobGenerator` to support new semantic labels.
-- **Templates**: Standardized `element_template` and `example-element` with v0.5.7 specs.旋照照
+- **Templates**: Standardized `element_template` and `example-element` with v0.5.7 specs.
 
 ### 0.5.3 - WebUI Distribution & Agent Workflow (2026-04-12)
 - **WebUI**: Fixed a critical bug where Review UI assets were missing in the global npm package. Added automatic asset copying to build pipeline.

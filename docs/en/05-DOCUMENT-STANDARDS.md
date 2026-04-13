@@ -48,7 +48,10 @@ reviews:                            # Review history
     - **Pure Markdown**: Fully deprecated YAML shot lists for Markdown headers.
 
 > [!IMPORTANT]
-> **Maintenance Rule**: All specification updates must be recorded incrementally. Do NOT delete previous version decisions to ensure full design traceability.旋照照
+> **Maintenance Rule**: All specification updates must be recorded incrementally. Do NOT delete previous version decisions to ensure full design traceability.
+
+- **v0.5.14 (Pure Spec & Dynamic Degradation)**:
+    - **Absolutely Pure Spec**: Hardcoding model implementation details or local workflows (like `target_model`, `comfy_workflow`) into Markdown files (`Shotlist.md`) is strictly forbidden. The Markdown document remains a pure representation of narrative intent. Base model compatibility checks are handled purely by the Dispatcher runtime via the capability boundaries defined in `api_config.yaml` (Graceful Degradation).
 
 ### 2.2 Scene Documents (scenes/*.md)
 
@@ -146,7 +149,7 @@ The following headers form the document "skeleton" and must be preserved:
 - `## Design References`: Reference images and attachments.
 - `## Approved References`: Post-review write-back area.
 
-Users can add custom headers below these (e.g., `## Backstory`, `## Notes`) to provide context for AI agents when updating YAML.旋照
+Users can add custom headers below these (e.g., `## Backstory`, `## Notes`) to provide context for AI agents when updating YAML.
 
 ### 4.3 Script.md Body Structure
 

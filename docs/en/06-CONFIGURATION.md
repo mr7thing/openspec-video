@@ -77,7 +77,14 @@ models:
     supports_first_image: true
     supports_last_image: true
     supports_reference_images: true
-```
+    max_reference_images: 9
+    supports_audio: true
+    supports_video_ref: true
+
+### Dynamic QC & Graceful Degradation (v0.5.14)
+The Dispatcher will perform a dynamic capacity boundary test before issuing a dispatch request:
+- `max_reference_images`: If the payload's image reference array exceeds this limit, the engine automatically truncates it and prints a warning.
+- `supports_audio` / `supports_video_ref`: If the payload introduces unsupported multimedia logic (audio, video), the dispatcher strips them safely to prevent API failure.
 
 ---
 
@@ -112,4 +119,4 @@ Defined in `videospec/project.md`. Automatically injected at the end of every pr
 ---
 
 > *"Configuration is Command; Parameters are Discipline."*
-> *OpsV 0.4.3 | Latest Update: 2026-03-29*
+> *OpsV 0.5.14 | Latest Update: 2026-04-13*
