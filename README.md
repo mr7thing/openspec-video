@@ -1,8 +1,6 @@
-# OpenSpec-Video (OpsV) 0.5.1
+# OpenSpec-Video (OpsV) 0.5.2
  
- fixed some problems in 0.5.0
-
-
+Professional, **Spec-First** video production pipeline.
 
 # OpenSpec-Video (OpsV) 0.5.0
 
@@ -70,17 +68,22 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.5.0 | 2026-04-10*
+> *OpsV 0.5.2 | 2026-04-12*
 
 ---
 
-## 🆕 Release Notes / 更新说明 (v0.5.0)
+## 🆕 Release Notes / 更新说明 (v0.5.2)
+
+### 0.5.2 - Security & Provider Architecture Stability (2026-04-12)
+- **Architecture**: Promoted `ImageProvider` interface. Unified all generation logic into a single `generateAndDownload` contract.
+- **Security**: Fixed OS command injection vulnerabilities in CLI parameters.
+- **Stability**: Fixed a critical async bug in `DependencyGraph` where task nodes were incorrectly marked as completed.
+- **CLI**: Re-enabled `--skip-failed` flag in video production pipe.
+- **Refactoring**: Eliminated duplicate logic across `AssetManager` and `JobGenerator` using `FrontmatterParser`.
+- **Docs**: Synchronized full API reference documentation for image/video providers (CN/EN).
 
 ### 0.5.0 - Spec-First & Addons Evolution (2026-04-10)
 - **Architecture**: Migrated to a **Dependency Graph** driven engine. Non-linear task resolution.
 - **Pure Markdown**: Fully deprecated YAML shot lists. Use `## Shot NN` Markdown headers for shot definitions.
-- **Addons System**: Introduced `opsv addons` command to install zip-based creative skill packs.
-- **Comic-Drama Pack**: Released the first official creative addon focusing on industrial mini-drama SOPs.
+- **Addon System**: Introduced `opsv addons` command to install zip-based creative skill packs.
 - **Review UI**: Replaced CLI review with a professional **Web Review UI** (Express + WebSocket).
-- **Skill Decoupling**: Separated Normative skills (OpsV rules) from Creative skills (Drama/MV brains).
-- **Agent Evolution**: Unified all Agent profiles (`Architect.md`, `AssetDesigner.md`, etc.) for 0.5 compliance.
