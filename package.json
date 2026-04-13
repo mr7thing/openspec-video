@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework to transform narrative specs into production-ready creative intents.",
   "main": "dist/index.js",
   "bin": {
@@ -12,7 +12,7 @@
   },
   "homepage": "https://github.com/mr7thing/openspec-video#readme",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-ui-assets.js",
     "prepublishOnly": "npm run build",
     "start": "ts-node src/index.ts",
     "daemon": "ts-node src/server/daemon.ts",

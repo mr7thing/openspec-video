@@ -39,8 +39,26 @@ export class ReviewServer {
         app.use('/artifacts', express.static(
             path.join(this.projectRoot, 'artifacts')
         ));
+
         // Review UI 静态页面
-        app.use(express.static(path.join(__dirname, 'public')));
+        // 增加动态路径探测，兼容开发模式 (ts-node) 和 发布模式 (dist)
+        let publicPath = path.join(__dirname, 'public');
+        if (!fs.existsSync(publicPath)) {
+            // 如果是在 dist/review-ui/server.js 运行，public 应该在同级
+            // 如果是在 src/review-ui/server.ts 运行，public 也在同级
+            // 但有些运行环境可能会导致路径偏移，此处做一个向上探测
+            publicPath = path.join(__dirname, '../src/review-ui/public');
+        }
+
+        if (fs.existsSync(publicPath)) {
+            app.use(express.static(publicPath));
+        } else {
+            logger.error(`❌ Review UI 静态资源目录不存在: ${publicPath}`);
+            // 提供一个基础的响应而不是挂起
+            app.get('/', (req, res) => {
+                res.status(500).send('<h1>OpsV Review UI 资源缺失</h1><p>请确保 dist/review-ui/public 目录存在。</p>');
+            });
+        }
 
         // ---- API: 获取批次内所有候选图 ----
         app.get('/api/candidates', (req: any, res: any) => {
