@@ -32,10 +32,23 @@ reviews:                            # 审阅记录
 ---
 ```
 
-**核心变更 (v0.5.8 架构鲁棒性重构)**:
-- **全量块语法**：长文本字段强制使用折叠块语法 (`>`)，彻底消除引号冲突问题。
-- **视觉专用字段**：`visual_brief` 和 `visual_detailed` 语义化职能定型。
-- **YAML 生成闭环**：确立正文启发 -> YAML 固化 -> Review 校准的工作流。旋照照
+**0.5 版本规范演进记录 (Incremental Specs Logic)**:
+
+- **v0.5.8 (架构鲁棒性)**: 
+    - **全量块语法**: 长文本字段（`visual_brief`, `visual_detailed`, `prompt_en`）强制使用折叠块语法 (`>`)，彻底消除引号冲突。
+- **v0.5.7 (视觉语义标准化)**:
+    - **视觉专用字段**: 引入 `visual_brief` 和 `visual_detailed` 语义标签，强制 Agent 仅关注外在视觉特征。
+    - **YAML 生成闭环**: 确立“正文启发 -> YAML 固化 -> Review 校准”的工作流。
+- **v0.5.6 (SSOT 2.0)**:
+    - **YAML 为先**: 渲染管线彻底剥离对 Markdown 正文的描述提取，强制读取 YAML。
+    - **骨架化正文**: 强制保留 `## Vision`, `## Design References`, `## Approved References` 标题。
+    - **依赖合并**: 废弃 `reference` 字段，变体依赖统一并入 `refs` 数组。
+- **v0.5.0 (架构进化)**:
+    - **依赖图驱动**: 引入 `DependencyGraph` 实现非线性任务解析。
+    - **Pure Markdown**: 废弃 YAML 数组分镜，改用 Markdown `## Shot NN` 标题解析。
+
+> [!IMPORTANT]
+> **规范维护准则**: 任何版本更新必须以增量方式记录规范变更（记录 `v0.5.X` 路径），严禁覆盖式删除过往决策，以保证设计决策的全貌可追溯。旋照照
 
 ### 2.2 场景文档 (scenes/*.md)
 

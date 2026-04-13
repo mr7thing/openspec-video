@@ -39,11 +39,19 @@ export class DependencyGraph {
         for (const doc of documents) {
             const deps = new Set<string>();
 
-            // 变体与内容依赖统一在 refs 数组中
+            // 统一解析 @id:variant 引用语法
             if (doc.frontmatter.refs) {
                 for (const ref of doc.frontmatter.refs) {
+                    // 1. 去掉 @ 前缀
+                    let cleanId = ref.startsWith('@') ? ref.slice(1) : ref;
+                    // 2. 去掉 :variant 后缀（依赖必须锁定到文档级）
+                    const colonIdx = cleanId.indexOf(':');
+                    if (colonIdx > 0) {
+                        cleanId = cleanId.slice(0, colonIdx);
+                    }
+
                     // 排除自引用
-                    if (ref !== doc.id) deps.add(ref);
+                    if (cleanId !== doc.id) deps.add(cleanId);
                 }
             }
 

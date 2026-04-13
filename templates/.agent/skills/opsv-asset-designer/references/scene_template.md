@@ -1,16 +1,12 @@
 ---
-name: "@scene_valley_farm"
 type: "scene"
 status: "approved"
 visual_brief: >
   薄雾笼罩下的欧洲中世纪风格农场
 visual_detailed: >
-  清晨薄雾弥漫的山谷农场，木排房错落，远山的轮廓模糊。光线从树冠间透过，
-  丁达尔效应明显。整体色调偏向冷灰绿与温暖的晨曦。
+  清晨薄雾弥漫的山谷农场，木排房错落，远山的轮廓模糊。
 prompt_en: >
-  A medieval European farm in a misty valley at dawn, wooden cabins, 
-  blurred mountain outlines in the background, Tyndall effect sunlight
-  piercing through trees, masterpiece, 8k.
+  A medieval European farm in a misty valley at dawn, masterpiece, 8k.
 ---
 
 ## Vision

@@ -32,10 +32,23 @@ reviews:                            # Review history
 ---
 ```
 
-**Core Changes (v0.5.8 Architectural Robustness)**:
-- **Universal Block Style**: Long-form fields are forced into Folded Block Style (`>`) to eliminate quote-parsing conflicts.
-- **Visual-Specific Fields**: Refined semantic labels for `visual_brief` and `visual_detailed`.
-- **SSOT Workflow**: Established Body-first -> YAML generation workflow.旋照照
+**v0.5 Specification Evolution (Incremental Specs Logic)**:
+
+- **v0.5.8 (Architectural Robustness)**:
+    - **Universal Block Style**: Forced Folded Block (`>`) for all long-text fields to eliminate quotation parsing errors.
+- **v0.5.7 (Visual Semantic Standardization)**:
+    - **Visual-First Fields**: Introduced `visual_brief` and `visual_detailed` to force visual-only metadata.
+    - **Process Loop**: Established "Body -> YAML -> Review correction" workflow.
+- **v0.5.6 (SSOT 2.0)**:
+    - **YAML-First Logic**: Rendering pipeline strictly reads YAML metadata.
+    - **Skeleton Headers**: Mandatory core Markdown headers enforced.
+    - **Refs Merger**: Unified references and variants into `refs` array.
+- **v0.5.0 (Architectural Evolution)**:
+    - **Dependency Graph**: Enabled non-linear task resolution.
+    - **Pure Markdown**: Fully deprecated YAML shot lists for Markdown headers.
+
+> [!IMPORTANT]
+> **Maintenance Rule**: All specification updates must be recorded incrementally. Do NOT delete previous version decisions to ensure full design traceability.旋照照
 
 ### 2.2 Scene Documents (scenes/*.md)
 

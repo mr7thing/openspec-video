@@ -261,9 +261,13 @@ export class JobGenerator {
             }
 
             // ---- 解析 @ 引用并展开 ----
-            const { expandedText, attachments } = this.refResolver.expandRefsInText(
+            const { expandedText, attachments: assetAttachments } = this.refResolver.expandRefsInText(
                 shot.body, shot.refs
             );
+
+            // ---- v0.5.12: 解析镜头局部参考图 (Shot-Local References) ----
+            const localAttachments = this.extractLocalImageRefs(shot.body, filePath);
+            const allAttachments = Array.from(new Set([...assetAttachments, ...localAttachments]));
 
             // ---- 全局配置 ----
             const ar = globalConfig.aspect_ratio || '16:9';
@@ -287,7 +291,7 @@ export class JobGenerator {
                 type: 'image_generation',
                 prompt_en: promptEn,
                 payload,
-                reference_images: attachments.length > 0 ? attachments : undefined,
+                reference_images: allAttachments.length > 0 ? allAttachments : undefined,
                 output_path: outputPath,
                 _meta: { batch: `batch_${this.batchIndex}`, source: filePath },
             };
@@ -360,6 +364,7 @@ export class JobGenerator {
 
     private cleanMarkdown(text: string): string {
         return text
+            .replace(/\*\?(?:\()?@([a-zA-Z0-9_:]+)(?:\))?/g, '') // 清理新语法标号
             .replace(/\*\*(.*?)\*\*/g, '$1')
             .replace(/\*(.*?)\*/g, '$1')
             .replace(/!\[.*?\]\(.*?\)/g, '')
@@ -367,5 +372,28 @@ export class JobGenerator {
             .replace(/---+/g, '')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
+    }
+
+    /**
+     * v0.5.12: 从文本中提取 Markdown 图片链接并转为绝对路径
+     */
+    private extractLocalImageRefs(text: string, sourcePath: string): string[] {
+        const refs: string[] = [];
+        const imgRegex = /!\[.*?\]\(([^)]+)\)/g;
+        let match;
+        const baseDir = path.dirname(sourcePath);
+
+        while ((match = imgRegex.exec(text)) !== null) {
+            const imgPath = match[1];
+            const absPath = path.isAbsolute(imgPath) 
+                ? imgPath 
+                : path.resolve(baseDir, imgPath);
+            if (fs.existsSync(absPath)) {
+                refs.push(absPath.replace(/\\/g, '/'));
+            } else {
+                logger.warn(`镜头局部参考图不存: ${absPath}`);
+            }
+        }
+        return refs;
     }
 }

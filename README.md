@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.5.8
+# OpenSpec-Video (OpsV) 0.5.12 (Incremental)
  
 Professional, **Spec-First** video production pipeline.
 
@@ -68,11 +68,31 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.5.8 | 2026-04-13*旋照照
+> *OpsV 0.5.12 | 2026-04-13*旋照照照照照照照照照照照照照照照照照照照照照照照照
 
 ---
 
 ## 🆕 Release Notes / 更新说明
+
+### 0.5.12 - Annotative & Shot-Local Refs (2026-04-13)
+- **Annotative Referencing**: Introduced support for `(@id)` bracketed syntax, allowing IDs to serve as semantic annotations without disrupting narrative flow.
+- **Shot-Local References**: Enabled direct embedding of Markdown images within `Script.md` shots. These images are automatically归集 as reference images for the specific job, eliminating the need for global asset modeling for one-off visual cues.
+- **Improved Parsing**: Enhanced `RefResolver` and `JobGenerator` to robustly handle both annotative and embedded reference types.旋照照照照照照照照照照照照照照照照照照照照照照照照
+
+### 0.5.11 - Narrative Grammar Standardization (2026-04-13)
+- **Natural Language Priority**: Updated `Story` and `Script` templates to enforce complete, human-readable grammar.
+- **Semantic Reference Embedding**: Defined the `@id` usage as a semantic anchor embedded within natural sentences, rather than as a standalone bracketed tag.
+- **Execution-Ready Literacy**: Ensured that the text remains logical and descriptive before and after automated reference replacement.旋照照照照照照照照
+
+### 0.5.10 - Reference Logic Standardization (2026-04-13)
+- **Unified @ Syntax**: Standardized the use of `@` prefix across both Markdown body and YAML `refs`.
+- **Granular Referencing**: Added support for `@id:variant` syntax in `refs` to point to specific approved images while maintaining document-level safety.
+- **Dependency Intelligence**: Enhanced the `DependencyGraph` to automatically resolve complex reference strings back to their core document dependencies.旋照照照
+
+### 0.5.9 - ID-Naming De-duplication (2026-04-13)
+- **Unified ID Logic**: Removed the redundant `name` field from YAML headers. Asset IDs are now strictly mapped from file names (e.g., `@broken_sword.md` -> `broken_sword`).
+- **Template Cleanup**: Streamlined all element and scene templates for a minimal, non-redundant metadata structure.
+- **Architectural Purity**: Enforced a single source of truth for IDs to prevent metadata drift and naming conflicts.旋照照照
 
 ### 0.5.8 - Architectural Robustness (2026-04-13)
 - **Block-Style YAML**: Switched all long-text fields to Folded Block Style (`>`) to eliminate character escape issues (e.g., quotations in prompts).

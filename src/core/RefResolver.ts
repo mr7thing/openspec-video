@@ -32,7 +32,11 @@ export class RefResolver {
         // v0.5 唯一合法语法:
         // @标识符 描述文本（描述到行尾或下一个 @ 之前）
         // 注意: @ 后不能有空格，标识符由字母数字下划线冒号组成
-        const refRegex = /@([a-zA-Z0-9_:]+)\s+([^\n@]*)/g;
+        // v0.5.12 支持两种模式:
+        // 1. 注解式: (@asset_id:variant) 描述
+        // 2. 嵌入式: @asset_id:variant 描述
+        // 正则解释: 捕获组 1 为标识符, 捕获组 2 为后续描述文本
+        const refRegex = /(?:\()?@([a-zA-Z0-9_:]+)(?:\))?\s+([^\n@]*)/g;
 
         let match;
         while ((match = refRegex.exec(markdown)) !== null) {
@@ -95,15 +99,22 @@ export class RefResolver {
             const refIdentifier = ref.variant
                 ? `${ref.assetId}:${ref.variant}`
                 : ref.assetId;
-            const refPattern = `@${refIdentifier} ${ref.label}`;
+            
+            // v0.5.12 同时适配带括号与不带括号的替换
+            const refPatternNoBracket = `@${refIdentifier} ${ref.label}`;
+            const refPatternWithBracket = `(@${refIdentifier}) ${ref.label}`;
+
+            const targetPattern = text.includes(refPatternWithBracket) 
+                ? refPatternWithBracket 
+                : refPatternNoBracket;
 
             // 替换为展开后的文本
             if (ref.resolvedImagePath && fs.existsSync(ref.resolvedImagePath)) {
                 attachments.push(ref.resolvedImagePath);
                 const imageIndex = attachments.length;
-                text = text.replace(refPattern, `${ref.label} [参考图 ${imageIndex}]`);
+                text = text.replace(targetPattern, `${ref.label} [参考图 ${imageIndex}]`);
             } else {
-                text = text.replace(refPattern, ref.label);
+                text = text.replace(targetPattern, ref.label);
             }
         }
 
