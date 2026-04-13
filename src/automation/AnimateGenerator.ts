@@ -4,6 +4,7 @@ import yaml from 'js-yaml';
 import { Job, PromptPayload } from '../types/PromptSchema';
 import { AssetCompiler } from '../core/AssetCompiler';
 import { RefResolver } from '../core/RefResolver';
+import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -19,7 +20,8 @@ export class AnimateGenerator {
     constructor(projectRoot: string) {
         this.projectRoot = projectRoot;
         this.assetCompiler = new AssetCompiler(projectRoot);
-        this.refResolver = new RefResolver(projectRoot);
+        const approvedRefReader = new ApprovedRefReader(projectRoot);
+        this.refResolver = new RefResolver(projectRoot, approvedRefReader);
     }
 
     async generateAnimationJobs(): Promise<Job[]> {
@@ -51,8 +53,7 @@ export class AnimateGenerator {
 
         const jobs: Job[] = [];
 
-        // 预加载资产图谱，用于解析 @ID
-        await this.refResolver.buildGraph();
+        // 不需要 buildGraph，parseAll 和 resolve 会动态查找
 
         for (const section of shotSections) {
             // 状态机拦截
@@ -91,7 +92,13 @@ export class AnimateGenerator {
 
             try {
                 // 将形如 (@hero), @scene 展开为标准 Prompt 描述
-                rawPrompt = await this.refResolver.expandRefsInText(rawPrompt);
+                const refs = await this.refResolver.parseAll(rawPrompt);
+                const expansion = this.refResolver.expandRefsInText(rawPrompt, refs);
+                rawPrompt = expansion.expandedText;
+                // 将附件图合并到 job 的参考图中
+                if (expansion.attachments.length > 0) {
+                    absRefs.push(...expansion.attachments);
+                }
             } catch (e) {
                 logger.warn(`⚠️ Shot ${section.id}: 引用展开失败 - ${(e as Error).message}`);
             }

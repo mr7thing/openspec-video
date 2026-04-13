@@ -39,6 +39,10 @@ export const PromptPayloadSchema = z.object({
     duration: z.string().optional(),
     // v0.5: frame_ref 替代 schema_0_3
     frame_ref: FrameRefSchema.optional(),
+    // v0.5.14: 额外资源引用 (Extra Media Refs)
+    extra: z.object({
+        media_refs: z.array(z.string()).optional()
+    }).optional()
 });
 
 export type PromptPayload = z.infer<typeof PromptPayloadSchema>;
