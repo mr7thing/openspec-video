@@ -4,26 +4,41 @@
 
 ---
 
-## 全景流程图
+## 全景流程图 (文档生命周期中心化)
 
 ```mermaid
 flowchart TD
-    START["💡 创意灵感"] --> INIT["opsv init"]
-    INIT --> ARCH["🏛️ Architect Agent"]
-    ARCH -->|"project.md + story.md"| WRITE["✍️ Screenwriter Agent"]
-    WRITE -->|"story.md + @ 锚点"| ASSET["🎨 AssetDesigner Agent"]
-    ASSET -->|"elements/ + scenes/"| SCRIPT["📐 ScriptDesigner Agent"]
-    SCRIPT -->|"Script.md"| GEN["opsv generate"]
-    GEN -->|"jobs.json"| EXEC["opsv gen-image"]
-    EXEC -->|"artifacts/drafts_N/"| REVIEW["opsv review"]
-    REVIEW -->|"图写回 Script.md"| QA2["🔍 Supervisor /opsv-qa act2"]
-    QA2 -->|"PASS ✅"| ANIM["🎬 Animator Agent"]
-    ANIM -->|"Shotlist.md"| COMPILE["opsv animate"]
-    COMPILE -->|"video_jobs.json"| VIDGEN["opsv gen-video"]
-    VIDGEN -->|"artifacts/videos/"| DONE["🎬 视频生成"]
+    START["💡 创意/Addon 入伙"] --> INIT["opsv init (项目初始化)"]
+    
+    subgraph Iteration["♻️ 文档驱动迭代循环"]
+        SPEC_ENTRY["📝 Spec 写入/修改 (Story/Asset/Shot)"]
+        VALIDATE["🔍 opsv validate (强格式校验)"]
+        QA["⚖️ opsv-qa (语义质检/Gatekeeper)"]
+        
+        SPEC_ENTRY --> VALIDATE
+        VALIDATE -->|FAIL| SPEC_ENTRY
+        VALIDATE -->|PASS| QA
+        QA -->|REDO| SPEC_ENTRY
+    end
 
-    style START fill:#f9f,stroke:#333
-    style DONE fill:#9f9,stroke:#333
+    INIT --> SPEC_ENTRY
+    
+    subgraph Execution["🎬 执行与反馈回路"]
+        GEN["opsv generate (任务编译)"]
+        RENDER["opsv gen-* (分布式生成)"]
+        REVIEW["opsv review (可视化审阅)"]
+        FEEDBACK["📩 选图/视频反馈 (回写 Spec)"]
+    end
+
+    QA -->|PASS| GEN
+    GEN --> RENDER
+    RENDER --> REVIEW
+    REVIEW --> FEEDBACK
+    FEEDBACK --> SPEC_ENTRY
+
+    style Iteration fill:#f5f5f5,stroke:#333,stroke-width:2px
+    style VALIDATE fill:#fff4dd,stroke:#d4a017
+    style QA fill:#e1f5fe,stroke:#01579b
 ```
 
 ---
@@ -62,61 +77,33 @@ my-project/
 
 ---
 
-## 阶段二：创意锚定 (Concept Anchoring)
+## 阶段二：文档定义与锚定 (Spec Anchoring)
 
-### 负责 Agent
-**Architect** → 调用 `opsv-architect` 技能
+### 协作逻辑
+任何**创作类技能 (Creative Skills)** 或 **Addon**（如 Comic Pack）注入的创意，最终都必须落地为 `videospec/` 目录下的 Markdown 文档。
 
-### 两阶段工作流
+### 核心动作
+1. **Spec 写入**：由创作插件或用户定义技能生成初稿（`project.md` 和 `story.md`）。
+2. **强制校验 (Validation Dams)**：
+   - 运行 **`opsv validate`**：确保 Markdown 语法和 YAML 头部符合 0.5 Zod 校验规则。
+   - 运行 **`/opsv-qa act1`**：由 **Supervisor** 核查资产清单在逻辑上的一致性。
 
-#### Phase 1：概念发散
-- 输入：一句歌词、一段旋律描述或一个模糊概念
-- 输出：**3 个差异化的故事方案**，每个方案包含：
-  - 方案标题（一句话）
-  - 核心情节（3-5 句话）
-  - 视觉风格关键词
-  - 核心角色清单
-  - 预估镜头数
-- **此阶段不生成任何文件**
+### 产物映射
+- `videospec/project.md` — 全局参数、视觉风格一致性定义、资产花名册。
+- `videospec/stories/story.md` — 叙事大纲，通过 `@id` 锚定实体。
 
-#### Phase 2：世界观锚定
-- 导演选择方案后，生成两个核心文件：
-  - `videospec/project.md` — 全局参数 + 资产花名册
-  - `videospec/stories/story.md` — 叙事大纲（含 `@` 实体锚点）
-
-### 示例
-
-导演说："一首关于蝴蝶的歌，很空灵"
-
-→ Architect 产出：
-```yaml
-# videospec/project.md
----
-aspect_ratio: "16:9"
-engine: ""
-vision: "一只破茧蝴蝶的孤独飞行，穿越四季的极简之美"
-global_style_postfix: "ethereal atmosphere, minimalist composition, soft bokeh, dreamlike quality, 8k"
----
-
-# Asset Manifest
-## Main Characters
-- @role_butterfly
-## Scenes
-- @scene_cocoon
-- @scene_spring_forest
-```
-
-### 质检门禁
-完成后可运行 `/opsv-qa act1`，由 Supervisor 核查资产清单是否完整。
+### 同步反馈回路 (The Sync Loop) — 核心要求
+**原则：正文是意志（Soul），YAML 是指令（CMD）。**
+- **手动修改对齐**：当用户在 Markdown 正文（Body）中进行了手动修改后，Agent 必须具备感知能力，并触发 `UpdateField` 同步更新 YAML 中的 `visual_detailed` 字段。
+- **对话一致性**：在每一轮 Review 对话结束后，Agent 生成的最终文档必须确保正文描述与 YAML 表头在语义上 100% 对齐。
+- **质检卡点**：如果 `opsv-qa` 发现正文与 YAML 存在漂移，系统将拦截后续的生成任务。
 
 ---
 
-## 阶段三：资产设计 (Asset Design)
+## 阶段三：资产建模 (Asset Specification)
 
-### 负责 Agent
-**AssetDesigner** → 调用 `opsv-asset-designer` 技能
-
-### 核心任务
+### 协作逻辑
+**创作 Addon** 负责描写资产的视觉灵魂，而 **OpsV 规范技能** 负责将其固化为符合 0.5 标准的 `.md` 定义文件。
 为 `project.md` 花名册中列出的每个实体创建独立的 `.md` 定义文件。
 
 ### 工作规则
@@ -168,8 +155,10 @@ prompt_en: "An aged swallowtail butterfly, faded colors, torn wing edges..."
 - 链接作为该变体设计基础的定档图。
 ```
 
-### 质检门禁
-`/opsv-qa act1` — 核查所有文件是否已在 `project.md` 花名册中登记。
+### 质检门禁 (Dams)
+在进入生成环节前，必须通过以下关卡：
+1. **`opsv validate`**：检测 Markdown 与 YAML 头部是否符合 Zod 校验。
+2. **`/opsv-qa act2`**：扫描死链，核查所有引用的文件夹或资产是否物理存在。
 
 ---
 
@@ -179,9 +168,10 @@ prompt_en: "An aged swallowtail butterfly, faded colors, torn wing edges..."
 
 ### 4.1 分镜设计
 
-**负责 Agent**：**ScriptDesigner** → 调用 `opsv-script-designer` 技能
+**负责技能**：**Creative Addon (创作插件)** + **opsv-script-designer (规范技能)**
 
-- 阅读 `story.md`，将叙事转化为结构化镜头语言
+- 创作插件提供文学层面的镜头描述。
+- 规范技能确保其输出为 `videospec/shots/Script.md` 格式。
 - 输出 `videospec/shots/Script.md`（**纯 Markdown 正文，无 YAML 配置数组**）
 - 每个 Shot 设计时长 **3-5 秒**，上限 **15 秒**
 - 分镜中**严禁刻画角色外貌**，必须用 `@实体名` 引用
