@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
 import inquirer from 'inquirer';
+import { projectAgentTemplates } from '../utils/projector';
 
 const TEMPLATE_DIR = path.join(__dirname, '../../templates');
 
@@ -10,6 +11,8 @@ export function registerInitCommand(program: Command, VERSION: string) {
         .command('init [projectName]')
         .description('Initialize a new OpenSpec-Video project')
         .option('-g, --gemini', 'Initialize with Gemini support (GEMINI.md)')
+        .option('-c, --claude', 'Initialize with Claude Code support (CLAUDE_INSTRUCTIONS.md)')
+        .option('-x, --codex', 'Initialize with Codex/Cursor support (.cursorrules)')
         .option('-o, --opencode', 'Initialize with OpenCode support (AGENTS.md + .opencode)')
         .option('-t, --trae', 'Initialize with Trae support (AGENTS.md + .trae)')
         .action(async (projectName, options) => {
@@ -32,6 +35,8 @@ export function registerInitCommand(program: Command, VERSION: string) {
 
             // 1. Check for CLI flags for automated/non-interactive use
             if (options.gemini) tools.push('gemini');
+            if (options.claude) tools.push('claude');
+            if (options.codex) tools.push('codex');
             if (options.opencode) tools.push('opencode');
             if (options.trae) tools.push('trae');
 
@@ -43,9 +48,11 @@ export function registerInitCommand(program: Command, VERSION: string) {
                         name: 'tools',
                         message: 'Select the AI assistants you want to support:',
                         choices: [
-                            { name: 'Gemini (Legacy - GEMINI.md)', value: 'gemini', checked: true },
+                            { name: 'Claude Code (CLAUDE_INSTRUCTIONS.md)', value: 'claude', checked: true },
+                            { name: 'Codex / Cursor (.cursorrules)', value: 'codex', checked: true },
+                            { name: 'Trae (AGENTS.md + .trae)', value: 'trae' },
                             { name: 'OpenCode (AGENTS.md + .opencode)', value: 'opencode' },
-                            { name: 'Trae (AGENTS.md + .trae)', value: 'trae' }
+                            { name: 'Gemini (Deprecated - GEMINI.md)', value: 'gemini' }
                         ]
                     }
                 ]);
@@ -57,14 +64,14 @@ export function registerInitCommand(program: Command, VERSION: string) {
             try {
                 await fs.ensureDir(targetDir);
 
-                // 1. Copy mandatory base templates (.agent skills, .antigravity workflows, and .env config)
-                await fs.copy(path.join(TEMPLATE_DIR, '.agent'), path.join(targetDir, '.agent'));
-                await fs.copy(path.join(TEMPLATE_DIR, '.antigravity'), path.join(targetDir, '.antigravity'));
+                // 1. Core Projection (All core genes from .agent are projected here)
+                await projectAgentTemplates(targetDir, tools, TEMPLATE_DIR);
+
                 if (fs.existsSync(path.join(TEMPLATE_DIR, '.env'))) {
                     await fs.copy(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
                 }
 
-                // 2. Selective copy based on tools
+                // 2. Selective copy based on tools (Legacy & Metadata)
                 if (tools.includes('gemini')) {
                     if (fs.existsSync(path.join(TEMPLATE_DIR, 'GEMINI.md'))) {
                         await fs.copy(path.join(TEMPLATE_DIR, 'GEMINI.md'), path.join(targetDir, 'GEMINI.md'));
@@ -72,28 +79,14 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 }
 
                 if (tools.includes('opencode') || tools.includes('trae')) {
-                    // Both use AGENTS.md as the primary instruction file
                     if (fs.existsSync(path.join(TEMPLATE_DIR, 'AGENTS.md'))) {
                         await fs.copy(path.join(TEMPLATE_DIR, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
                     }
                 }
 
                 if (tools.includes('opencode')) {
-                    const opencodeDir = path.join(TEMPLATE_DIR, '.opencode');
-                    if (fs.existsSync(opencodeDir)) {
-                        await fs.copy(opencodeDir, path.join(targetDir, '.opencode'));
-                    } else {
-                        await fs.ensureDir(path.join(targetDir, '.opencode'));
-                    }
-                }
-
-                if (tools.includes('trae')) {
-                    const traeDir = path.join(TEMPLATE_DIR, '.trae');
-                    if (fs.existsSync(traeDir)) {
-                        await fs.copy(traeDir, path.join(targetDir, '.trae'));
-                    } else {
-                        await fs.ensureDir(path.join(targetDir, '.trae'));
-                    }
+                    // Still ensuring the physical directory exists for OpenCode specific reasons
+                    await fs.ensureDir(path.join(targetDir, '.opencode'));
                 }
 
                 // 3. Create normative videospec structure

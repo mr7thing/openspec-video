@@ -16,17 +16,10 @@ description: 掌握 OpsV 命令行工具的自动化调用逻辑。让 Agent 成
 ## 2. 生产流水线 (Pipeline Trigger)
 **场景**：文档通过校验且导演明确给出推进指令（如 "go", "开始", "生成"）。
 **动作执行**：
-1. **编译任务**：执行 `opsv generate`。观察 `queue/jobs.json` 是否已更新。
+1. **任务编译**：执行 `opsv generate`。观察 `queue/jobs.json` 是否已更新。
 2. **驱动渲染**：根据项目状态执行：
-    - 资产生成：`opsv gen-image --model <default_model>`。
-    - 视频生成：`opsv gen-video --model <default_model>`。
+    - 资产生成：`opsv gen-image --all`。
+    - 视频生成：`opsv gen-video --all`。
 
 ## 3. 防御型执行 (Defensive Execution)
-- **API 错误处理**：若命令报错（如 `ETIMEDOUT`），不得回复“出错了”，而应查看对应的日志，告知导演“正在尝试重试”或“API 额度已满”。
 - **产物巡检**：定期检查 `artifacts/` 目录。在回复导演时，应携带最新的产物路径。
-
-## 4. 常用速查命令
-- `opsv validate` — 唯一准入。
-- `opsv generate` — 指令编译。
-- `opsv gen-image` — 静态渲染。
-- `opsv gen-video` — 动态渲染。
