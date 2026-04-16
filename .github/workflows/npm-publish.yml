@@ -4,8 +4,11 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: read
+  packages: write
+
 env:
-  # 强制让 GitHub Actions 的 JS 执行环境进入 Node 24 模式，规避 Deprecation 警告
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -15,8 +18,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm ci
+          node-version: 24
+      - run: npm install
+      - run: npm run build
       - run: npm test
 
   publish-npm:
@@ -26,9 +30,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org/
-      - run: npm ci
+      - run: npm install
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.npm_token}}
