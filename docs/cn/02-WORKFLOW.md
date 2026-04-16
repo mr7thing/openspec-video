@@ -121,8 +121,6 @@ global_style_postfix: "ethereal atmosphere, minimalist composition, soft bokeh, 
 
 ### 工作规则
 
-> 详细规范见 [OPSV-ASSET-0.4](schema/OPSV-ASSET-0.4.md)
-
 1. **先读全局上下文**：必须读取 `project.md` 了解时代氛围和风格
 2. **双通道参考图体系**：
    - `## Design References`（d-ref）：放入生成本实体时需要的输入参考图（灵感图、已有资产的 a-ref 用于变体生成）
@@ -149,13 +147,10 @@ prompt_en: >
 ---
 
 ## Design References
-- [蝴蝶翅膀纹理参考](refs/butterfly_wing_texture.jpg)
-- [琥珀色调光影参考](refs/amber_lighting_mood.png)
+- 链接灵感图、已有资产参考图等。
 
 ## Approved References
-<!-- opsv review 审批后回写 →
-- [蝴蝶三视图](artifacts/drafts_2/role_butterfly_turnaround.png)
--->
+<!-- 选图定档后由系统或人工回写正式参考图链接 -->
 ```
 
 ### 变体链示例
@@ -170,8 +165,7 @@ prompt_en: "An aged swallowtail butterfly, faded colors, torn wing edges..."
 ---
 
 ## Design References
-- [年轻版定档图 - 作为老化基础](artifacts/drafts_2/role_butterfly_turnaround.png)
-- [老化纹理参考](refs/aged_wing_texture.jpg)
+- 链接作为该变体设计基础的定档图。
 ```
 
 ### 质检门禁
@@ -265,11 +259,11 @@ opsv review
 
 ## Shot 1 (5s)
 **Motion Prompt:** Extreme macro, chrysalis slowly cracks open, tiny legs push through...
-- [首帧](../artifacts/drafts_1/shot_1/draft_1.png)
+- [参考首帧](@REF:shot_1_start)
 
 ## Shot 2 (4s)
 **Motion Prompt:** Camera slowly pulls back to wide angle, butterfly spreads wings for the first time...
-- [首帧](@FRAME:shot_1_last)
+- [首帧继承](@FRAME:shot_1_last)
 ```
 
 ### 编译发布

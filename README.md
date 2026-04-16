@@ -18,9 +18,9 @@ Professional, **Spec-First** video production pipeline.
 
 ## 💡 What is OpsV? / 什么是 OpsV?
 
-OpsV is a professional, **Spec-First** video production pipeline. It allows creators to write stories and design shots using structured Markdown, entirely eliminating legacy YAML shot arrays. The CLI tool uses a **Dependency Graph** to "compile" these specifications into executable job queues for models like **Vidu, Kling, Minimax, and SiliconFlow**.
+OpsV is a professional, **Spec-First** video production pipeline. It allows creators to write stories and design shots using structured Markdown. The CLI tool uses a **Dependency Graph** to "compile" these specifications into executable job queues for models like **Vidu, Kling, Minimax, and SiliconFlow**.
 
-OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。它允许创作者使用纯粹的 Markdown 编写故事和设计分镜，彻底废弃了繁琐的 YAML 数组。CLI 工具通过**依赖图 (Dependency Graph)** 将这些规范“编译”为可执行的任务队列，驱动 **Vidu, Kling, Minimax, SiliconFlow** 等模型进行生成。
+OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。它允许创作者使用纯粹的 Markdown 编写故事和设计分镜，CLI 工具通过**依赖图 (Dependency Graph)** 将这些规范“编译”为可执行的任务队列，驱动 **Vidu, Kling, Minimax, SiliconFlow** 等模型进行生成。
 
 ---
 
