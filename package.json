@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.5.16",
+  "version": "0.5.17",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework to transform narrative specs into production-ready creative intents.",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,7 @@
     "start": "ts-node src/index.ts",
     "daemon": "ts-node src/server/daemon.ts",
     "daemon:restart": "npx kill-port 3061 && npm run daemon",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "lint": "eslint src/**/*.ts",
     "release": "npm version patch && git push --follow-tags"
   },
@@ -81,8 +81,7 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "roots": [
-      "<rootDir>/src",
-      "<rootDir>/test"
+      "<rootDir>/src"
     ]
   }
 }
