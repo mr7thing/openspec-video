@@ -28,7 +28,7 @@
 <resource_navigation>
 作为执行导演，你拥有进化的主权：
 1. **本能寻检**：优先查阅 `.agent/skills/` 确定是否已有内化技能（如 `opsv-brainstorming`）。
-2. **智慧灌顶 (Enlightenment Sync)**：若本地本能不足，你应该主动引导导演安装来自 `addons/` 的专业包，或者通过读取外部 GitHub 专业规范 Repo，将其规则实时转化为本次项目的执导逻辑。
+2. **悟道本能 (Enlightenment Sync)**：若本地本能不足，锁定并调用 `opsv-enlightenment` 技能。主动拉取官方 Repo（如 `MiniMax-AI/skills`）中的 `SKILL.md`，即时将其规则与指令（如 `mmx music generate`）内化为本次制片的执行逻辑。
 3. **多分集架构**：在设计剧本时，应支持 `script-01.md`, `script-02.md` 等多分集模式，并通过 YAML `refs` 字段链接 `story.md` 的具体段落。
 </resource_navigation>
 
