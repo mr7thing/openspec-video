@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.5.15 (Industrial-Class Evolution)
+# OpenSpec-Video (OpsV) 0.5.16 (Precision Editing Era)
  
 Professional, **Spec-First** video production pipeline.
 
@@ -68,28 +68,24 @@ opsv gen-video       # Render Videos
 
 ---
 
-> *OpsV 0.5.15 | 2026-04-16*
+> *OpsV 0.5.16 | 2026-04-16*
 
 ---
 
 ## 🆕 Release Notes / 更新说明
 
-## 🚀 工业级分集管线与动态悟道 (v0.5.15)
-### 1. 分集工业化 (Multi-Episode Support)
-- **文件名探测**: 解除 `Script.md` 唯一限制，管线现支持探测 `/shots/` 目录下所有 `type: shot-design` 的 Markdown 剧本（如 `ep01.md`, `ep02.md`）。
-- **智能跳过**: `opsv generate --skip-approved` 全面对齐分镜级状态机。已 `approved` 的剧本分镜将自动在编译阶段被过滤。
-- **Shotlist 动态识别**: 支持 `*.shotlist.md` 命名，自动识别并跳过已生成的生产辅助文档。
+## 🚀 图像精修与混合模型驱动 (v0.5.16)
+### 1. SiliconFlow 图像大版图接入
+- **Qwen 图像双子星**: 
+    - `qwen-image`: 正式支持 Qwen 多模态文生图，提供高质量的审美底座。
+    - `qwen-image-edit-2509`: 引入指令式图像编辑模型。OpsV 现从“盲目生成”跨入“精准重绘”时代。
+- **混合驱动架构 (Hybrid Provider)**: `SiliconFlowProvider` 现已重构为“影/像双修”架构，能够根据模型语义自动切换端点（`/submit` vs `/generations`）。
 
-### 2. 悟道本能 (Enlightenment Sync)
-- **动态进化**: 引入 `opsv-enlightenment` 技能。Agent 具备实时拉取外部官方 Repo（如 MiniMax-AI/skills）并内化其指令（如 `mmx music`）的能力。
-- **求知本能**: 打破静态 Addon 依赖，实现“按需检索-即时学习-实战内化”的闭环。
+### 2. 指令重绘工作流
+- **智能图像注入**: 针对编辑类模型，Provider 会自动从分镜的 `frame_ref` 中提取首帧/参考图并进行 Base64 编码注入。
+- **调度器拓扑更新**: `ImageModelDispatcher` 正式接管 SiliconFlow 图像派发逻辑，实现单镜渲染的无缝衔接。
 
-### 3. 火山引擎 API 深度重构
-- **方舟 V3 全力支持**: SeaDream (CV-S) 升级至 5.0 Lite 端点；Seedance 1.5 修复响应穿透解析。
-- **豆包视频 V2 首发**: 增加 `seedance-2.0-fast` 模型支持，默认使用 V2 Fast 引擎，支持多模态音视频引用。
-- **鲁棒性防御**: 统一对齐 V3 协议返回体，修复了旧版本在解析嵌套 `data.data` 时的逻辑崩坏。
-
-## 🚀 历史更新 (v0.5.14)
+## 🚀 历史更新 (v0.5.15)
 
 ## 🚀 历史更新 (v0.5.13)
 
