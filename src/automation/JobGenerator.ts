@@ -166,12 +166,13 @@ export class JobGenerator {
         if (normalizedPath.includes('/elements/') || normalizedPath.includes('/scenes/')) {
             return this.processAssetFile(filePath, globalConfig, options, skippedLog);
         } else if (normalizedPath.includes('/shots/')) {
-            // v0.5: 只处理 Script.md（shot-design），跳过 Shotlist.md（shot-production）
-            if (path.basename(filePath).toLowerCase() === 'shotlist.md') {
-                logger.info(`跳过 Shotlist.md（视频编译管线专用）`);
+            // v0.5: 支持多样化命名。包含 'shotlist.md' 的文件被视为生产辅助文档并跳过解析
+            const fileName = path.basename(filePath).toLowerCase();
+            if (fileName.includes('shotlist.md')) {
+                logger.info(`跳过 ${path.basename(filePath)} (视频编译管线专用)`);
                 return [];
             }
-            return this.processShotDesignFile(filePath, globalConfig, options);
+            return this.processShotDesignFile(filePath, globalConfig, options, skippedLog);
         }
 
         logger.warn(`跳过非规范目录文件: ${filePath}`);
@@ -251,23 +252,34 @@ export class JobGenerator {
     private async processShotDesignFile(
         filePath: string,
         globalConfig: any,
-        options: { preview?: boolean; shots?: string[] }
+        options: { preview?: boolean; shots?: string[]; skipApproved?: boolean },
+        skippedLog: { id: string; file: string; reason: string }[]
     ): Promise<Job[]> {
         const content = fs.readFileSync(filePath, 'utf-8');
         const jobs: Job[] = [];
 
+        let frontmatter: any;
         let body: string;
         try {
             const parsed = FrontmatterParser.parseRaw(content);
+            frontmatter = parsed.frontmatter;
             body = parsed.body;
         } catch (e) {
-            logger.error(`Script.md 解析失败: ${(e as Error).message}`);
+            logger.error(`[${path.basename(filePath)}] 解析失败: ${(e as Error).message}`);
+            return [];
+        }
+
+        // v0.5: 如果开启了 --skip-approved 且剧本 status 已经是 approved，跳过分镜生成
+        if (options.skipApproved && frontmatter.status === 'approved') {
+            const fileName = path.basename(filePath);
+            logger.info(`  ⏭️  跳过已 approved 脚本: ${fileName}`);
+            skippedLog.push({ id: fileName, file: filePath, reason: 'status: approved' });
             return [];
         }
 
         // ---- v0.5 核心: 从正文 ## Shot NN 标题解析 shots ----
         const shots = this.parseShotsFromBody(body);
-        logger.info(`  Script.md 解析到 ${shots.length} 个分镜`);
+        logger.info(`  [${path.basename(filePath)}] 解析到 ${shots.length} 个分镜`);
 
         for (const shot of shots) {
             // ---- 过滤: preview 模式或指定 shots ----

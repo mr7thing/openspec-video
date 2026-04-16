@@ -1,3 +1,9 @@
+---
+type: story-outline
+status: approved
+review: []
+---
+
 # Story Outline
 
 > 规范指引：正文应保持完整的人类叙事语态。资产 ID 应作为“注解”使用括号包裹嵌入句中。
