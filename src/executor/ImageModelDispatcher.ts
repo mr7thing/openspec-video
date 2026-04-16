@@ -11,6 +11,7 @@ import { Job } from '../types/PromptSchema';
 import { ImageProvider } from './providers/ImageProvider';
 import { SeaDreamProvider } from './providers/SeaDreamProvider';
 import { MinimaxImageProvider } from './providers/MinimaxImageProvider';
+import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
 import { logger } from '../utils/logger';
 import { ErrorFactory, OpsVError } from '../errors/OpsVError';
 import { ConfigLoader, ApiConfig, ModelConfig } from '../utils/configLoader';
@@ -39,6 +40,9 @@ export class ImageModelDispatcher {
         
         // 注册 Minimax 提供商
         this.providers.set('minimax', new MinimaxImageProvider());
+
+        // 注册 SiliconFlow 提供商
+        this.providers.set('siliconflow', new SiliconFlowProvider() as any);
     }
 
     /**

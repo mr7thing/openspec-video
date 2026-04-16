@@ -28,7 +28,39 @@ models:
       cfg_scale: 7.5
       negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
     
-    max_size: { width: 2048, height: 2048 }
+    max_size: { width: 1280, height: 720 }
+
+  # ==========================================
+  # 图像模型：SiliconFlow Qwen-Image (多模态文生图)
+  # ==========================================
+  qwen-image:
+    provider: "siliconflow"
+    type: "image"
+    enable: true
+    model: "Qwen/Qwen-Image"
+    gen_command: "gen-image"
+    required_env: ["SILICONFLOW_API_KEY"]
+    features: ["txt2img", "aspect_ratio"]
+    defaults:
+      quality: "1024x1024"
+      aspect_ratio: "1:1"
+
+  # ==========================================
+  # 图像模型：SiliconFlow Qwen-Image-Edit (指令式图像编辑)
+  # ==========================================
+  qwen-image-edit-2509:
+    provider: "siliconflow"
+    type: "image"
+    enable: true
+    model: "Qwen/Qwen-Image-Edit-2509"
+    gen_command: "gen-image"
+    required_env: ["SILICONFLOW_API_KEY"]
+    features: ["img2img", "edit"]
+    # 编辑模型强制要求参考图
+    requires_reference: true
+    defaults:
+      quality: "original"
+      aspect_ratio: "original"
 
   # ==========================================
   # 视频模型：SiliconFlow Wan 2.1

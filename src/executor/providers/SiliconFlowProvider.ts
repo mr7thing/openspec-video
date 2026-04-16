@@ -2,10 +2,15 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { VideoProvider } from './VideoProvider';
+import { ImageProvider } from './ImageProvider';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
 
-export class SiliconFlowProvider implements VideoProvider {
+/**
+ * SiliconFlowProvider - 同时支持视频生成与图像生成/编辑
+ * 实现接口: VideoProvider, ImageProvider
+ */
+export class SiliconFlowProvider implements VideoProvider, ImageProvider {
     providerName = 'siliconflow';
 
     private getBase64Image(filePath: string): string {
@@ -27,10 +32,11 @@ export class SiliconFlowProvider implements VideoProvider {
         }
     }
 
+    /**
+     * 视频生成入口 (VideoProvider 接口)
+     */
     async submitJob(job: Job, modelName: string, apiKey: string): Promise<string> {
         const url = 'https://api.siliconflow.cn/v1/video/submit';
-
-        // v0.5: 从 frame_ref 读取首帧
         const frameRef = job.payload.frame_ref;
         let imageArg = undefined;
 
@@ -40,111 +46,98 @@ export class SiliconFlowProvider implements VideoProvider {
             imageArg = this.getBase64Image(job.reference_images[0]);
         }
 
-        // 当模型是图生视频时，首帧图通常必填。这里抛给外部或 API 自身去校验
-        if (!imageArg && modelName.toLowerCase().includes("i2v")) {
-            logger.warn(`[SiliconFlowProvider] Warning: Job ${job.id} uses I2V model but lacks first_image.`);
-        }
-
         const requestBody = {
             model: modelName,
             prompt: job.prompt_en || "Cinematic video.",
-            // Wan2.1 官方参数是 image_size
-            image_size: job.payload.global_settings.quality === '1080p' ? "1280x720" : "1280x720", // 暂设默认
+            image_size: "1280x720", // 视频默认尺寸
             image: imageArg,
         };
 
-        if (process.env.OPSV_DEBUG === 'true') {
-            logger.debug(`[SiliconFlowProvider] Submitting to ${modelName}`, { 
-                image_size: requestBody.image_size,
-                prompt: requestBody.prompt 
-            });
-        }
-
         const response = await axios.post(url, requestBody, {
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
         });
 
-        if (response.data && response.data.requestId) {
-            return response.data.requestId;
-        }
-
-        throw new Error(`Invalid submission response from SiliconFlow: ${JSON.stringify(response.data)}`);
+        if (response.data && response.data.requestId) return response.data.requestId;
+        throw new Error(`Invalid submission response: ${JSON.stringify(response.data)}`);
     }
 
+    /**
+     * 轮询视频状态 (VideoProvider 接口)
+     */
     async pollAndDownload(requestId: string, apiKey: string, outputFilePath: string): Promise<void> {
         const url = 'https://api.siliconflow.cn/v1/video/status';
         let retries = 0;
-        const maxRetries = 120; // 约等待 20 分钟 (120 * 10s)
-
-        logger.info(`[SiliconFlow] Start polling for RequestID: ${requestId}`);
-
-        while (retries < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 10000)); // 10秒轮询间隔
+        while (retries < 120) {
+            await new Promise(r => setTimeout(r, 10000));
             retries++;
-
             try {
                 const response = await axios.post(url, { requestId }, {
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
                 });
-
                 const status = response.data.status;
-
                 if (status === 'Succeed') {
                     const videoUrl = response.data.results?.videos?.[0]?.url;
-                    if (!videoUrl) {
-                        throw new Error(`Status is Succeed but no video URL found in response.`);
-                    }
-                    logger.info(`[SiliconFlow] 🟢 Video generation succeeded! Downloading from: ${videoUrl}`);
-                    await this.downloadVideo(videoUrl, outputFilePath);
+                    if (!videoUrl) throw new Error(`Status Succeed but no video URL.`);
+                    await this.downloadFile(videoUrl, outputFilePath);
                     return;
                 } else if (status === 'Failed') {
-                    throw new Error(`Video generation failed remotely: ${response.data.reason}`);
-                } else {
-                    // 'InQueue' or 'InProgress'
-                    if (process.env.OPSV_DEBUG === 'true') {
-                        process.stdout.write('.');
-                    }
+                    throw new Error(`Video generation failed: ${response.data.reason}`);
                 }
-            } catch (error: any) {
-                // 判断如果是手动抛出的明确 Failed，直接中止轮询不再重试
-                if (error.message && error.message.includes('Video generation failed remotely')) {
-                    throw error;
-                }
-                
-                if (retries > 5) {
-                    logger.warn(`[SiliconFlow] Poll Error (Try ${retries}): ${error.message}`);
-                }
+            } catch (e: any) {
+                if (e.message.includes('failed')) throw e;
             }
         }
-
-        throw new Error(`Polling timeout for requestId: ${requestId} after ${maxRetries} attempts.`);
+        throw new Error(`Polling timeout for ${requestId}`);
     }
 
-    private async downloadVideo(videoUrl: string, outputFilePath: string): Promise<void> {
-        const response = await axios({
-            method: 'GET',
-            url: videoUrl,
-            responseType: 'stream'
-        });
-
-        // 确保父目录存在
-        const dir = path.dirname(outputFilePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+    /**
+     * 图像生成/编辑入口 (ImageProvider 接口)
+     */
+    async generateAndDownload(job: Job, modelName: string, apiKey: string, outputPath: string): Promise<void> {
+        const url = 'https://api.siliconflow.cn/v1/images/generations';
+        
+        // 自动提取底图 (用于 Qwen-Image-Edit)
+        let imageArg = undefined;
+        const frameRef = job.payload.frame_ref;
+        if (frameRef && frameRef.first) {
+            imageArg = this.getBase64Image(frameRef.first);
+        } else if (job.reference_images && job.reference_images.length > 0) {
+            imageArg = this.getBase64Image(job.reference_images[0]);
         }
 
+        const requestBody: any = {
+            model: modelName,
+            prompt: job.prompt_en || "Cinematic image.",
+            // Qwen-Image 编辑模型需要 image 参数
+            ...(imageArg && { image: imageArg })
+        };
+
+        // 注入尺寸参数（仅非编辑模型可能需要）
+        if (!modelName.includes('Edit')) {
+             requestBody.image_size = job.payload.global_settings.quality || "1024x1024";
+        }
+
+        try {
+            const response = await axios.post(url, requestBody, {
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+            });
+
+            const imageUrl = response.data.images?.[0]?.url;
+            if (!imageUrl) throw new Error(`Invalid response: no image URL found. ${JSON.stringify(response.data)}`);
+
+            await this.downloadFile(imageUrl, outputPath);
+        } catch (error: any) {
+            const apiError = error.response ? error.response.data : error.message;
+            throw new Error(`[SiliconFlow Image] FAILED: ${JSON.stringify(apiError)}`);
+        }
+    }
+
+    private async downloadFile(url: string, outputFilePath: string): Promise<void> {
+        const response = await axios({ method: 'GET', url, responseType: 'stream' });
+        const dir = path.dirname(outputFilePath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         const writer = fs.createWriteStream(outputFilePath);
         response.data.pipe(writer);
-
-        return new Promise((resolve, reject) => {
-            writer.on('finish', () => resolve());
-            writer.on('error', reject);
-        });
+        return new Promise((res, rej) => { writer.on('finish', res); writer.on('error', rej); });
     }
 }
