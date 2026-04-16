@@ -149,6 +149,56 @@ export class ReviewServer {
             }
         });
 
+        // ---- API: Draft 操作（打回并记录参考） ----
+        app.post('/api/draft', async (req: any, res: any) => {
+            try {
+                const { jobId, imagePath, feedback } = req.body;
+                if (!jobId) {
+                    return res.status(400).json({ success: false, error: '缺少 jobId' });
+                }
+
+                const docPath = this.findSourceDoc(jobId);
+                if (!docPath) {
+                    return res.status(404).json({ success: false, error: '源文档不存在' });
+                }
+
+                let content = fs.readFileSync(docPath, 'utf-8');
+
+                // 1. 设置 status → draft
+                content = FrontmatterParser.updateField(content, 'status', 'draft');
+
+                // 2. 记录 draft_ref（当前不满意的生成结果，供下轮迭代参考）
+                if (imagePath) {
+                    const relativePath = path.relative(this.projectRoot, imagePath).replace(/\\/g, '/');
+                    content = FrontmatterParser.updateField(content, 'draft_ref', relativePath);
+                }
+
+                // 3. 记录导演意见
+                const reviewEntry = `${new Date().toISOString().split('T')[0]}: [DRAFT] ${feedback || '需要调整'}`;
+                content = FrontmatterParser.appendReview(content, reviewEntry);
+
+                fs.writeFileSync(docPath, content, 'utf-8');
+                logger.info(`📝 Draft: ${jobId} — ${feedback || '(无具体意见)'}`);
+
+                // 自动 git commit
+                try {
+                    const SAFE_JOB_ID = /^[a-zA-Z0-9_-]+$/;
+                    if (typeof jobId === 'string' && SAFE_JOB_ID.test(jobId)) {
+                        execFileSync('git', ['add', '.'], { cwd: this.projectRoot, stdio: 'pipe' });
+                        execFileSync('git', ['commit', '-m', `draft: ${jobId} — ${(feedback || '').substring(0, 60)}`], {
+                            cwd: this.projectRoot, encoding: 'utf-8', stdio: 'pipe'
+                        });
+                    }
+                } catch (e) {
+                    logger.warn(`Git commit 失败: ${(e as Error).message}`);
+                }
+
+                res.json({ success: true, data: { jobId, status: 'draft' } });
+            } catch (e) {
+                res.status(500).json({ success: false, error: (e as Error).message });
+            }
+        });
+
         app.listen(port, () => {
             logger.info(`Review 服务启动: http://localhost:${port}`);
         });

@@ -113,6 +113,9 @@
         .btn-primary { background: var(--green); color: #000; }
         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
         .btn-primary:active { transform: translateY(0); }
+        .btn-draft { background: var(--yellow); color: #000; }
+        .btn-draft:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+        .btn-draft:active { transform: translateY(0); }
         .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
         .btn-secondary:hover { background: #25252e; }
 
@@ -255,8 +258,11 @@
         <div class="content">
             <div class="toolbar">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <button class="btn btn-primary" id="approveBtn" disabled onclick="openApproveModal()">
-                        ✅ Approve 选中 (<span id="selectedCount">0</span>)
+                    <button class="btn btn-primary" id="approveBtn" disabled onclick="openReviewModal('approve')">
+                        ✅ Approve (<span id="selectedCount">0</span>)
+                    </button>
+                    <button class="btn btn-draft" id="draftBtn" disabled onclick="openReviewModal('draft')">
+                        📝 Draft
                     </button>
                     <span style="font-size: 12px; color: var(--muted);" id="currentId">未选择任务</span>
                 </div>
@@ -283,17 +289,34 @@
     </div>
 
     <!-- Modals -->
-    <div class="modal-overlay" id="approveModal">
+    <div class="modal-overlay" id="reviewModal">
         <div class="modal">
-            <h2>🎉 决定资产转正</h2>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px;">选中的图片将作为正式参考图回写到源码文档中。</p>
-            <label style="font-size: 12px; color: var(--muted);">变体名称（例如: default, wide, closeup）</label>
-            <input type="text" id="variantInput" placeholder="默认为序号名...">
+            <h2 id="modalTitle">🎬 审查决策</h2>
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px;" id="modalDesc"></p>
+
+            <!-- Approve/Draft 单选 -->
+            <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; border-radius: 8px; border: 2px solid var(--border); flex: 1; transition: all 0.2s;" id="radioApproveLabel">
+                    <input type="radio" name="reviewDecision" value="approve" id="radioApprove" checked onchange="updateRadioStyle()">
+                    <span style="font-weight: 600; color: var(--green);">✅ Approve</span>
+                    <span style="font-size: 11px; color: var(--muted);">转正为正式参考图</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; border-radius: 8px; border: 2px solid var(--border); flex: 1; transition: all 0.2s;" id="radioDraftLabel">
+                    <input type="radio" name="reviewDecision" value="draft" id="radioDraft" onchange="updateRadioStyle()">
+                    <span style="font-weight: 600; color: var(--yellow);">📝 Draft</span>
+                    <span style="font-size: 11px; color: var(--muted);">打回并记录意见</span>
+                </label>
+            </div>
+
+            <div id="approveFields">
+                <label style="font-size: 12px; color: var(--muted);">变体名称（例如: default, wide, closeup）</label>
+                <input type="text" id="variantInput" placeholder="默认为序号名...">
+            </div>
             <label style="font-size: 12px; color: var(--muted);">导演意见</label>
-            <textarea id="reviewNote" rows="3" placeholder="可选: 记录调整建议或通过理由..."></textarea>
+            <textarea id="reviewNote" rows="3" placeholder="记录调整建议或通过理由..."></textarea>
             <div style="display: flex; justify-content: flex-end; gap: 12px;">
-                <button class="btn btn-secondary" onclick="closeApproveModal()">再想想</button>
-                <button class="btn btn-primary" onclick="submitApprove()">确认批准</button>
+                <button class="btn btn-secondary" onclick="closeReviewModal()">再想想</button>
+                <button class="btn btn-primary" id="submitReviewBtn" onclick="submitReview()">确认提交</button>
             </div>
         </div>
     </div>
@@ -399,12 +422,13 @@
                 selectedImages.add(key);
             }
             document.getElementById('selectedCount').textContent = selectedImages.size;
-            document.getElementById('approveBtn').disabled = selectedImages.size === 0;
+            const hasSelection = selectedImages.size > 0;
+            document.getElementById('approveBtn').disabled = !hasSelection;
+            document.getElementById('draftBtn').disabled = !hasSelection;
             renderImages(jobId);
         }
 
         function simpleMarkdown(text) {
-            // 简单处理：过滤 YAML 同时处理换行和加粗
             const body = text.replace(/^---[\s\S]*?---\n*/, '');
             return body
                 .replace(/\n/g, '<br>')
@@ -419,8 +443,44 @@
             document.getElementById('previewOverlay').classList.add('active');
         }
 
-        function openApproveModal() { document.getElementById('approveModal').classList.add('active'); }
-        function closeApproveModal() { document.getElementById('approveModal').classList.remove('active'); }
+        let currentReviewMode = 'approve';
+
+        function openReviewModal(mode) {
+            currentReviewMode = mode;
+            document.getElementById('reviewModal').classList.add('active');
+            if (mode === 'approve') {
+                document.getElementById('radioApprove').checked = true;
+                document.getElementById('modalTitle').textContent = '🎬 审查决策';
+                document.getElementById('modalDesc').textContent = '为选中的图片选择审查结果。';
+            } else {
+                document.getElementById('radioDraft').checked = true;
+                document.getElementById('modalTitle').textContent = '📝 打回迭代';
+                document.getElementById('modalDesc').textContent = '记录您的修改意见，生成结果将被标记为 Draft 供下轮迭代。';
+            }
+            updateRadioStyle();
+        }
+
+        function closeReviewModal() {
+            document.getElementById('reviewModal').classList.remove('active');
+        }
+
+        function updateRadioStyle() {
+            const isApprove = document.getElementById('radioApprove').checked;
+            document.getElementById('radioApproveLabel').style.borderColor = isApprove ? 'var(--green)' : 'var(--border)';
+            document.getElementById('radioDraftLabel').style.borderColor = !isApprove ? 'var(--yellow)' : 'var(--border)';
+            document.getElementById('approveFields').style.display = isApprove ? 'block' : 'none';
+            document.getElementById('submitReviewBtn').textContent = isApprove ? '✅ 确认批准' : '📝 确认打回';
+            document.getElementById('submitReviewBtn').style.background = isApprove ? 'var(--green)' : 'var(--yellow)';
+        }
+
+        async function submitReview() {
+            const isApprove = document.getElementById('radioApprove').checked;
+            if (isApprove) {
+                await submitApprove();
+            } else {
+                await submitDraft();
+            }
+        }
 
         async function submitApprove() {
             const variant = document.getElementById('variantInput').value.trim();
@@ -440,8 +500,34 @@
             if (json.success) {
                 alert(`✅ Approve 成功！文档已回写。`);
                 selectedImages.clear();
-                closeApproveModal();
+                closeReviewModal();
                 location.reload();
+            }
+        }
+
+        async function submitDraft() {
+            const feedback = document.getElementById('reviewNote').value.trim();
+            const results = [];
+
+            for (const key of selectedImages) {
+                const [jobId, imagePath] = key.split('|');
+                const res = await fetch('/api/draft', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jobId, imagePath, feedback })
+                });
+                const json = await res.json();
+                results.push(json);
+            }
+
+            const allOk = results.every(r => r.success);
+            if (allOk) {
+                alert(`📝 Draft 已记录！当前结果将作为下轮参考。`);
+                selectedImages.clear();
+                closeReviewModal();
+                location.reload();
+            } else {
+                alert('⚠️ 部分操作失败，请检查控制台。');
             }
         }
 

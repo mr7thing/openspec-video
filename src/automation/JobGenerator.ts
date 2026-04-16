@@ -48,7 +48,7 @@ export class JobGenerator {
 
     async generateJobs(
         targets: string[],
-        options: { preview?: boolean; shots?: string[] } = {}
+        options: { preview?: boolean; shots?: string[]; skipApproved?: boolean } = {}
     ): Promise<Job[]> {
         // ---- 初始化 ----
         await this.assetManager.loadAssets();
@@ -77,6 +77,8 @@ export class JobGenerator {
         }
 
         let allJobs: Job[] = [];
+        const skippedLog: { id: string; file: string; reason: string }[] = [];
+
         for (const target of targets) {
             const targetPath = path.resolve(this.projectRoot, target);
             if (!fs.existsSync(targetPath)) continue;
@@ -86,11 +88,11 @@ export class JobGenerator {
                 const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
                 for (const file of files) {
                     const filePath = path.join(targetPath, file);
-                    const jobs = await this.processFile(filePath, globalConfig, options);
+                    const jobs = await this.processFile(filePath, globalConfig, options, skippedLog);
                     allJobs = allJobs.concat(jobs);
                 }
             } else if (stats.isFile() && targetPath.endsWith('.md')) {
-                const jobs = await this.processFile(targetPath, globalConfig, options);
+                const jobs = await this.processFile(targetPath, globalConfig, options, skippedLog);
                 allJobs = allJobs.concat(jobs);
             }
         }
@@ -130,9 +132,20 @@ export class JobGenerator {
             JSON.stringify(executable, null, 2)
         );
 
+        // ---- 输出跳过日志 ----
+        if (skippedLog.length > 0) {
+            const logPath = path.join(queueDir, 'skipped.json');
+            fs.writeFileSync(logPath, JSON.stringify(skippedLog, null, 2));
+            logger.info(`\n📋 已跳过 ${skippedLog.length} 个 Approved 文档 (详见 queue/skipped.json):`);
+            for (const s of skippedLog) {
+                logger.info(`  ⏭️  ${s.id} — ${s.reason}`);
+            }
+        }
+
         logger.info(
             `\n✅ 编译完成: ${executable.length} 个可执行任务` +
-            (blocked.length > 0 ? ` (${blocked.length} 个等待依赖)` : '')
+            (blocked.length > 0 ? ` (${blocked.length} 个等待依赖)` : '') +
+            (skippedLog.length > 0 ? ` (${skippedLog.length} 个已跳过)` : '')
         );
 
         return executable;
@@ -145,12 +158,13 @@ export class JobGenerator {
     private async processFile(
         filePath: string,
         globalConfig: any,
-        options: { preview?: boolean; shots?: string[] }
+        options: { preview?: boolean; shots?: string[]; skipApproved?: boolean },
+        skippedLog: { id: string; file: string; reason: string }[]
     ): Promise<Job[]> {
         const normalizedPath = filePath.replace(/\\/g, '/');
 
         if (normalizedPath.includes('/elements/') || normalizedPath.includes('/scenes/')) {
-            return this.processAssetFile(filePath, globalConfig);
+            return this.processAssetFile(filePath, globalConfig, options, skippedLog);
         } else if (normalizedPath.includes('/shots/')) {
             // v0.5: 只处理 Script.md（shot-design），跳过 Shotlist.md（shot-production）
             if (path.basename(filePath).toLowerCase() === 'shotlist.md') {
@@ -168,7 +182,12 @@ export class JobGenerator {
     // 资产文件处理（elements/*.md, scenes/*.md）
     // ================================================================
 
-    private async processAssetFile(filePath: string, globalConfig: any): Promise<Job[]> {
+    private async processAssetFile(
+        filePath: string,
+        globalConfig: any,
+        options: { skipApproved?: boolean },
+        skippedLog: { id: string; file: string; reason: string }[]
+    ): Promise<Job[]> {
         const content = fs.readFileSync(filePath, 'utf-8');
         const id = path.parse(filePath).name.replace(/^@/, '');
 
@@ -182,9 +201,10 @@ export class JobGenerator {
             return [];
         }
 
-        // v0.5: 如果 status 已经是 approved，跳过图像生成
-        if (frontmatter.status === 'approved') {
-            logger.info(`  跳过已 approved 资产: ${id}`);
+        // v0.5: 如果开启了 --skip-approved 且 status 已经是 approved，跳过图像生成
+        if (options.skipApproved && frontmatter.status === 'approved') {
+            logger.info(`  ⏭️  跳过已 approved 资产: ${id}`);
+            skippedLog.push({ id, file: filePath, reason: 'status: approved' });
             return [];
         }
 

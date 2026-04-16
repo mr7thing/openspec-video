@@ -16,6 +16,7 @@ export function registerGenerateCommand(program: Command, VERSION: string) {
         .description('编译 Markdown 文档为图像生成任务 (jobs.json)')
         .option('-p, --preview', '预览模式（仅生成第一个分镜）', false)
         .option('--shots <list>', '指定分镜 ID（逗号分隔: 1,5,12）', (val) => val.split(','))
+        .option('--skip-approved', '跳过已 Approve 的文档，不纳入生成队列', false)
         .action(async (targets, options) => {
             try {
                 const projectRoot = process.cwd();
@@ -24,11 +25,13 @@ export function registerGenerateCommand(program: Command, VERSION: string) {
                 logger.info(`   目标: ${targets && targets.length > 0 ? targets.join(', ') : '全部规范目录'}`);
                 if (options.preview) logger.info('   👀 预览模式');
                 if (options.shots) logger.info(`   🎯 指定分镜: ${options.shots.join(', ')}`);
+                if (options.skipApproved) logger.info('   ✅ 已启用: 跳过 Approved 文档');
 
                 const generator = new JobGenerator(projectRoot);
                 const jobs = await generator.generateJobs(targets, {
                     preview: options.preview,
                     shots: options.shots,
+                    skipApproved: options.skipApproved,
                 });
 
                 if (!isDaemonRunning()) {
