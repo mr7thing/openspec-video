@@ -100,13 +100,30 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 // 4. Create operational directories
                 await fs.ensureDir(path.join(targetDir, 'artifacts'));
                 await fs.ensureDir(path.join(targetDir, 'queue'));
+                await fs.ensureDir(path.join(targetDir, '.opsv-queue'));
+                await fs.ensureDir(path.join(targetDir, '.opsv'));
 
                 // 5. Create .gitignore and initialize Git
-                const gitignoreSrc = path.join(TEMPLATE_DIR, 'assets/.gitignore');
+                const defaultGitignore = `# System Files
+.DS_Store
+Thumbs.db
+
+# Dependencies & Build
+node_modules/
+dist/
+
+# Runtime Data & Artifacts
+artifacts/
+queue/
+.opsv/
+.opsv-queue/
+
+# OpenCode & Trae 
+.opencode/
+.trae/
+`;
                 const gitignoreDest = path.join(targetDir, '.gitignore');
-                if (fs.existsSync(gitignoreSrc)) {
-                    await fs.copy(gitignoreSrc, gitignoreDest);
-                }
+                await fs.writeFile(gitignoreDest, defaultGitignore);
 
                 const { execSync } = require('child_process');
                 try {
