@@ -1,50 +1,51 @@
 # OpsV Workflow Guide
 
-> From inspiration to final video in a three-role cycle, understanding Agent collaboration and CLI interaction.
+> From inspiration to final cut — the three-role collaboration loop, understanding the complete interaction between Agents and CLI commands.
 
 ---
 
-## Overall Flowchart (Three-Role Collaboration)
+## Pipeline Overview (Three-Role Collaboration)
 
 ```mermaid
 flowchart TD
-    START["💡 Creative Inspiration"] --> INIT["opsv init"]
-
+    START["💡 Creative / Addon Input"] --> INIT["opsv init"]
+    
     subgraph Creative["🎨 Creative-Agent Domain"]
         BRAIN["🧠 opsv-brainstorming"]
         ARCH["🏛️ opsv-architect"]
         ASSET["🎨 opsv-asset-designer"]
         SCRIPT["📐 opsv-script-designer"]
-
+        
         BRAIN --> ARCH
         ARCH -->|"project.md + story.md"| ASSET
         ASSET -->|"elements/ + scenes/"| SCRIPT
     end
 
     INIT --> BRAIN
-
+    
     subgraph Guardian["🛡️ Guardian-Agent Domain"]
         PREGEN["🔍 opsv-pregen-review"]
         OPS["⚙️ opsv-ops-mastery"]
-
         PREGEN --> OPS
     end
 
     SCRIPT -->|"Script.md"| PREGEN
-
+    
     subgraph Runner["🚀 Runner-Agent Domain"]
-        GEN["opsv generate"]
-        RENDER["opsv gen-image / gen-video"]
-        REVIEW["opsv review"]
+        GEN["opsv generate (intent)"]
+        COMPILE["opsv queue compile (atomize)"]
+        RUN["opsv queue run (consume)"]
+        REVIEW["opsv review (visual review)"]
         ANIM["animation-director + opsv-animator"]
     end
 
     OPS -->|"✅ PASS"| GEN
-    GEN --> RENDER
-    RENDER --> REVIEW
+    GEN -->|"jobs.json"| COMPILE
+    COMPILE -->|".opsv-queue/pending/"| RUN
+    RUN --> REVIEW
     REVIEW -->|"Approve ✅"| ANIM
     ANIM -->|"Shotlist.md"| GEN
-    REVIEW -->|"Draft 📝 Rollback"| BRAIN
+    REVIEW -->|"Draft 📝"| BRAIN
 
     style Creative fill:#fef3e2,stroke:#e67e22,stroke-width:2px
     style Guardian fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
@@ -53,117 +54,104 @@ flowchart TD
 
 ---
 
-## Phase 1: Project Initialization (Init)
+## Phase 1: Project Initialization
 
-### Trigger Command
 ```bash
 opsv init [projectName]
 ```
 
-### What Happens
-1. **Interactive selection** of AI assistant (Gemini / OpenCode / Trae).
-2. **Template copying**:
-   - `.agent/` — 3 Agent role definitions + 9 Skills.
-   - `.antigravity/` — Workflow templates.
-   - `.env/` — API config templates.
-3. **Directory skeleton creation**:
-   - `videospec/stories/`, `videospec/elements/`, `videospec/scenes/`, `videospec/shots/`
-   - `artifacts/`, `queue/`
+Creates:
+- `.agent/` — 3 Agent role definitions + 9 Skills
+- `.env/` — API configuration templates
+- `videospec/{stories,elements,scenes,shots}/` — Narrative asset skeleton
+- `artifacts/`, `queue/` — Output directories
+- `.opsv/`, `.opsv-queue/` — Runtime directories (v0.6)
+- `.gitignore` — Built-in generation (v0.6)
 
 ---
 
-## Phase 2: Brainstorming & Concept Anchoring
+## Phase 2: Brainstorming & Spec Anchoring
 
-### Responsible Agent
-**Creative-Agent** → Invokes `opsv-brainstorming` + `opsv-architect`
+**Agent**: Creative-Agent → `opsv-brainstorming` + `opsv-architect`
 
-### Core Actions
-1. **Brainstorming First**: Never settle specs before confirming creative details. Use the Trinity Choice (Standard / Avant-garde / Zen) to deep-dive into the director's vision.
-2. **Spec Settlement**: Generate initial drafts (`project.md` and `story.md`) via creative plugins or user-driven skills.
-3. **Handoff to Guardian**: Once drafts are complete, they must be handed to **Guardian-Agent** for reflective sync.
+1. **Brainstorm First**: Never create documents before confirming creative direction via Trinity Choice proposals
+2. **Spec Anchoring**: Generate `project.md` and `story.md` after director confirmation
+3. **Handoff**: Pass to Guardian-Agent for reflection sync
 
-### The Sync Loop — Core Requirement
-**Principle: Body is the Will (Soul), YAML is the Command (CMD).**
-- **Reflective Sync**: When the Markdown body is modified, Guardian-Agent updates the YAML `visual_detailed` field.
-- **Consistency**: After each review dialogue, body description and YAML header must be 100% semantically aligned.
-- **Gatekeeper**: If `opsv validate` detects drift between body and YAML, downstream generation is blocked.
+**Sync Loop**: Body text (Soul) ↔ YAML (CMD) must maintain 100% semantic alignment after every review round.
 
 ---
 
-## Phase 3: Asset Design
+## Phase 3: Asset Specification
 
-### Responsible Agent
-**Creative-Agent** → Invokes `opsv-asset-designer`
+**Agent**: Creative-Agent → `opsv-asset-designer`
 
-### Design Principles
-1. **Context Awareness**: Must read `project.md` to align with the overall atmosphere.
-2. **Dual-Channel References**:
-   - `Design References` (d-ref): Images used when creating the asset itself.
-   - `Approved References` (a-ref): Approved images for downstream references.
-3. **Quality Gates**: Executed by **Guardian-Agent** via `opsv validate` and `opsv-pregen-review`.
+1. Read `project.md` for global context
+2. Dual-channel reference system: `## Design References` (input) + `## Approved References` (output)
+3. Quality gate by Guardian-Agent: `opsv validate` + `opsv-pregen-review`
 
 ---
 
-## Phase 4: Storyboard Compilation & Review
+## Phase 4: Spooler Queue Pipeline (v0.6.0 Core)
 
-### 4.1 Scripting
-- **Responsible Agent**: **Creative-Agent** → `opsv-script-designer`.
-- **Pure Markdown body format**, no YAML configuration array needed.
-- No character descriptions; use `@entity` tags only.
-- **No hardcoded** `target_model` or execution flow configs (v0.5.14+).
+The old `gen-image` / `gen-video` single-step model is replaced by a three-step Spooler pipeline.
 
-### 4.2 Image Generation
-**Responsible Agent**: **Runner-Agent**
+### 4.1 Storyboard Design
+**Agent**: Creative-Agent → `opsv-script-designer`
+- Output: `videospec/shots/Script.md` (pure Markdown, no YAML arrays)
+- Each shot: 3-5 seconds, max 15 seconds
+
+### 4.2 Intent Compilation
 ```bash
-opsv generate        # Compile Spec -> JSON jobs
-opsv gen-image       # Render images (Parallel Universe Sandbox)
+opsv generate    # Produces queue/jobs.json — pure business intent
 ```
 
-### 4.3 Web UI Review
+### 4.3 Atomic Delivery
 ```bash
-opsv review          # Start local Review server
+opsv queue compile queue/jobs.json --provider seadream     # Standard API
+opsv queue compile queue/jobs.json --provider runninghub   # ComfyUI workflow
 ```
-Opens a dark-themed Web UI (e.g., `localhost:3456`) for visual selection:
-- **Approve**: Auto write-back to `## Approved References`, update `status: approved`
-- **Draft**: Record modification notes, rollback to Creative-Agent for iteration
+- Each job becomes an independent `UUID.json` in `.opsv-queue/pending/{provider}/`
 
----
-
-## Phase 5: Animation & Video
-
-### Responsible Agent
-**Runner-Agent** → Invokes `opsv-animator` + `animation-director`
-
-### Core Task
-Read confirmed `Script.md` and extract pure motion instructions into `Shotlist.md`.
-
-### Statics-Motion Separation
-- Only describe camera movement and subject action; appearances are handled by references.
-- **Camera First**: Force camera movement descriptions to prevent AI "slideshow" videos.
-- `motion_prompt_en` must be **English only**.
-
-### Video Generation
+### 4.4 Single-Threaded Consumption
 ```bash
-opsv animate         # Compile Shotlist -> Video jobs
-opsv gen-video       # Render videos (Seedance 1.5 Pro, 2.0 Fast, etc.)
+opsv queue run seadream
 ```
+- Sequential processing, no concurrency conflicts
+- Success → `completed/`, Failure → `failed/`
+- Supports Ctrl+C breakpoint recovery
 
-### Long-Take Inheritance
-Via `@FRAME:shot_N_last` — the system auto-extracts the last frame of the previous video as the first frame of the next shot.
+### 4.5 Visual Review
+```bash
+opsv review    # Port configured via OPSV_REVIEW_PORT
+```
+- Grid selection, variant naming, Approve/Draft dual-state
 
 ---
 
-## Iterative Cycle
+## Phase 5: Animation
 
-The five phases are not a one-pass process. Directors iterate based on review results:
+**Agent**: Runner-Agent → `opsv-animator` + `animation-director`
 
+```bash
+opsv animate
+opsv queue compile queue/video_jobs.json --provider seedance
+opsv queue run seedance
 ```
-Creative-Agent → Guardian-Agent → Runner-Agent → Review → (Unsatisfied) → Rollback to Creative-Agent
-```
 
-The three-role collaboration ensures creativity, specification, and execution each stay in their lane.
+**Static-Dynamic Separation**: Describe only camera motion, character actions, dynamic changes — never appearance details.
 
 ---
 
-> *"Let creativity flow like water, let specification be the dam."*
-> *OpsV 0.5.19 | Latest Update: 2026-04-17*
+## Iterative Loop
+
+```
+Creative-Agent → Guardian-Agent → Runner-Agent → Review → (rejected) → Creative-Agent
+```
+
+Three roles ensure creativity, standards, and execution remain properly separated in each iteration.
+
+---
+
+> *"Let creativity flow like water, let standards stand firm like dams."*
+> *OpsV 0.6.0 | Last updated: 2026-04-17*

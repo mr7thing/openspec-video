@@ -11,7 +11,7 @@
 │                   导演 (柒叔)                      │
 │              ↓ 发出自然语言指令                      │
 ├──────────────────────────────────────────────────┤
-│ Agent 层 — "三角色协作" (v0.5.15+)                  │
+│ Agent 层 — "三角色协作"                              │
 │ ┌─────────────┐ ┌──────────────┐ ┌─────────────┐│
 │ │ Creative    │ │   Guardian   │ │   Runner    ││
 │ │ (创世代理)  │ │  (同步守卫)  │ │ (疾走特遣)  ││
@@ -26,26 +26,24 @@
 │         └────────┬────────┴───────────────┘      │
 │                  ↓                               │
 ├──────────────────────────────────────────────────┤
-│ CLI 层 — "编译与安装"                               │
-│ opsv init → opsv addons install → opsv generate   │
+│ CLI 层 — "三步式 Spooler Queue"                    │
+│ generate → queue compile → queue run              │
 └──────────────────────────────────────────────────┘
 ```
 
 - **Agent**（`.agent/*.md`）：定义角色身份、核心职责和调用哪些 Skill
 - **Skill**（`.agent/skills/*/SKILL.md`）：定义具体执行规范、格式模板和质量门限
-- **CLI**（`opsv` 命令）：Agent 产出 Markdown 后，由 CLI 编译执行
+- **CLI**（`opsv` 命令）：Agent 产出 Markdown 后，由 CLI 三步管线编译执行
 
 ---
 
-## Agent 角色矩阵 (v0.5.15+)
-
-从 v0.5.15 开始，OpsV 将旧有的 7 个细粒度角色精简为 **3 个功能型 Agent**，每个 Agent 承担多个 Skill 的调度职责。
+## Agent 角色矩阵
 
 | Agent | 文件 | 职责 | 绑定 Skill |
-|-------|------|------|-----------|
+|-------|------|------|-----------| 
 | **Creative-Agent** | `Creative-Agent.md` | 创世代理：苏格拉底式脑暴、三向提案、创意落盘为 `project.md` + `story.md` | `opsv-brainstorming`, `opsv-architect`, `opsv-asset-designer`, `opsv-script-designer` |
 | **Guardian-Agent** | `Guardian-Agent.md` | 同步守卫：反射同步 YAML ↔ Body、审前评审、规范堤坝、语义质检 | `opsv-pregen-review`, `opsv-ops-mastery` |
-| **Runner-Agent** | `Runner-Agent.md` | 疾走特遣：任务编译、批处理分发、管线监控、产物归档 | `opsv-animator`, `animation-director`, `opsv-enlightenment` |
+| **Runner-Agent** | `Runner-Agent.md` | 疾走特遣：任务编译、Spooler 分发、管线监控、产物归档 | `opsv-animator`, `animation-director`, `opsv-enlightenment` |
 
 ### Agent 协作流
 
@@ -114,7 +112,7 @@ Creative-Agent → 创意落盘 → Guardian-Agent → 校验 + Approve → Runn
 2. **视觉语言**：描述"摄像机看到的内容"，非文字叙事
 3. **纯正文解析**：从 `## Shot NN` 标题解析，不使用 YAML 数组
 4. **双语分离**：`prompt_en` 纯英文，其余中文
-5. **文档纯净**：严禁硬编码 `target_model` 等执行流配置（v0.5.14+）
+5. **文档纯净**：严禁硬编码 `target_model` 等执行流配置
 
 ---
 
@@ -165,7 +163,7 @@ Creative-Agent → 创意落盘 → Guardian-Agent → 校验 + Approve → Runn
 
 **核心机制**：
 1. **自动哨兵**：文件变动后自动提议 `opsv validate`，GREEN 放行 / RED 拦截
-2. **任务编排**：`opsv generate --skip-approved` → 巡检 `skipped.json` → 触发渲染
+2. **任务编排**：`opsv generate` → `opsv queue compile` → `opsv queue run`
 3. **标准文法**：强力维护目录主权（elements/scenes/shots）与 YAML 铁律
 4. **故障处理**：API 报错时检查 `.env` 配置，保留原始错误 JSON
 
@@ -183,9 +181,9 @@ Creative-Agent → 创意落盘 → Guardian-Agent → 校验 + Approve → Runn
 
 ---
 
-## 扩展体系：Addons (v0.5 新增)
+## 扩展体系：Addons
 
-从 v0.5 开始，创作大脑（创意技能）与管线模具（规范技能）实现了彻底解耦。
+创作大脑（创意技能）与管线模具（规范技能）实现了彻底解耦。
 
 ### 1. 技能解耦哲学
 - **规范技能 (opsv-*)**：定义"盒子"的形状。如：Script.md 该怎么排版，jobs.json 该怎么嵌套。这部分是工业化的刚性标准。
@@ -196,12 +194,12 @@ Creative-Agent → 创意落盘 → Guardian-Agent → 校验 + Approve → Runn
 
 ```bash
 # 安装漫剧专业插件包
-opsv addons install ./addons/comic-drama-v0.5.zip
+opsv addons install ./addons/comic-drama-v0.6.zip
 ```
 
 安装后，`Agent` 的配置文件会自动映射到这些新增的创作专家。
 
 ---
 
-> *"Agent 是灵魂，规范 Skill 是骨架，创意 Skill 是血肉，CLI 是双手。"*
-> *OpsV 0.5.19 | 最后更新: 2026-04-17*
+> *"Agent 是灵魂，规范 Skill 是骨架，创意 Skill 是血肉，Spooler Queue 是神经。"*
+> *OpsV 0.6.0 | 最后更新: 2026-04-17*

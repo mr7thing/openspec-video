@@ -1,6 +1,6 @@
 # OpsV 配置体系 (Configuration Guide)
 
-> 双重配置体系：密钥归密钥，参数归参数。一切生成行为由配置文件驱动。
+> 三重配置体系：服务归服务，密钥归密钥，参数归参数。一切行为由配置文件驱动。
 
 ---
 
@@ -8,6 +8,7 @@
 
 ```
 project/
+├── .env                        # 服务管理配置（端口等，v0.6 新增）
 └── .env/                       # 环境配置目录（git 忽略）
     ├── secrets.env             # API 密钥（绝密）
     └── api_config.yaml         # 引擎参数（可共享）
@@ -15,12 +16,32 @@ project/
 
 | 文件 | 存储内容 | Git 跟踪 | 修改频率 |
 |------|---------|---------|---------| 
-| `secrets.env` | API Key 等敏感信息 | ❌ 忽略 | 极少（初始化后不变） |
-| `api_config.yaml` | 模型参数、默认值、能力描述 | ❌ 忽略 | 偶尔（切换模型/调参时） |
+| `.env`（根目录文件） | 服务端口配置（Daemon / Review） | ✅ 跟踪 | 极少 |
+| `.env/secrets.env` | API Key 等敏感信息 | ❌ 忽略 | 极少（初始化后不变） |
+| `.env/api_config.yaml` | 模型参数、默认值、能力描述 | ❌ 忽略 | 偶尔（切换模型/调参时） |
 
 ---
 
-## 2. API 密钥配置 (`secrets.env`)
+## 2. 服务管理配置 (`.env` 根文件，v0.6.0 新增)
+
+```env
+# 全局 Daemon 服务端口 (支持 Chrome 浏览器扩展)
+OPSV_DAEMON_PORT=3061
+
+# Local UI Review 服务端口 (可视化审阅与交互)
+OPSV_REVIEW_PORT=3456
+```
+
+### 加载机制
+- `opsv daemon` 启动时通过 `dotenv` 加载，读取 `OPSV_DAEMON_PORT`
+- `opsv review` 启动时通过 `dotenv` 加载，读取 `OPSV_REVIEW_PORT`
+- 所有服务端口均提供默认值回退
+
+> **v0.6.0 设计原则**：服务端口从硬编码解耦至环境变量，第三方 Agent 或子系统在对接时**必须优先读取环境变量**进行连接。
+
+---
+
+## 3. API 密钥配置 (`secrets.env`)
 
 ### 格式
 
@@ -41,26 +62,19 @@ CLI 启动时按以下优先级加载环境变量：
 
 ```
 1 (最高) → .env/secrets.env    # 推荐存放位置
-2        → .env (文件)          # 标准 dotenv 文件（非目录）
+2        → .env (文件)          # 根目录 dotenv 文件（服务配置）
 3 (最低) → 系统环境变量         # process.env 兜底
-```
-
-### 验证方式
-
-```bash
-# 查看环境变量加载状态
-opsv gen-image --dry-run
 ```
 
 ---
 
-## 3. 引擎参数配置 (`api_config.yaml`)
+## 4. 引擎参数配置 (`api_config.yaml`)
 
-### 完整配置模板 (v0.5.19)
+### 完整配置模板 (v0.6.0)
 
 ```yaml
-# OpsV 0.5.x 多模态视频引擎调度配置文件
-# 调度器 (Dispatcher) 在发出请求前严格根据此表映射参数并执行优雅降级
+# OpsV 0.6.x Spooler Queue 模型配置
+# QueueWatcher 根据此表实例化对应 Provider
 
 models:
 
@@ -71,7 +85,6 @@ models:
     type: "image"
     enable: true
     model: "doubao-seedream-5-0-260128"
-    gen_command: "gen-image"
     required_env: ["VOLCENGINE_API_KEY"]
     features: ["txt2img", "img2img", "negative_prompt", "aspect_ratio"]
     defaults:
@@ -88,32 +101,17 @@ models:
     type: "image"
     enable: true
     model: "Qwen/Qwen-Image"
-    gen_command: "gen-image"
     required_env: ["SILICONFLOW_API_KEY"]
     features: ["txt2img", "aspect_ratio"]
     defaults:
       quality: "1024x1024"
       aspect_ratio: "1:1"
 
-  qwen-image-edit-2509:
-    provider: "siliconflow"
-    type: "image"
-    enable: true
-    model: "Qwen/Qwen-Image-Edit-2509"
-    gen_command: "gen-image"
-    required_env: ["SILICONFLOW_API_KEY"]
-    features: ["img2img", "edit"]
-    requires_reference: true          # 编辑模型强制要求参考图
-    defaults:
-      quality: "original"
-      aspect_ratio: "original"
-
   minimax-image-01:
     provider: "minimax"
     type: "image"
     enable: false
     model: "image-01"
-    gen_command: "gen-image"
     required_env: ["MINIMAX_API_KEY"]
     features: ["txt2img", "img2img", "aspect_ratio"]
     defaults:
@@ -126,7 +124,6 @@ models:
     type: "video"
     enable: true
     model: "doubao-seedance-1-5-pro"
-    gen_command: "gen-video"
     required_env: ["VOLCENGINE_API_KEY"]
     defaults:
       quality: "720p"
@@ -143,7 +140,6 @@ models:
     type: "video"
     enable: true
     model: "doubao-video-v2-fast"
-    gen_command: "gen-video"
     required_env: ["VOLCENGINE_API_KEY"]
     defaults:
       quality: "720p"
@@ -156,73 +152,42 @@ models:
     max_reference_images: 10
     supports_audio: true
     supports_video_ref: true
-
-  wan2.2-i2v:
-    provider: "siliconflow"
-    type: "video"
-    enable: false
-    model: "wan-ai/Wan2.1-T2V-14B"
-    gen_command: "gen-video"
-    required_env: ["SILICONFLOW_API_KEY"]
-    defaults:
-      size: "1280x720"
-      fps: 24
-      duration: 5
-    supports_first_image: true
-    max_reference_images: 0
-    supports_audio: false
-
-  minimax-video-01:
-    provider: "minimax"
-    type: "video"
-    enable: false
-    model: "MiniMax-Hailuo-2.3"
-    gen_command: "gen-video"
-    required_env: ["MINIMAX_API_KEY"]
-    defaults:
-      resolution: "1080P"
-      duration: 5
-    supports_first_image: true
-    supports_last_image: true
-    supports_reference_images: true
-    max_reference_images: 1
-    supports_audio: false
 ```
 
 ---
 
-## 4. 模型能力矩阵
+## 5. 模型能力矩阵
 
 ### 图像模型
 
-| 能力 | SeaDream 5.0 | Qwen Image | Qwen Edit | MiniMax Image |
-|------|:---:|:---:|:---:|:---:|
-| **文生图** | ✅ | ✅ | ❌ | ✅ |
-| **图生图** | ✅ | ❌ | ✅ (编辑) | ✅ |
-| **负面提示词** | ✅ | ❌ | ❌ | ❌ |
-| **画幅选项** | 5 种 | 固定 | 原图 | 多种 |
-| **分辨率** | 2K | 1024² | 原图 | 可配置 |
+| 能力 | SeaDream 5.0 | Qwen Image | MiniMax Image |
+|------|:---:|:---:|:---:|
+| **文生图** | ✅ | ✅ | ✅ |
+| **图生图** | ✅ | ❌ | ✅ |
+| **负面提示词** | ✅ | ❌ | ❌ |
+| **画幅选项** | 5 种 | 固定 | 多种 |
+| **分辨率** | 2K | 1024² | 可配置 |
 
 ### 视频模型
 
-| 能力 | Seedance 1.5 Pro | Seedance 2.0 Fast | Wan 2.1 | MiniMax Hailuo |
-|------|:---:|:---:|:---:|:---:|
-| **首帧参考** | ✅ | ✅ | ✅ | ✅ |
-| **尾帧参考** | ✅ | ✅ | ❌ | ✅ |
-| **角色参考图** | ✅ (≤9) | ✅ (≤10) | ❌ | ✅ (≤1) |
-| **空间音频** | ✅ | ✅ | ❌ | ❌ |
-| **视频参考** | ❌ | ✅ | ❌ | ❌ |
-| **分辨率** | 480p-1080p | 720p | 720p | 1080P |
+| 能力 | Seedance 1.5 Pro | Seedance 2.0 Fast |
+|------|:---:|:---:|
+| **首帧参考** | ✅ | ✅ |
+| **尾帧参考** | ✅ | ✅ |
+| **角色参考图** | ✅ (≤9) | ✅ (≤10) |
+| **空间音频** | ✅ | ✅ |
+| **视频参考** | ❌ | ✅ |
+| **分辨率** | 480p-1080p | 720p |
 
 ---
 
-## 5. 关键参数解读
+## 6. 关键参数解读
 
-### `type` 字段 (v0.5.15+)
-标注模型类型为 `"image"` 或 `"video"`，调度器据此路由到 `ImageModelDispatcher` 或 `VideoModelDispatcher`。
+### `type` 字段
+标注模型类型为 `"image"` 或 `"video"`，`opsv queue compile` 据此路由到 `StandardAPICompiler` 或 `ComfyUITaskCompiler`。
 
-### `requires_reference` 字段 (v0.5.16+)
-当设为 `true` 时，该模型为编辑类模型，Provider 会自动从分镜的 `frame_ref` 中提取参考图并进行 Base64 编码注入。
+### `provider` 字段 (v0.6.0 更新)
+直接对应 `opsv queue run <provider>` 的参数名。QueueWatcher 根据此字段实例化对应的 Provider 类。
 
 ### `global_style_postfix`（全局风格后缀）
 
@@ -232,46 +197,23 @@ models:
 [Shot Prompt] + [Asset Description] + [global_style_postfix]
 ```
 
-### 模型边界与优雅降级 (v0.5.14+)
-调度器会在派发前进行动态的资源边界测试 (Graceful Degradation)：
-- `max_reference_images`: 如果输入参考图超载，引擎将自动截断并抛出黄色警告。
-- `supports_audio` / `supports_video_ref`: 如果输入多模态音频或视频引用而设定为 false，派发器将自动剔除以免执行错误。
-
-### `required_env` / `fallback_env` 字段
+### `required_env` 字段
 
 声明模型所需的 API Key 环境变量名。CLI 在执行前查表校验，无需硬编码。
 
-| 字段 | 含义 | 示例 |
-|------|------|------|
-| `required_env` | 必需的 Key（至少一个存在） | `["VOLCENGINE_API_KEY"]` |
-| `fallback_env` | 备选 Key（required 不存在时尝试） | `["SEADREAM_API_KEY"]` |
-
 ---
 
-## 6. 模板与本地配置的关系
+## 7. 添加新模型 (v0.6.0 流程)
 
-```
-安装包（npm 包）               用户项目
-templates/.env/                 .env/
-├── api_config.yaml      →→→   ├── api_config.yaml   (opsv init 复制)
-└── secrets.env          →→→   └── secrets.env        (opsv init 复制)
-```
-
-- `opsv init` 将 `templates/.env/` 作为种子模板复制到新项目
-- 用户修改本地 `.env/` 不影响全局模板
-- 手动升级时可对比 `templates/.env/api_config.yaml` 获取新参数
-
----
-
-## 7. 添加新模型
-
-1. 在 `api_config.yaml` 中添加新模型配置块（含 `type`、`required_env`）
+1. 在 `api_config.yaml` 中添加新模型配置块（含 `type`、`provider`、`required_env`）
 2. 在 `secrets.env` 中添加对应的 API Key
-3. 在 `src/executor/providers/` 中实现对应的 Provider 类
-4. 在 `ImageModelDispatcher` 或 `VideoModelDispatcher` 中注册新 Provider
-5. 更新 `docs/07-API-REFERENCE.md` 添加接口文档
+3. 在 `src/executor/providers/` 中实现对应的 Provider 类（实现 `processTask(task)` 方法）
+4. 在 `src/commands/queue.ts` 的 `run` 命令中注册新 Provider
+5. 更新 `docs/cn/07-API-REFERENCE.md` 添加接口文档
+
+> **v0.6.0 注意**: 不再需要在 Dispatcher 中注册！Provider 直接通过 QueueWatcher 被调用。
 
 ---
 
 > *"配置即命令，参数即纪律。"*
-> *OpsV 0.5.19 | 最后更新: 2026-04-17*
+> *OpsV 0.6.0 | 最后更新: 2026-04-17*

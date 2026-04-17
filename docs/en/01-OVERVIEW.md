@@ -1,32 +1,37 @@
-# OpsV Project Panorama
+# OpsV Project Overview
 
-> **OpenSpec-Video (OpsV) 0.5.19** — An automation framework that compiles Markdown narratives into video/image generation tasks.
+> **OpenSpec-Video (OpsV) 0.6.0** — An automation framework that compiles Markdown narrative specs into video/image generation tasks.
 
 ---
 
-## 1. What is OpsV?
+## 1. What is OpsV
 
-OpsV is a **Spec-as-Code** video production pipeline. It allows creators (directors, PMs, art directors) to write stories, independently define assets (characters/scenes/props), and design shots in Markdown. The CLI then "compiles" these text specifications into executable JSON job queues.
-With the v0.5 refactoring, OpsV has fully moved into the **Spec-First** era. It now leverages **Dependency Graph Topological Sorting** and **Two-Stage Runtime Validation** to ensure a rock-solid automation engine.
+OpsV is a **Spec-as-Code** video production pipeline. It allows creators (directors/PMs/art directors) to write stories in Markdown, define assets (characters/scenes/props) independently, design storyboards, then compile these text specs into executable JSON task queues via CLI commands.
 
-**Core Principles**:
+With the v0.6.0 architecture revolution, OpsV achieves **physical isolation of intent and execution**:
+- `opsv generate` outputs pure intent outlines (`jobs.json`)
+- `opsv queue compile` compiles intents into API-specific atomic task cards
+- `opsv queue run` consumes task cards sequentially in single-threaded safety
 
-- **Spec-as-Code**: `.md` files are the single source of truth; images and videos are merely compilation artifacts.
-- **Dependency-Driven**: Relies on `## Approved References` to establish causal constraints between entities.
-- **Format Review**: Ensures 100% synchronization between metadata and output artifacts via the Review UI.
-- **Motion-Static Separation**: Decouples image generation from video generation pipelines to maintain consistency.
+**Core Beliefs**:
+
+- **Docs as Code**: `.md` files are the single source of truth; images and videos are merely compiled artifacts
+- **Dependency Driven**: `## Approved References` establishes causal constraints between entities
+- **Intent-Execution Separation**: Generate produces intent, Compile translates to API instructions, Run passively consumes
+- **Physical State Machine**: Tasks flow as atomic files through `pending → processing → completed/failed` directories
+- **Static-Dynamic Separation**: Image and video pipelines are independent, non-interfering
 
 ---
 
 ## 2. Tech Stack
 
 | Layer | Technology | Purpose |
-|-------|------------|---------|
-| Language | TypeScript | Core logic |
-| CLI Framework | Commander.js | Command Line Interface |
+|-------|-----------|---------|
+| Language | TypeScript | Core codebase |
+| CLI Framework | Commander.js | Command-line interface |
 | Communication | WebSocket (ws) | Daemon ↔ Browser Extension |
-| Configuration | dotenv + js-yaml | Env variables + YAML config |
-| Validation | Zod | Job schema validation |
+| Configuration | dotenv + js-yaml | Env vars + YAML config |
+| Validation | Zod | Job structure validation |
 | Logging | Winston | Unified logging system |
 | Parsing | unified + remark | Markdown/YAML parsing |
 | HTTP | Axios | API requests |
@@ -35,113 +40,99 @@ With the v0.5 refactoring, OpsV has fully moved into the **Spec-First** era. It 
 
 ## 3. Standard Directory Structure
 
-Project structure created by `opsv init`:
+Project skeleton created by `opsv init`:
 
 ```
 project/
 ├── .agent/                     # AI Agent configuration
-│   ├── Creative-Agent.md       # Creator: brainstorming + spec settlement
-│   ├── Guardian-Agent.md       # Guardian: validation + reflective sync
-│   ├── Runner-Agent.md         # Runner: compilation + rendering
-│   └── skills/                 # Skills library (9 Skills)
-│       ├── opsv-architect/
-│       ├── opsv-asset-designer/
-│       ├── opsv-script-designer/
-│       ├── opsv-animator/
-│       ├── opsv-brainstorming/
-│       ├── opsv-pregen-review/
-│       ├── opsv-ops-mastery/
-│       ├── opsv-enlightenment/
-│       └── animation-director/
-├── .antigravity/               # Antigravity tool configuration
-│   ├── rules/                  # Behavioral rules
-│   └── workflows/              # Workflow templates
+│   ├── Creative-Agent.md       # Creative Agent: brainstorm + spec anchoring
+│   ├── Guardian-Agent.md       # Guardian Agent: validation + sync
+│   ├── Runner-Agent.md         # Runner Agent: compile + render
+│   └── skills/                 # Skill manuals
+├── .env                        # Service management config (ports)
 ├── .env/                       # Environment config (git ignored)
 │   ├── secrets.env             # API keys
 │   └── api_config.yaml         # Engine parameters
-├── videospec/                  # Core narratives (Source of Truth)
-│   ├── project.md              # Global config & asset manifest
-│   ├── stories/                # Story outlines
-│   │   └── story.md
-│   ├── elements/               # Character/prop definitions
-│   │   ├── @role_hero.md
-│   │   └── @prop_sword.md
-│   ├── scenes/                 # Scene definitions
-│   │   └── @scene_forest.md
-│   └── shots/                  # Storyboards & animation scripts
-│       ├── Script.md           # Static composition
-│       └── Shotlist.md         # Motion & animation
+├── .opsv/                      # Runtime state (git ignored)
+│   └── dependency-graph.json   # Dependency graph snapshot
+├── .opsv-queue/                # Spooler physical mailbox (git ignored)
+│   ├── pending/{provider}/     # Pending tasks
+│   ├── processing/{provider}/  # In-progress tasks
+│   ├── completed/{provider}/   # Completed tasks
+│   └── failed/{provider}/      # Failed tasks
+├── videospec/                  # Core narrative assets (source of truth)
+│   ├── project.md
+│   ├── stories/
+│   ├── elements/
+│   ├── scenes/
+│   └── shots/
 ├── artifacts/                  # Generated outputs
-│   └── drafts_N/               # Batch N rendering drafts
-├── queue/                      # Job queues
-│   ├── jobs.json               # Image generation jobs
-│   └── video_jobs.json         # Video generation jobs
-├── GEMINI.md                   # Gemini persona config
+├── queue/                      # Intent queue
+│   └── jobs.json
 └── AGENTS.md                   # OpenCode/Trae unified protocol
 ```
 
 ---
 
-## 4. Vocabulary
+## 4. Core Concepts
 
-| Concept | Definition |
-|---------|------------|
+| Concept | Description |
+|---------|-------------|
 | **Spec-as-Code** | Using structured Markdown as the source code for video production. |
-| **Dependency Graph** | `New in v0.5`. Performs topological parsing at compile time. Blocks generation if prerequisite assets are not formally approved. |
-| **Review UI** | `New in v0.5`. Local Express Web interface replacing legacy CLI logic, allowing visual image selection, naming, and automated metadata writebacks. |
-| **@ Reference Syntax** | Invokes approved asset variants using tags like `@role_K` or `@scene_bar:morning`. |
-| **Motion-Static Separation** | Image pipeline (Script.md + Generator) and Video pipeline (Shotlist.md + Animator) are strictly independent. |
-| **frame_ref** | `New in v0.5`. Replaces schema_0_3. Standard data payload to pass first/last frame reference images to models. |
-| **Two-Stage Validation** | `New in v0.5`. Compile-time format checks combined with runtime hard-constraints (pixel sizes, aspect ratios, model token limits). |
-| **Graceful Degradation** | `New in v0.5.14`. Dispatcher dynamically detects model capability boundaries before dispatch, auto-stripping unsupported parameters with warnings. |
+| **Spooler Queue** | `v0.6` Physical file-based state machine for task scheduling, replacing the old in-memory Dispatcher. |
+| **Dependency Graph** | `v0.5` Topological parsing at compile time; blocks tasks whose dependencies aren't Approved. |
+| **Review UI** | `v0.5` Local Express web page for visual image selection, naming, and metadata writeback. |
+| **@ Reference Syntax** | Tags like `@role_K`, `@scene_bar` to invoke approved asset variants. |
+| **Intent-Execution Separation** | `v0.6` Generate produces pure intent JSON, Compile translates API instructions, Run passively consumes. |
+| **Service Topology** | `v0.6` Global Daemon / Local Review / Task Worker three-tier service classification. |
 
 ---
 
 ## 5. Quick Start
 
 ```bash
-# 1. Install
+# 1. Global install
 npm install -g videospec
 
-# 2. Init
-opsv init my-project
+# 2. Create new project
+opsv init my-mv-project
 
-# 3. Configure
-echo "VOLCENGINE_API_KEY=your_key" > .env/secrets.env
+# 3. Configure API keys
+echo "VOLCENGINE_API_KEY=your_key_here" > .env/secrets.env
 
-# 4. Write assets and shots (see Workflow guide)
+# 4. Write assets and storyboards
 
-# 5. Analyze dependencies
+# 5. Dependency check
 opsv deps
 
-# 6. Generate jobs
+# 6. Compile intent outline
 opsv generate
 
-# 7. Image generation
-opsv gen-image
+# 7. Compile to API-specific atomic tasks
+opsv queue compile queue/jobs.json --provider seadream
 
-# 8. Web Review
+# 8. Execute tasks (single-threaded sequential)
+opsv queue run seadream
+
+# 9. Visual review
 opsv review
-
-# 9. Animate & generate video
-opsv animate
-opsv gen-video
 ```
 
 ---
 
-## 6. Documentation (EN)
+## 6. Related Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Workflow Guide](./02-WORKFLOW.md) | Three-role collaboration cycle |
-| [CLI Reference](./03-CLI-REFERENCE.md) | All 9 commands in detail |
-| [Agents & Skills](./04-AGENTS-AND-SKILLS.md) | 3 Agents + 9 Skills |
+| [Workflow Guide](./02-WORKFLOW.md) | Three-role collaboration flow |
+| [CLI Reference](./03-CLI-REFERENCE.md) | Complete command reference |
+| [Agents & Skills](./04-AGENTS-AND-SKILLS.md) | 3 roles + 9 skills |
 | [Document Standards](./05-DOCUMENT-STANDARDS.md) | Four-layer architecture, YAML templates, @ syntax |
-| [Configuration](./06-CONFIGURATION.md) | .env directory & engine parameters |
-| [API Reference](./07-API-REFERENCE.md) | Multi-model interface protocol |
+| [Configuration](./06-CONFIGURATION.md) | .env directory and engine parameters |
+| [API Reference](./07-API-REFERENCE.md) | Spooler Queue Provider protocol |
+| [Server Architecture](../Server-Architecture.md) | Service topology and lifecycle management |
 
 ---
 
-> *"Code is for humans to read, and only incidentally for machines to execute."*
-> *OpsV 0.5.19 | Latest Update: 2026-04-17*
+> *"Code is written for humans to read, and only incidentally for machines to execute."*
+> *OpsV 0.6.0 | Last updated: 2026-04-17*

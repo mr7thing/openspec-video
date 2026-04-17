@@ -1,190 +1,175 @@
-# CLI Reference (v0.5.19)
+# CLI Reference (v0.6.0)
 
 ## Command Overview
 
 | Command | Description | Phase |
 |---------|-------------|-------|
-| `opsv init` | Initialize project structure | Setup |
-| `opsv generate` | Compile documents to image generation jobs | Image Pipeline |
-| `opsv gen-image` | Execute image generation (call APIs) | Image Pipeline |
-| `opsv review` | Launch Review page service | Review |
-| `opsv deps` | Analyze asset dependency graph | Analysis |
-| `opsv animate` | Compile Shotlist to video jobs | Video Pipeline |
-| `opsv gen-video` | Execute video generation (call APIs) | Video Pipeline |
-| `opsv addons` | Manage extension packs and skills | Extensions |
+| `opsv init` | Initialize project structure | Project Setup |
+| `opsv generate` | Compile docs to intent outline (jobs.json) | Intent Compilation |
+| `opsv queue compile` | Compile intent to API atomic tasks | Task Delivery |
+| `opsv queue run` | Start QueueWatcher to consume tasks | Task Execution |
+| `opsv review` | Start Review page server | Review |
+| `opsv deps` | Analyze asset dependencies | Analysis |
+| `opsv animate` | Compile Shotlist to video intent | Video Pipeline |
+| `opsv addons` | Manage extension plugins and skill packs | Extensions |
 | `opsv daemon` | Global background service management | Infrastructure |
+
+> **v0.6.0 Breaking Change**: `opsv gen-image` and `opsv gen-video` have been removed. All execution goes through `opsv queue compile` + `opsv queue run`.
+
+---
 
 ## opsv init
 
 Initialize OpsV project structure.
 
 ```bash
-opsv init
+opsv init                          # Interactive mode
+opsv init my-project --claude      # Non-interactive with flags
 ```
 
-Creates directory structure:
-```
-videospec/
-├── elements/       # Element documents
-├── scenes/         # Scene documents
-├── shots/          # Storyboard documents
-└── project.md      # Project configuration
-.agent/
-├── Creative-Agent.md
-├── Guardian-Agent.md
-├── Runner-Agent.md
-└── skills/         # 9 skill manuals
-.env/
-├── secrets.env     # API keys
-└── api_config.yaml # Model configuration
-```
-
-## opsv generate
-
-Compile Markdown documents into image generation jobs (`jobs.json`).
-
-```bash
-opsv generate                        # Compile all normative directories
-opsv generate videospec/elements     # Compile specific directory
-opsv generate -p                     # Preview mode (first shot only)
-opsv generate --shots 1,5,12         # Specific shots
-```
-
-**v0.5 Changes**:
-- Integrated DependencyGraph strict mode — unapproved dependencies are auto-blocked
-- Integrated compile-time validation (quote sanitization, required field checks)
-- Script.md parsed from body `## Shot NN` headers, not frontmatter `shots[]`
-- Outputs batch-numbered `jobs_batch_N.json`
+### Options
 
 | Option | Description |
 |--------|-------------|
-| `-p, --preview` | Preview mode, first shot only |
-| `--shots <list>` | Comma-separated shot IDs |
+| `-g, --gemini` | Gemini support |
+| `-c, --claude` | Claude Code support |
+| `-x, --codex` | Codex/Cursor support |
+| `-o, --opencode` | OpenCode support |
+| `-t, --trae` | Trae support |
 
-## opsv gen-image
+Creates: `videospec/`, `.agent/`, `.env/`, `.opsv/`, `.opsv-queue/`, `artifacts/`, `queue/`, `.gitignore`
 
-Execute image generation jobs.
+---
+
+## opsv generate
+
+Compile Markdown docs to pure intent outline.
 
 ```bash
-opsv gen-image                       # All enabled models
-opsv gen-image -m seadream-5.0-lite  # Specific model
-opsv gen-image -m seadream-5.0-lite,qwen-image  # Multiple models
-opsv gen-image --dry-run             # Validate only
-opsv gen-image -s                    # Skip failed, continue
+opsv generate                      # All spec directories
+opsv generate videospec/elements   # Specific directory
+opsv generate -p                   # Preview mode (first shot only)
+opsv generate --shots 1,5,12       # Specific shots
 ```
 
-**v0.5.16 Changes**:
-- SiliconFlow image dispatch officially integrated into ImageModelDispatcher
-- Supports Qwen multi-modal text-to-image and instruction-based image editing models
+**Output**: `queue/jobs.json` — pure business intent, no API-specific parameters.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-m, --model <model>` | Target model(s), comma-separated or "all" | `all` |
-| `-c, --concurrency <num>` | Concurrency | `1` |
-| `-s, --skip-failed` | Skip failed jobs | `false` |
-| `--dry-run` | Validate only | `false` |
+---
+
+## opsv queue compile
+
+Compile intent outline to API-specific atomic task cards.
+
+```bash
+opsv queue compile queue/jobs.json --provider seadream      # Standard API
+opsv queue compile queue/jobs.json --provider runninghub    # ComfyUI workflow
+```
+
+| Provider | Compiler | Description |
+|----------|----------|-------------|
+| `comfyui_local` / `runninghub` | `ComfyUITaskCompiler` | Loads Addon workflow templates |
+| Others (seadream, minimax...) | `StandardAPICompiler` | Standard HTTP API payload |
+
+**Output**: Individual `UUID.json` files in `.opsv-queue/pending/{provider}/`
+
+---
+
+## opsv queue run
+
+Start QueueWatcher for single-threaded task consumption.
+
+```bash
+opsv queue run seadream
+opsv queue run minimax
+opsv queue run siliconflow
+opsv queue run comfyui_local
+opsv queue run runninghub
+```
+
+- Single-threaded sequential processing
+- Physical state flow: `pending → processing → completed/failed`
+- Ctrl+C breakpoint recovery supported
+- Provider names are case-insensitive
+
+---
 
 ## opsv review
 
-**v0.5 New**: Launch local Review page service.
+Start local Review page server.
 
 ```bash
-opsv review                          # Default port 3456
-opsv review -p 8080                  # Custom port
-opsv review -b 3                     # Specific batch
+opsv review                        # Default port from OPSV_REVIEW_PORT
+opsv review -p 8080                # Custom port
+opsv review -b 3                   # Specific batch
 ```
-
-Review Page Features:
-- 📸 Candidate images grouped by job (multi-model comparison)
-- ✅ Multi-select approve (custom variant name or auto-numbered)
-- 📝 Draft rollback (record modification notes for iteration)
-- 📋 Format check (detect missing frontmatter fields)
-- 🔄 Automatic `git commit`
-
-Approve auto-executes:
-1. Copy selected image to `artifacts/` with new name
-2. Write-back `## Approved References` to source document
-3. Update `status: approved`
-4. Append `reviews` record
-5. Execute `git add . && git commit`
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-p, --port <port>` | Service port | `3456` |
-| `-b, --batch <num>` | Batch number (default: latest) | latest |
+| `-p, --port <port>` | Server port | `OPSV_REVIEW_PORT` or `3456` |
+| `-b, --batch <num>` | Batch number | Latest |
+
+---
 
 ## opsv deps
 
-**v0.5 New**: Analyze asset dependencies and display recommended generation order.
+Analyze asset dependency graph.
 
 ```bash
 opsv deps
 ```
 
+Output: Dependency analysis with recommended generation order. Saves to `.opsv/dependency-graph.json`.
+
+---
+
 ## opsv animate
 
-Compile Shotlist.md to video generation jobs.
+Compile Shotlist.md to video generation intent.
 
 ```bash
 opsv animate
 ```
 
-**v0.5 Changes**: Uses `frame_ref` instead of `schema_0_3`. Removed `middle_image`.
-
-## opsv gen-video
-
-Execute video generation jobs.
-
-```bash
-opsv gen-video                       # All enabled video models
-opsv gen-video -m seedance-1.5-pro   # Specific model
-opsv gen-video --dry-run             # Validate only
-```
-
-**v0.5.15 Changes**:
-- Seedance Provider implemented
-- Supports Seedance 2.0 Fast turbo mode
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-m, --model <model>` | Target model | `all` |
-| `-s, --skip-failed` | Skip failed jobs | `false` |
-| `--dry-run` | Validate only | `false` |
+---
 
 ## opsv daemon
 
-Global background service management.
+Global background service management (Chrome Extension support).
 
 ```bash
-opsv daemon start    # Start
-opsv daemon stop     # Stop
-opsv daemon status   # View status
+opsv daemon start    # Port from OPSV_DAEMON_PORT or default 3061
+opsv daemon stop
+opsv daemon status
 ```
+
+---
 
 ## opsv addons
 
-**v0.5 New**: Manage project extensions and domain-specific skill packs.
+Manage extension plugins and skill packs.
 
 ```bash
-# Install addon pack (.zip)
-opsv addons install ./addons/comic-drama-v0.5.zip
+opsv addons install ./addons/comic-drama-v0.6.zip
 ```
 
-Installation Logic:
-- Validates that the current directory is an active OpsV project.
-- Merges the `.agent/` directory from the Zip pack into the project root.
-- Lists the newly installed expert skills and agent roles upon completion.
+---
 
 ## Typical Workflow
 
 ```bash
-opsv init                            # 1. Initialize
-# Write documents (elements/*.md, scenes/*.md, Script.md)
-opsv deps                            # 3. Analyze dependencies
-opsv generate                        # 4. Compile jobs
-opsv gen-image --dry-run             # 5a. Validate
-opsv gen-image                       # 5b. Execute
-opsv review                          # 6. Review & Approve
-opsv animate                         # 7. Video pipeline
-opsv gen-video                       # 8. Generate videos
+opsv init
+# Write docs...
+opsv deps
+opsv generate
+opsv queue compile queue/jobs.json --provider seadream
+opsv queue run seadream
+opsv review
+# Iterate...
+opsv animate
+opsv queue compile queue/video_jobs.json --provider seedance
+opsv queue run seedance
 ```
+
+---
+
+> *OpsV 0.6.0 | Last updated: 2026-04-17*

@@ -1,70 +1,60 @@
-# OpsV Provider 接口规范（v0.5.19）
+# OpsV Provider 接口规范（v0.6.0）
 
-> 本文件记录所有图像/视频生成 Provider 必须遵守的接口契约与接入规范。
+> 本文件记录所有图像/视频生成 Provider 必须遵守的接口契约与 Spooler Queue 接入规范。
 
 ---
 
-## 1. 设计理念（强制接口）
+## 1. 架构革命（v0.6.0）
 
-**v0.5.2 起，`generateAndDownload` 是所有 Provider 唯一的必须方法。**
-
-旧的两步式模式（`generateImage` 返回 URL → Dispatcher 手动下载）已废除。每个 Provider 现在作为完整的"提交-轮询-下载"执行单元，Dispatcher 无需关心内部细节，只调用一个方法，一个承诺。
+**v0.6.0 彻底废除了 Dispatcher 调度模式。** 旧版 `ImageModelDispatcher` / `VideoModelDispatcher` 已被删除，取而代之的是基于物理文件的 **Spooler Queue** 架构。
 
 ```
-之前（废弃）:
-  Dispatcher → provider.generateImage() → result.url
-  Dispatcher → download(result.url) → 写盘
-  缺陷：Dispatcher 必须知道每个 Provider 的保存策略 → instanceof 死代码
+之前（已废弃 — Dispatcher 模式）:
+  CLI → Dispatcher.dispatch(jobs) → provider.generateAndDownload(job, model, apiKey, path)
+  问题：Dispatcher 必须知道所有 Provider 的注册关系 → 中心化瓶颈
 
-之后（现行）:
-  Dispatcher → provider.generateAndDownload(job, model, apiKey, outputPath)
-  Provider 内部承担：提交 + 轮询 + 下载 + 写盘
-  好处：接口即合约，无 instanceof，无分支，新增 Provider 零侵入
+之后（现行 — Spooler Queue 模式）:
+  opsv generate → jobs.json (纯意图)
+  opsv queue compile → .opsv-queue/pending/{provider}/UUID.json (原子载荷)
+  opsv queue run {provider} → QueueWatcher → provider.processTask(task)
+  优势：物理解耦，新增 Provider 零侵入，支持断点恢复
 ```
 
 ---
 
 ## 2. 接口定义
 
-### 2.1 ImageProvider
+### 2.1 Provider 通用接口
+
+所有 Provider 必须实现 `processTask` 方法，由 QueueWatcher 逐一调用：
 
 ```typescript
-export interface ImageProvider {
-    /** 唯一标识符，对应 api_config.yaml 中的 provider 字段 */
-    providerName: string;
+// Provider 接口契约（v0.6.0）
+interface SpoolerProvider {
+    /** 处理从物理信箱中取出的单个原子任务 */
+    processTask(task: SpoolerTask): Promise<any>;
+}
 
-    /**
-     * 执行完整的图像生成→写盘流程（唯一必须方法）
-     */
-    generateAndDownload(
-        job: Job,
-        modelName: string,
-        apiKey: string,
-        outputPath: string
-    ): Promise<void>;
-
-    /** 可选：能力探针 */
-    supportsFeature?(feature: string): boolean;
+// SpoolerTask 结构
+interface SpoolerTask {
+    uuid: string;          // 任务唯一 ID
+    payload: any;          // 编译器产出的 API 特定载荷
+    metadata: {
+        provider: string;  // 来源 Provider 标识
+        createdAt: string; // 创建时间
+    };
 }
 ```
 
-### 2.2 VideoProvider
+### 2.2 QueueWatcher 调用协议
 
 ```typescript
-export interface VideoProvider {
-    /** 唯一标识符 */
-    providerName: string;
-
-    /**
-     * 执行完整的视频生成→写盘流程
-     */
-    generateAndDownload(
-        job: Job,
-        modelName: string,
-        apiKey: string,
-        outputPath: string
-    ): Promise<void>;
-}
+// QueueWatcher 逐一消费 — 无 instanceof，无分支
+const task = await queue.dequeue();
+const result = await provider.processTask(task);
+await queue.markCompleted(task.uuid, result);
+// 失败时:
+await queue.markFailed(task.uuid, error);
 ```
 
 ---
@@ -73,21 +63,26 @@ export interface VideoProvider {
 
 ### 图像 Provider
 
-| Provider 类 | 文件 | 供应商 | 状态 |
-|-------------|------|--------|------|
-| `SeaDreamProvider` | providers/SeaDreamProvider.ts | 火山引擎 | ✅ 已实现 |
-| `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow (影/像双修) | ✅ 已实现 (v0.5.16) |
-| `MinimaxImageProvider` | providers/MinimaxImageProvider.ts | MiniMax | ✅ 已实现 |
+| Provider 类 | 文件 | 供应商 | 队列 Provider 名 |
+|-------------|------|--------|------------------|
+| `SeaDreamProvider` | providers/SeaDreamProvider.ts | 火山引擎 | `seadream` |
+| `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow | `siliconflow` |
+| `MinimaxImageProvider` | providers/MinimaxImageProvider.ts | MiniMax | `minimax` |
 
 ### 视频 Provider
 
-| Provider 类 | 文件 | 供应商 | 状态 |
-|-------------|------|--------|------|
-| `SeedanceProvider` | providers/SeedanceProvider.ts | 火山引擎 (Seedance) | ✅ 已实现 (v0.5.15) |
-| `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow (Wan 2.1) | ✅ 已实现 |
-| `MinimaxVideoProvider` | providers/MinimaxVideoProvider.ts | MiniMax (Hailuo) | ✅ 已实现 |
+| Provider 类 | 文件 | 供应商 | 队列 Provider 名 |
+|-------------|------|--------|------------------|
+| `SeedanceProvider` | providers/SeedanceProvider.ts | 火山引擎 | `seedance` |
+| `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow | `siliconflow` |
+| `MinimaxVideoProvider` | providers/MinimaxVideoProvider.ts | MiniMax | `minimax` |
 
-> **注意**：`SiliconFlowProvider` 同时承担图像和视频两种职责，根据 `api_config.yaml` 中模型的 `type` 字段自动切换端点（`/generations` vs `/submit`）。
+### ComfyUI Provider
+
+| Provider 类 | 文件 | 说明 | 队列 Provider 名 |
+|-------------|------|------|------------------|
+| `ComfyUILocalProvider` | providers/ComfyUILocalProvider.ts | 本地 ComfyUI 实例 | `comfyui_local` |
+| `RunningHubProvider` | providers/RunningHubProvider.ts | RunningHub 云端 | `runninghub` |
 
 ---
 
@@ -99,28 +94,28 @@ export interface VideoProvider {
 2. **强力证据式日志**：任何非 2xx 或格式异常必须 `JSON.stringify(rawResponse)` 记录完整载荷，禁止模糊 `undefined` 输出。
 3. **Axios 防空逻辑**：必须区分 `error.response`（API 业务错误）和 `error.code`（如 `ETIMEDOUT`，网络中断）。
 
-### 4.2 接入步骤清单
+### 4.2 接入步骤清单 (v0.6.0 流程)
 
 ```
 需要实现：
-  ✅ providerName: string（匹配 api_config.yaml 的 provider 字段）
-  ✅ generateAndDownload(job, modelName, apiKey, outputPath): Promise<void>
+  ✅ 创建 Provider 类文件: src/executor/providers/YourProvider.ts
+  ✅ 实现 processTask(task: SpoolerTask): Promise<any>
   
-  ✅ 内部实现：
-     1. 从 job.payload 读取参数
+  ✅ processTask 内部实现：
+     1. 从 task.payload 读取参数
      2. POST 提交生成请求（按官方 API 格式）
      3. 轮询直到完成（建议间隔 3-5 秒，超时抛异常）
-     4. 下载图片/视频 Buffer，写入 outputPath
-     5. 验证文件存在且大小 > 0
+     4. 下载图片/视频 Buffer，写入目标路径
+     5. 返回结果对象
 
 需要注册：
-  ✅ 在 ImageModelDispatcher 或 VideoModelDispatcher 中注册
+  ✅ 在 src/commands/queue.ts 的 run 命令中添加 provider 分支
   ✅ 在 api_config.yaml 中配置 provider 和 type 字段
 
 禁止：
+  ❌ 创建新的 Dispatcher（Dispatcher 模式已废弃）
   ❌ 在 Provider 内部使用 instanceof 检测其他 Provider
-  ❌ 返回 ImageGenerationResult（旧接口，已废弃）
-  ❌ 让 Dispatcher 知道 URL 下载逻辑
+  ❌ 在 Provider 内部假设载荷结构（从 task.payload 读取）
 ```
 
 ### 4.3 超时约定
@@ -137,24 +132,48 @@ while (Date.now() < deadline) {
 }
 
 if (Date.now() >= deadline) {
-    throw new Error(`生成超时 (${TIMEOUT_MS / 1000}s): ${job.id}`);
-    // ↑ 含 "超时" 关键词，Dispatcher 可识别
+    throw new Error(`生成超时 (${TIMEOUT_MS / 1000}s): ${task.uuid}`);
 }
 ```
 
 ---
 
-## 5. Dispatcher 调用协议（内部）
+## 5. Spooler Queue 物理状态机
 
-Dispatcher 唯一职责：**路由 + 注入配置 + 统计结果**。
+```
+.opsv-queue/
+├── pending/{provider}/      # 待执行 — compile 投递的原子 JSON
+├── processing/{provider}/   # 执行中 — QueueWatcher 原子提取
+├── completed/{provider}/    # 已完成 — 归档含结果
+└── failed/{provider}/       # 已失败 — 归档含错误信息
+```
 
-```typescript
-// ImageModelDispatcher / VideoModelDispatcher 伪码
-await provider.generateAndDownload(job, targetModel, apiKey, finalOutputPath);
-// 就这一行，无 instanceof，无分支
+### 状态流转
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: queue compile
+    pending --> processing: QueueWatcher.dequeue()
+    processing --> completed: processTask 成功
+    processing --> failed: processTask 异常
+    failed --> pending: 人工重试（移动文件）
 ```
 
 ---
 
-> *「接口是合约，文档是保险，测试是证明。」*
-> *OpsV v0.5.19 | 更新时间: 2026-04-17*
+## 6. 编译器协议
+
+### StandardAPICompiler
+- 将 `Job` 对象序列化为 UUID.json 原子文件
+- 注入 provider 元数据
+- 适用于所有原生 HTTP API（SeaDream, Minimax, SiliconFlow）
+
+### ComfyUITaskCompiler
+- 加载 Addon 中的 JSON 工作流模板
+- 通过节点标题约定（`input-prompt`, `input-image1`）进行参数注入
+- 适用于 ComfyUI 类执行环境（Local / RunningHub）
+
+---
+
+> *「物理状态机替代内存调度，文件即证据，目录即状态。」*
+> *OpsV v0.6.0 | 更新时间: 2026-04-17*
