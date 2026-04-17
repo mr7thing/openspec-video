@@ -1,0 +1,15 @@
+providers:
+  comfyui_local:
+    type: "local_comfyui"
+    endpoint: "http://127.0.0.1:8188"
+    skills:
+      - "comic-drama-architect"
+
+  runninghub:
+    type: "runninghub_comfyui"
+    api_key: "Bearer YOUR_API_KEY_HERE"
+    skills:
+      - "comic-drama-director"
+
+queue:
+  base_dir: "Workspace/.opsv-queue"

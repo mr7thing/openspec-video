@@ -2,7 +2,6 @@ import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
 import { JobGenerator } from '../automation/JobGenerator';
-import { isDaemonRunning, startDaemon, registerProject } from '../utils/daemonUtils';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -34,13 +33,8 @@ export function registerGenerateCommand(program: Command, VERSION: string) {
                     skipApproved: options.skipApproved,
                 });
 
-                if (!isDaemonRunning()) {
-                    logger.info('自动启动 OpsV Server...');
-                    startDaemon();
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-
-                registerProject(projectRoot);
+                logger.info('\n📂 意图生成完毕。接下来请执行编译命令：');
+                logger.info('   $ opsv queue compile queue/jobs.json --provider <目标API>');
             } catch (err) {
                 logger.error(`编译失败: ${(err as Error).message}`);
                 process.exit(1);

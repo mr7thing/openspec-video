@@ -53,7 +53,8 @@ export function stopDaemon() {
 }
 
 export function registerProject(projectRoot: string) {
-    const ws = new WebSocket('ws://127.0.0.1:3061');
+    const port = process.env.OPSV_DAEMON_PORT || '3061';
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
     ws.on('open', () => {
         const payload = JSON.stringify({
             type: 'REGISTER_PROJECT',
@@ -72,6 +73,6 @@ export function registerProject(projectRoot: string) {
         });
     });
     ws.on('error', (err) => {
-        console.warn(`Failed to connect to Global Daemon at 3061: ${err.message}. Ensure it is running to use the extension.`);
+        console.warn(`Failed to connect to Global Daemon at ${port}: ${err.message}. Ensure it is running to use the extension.`);
     });
 }

@@ -13,7 +13,7 @@ export function registerReviewCommand(program: Command) {
     program
         .command('review')
         .description('启动 Review 页面服务，可视化审阅候选图并 Approve')
-        .option('-p, --port <port>', '服务端口', '3456')
+        .option('-p, --port <port>', '服务端口', process.env.OPSV_REVIEW_PORT || '3456')
         .option('-b, --batch <batch>', '指定批次号: all, 1:4, 或 1,3,5 (默认最新批次)', 'latest')
         .action(async (options) => {
             const projectRoot = process.cwd();

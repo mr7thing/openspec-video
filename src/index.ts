@@ -1,7 +1,6 @@
 import { config } from 'dotenv';
 import { SpecParser } from './core/SpecParser';
 import { AssetManager } from './core/AssetManager';
-import { VideoModelDispatcher } from './executor/VideoModelDispatcher';
 import path from 'path';
 
 // 加载项目根目录下的 .env 文件
@@ -19,25 +18,8 @@ async function main() {
         // ---- 0.3 新增 CLI 原语测试入口 ----
         const args = process.argv.slice(2);
         if (args[0] === 'execute') {
-            const fs = await import('fs');
-            const jobsPath = path.join(projectRoot, 'queue', 'video_jobs.json');
-            if (fs.existsSync(jobsPath)) {
-                const rawJobs = fs.readFileSync(jobsPath, 'utf8');
-                const jobs = JSON.parse(rawJobs);
-
-                const dispatcher = new VideoModelDispatcher(projectRoot);
-                console.log(`\n▶ Starting Execution Pipeline for ${jobs.length} jobs...\n`);
-
-                try {
-                    // 交给 Dispatcher 管理内部的时序和挂起
-                    await dispatcher.dispatchAll(jobs, 'wan2.2-i2v');
-                } catch (e: any) {
-                    console.error(`[Main] ❌ Pipeline terminated unexpectedly: ${e.message}`);
-                }
-            } else {
-                console.log('No video_jobs.json found to execute.');
-            }
-            return;
+             console.log("Use OpsV CLI to execute jobs now.");
+             return;
         }
 
     } catch (error) {
