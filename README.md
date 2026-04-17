@@ -1,12 +1,8 @@
-# OpenSpec-Video (OpsV) 0.5.16 (Precision Editing Era)
- 
-Professional, **Spec-First** video production pipeline.
-
-# OpenSpec-Video (OpsV) 0.5.0
+# OpenSpec-Video (OpsV) 0.6.0 (Spooler Queue Era)
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
-> **Spec-as-Code** framework that compiles Pure Markdown narratives into automated video & image generation tasks for AI models.
+> **Spec-as-Code** framework that compiles Narrative Markdown into industrial-grade video & image generation tasks via physical state machines.
 
 ---
 
@@ -18,41 +14,62 @@ Professional, **Spec-First** video production pipeline.
 
 ## 💡 What is OpsV? / 什么是 OpsV?
 
-OpsV is a professional, **Spec-First** video production pipeline. It allows creators to write stories and design shots using structured Markdown. The CLI tool uses a **Dependency Graph** to "compile" these specifications into executable job queues for models like **Vidu, Kling, Minimax, and SiliconFlow**.
+OpsV is a professional, **Spec-First** video production pipeline. v0.6.0 introduces the **Spooler Queue** architecture, a major leap in reliability that isolates creative intent from API execution using a physical file-based state machine.
 
-OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。它允许创作者使用纯粹的 Markdown 编写故事和设计分镜，CLI 工具通过**依赖图 (Dependency Graph)** 将这些规范“编译”为可执行的任务队列，驱动 **Vidu, Kling, Minimax, SiliconFlow** 等模型进行生成。
+OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。v0.6.0 引入了全新的 **Spooler Queue (物理排队论)** 架构，通过物理文件状态机实现了创意意图与 API 执行的彻底解耦，极大提升了工业级生产的鲁棒性。
 
 ---
 
 ## 🚀 Quick Start / 快速开始
 
 ```bash
-# Install
+# Install / 安装
 npm install -g videospec
 
-# Initialize Project
+# Initialize Project / 项目初始化 (v0.6 自动创建运行时目录)
 opsv init my-project
 
-# (Optional) Install Creative Addon Pack / 安装创作插件包
-opsv addons install ./addons/comic-drama-v0.5.zip
+# 1. Compile Spec -> Intent Outline / 编译意图大纲
+opsv generate        
 
-# Standard Workflow
-opsv generate        # Compile Spec -> Jobs (Markdown parsing)
-opsv gen-image       # Render Images
-opsv review          # Web-based Review & Feedback UI
-opsv animate         # Compile Animation -> Video Jobs (@FRAME inheritance)
-opsv gen-video       # Render Videos
+# 2. Atomize Intent -> API Tasks / 原子化编译任务 (v0.6 新增)
+opsv queue compile queue/jobs.json --provider seadream
+
+# 3. Consume & Execute / 顺序执行任务 (v0.6 新增)
+opsv queue run seadream
+
+# 4. Web-based Review / 可视化审阅
+opsv review          
+
+# 5. Video Pipeline / 视频管线
+opsv animate         
+opsv queue compile queue/video_jobs.json --provider seedance
+opsv queue run seedance
 ```
+
+---
+
+## 🏗️ Core Architecture: Spooler Queue (v0.6)
+
+In v0.6.0, we replaced the in-memory **Dispatcher** with a robust **Physical State Machine**. All generation tasks now flow through the `.opsv-queue/` directory:
+
+在 v0.6.0 中，我们用稳健的**物理状态机**取代了内存中的 **Dispatcher**。所有生成任务现在都流经 `.opsv-queue/` 目录：
+
+1. **Pending**: Tasks waiting to be executed.
+2. **Processing**: Atomic task being handled by a provider (Locked).
+3. **Completed / Failed**: Final archival with full result traces or error logs.
+
+This allows for **breakpoint recovery**, **single-threaded safety**, and **zero-collision execution**.
 
 ---
 
 ## 🛠️ Key Features / 核心特性
 
-- **Pure Markdown Spec**: 100% human-readable shot definitions. No more YAML arrays in `Script.md`.
-- **Addon Ecosystem**: Decoupled creative skills. Swap between "Mini-Drama", "Music Video", or "Commercial" brain packs using `opsv addons`.
+- **Intent-Execution Decoupling**: `generate` only cares about *what* you want; `queue run` only cares about *how* to call the API.
+- **Physical State Machine**: No more lost tasks due to crashes. Everything is persisted on disk.
+- **Unified Server Topology**: Standardized service layers (Global Daemon vs. Local Review) with port configuration via `.env`.
 - **Dependency Graph Engine**: Automated task resolution. The framework understands that a video segment depends on a specific approved frame.
-- **Web Review UI**: A modern Express-based interface for visual asset selection and one-click feedback.
-- **Motion-Static Separation**: Decouples visual appearance from animation instructions for better concept stability.
+- **Pure Markdown Spec**: 100% human-readable shot definitions. No more complex YAML arrays.
 
 ---
 
@@ -65,80 +82,39 @@ opsv gen-video       # Render Videos
 | **CLI Reference** / 命令参考     | [Link](./docs/en/03-CLI-REFERENCE.md)      | [链接](./docs/cn/03-CLI-REFERENCE.md)      |
 | **Agents & Skills** / 角色与技能 | [Link](./docs/en/04-AGENTS-AND-SKILLS.md)  | [链接](./docs/cn/04-AGENTS-AND-SKILLS.md)  |
 | **Spec Standards** / 规范标准    | [Link](./docs/en/05-DOCUMENT-STANDARDS.md) | [链接](./docs/cn/05-DOCUMENT-STANDARDS.md) |
+| **Server Arch** / 服务架构       | [Link](./docs/Server-Architecture.md)      | [链接](./docs/Server-Architecture.md)      |
 
 ---
 
-> *OpsV 0.5.16 | 2026-04-16*
+> *OpsV 0.6.0 | 2026-04-17*
 
 ---
 
 ## 🆕 Release Notes / 更新说明
 
-## 🚀 图像精修与混合模型驱动 (v0.5.16)
-### 1. SiliconFlow 图像大版图接入
-- **Qwen 图像双子星**: 
-    - `qwen-image`: 正式支持 Qwen 多模态文生图，提供高质量的审美底座。
-    - `qwen-image-edit-2509`: 引入指令式图像编辑模型。OpsV 现从“盲目生成”跨入“精准重绘”时代。
-- **混合驱动架构 (Hybrid Provider)**: `SiliconFlowProvider` 现已重构为“影/像双修”架构，能够根据模型语义自动切换端点（`/submit` vs `/generations`）。
+## 🚀 架构革命：Spooler Queue 物理排队论 (v0.6.0)
 
-### 2. 指令重绘工作流
-- **智能图像注入**: 针对编辑类模型，Provider 会自动从分镜的 `frame_ref` 中提取首帧/参考图并进行 Base64 编码注入。
-- **调度器拓扑更新**: `ImageModelDispatcher` 正式接管 SiliconFlow 图像派发逻辑，实现单镜渲染的无缝衔接。
+### 1. Dispatcher 灭亡与意图解耦
+- **三步式管线**: `generate` (编译意图) → `queue compile` (原子拆分) → `queue run` (消费执行)。
+- **物理状态机**: 任务以 `.json` 文件形式在 `pending`, `processing`, `completed`, `failed` 目录流转，彻底解决崩溃丢任务的问题。
+- **单线程安全**: 每个 Provider 顺序消费，杜绝 API 并发冲突，支持 Ctrl+C 断点恢复。
 
-## 🚀 历史更新 (v0.5.15)
+### 2. 服务管理标准化 (Server Topology)
+- **.env 驱动**: 根目录 `.env` 加入 `OPSV_DAEMON_PORT` 与 `OPSV_REVIEW_PORT` 配置，全面解耦硬编码端口。
+- **服务分层**: 明确 Global Daemon (跨项目连接器) 与 Local Review (项目 Review UI) 的职责边界。
 
-## 🚀 历史更新 (v0.5.13)
+### 3. 项目初始化自动化 (Zero-Config Init)
+- **动态运行时创建**: `opsv init` 现在会自动创建 `.opsv/` 和 `.opsv-queue/` 目录。
+- **内建 Git 策略**: 自动生成防御性 `.gitignore`，确保运行时状态文件不污染仓库。
 
-### 显式账本图纸 (Explicit Ledger Paradigm)
-- **绝对透明**：视频管线摒弃黑盒运行时拼接，所有大模型依赖的视觉设定与运镜动作（`Video Prompt`）必须由 Agent 在撰写 `Shotlist.md` 时显式组合并写明。
-- **状态驱动混写**：`Shotlist.md` 下每一镜引入局部 `YAML` 块进行状态驱动追踪（`pending | completed`），完美保留外部的 Markdown 文本供人类随性批注。
-- **双轨审查环 (Dual Review)**：在原本的图像审查之外，正式升级基于 `Shotlist.md` 的视频审查，`opsv review` 能自动捕捉生成的关联视频并写回文档供导演验收。
+### 4. 命令集精简与优化
+- **删除废弃指令**: 移除 `gen-image` 与 `gen-video`，统一并入 `queue` 指令集。
+- **鲁棒性增强**: `queue run` 命令的 Provider 名称支持大小写模糊匹配。
+- **Generate 纯净化**: `generate` 指令回归“纯编译”本质，不再主动拉起网络服务。
 
-## 🚀 历史更新 (v0.5.12)
-- **Annotative Referencing**: Introduced support for `(@id)` bracketed syntax, allowing IDs to serve as semantic annotations without disrupting narrative flow.
-- **Shot-Local References**: Enabled direct embedding of Markdown images within `Script.md` shots. These images are automatically归集 as reference images for the specific job, eliminating the need for global asset modeling for one-off visual cues.
-- **Improved Parsing**: Enhanced `RefResolver` and `JobGenerator` to robustly handle both annotative and embedded reference types.
+---
 
-### 0.5.11 - Narrative Grammar Standardization (2026-04-13)
-- **Natural Language Priority**: Updated `Story` and `Script` templates to enforce complete, human-readable grammar.
-- **Semantic Reference Embedding**: Defined the `@id` usage as a semantic anchor embedded within natural sentences, rather than as a standalone bracketed tag.
-- **Execution-Ready Literacy**: Ensured that the text remains logical and descriptive before and after automated reference replacement.
-
-### 0.5.10 - Reference Logic Standardization (2026-04-13)
-- **Unified @ Syntax**: Standardized the use of `@` prefix across both Markdown body and YAML `refs`.
-- **Granular Referencing**: Added support for `@id:variant` syntax in `refs` to point to specific approved images while maintaining document-level safety.
-- **Dependency Intelligence**: Enhanced the `DependencyGraph` to automatically resolve complex reference strings back to their core document dependencies.
-
-### 0.5.9 - ID-Naming De-duplication (2026-04-13)
-- **Unified ID Logic**: Removed the redundant `name` field from YAML headers. Asset IDs are now strictly mapped from file names (e.g., `@broken_sword.md` -> `broken_sword`).
-- **Template Cleanup**: Streamlined all element and scene templates for a minimal, non-redundant metadata structure.
-- **Architectural Purity**: Enforced a single source of truth for IDs to prevent metadata drift and naming conflicts.
-
-### 0.5.8 - Architectural Robustness (2026-04-13)
-- **Block-Style YAML**: Switched all long-text fields to Folded Block Style (`>`) to eliminate character escape issues (e.g., quotations in prompts).
-- **Template Standardization**: Updated all element, scene, story, and project templates to ensure parsing stability.
-- **Improved Docs**: Clarified YAML generation rules and block syntax usage.
-
-### 0.5.7 - Visual Semantic Standardization (2026-04-13)
-- **Visual-First Fields**: Renamed YAML fields to `visual_brief` and `visual_detailed` to strictly enforce visual-only metadata.
-- **SSOT 2.0 Workflow**: Established a deterministic logic: Markdown Body Explanation -> YAML Generation -> Review Correction.
-- **Schema Validation**: Updated `FrontmatterSchema` and `JobGenerator` to support new semantic labels.
-- **Templates**: Standardized `element_template` and `example-element` with v0.5.7 specs.
-
-### 0.5.3 - WebUI Distribution & Agent Workflow (2026-04-12)
-- **WebUI**: Fixed a critical bug where Review UI assets were missing in the global npm package. Added automatic asset copying to build pipeline.
-- **Server**: Enhanced `ReviewServer` with dynamic static resource path detection and robust error reporting.
-- **Agent Roles**: Updated `AGENTS.md` with strict QA gatekeeping, mandatory `opsv parse` validation after writing, and flexible Markdown header support for creative freedom.
-- **CLI**: Optimized `opsv review` startup reliability across different OS environments.
-
-### 0.5.2 - Security & Provider Architecture Stability (2026-04-12)
-- **Architecture**: Promoted `ImageProvider` interface. Unified all generation logic into a single `generateAndDownload` contract.
-- **Security**: Fixed OS command injection vulnerabilities in CLI parameters.
-- **Stability**: Fixed a critical async bug in `DependencyGraph` where task nodes were incorrectly marked as completed.
-- **Refactoring**: Eliminated duplicate logic across `AssetManager` and `JobGenerator` using `FrontmatterParser`.
-
-### 0.5.0 - Spec-First & Addons Evolution (2026-04-10)
-- **Architecture**: Migrated to a **Dependency Graph** driven engine. Non-linear task resolution.
-- **Pure Markdown**: Fully deprecated YAML shot lists. Use `## Shot NN` Markdown headers for shot definitions.
-- **Addon System**: Introduced `opsv addons` command to install zip-based creative skill packs.
-- **Review UI**: Replaced CLI review with a professional **Web Review UI** (Express + WebSocket).
+## 🚀 历史更新 (v0.5.16)
+- **SiliconFlow 图像接入**: 支持 Qwen 多模态文生图与指令式编辑。
+- **混合驱动架构 (Hybrid Provider)**: 根据模型语义自动切换端点。
+- **指令重绘工作流**: 智能图像注入 `frame_ref`。
