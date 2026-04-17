@@ -1,4 +1,4 @@
-# 文档规范 (v0.5.8)
+# 文档规范 (v0.5.19)
 
 > OpenSpec-Video v0.5 采用 **四层规范体系**，确保文档即代码的确定性。
 
@@ -34,11 +34,27 @@ reviews:                            # 审阅记录
 
 **0.5 版本规范演进记录 (Incremental Specs Logic)**:
 
+- **v0.5.19 (工业管线稳定化)**:
+    - **CI/CD 集成**: 新增 GitHub Actions 自动化 npm 发布工作流。
+    - **Agent 三角色定型**: 旧 7 Agent 结构正式被 Creative/Guardian/Runner 三角色取代。
+
+- **v0.5.16 (精修与混合模型驱动)**:
+    - **SiliconFlow 图像接入**: `ImageModelDispatcher` 正式接管 SiliconFlow 图像派发，支持 Qwen 文生图与指令式编辑。
+    - **混合驱动架构**: `SiliconFlowProvider` 重构为影/像双修架构，根据模型语义自动切换端点。
+    - **`requires_reference` 字段**: 编辑类模型标注 `requires_reference: true`，Provider 自动提取参考图。
+
+- **v0.5.15 (多模态引擎调度)**:
+    - **Seedance Provider**: 实现 Seedance 视频生成 Provider，支持 1.5 Pro 与 2.0 Fast 双模式。
+    - **api_config 能力级**: 模型配置新增 `type`、`max_reference_images`、`supports_audio`、`supports_video_ref` 等能力边界字段。
+
+- **v0.5.14 (全模态纯净指令)**:
+    - **文档纯净**: `Shotlist.md` 和 `Script.md` 严禁硬编码基座模型或执行流配置（如 `target_model`）。文档作为"本愿"呈现纯文本指令，能力质检（预飞或优雅降级）交给 `api_config` 和运行时处理。
+
 - **v0.5.8 (架构鲁棒性)**: 
     - **全量块语法**: 长文本字段（`visual_brief`, `visual_detailed`, `prompt_en`）强制使用折叠块语法 (`>`)，彻底消除引号冲突。
 - **v0.5.7 (视觉语义标准化)**:
     - **视觉专用字段**: 引入 `visual_brief` 和 `visual_detailed` 语义标签，强制 Agent 仅关注外在视觉特征。
-    - **YAML 生成闭环**: 确立“正文启发 -> YAML 固化 -> Review 校准”的工作流。
+    - **YAML 生成闭环**: 确立"正文启发 -> YAML 固化 -> Review 校准"的工作流。
 - **v0.5.6 (SSOT 2.0)**:
     - **YAML 为先**: 渲染管线彻底剥离对 Markdown 正文的描述提取，强制读取 YAML。
     - **骨架化正文**: 强制保留 `## Vision`, `## Design References`, `## Approved References` 标题。
@@ -49,9 +65,6 @@ reviews:                            # 审阅记录
 
 > [!IMPORTANT]
 > **规范维护准则**: 任何版本更新必须以增量方式记录规范变更（记录 `v0.5.X` 路径），严禁覆盖式删除过往决策，以保证设计决策的全貌可追溯。
-
-- **v0.5.14 (全模态纯净指令)**:
-    - **文档纯净**: `Shotlist.md` 和 `Script.md` 严禁硬编码基座模型或执行流配置（如 `target_model`）。文档作为“本愿”呈现纯文本指令，能力质检（预飞或优雅降级）交给 `api_config` 和运行时处理。
 
 ### 2.2 场景文档 (scenes/*.md)
 
@@ -114,7 +127,7 @@ vision: "一个关于兄弟情的短片"
 ### 3.3 解析规则
 
 | 引用 | 解析目标 |
-|------|---------|
+|------|---------| 
 | `@elder_brother` | `elements/elder_brother.md` 的 `## Approved References` 中 `default` 变体 |
 | `@elder_brother:childhood` | 同上，`childhood` 变体 |
 | `@classroom:morning` | `scenes/classroom.md` 的 `morning` 变体 |
@@ -143,7 +156,7 @@ vision: "一个关于兄弟情的短片"
 
 ### 4.2 规范标题（必须保留）
 
-以下标题是文档的“骨架”，即使没有内容也必须保留：
+以下标题是文档的"骨架"，即使没有内容也必须保留：
 
 - `## Vision`: 记录导演的艺术直觉。
 - `## Design References`: 设计参考与附件。
@@ -205,8 +218,7 @@ opsv gen-image --dry-run    # 仅校验不执行
 
 ### 6.1 依赖关系来源
 
-- `reference` 字段：变体依赖（younger_brother → elder_brother）
-- `refs` 字段：内容引用依赖
+- `refs` 字段：内容引用依赖（变体依赖统一并入）
 
 ### 6.2 严格模式
 

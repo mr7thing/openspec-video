@@ -11,11 +11,12 @@
 │                   导演 (柒叔)                      │
 │              ↓ 发出自然语言指令                      │
 ├──────────────────────────────────────────────────┤
-│ Agent 层 — "人格与职责"                             │
-│ ┌──────────┐ ┌──────────┐ ┌──────────────┐       │
-│ │Architect │ │Screenwr. │ │AssetDesigner │ ...   │
-│ └────┬─────┘ └────┬─────┘ └──────┬───────┘       │
-│      ↓              ↓              ↓               │
+│ Agent 层 — "三角色协作" (v0.5.15+)                  │
+│ ┌─────────────┐ ┌──────────────┐ ┌─────────────┐│
+│ │ Creative    │ │   Guardian   │ │   Runner    ││
+│ │ (创世代理)  │ │  (同步守卫)  │ │ (疾走特遣)  ││
+│ └──────┬──────┘ └──────┬───────┘ └──────┬──────┘│
+│        ↓                ↓                ↓       │
 ├──────────────────────────────────────────────────┤
 │ Skill 层 — "标准与创意解耦"                         │
 │ ┌───────────────┐ ┌────────────────┐ ┌──────────┐│
@@ -36,23 +37,44 @@
 
 ---
 
-## Agent 角色矩阵
+## Agent 角色矩阵 (v0.5.15+)
+
+从 v0.5.15 开始，OpsV 将旧有的 7 个细粒度角色精简为 **3 个功能型 Agent**，每个 Agent 承担多个 Skill 的调度职责。
 
 | Agent | 文件 | 职责 | 绑定 Skill |
 |-------|------|------|-----------|
-| **Architect** | `Architect.md` | 总架构师：将灵感锚定为项目世界观，生成 `project.md` + `story.md` | `opsv-architect` |
-| **Screenwriter** | `Screenwriter.md` | 主编剧：撰写故事大纲，提纯实体资产，埋设 `@` 指针 | `opsv-screenwriter` |
-| **AssetDesigner** | `AssetDesigner.md` | 资产设计师：创建 `elements/` 和 `scenes/` 下的实体定义 | `opsv-asset-designer` |
-| **ScriptDesigner** | `ScriptDesigner.md` | 脚本分镜：将故事翻译为 Markdown 结构化分镜 `Script.md` | `opsv-script-designer` (规范), `comic-drama-storyboarder` (创意) |
-| **Animator** | `Animator.md` | 动画编导：提取动态控制指令，生成 `Shotlist.md` | `opsv-animator` (规范), `comic-drama-animator` (创意) |
-| **PostEditor** | `PostEditor.md` | 后期统筹：负责成片拼装、命名规范与音画对齐 | `comic-drama-post-editor` |
-| **Supervisor** | `Supervisor.md` | 质检监制：自动化审查，输出 PASS/FAIL 报告 | `opsv-supervisor` |
+| **Creative-Agent** | `Creative-Agent.md` | 创世代理：苏格拉底式脑暴、三向提案、创意落盘为 `project.md` + `story.md` | `opsv-brainstorming`, `opsv-architect`, `opsv-asset-designer`, `opsv-script-designer` |
+| **Guardian-Agent** | `Guardian-Agent.md` | 同步守卫：反射同步 YAML ↔ Body、审前评审、规范堤坝、语义质检 | `opsv-pregen-review`, `opsv-ops-mastery` |
+| **Runner-Agent** | `Runner-Agent.md` | 疾走特遣：任务编译、批处理分发、管线监控、产物归档 | `opsv-animator`, `animation-director`, `opsv-enlightenment` |
+
+### Agent 协作流
+
+```
+Creative-Agent → 创意落盘 → Guardian-Agent → 校验 + Approve → Runner-Agent → 渲染
+      ↑                                                                        |
+      └────────────────── 审阅不通过时回滚 ─────────────────────────────────────┘
+```
 
 ---
 
 ## Skill 详细说明
 
-### 1. `opsv-architect` — 项目军师手册
+### 1. `opsv-brainstorming` — 灵心本能
+
+**触发场景**：项目启动初期，从模糊灵感中提炼视觉方向
+
+**核心流程**：
+1. **响应禁令**：收到模糊灵感时严禁直接落盘，必须先围绕"核心冲突、视觉风格、情感底色"追问 3 个问题
+2. **三向提案 (Trinity Choice)**：
+   - 方案 A（标准制式）：符合主流审美
+   - 方案 B（风格化实验）：强视觉冲击
+   - 方案 C（意境/禅意）：留白与深度情感
+3. **视觉提纯**：将角色/场景解构为面料质感、光影布局、镜头语言，铸造高密度英文 Prompt
+4. **共识落盘**：导演确认方向后，方可触发文档沉淀
+
+---
+
+### 2. `opsv-architect` — 项目军师手册
 
 **触发场景**：从无到有建立新视频项目
 
@@ -70,55 +92,16 @@
 
 ---
 
-### 2. `opsv-screenwriter` — 编剧手册
-
-**触发场景**：充实故事血肉，撰写 `story.md`
-
-**核心任务**：
-1. **实体提纯**：识别高频出现的角色/场景/道具
-2. **资产声明**：写入 `elements/` 和 `scenes/` 目录，严守 `has_image` 二元法
-3. **代码化大纲**：用 `@实体名` 指针替代冗长的外貌描写
-
-**铁律**：
-- ❌ 错误："`@role_K` 那个穿着黑色破防风衣的男人走向吧台"
-- ✅ 正确："`@role_K` 走向吧台"（风衣颜色只在 `K.md` 里）
-- 绝不写任何 `Shot X` 等摄像机机位要求
-
----
-
 ### 3. `opsv-asset-designer` — 资产生成手册
 
 **触发场景**：创建角色、场景或道具的 `.md` 定义文件
 
-**五大准则**：
+**关键规则**：
 1. **上下文为王**：先读 `project.md` 了解全局风格
 2. **超高精细度**：致密描写材质、光影、磨损度、情绪
-3. **has_image 默认 false**：仅导演确认后才可设为 true
+3. **折叠块语法**：`visual_brief`、`visual_detailed`、`prompt_en` 强制使用 `>` 语法
 4. **母语友好**：正文中文，只有 `prompt_en` 字段英文
 5. **YAML-First**：所有数据进 YAML Frontmatter
-
-**三段式格式**：
-```yaml
----
-name: "@AssetName"
-type: "character"       # character | scene | prop
-has_image: false
-detailed_description: >
-  [致密的中文特征描写，至少3-5句话]
-brief_description: "[一句话简略描述]"
-prompt_en: >
-  [Dense English prompt for image generation]
----
-
-## subject
-[主体描述，中文]
-
-## environment
-[环境/背景，中文]
-
-## camera
-[景别，英文]
-```
 
 ---
 
@@ -126,27 +109,12 @@ prompt_en: >
 
 **触发场景**：将 `story.md` 翻译为结构化 `Script.md`
 
-**四大规则**：
+**核心规则**：
 1. **时间绝对约束**：每个 Shot 3-5 秒，上限 15 秒
 2. **视觉语言**：描述"摄像机看到的内容"，非文字叙事
-3. **YAML 优先**：所有 Shot 定义在 `shots:` 数组中
+3. **纯正文解析**：从 `## Shot NN` 标题解析，不使用 YAML 数组
 4. **双语分离**：`prompt_en` 纯英文，其余中文
-
-**Script.md YAML 字段**：
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | ✅ | 如 `shot_1` |
-| `duration` | integer | ✅ | 秒数 |
-| `camera` | string | ✅ | 景别与运镜 |
-| `environment` | string | ✅ | 场景引用（含 @） |
-| `subject` | string | ✅ | 主体动作（含 @） |
-| `prompt_en` | string | ✅ | 英文渲染提示词 |
-| `first_image` | string | - | 首帧参考图路径 |
-| `last_image` | string | - | 尾帧参考图路径 |
-| `target_last_prompt` | string | - | 靶向补帧诱饵词 |
-
-**画廊审阅区**：为每个 Shot 预留视觉审阅廊，供 `opsv review` 回写图片。
+5. **文档纯净**：严禁硬编码 `target_model` 等执行流配置（v0.5.14+）
 
 ---
 
@@ -159,111 +127,69 @@ prompt_en: >
 - ✅ 只描述：镜头怎么动？角色怎么动？场景有什么动态变化？
 - `motion_prompt_en` 全英文
 
-**Shotlist.md YAML 字段**：
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | ✅ | 如 `shot_1` |
-| `duration` | string | ✅ | 从 Script.md 透传 |
-| `reference_image` | string | ✅ | 导演确认的底图路径 |
-| `motion_prompt_en` | string | ✅ | 纯动态英文指令 |
-| `first_image` | string | - | 可用 `@FRAME` 延迟指针 |
-
-**motion_prompt_en 示例**：
-```
-"Slow dolly in, townsfolk walking across the alley,
- steam rising from food carts, cinematic motion."
-```
+**长镜头继承**：
+通过 `@FRAME:shot_N_last` 自动截取前一视频的尾帧作为下一镜头的首帧。
 
 ---
 
-### 6. `opsv-supervisor` — 质检监制手册
+### 6. `animation-director` — 动画编导艺术家
 
-**触发条件**：Slash 命令 `/opsv-qa`
+**触发场景**：撰写高质量视频 Motion Prompt
 
-| 命令 | 检查内容 | 判定标准 |
-|------|---------|---------|
-| `/opsv-qa act1` | 资产对账：文件与 `project.md` 花名册一致性 | 无黑户、无遗漏 |
-| `/opsv-qa act2` | 死链核查：`has_image: true` 的图片路径是否真实存在 | 文件存在且 >0 bytes |
-| `/opsv-qa act3` | 特征泄漏：分镜中是否有容貌描写跟在 `@实体名` 后面 | 无偷渡特征 |
-| `/opsv-qa act4` | 配置核查：检查 `api_config.yaml` 确保至少有一个模型 `enable: true` | 模型开关正确配置 |
-| `/opsv-qa final` | Payload 断言：`jobs.json` 的全局后缀注入和参考图路径 | 针脚对齐 |
-
-**输出格式**：
-```
-🟢 PASS: 针脚严丝合缝
-🔴 FAIL: 扫出 2 个未登记黑户：@xxx, @yyy
-```
+**四大技巧原则**：
+1. **分离主义**：永远不描述衣着、肤色等外观细节（图像参考已决定）
+2. **机位优先**：强制指定摄影机运动（`Dolly in`, `Pan right`, `Crane down`）
+3. **物理动作精准**：遵循物理规律，极其具体的动作描写
+4. **全程英文**：视频 AI 模型只吃英文提示词
 
 ---
 
-### 7. `opsv-apply-change` — 变更执行手册
+### 7. `opsv-pregen-review` — 目标审查协议
 
-**触发场景**：批量应用变更提案
+**触发场景**：视觉生成前，针对目标 Spec 执行交互式审查
 
-**工作流**：
-1. 读取 `videospec/changes/` 下的提案 `.md`
-2. 逐项执行修改（如 "将 K 的大衣改为黑色"）
-3. 标记完成（`- [ ]` → `- [x]`）
-4. 提示运行 `opsv generate` 刷新任务队列
+**审查三步走**：
+1. **交互填充**：检查 `visual_detailed` 颗粒度，提出进阶审美建议
+2. **灵魂归纳**：用电影感文字总结目标的视觉核心
+3. **工业质检**：静默调用 `opsv validate` 执行物理检查
 
----
-
-### 8. `opsv-asset-compiler` — 资产编译大脑
-
-**触发场景**：解析含 `@` 标签的场景描述，编译为 JSON Payload
-
-**核心逻辑**：
-1. 识别 `@` 实体标签
-2. 根据 `has_image` 状态选择提取策略（极简 vs 详尽描述）
-3. 融合多实体的语义场景
-4. 输出 `PROMPT_INTENT` + `REQUIRED_ASSETS` JSON
-
-**输出示例**：
-```json
-{
-  "PROMPT_INTENT": "暴雨倾盆，30多岁赛博侦探，黑色高领大衣被雨水打湿...",
-  "REQUIRED_ASSETS": ["@role_K"]
-}
-```
+**Approve / Draft 双态流转**：
+- **Approve**：转正 → 回写 `## Approved References` → `status: approved` → 后续 `--skip-approved` 自动跳过
+- **Draft**：打回 → 记录意见到 `reviews` → `status: draft` → 下轮生成时用 `draft_ref` 作为参考图
 
 ---
 
-### 9. `opsv-auto-create` — 全自动创建手册
+### 8. `opsv-ops-mastery` — 运维本能
 
-**触发场景**：从歌词/概念一次性展开完整项目
+**触发场景**：工业管线运行期的指令调用与规范守护
 
-**流程**：Intent 分析 → 草稿剧本 → 定义资产 → 生成参考图 → 全局校验
-
-> **注意**：适合快速展开。精细控制的项目应使用 `opsv-architect` → `opsv-screenwriter` → `opsv-asset-designer` 逐步过渡。
+**核心机制**：
+1. **自动哨兵**：文件变动后自动提议 `opsv validate`，GREEN 放行 / RED 拦截
+2. **任务编排**：`opsv generate --skip-approved` → 巡检 `skipped.json` → 触发渲染
+3. **标准文法**：强力维护目录主权（elements/scenes/shots）与 YAML 铁律
+4. **故障处理**：API 报错时检查 `.env` 配置，保留原始错误 JSON
 
 ---
 
-### 10. `opsv-seedance-expert` — Seedance 提示词工程
+### 9. `opsv-enlightenment` — 悟道本能
 
-**独立 Skill**（无绑定 Agent），作为 Seedance 1.5 Pro 视频生成的提示词优化指南。
+**触发场景**：现有技能无法覆盖特定 API 能力时，动态学习外部规范
 
-**核心规范**：
-- **运动描述范式**：`[Subject Action] + [Camera Movement] + [Lighting/Atmosphere]`
-- **首尾帧规则**：提供首尾帧时，prompt 应重点描述"路径"而非"内容"
-- **推荐词汇**：
-  - 相机运动：`cinematic slow pan`, `dynamic dolly zoom`, `low-angle tracking shot`
-  - 主体动作：`flowing hair`, `subtle micro-expressions`, `graceful floating`
-
-**最佳实践**：
-- 避免负面词，直接描述想要的效果
-- 使用参考图时聚焦于"动作"而非"长相"
-- `sound: true` 可开启空间音频，prompt 中加入环境音描述
+**核心流程**：
+1. **求知触发**：导演提出超范围需求时，严禁推辞，主动检索官方技能库
+2. **动态内化**：读取外部 SKILL.md → 提取 CLI 指令 + 参数约束 + 输出规范
+3. **工业对齐**：执行前检查本地环境，缺失工具时引导安装
+4. **进化禁令**：严禁凭空想象参数名，必须以官方文档为唯一真理
 
 ---
 
 ## 扩展体系：Addons (v0.5 新增)
 
-从 v0.5 开始，创作在大脑（创意技能）与管线模具（规范技能）实现了彻底解耦。
+从 v0.5 开始，创作大脑（创意技能）与管线模具（规范技能）实现了彻底解耦。
 
 ### 1. 技能解耦哲学
-- **规范技能 (opsv-*)**：定义“盒子”的形状。如：Script.md 该怎么排版，jobs.json 该怎么嵌套。这部分是工业化的刚性标准。
-- **创意技能 (comic-drama-* / mv-*)**：定义“灵魂”的厚度。如：漫剧该怎么分镜， Prompt 该怎么写效果才爆。这部分是可拔插、可进化的。
+- **规范技能 (opsv-*)**：定义"盒子"的形状。如：Script.md 该怎么排版，jobs.json 该怎么嵌套。这部分是工业化的刚性标准。
+- **创意技能 (comic-drama-* / mv-*)**：定义"灵魂"的厚度。如：漫剧该怎么分镜，Prompt 该怎么写效果才爆。这部分是可拔插、可进化的。
 
 ### 2. Addons 插件包安装
 用户可以通过 `opsv addons` 命令动态扩展 Agent 的能力：
@@ -278,4 +204,4 @@ opsv addons install ./addons/comic-drama-v0.5.zip
 ---
 
 > *"Agent 是灵魂，规范 Skill 是骨架，创意 Skill 是血肉，CLI 是双手。"*
-> *OpsV 0.5.0 | 最后更新: 2026-04-10*
+> *OpsV 0.5.19 | 最后更新: 2026-04-17*

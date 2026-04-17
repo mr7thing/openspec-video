@@ -1,12 +1,12 @@
-# OpsV Image Provider Interface Specification (v0.5.2)
+# OpsV Provider Interface Specification (v0.5.19)
 
-> Defines the mandatory interface contract for all image generation Providers in OpsV.
+> Defines the mandatory interface contract for all image/video generation Providers in OpsV.
 
 ---
 
-## 1. Design Philosophy (Scheme A: Mandatory Interface)
+## 1. Design Philosophy (Mandatory Interface)
 
-**Since v0.5.2, `generateAndDownload` is the ONLY required method for all ImageProviders.**
+**Since v0.5.2, `generateAndDownload` is the ONLY required method for all Providers.**
 
 The old two-step pattern (`generateImage` returns URL → Dispatcher manually downloads) has been deprecated. Each Provider is now a complete "Submit-Poll-Download" execution unit. The Dispatcher doesn't need to know implementation details — it calls one method, holds one promise.
 
@@ -26,6 +26,8 @@ After (Current):
 
 ## 2. Interface Definition
 
+### 2.1 ImageProvider
+
 ```typescript
 export interface ImageProvider {
     /** Unique identifier, matches the `provider` field in api_config.yaml */
@@ -33,11 +35,6 @@ export interface ImageProvider {
 
     /**
      * Execute the complete image generation → write-to-disk flow (ONLY required method)
-     *
-     * Success: File has been written to outputPath, function resolves normally
-     * Failure: Throw an Error (or OpsVError) with detailed information
-     * Timeout: Throw an Error containing "超时" or "timeout" keyword
-     *          (Dispatcher relies on this keyword to distinguish timeout vs failed status)
      */
     generateAndDownload(
         job: Job,
@@ -51,14 +48,46 @@ export interface ImageProvider {
 }
 ```
 
+### 2.2 VideoProvider
+
+```typescript
+export interface VideoProvider {
+    /** Unique identifier */
+    providerName: string;
+
+    /**
+     * Execute the complete video generation → write-to-disk flow
+     */
+    generateAndDownload(
+        job: Job,
+        modelName: string,
+        apiKey: string,
+        outputPath: string
+    ): Promise<void>;
+}
+```
+
 ---
 
 ## 3. Existing Providers
 
-| Provider Class | File | Task Type | Status |
-|----------------|------|-----------|--------|
-| `SeaDreamProvider` | providers/SeaDreamProvider.ts | image_generation | ✅ generateAndDownload implemented |
-| `MinimaxImageProvider` | providers/MinimaxImageProvider.ts | image_generation | ✅ generateAndDownload implemented |
+### Image Providers
+
+| Provider Class | File | Vendor | Status |
+|----------------|------|--------|--------|
+| `SeaDreamProvider` | providers/SeaDreamProvider.ts | Volcengine | ✅ Implemented |
+| `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow (Dual Image/Video) | ✅ Implemented (v0.5.16) |
+| `MinimaxImageProvider` | providers/MinimaxImageProvider.ts | MiniMax | ✅ Implemented |
+
+### Video Providers
+
+| Provider Class | File | Vendor | Status |
+|----------------|------|--------|--------|
+| `SeedanceProvider` | providers/SeedanceProvider.ts | Volcengine (Seedance) | ✅ Implemented (v0.5.15) |
+| `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow (Wan 2.1) | ✅ Implemented |
+| `MinimaxVideoProvider` | providers/MinimaxVideoProvider.ts | MiniMax (Hailuo) | ✅ Implemented |
+
+> **Note**: `SiliconFlowProvider` serves dual image and video roles, auto-switching endpoints (`/generations` vs `/submit`) based on the model's `type` field in `api_config.yaml`.
 
 ---
 
@@ -67,7 +96,7 @@ export interface ImageProvider {
 ### 4.1 Three Defensive Coding Standards
 
 1. **Deep Penetrative Parsing**: Never assume a single response structure. Handle `data.id`, `data.data.id`, and other variants defensively.
-2. **Evidential Logging**: Never return `undefined`. Always use `JSON.stringify(rawResponse)` to log the complete payload on any non-2xx response or suspected format error.
+2. **Evidential Logging**: Never return `undefined`. Always use `JSON.stringify(rawResponse)` to log the complete payload on any non-2xx response.
 3. **Axios Defensive Handling**: Distinguish between `error.response` (API business error) and `error.code` (e.g., `ETIMEDOUT`, network interruption).
 
 ### 4.2 Integration Checklist
@@ -81,12 +110,12 @@ Must implement:
      1. Read parameters from job.payload
      2. POST submit request (per official API format)
      3. Poll until completion (recommended: 3-5s interval, throw on timeout)
-     4. Download image buffer, write to outputPath
+     4. Download image/video buffer, write to outputPath
      5. Verify file exists and size > 0
 
 Must register:
-  ✅ Add to ImageModelDispatcher.registerProviders()
-  ✅ Configure provider field in api_config.yaml
+  ✅ Add to ImageModelDispatcher or VideoModelDispatcher
+  ✅ Configure provider and type fields in api_config.yaml
 
 Prohibited:
   ❌ Using instanceof to detect other Providers inside your Provider
@@ -120,31 +149,12 @@ if (Date.now() >= deadline) {
 The Dispatcher's only responsibility: **Route + Inject Config + Aggregate Stats**.
 
 ```typescript
-// ImageModelDispatcher.dispatchJob pseudo-code
+// ImageModelDispatcher / VideoModelDispatcher pseudo-code
 await provider.generateAndDownload(job, targetModel, apiKey, finalOutputPath);
 // That's it. No instanceof. No branches.
 ```
 
 ---
 
-## 6. Core API Specifications
-
-### 6.1 ByteDance Seedance 1.5 Pro (Video)
-- **Endpoint**: `https://ark.cn-beijing.volces.com/api/v3/video/submit`
-- **Auth**: `Authorization: Bearer <VOLCENGINE_API_KEY>`
-- **Key Parameters**: `model: "doubao-seedance-1-5-pro"`, `resolution: "480p|720p|1080p"`, `image` (Base64 first frame)
-
-### 6.2 SeaDream 5.0 (Image Generation)
-- **Endpoint**: `https://api.volcengine.com/visual/image_generation/2024-08-01`
-- **Auth**: `Authorization: Bearer <VOLCENGINE_API_KEY>`
-- **Key Parameters**: `req_key: "high_definition_generation"`, `model_version: "seadream_5_0"`, `aspect_ratio`
-
-### 6.3 SiliconFlow Wan 2.1 (Video)
-- **Endpoint**: `https://api.siliconflow.cn/v1/video/submit`
-- **Auth**: `Authorization: Bearer <SILICONFLOW_API_KEY>`
-- **Key Parameters**: `model: "wan-ai/Wan2.1-T2V-14B"`, `prompt`
-
----
-
 > *"The Interface is the Contract; Documentation is the Insurance; Tests are the Proof."*
-> *OpsV v0.5.2 | Updated: 2026-04-12*
+> *OpsV v0.5.19 | Updated: 2026-04-17*

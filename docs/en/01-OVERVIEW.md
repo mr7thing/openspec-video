@@ -1,6 +1,6 @@
 # OpsV Project Panorama
 
-> **OpenSpec-Video (OpsV) 0.5.0** — An automation framework that compiles Markdown/YAML narratives into video/image generation tasks.
+> **OpenSpec-Video (OpsV) 0.5.19** — An automation framework that compiles Markdown narratives into video/image generation tasks.
 
 ---
 
@@ -21,10 +21,10 @@ With the v0.5 refactoring, OpsV has fully moved into the **Spec-First** era. It 
 ## 2. Tech Stack
 
 | Layer | Technology | Purpose |
-|------|------|------|
+|-------|------------|---------|
 | Language | TypeScript | Core logic |
 | CLI Framework | Commander.js | Command Line Interface |
-| Communication | WebSocket (ws) | Daemon 鈫?Browser Extension |
+| Communication | WebSocket (ws) | Daemon ↔ Browser Extension |
 | Configuration | dotenv + js-yaml | Env variables + YAML config |
 | Validation | Zod | Job schema validation |
 | Logging | Winston | Unified logging system |
@@ -39,29 +39,45 @@ Project structure created by `opsv init`:
 
 ```
 project/
-鈹溾攢鈹€ .agent/                     # AI Agent configuration
-鈹?  鈹溾攢鈹€ Architect.md            # Role definition: Architect
-鈹?  鈹溾攢鈹€ Screenwriter.md         # Role definition: Screenwriter
-鈹?  鈹溾攢鈹€ AssetDesigner.md        # Role definition: Asset Designer
-鈹?  鈹溾攢鈹€ ScriptDesigner.md       # Role definition: Script Designer
-鈹?  鈹溾攢鈹€ Animator.md             # Role definition: Animator
-鈹?  鈹溾攢鈹€ Supervisor.md           # Role definition: Supervisor (QA)
-鈹?  鈹斺攢鈹€ skills/                 # Skills library
-鈹溾攢鈹€ .antigravity/               # Antigravity tool configuration
-鈹溾攢鈹€ .env/                       # Environment config (git ignored)
-鈹?  鈹溾攢鈹€ secrets.env             # API keys
-鈹?  鈹斺攢鈹€ api_config.yaml         # Engine parameters
-鈹溾攢鈹€ videospec/                  # Core narratives (Source of Truth)
-鈹?  鈹溾攢鈹€ project.md              # Global config & asset manifest
-鈹?  鈹溾攢鈹€ stories/                # Story outlines
-鈹?  鈹溾攢鈹€ elements/               # Character/prop definitions
-鈹?  鈹溾攢鈹€ scenes/                 # Scene definitions
-鈹?  鈹斺攢鈹€ shots/                  # Storyboards & animation scripts
-鈹?      鈹溾攢鈹€ Script.md           # Static composition
-鈹?      鈹斺攢鈹€ Shotlist.md         # Motion & animation
-鈹溾攢鈹€ artifacts/                  # Generated outputs
-鈹溾攢鈹€ queue/                      # Job queues
-鈹斺攢鈹€ README.md                   # Project landing page
+├── .agent/                     # AI Agent configuration
+│   ├── Creative-Agent.md       # Creator: brainstorming + spec settlement
+│   ├── Guardian-Agent.md       # Guardian: validation + reflective sync
+│   ├── Runner-Agent.md         # Runner: compilation + rendering
+│   └── skills/                 # Skills library (9 Skills)
+│       ├── opsv-architect/
+│       ├── opsv-asset-designer/
+│       ├── opsv-script-designer/
+│       ├── opsv-animator/
+│       ├── opsv-brainstorming/
+│       ├── opsv-pregen-review/
+│       ├── opsv-ops-mastery/
+│       ├── opsv-enlightenment/
+│       └── animation-director/
+├── .antigravity/               # Antigravity tool configuration
+│   ├── rules/                  # Behavioral rules
+│   └── workflows/              # Workflow templates
+├── .env/                       # Environment config (git ignored)
+│   ├── secrets.env             # API keys
+│   └── api_config.yaml         # Engine parameters
+├── videospec/                  # Core narratives (Source of Truth)
+│   ├── project.md              # Global config & asset manifest
+│   ├── stories/                # Story outlines
+│   │   └── story.md
+│   ├── elements/               # Character/prop definitions
+│   │   ├── @role_hero.md
+│   │   └── @prop_sword.md
+│   ├── scenes/                 # Scene definitions
+│   │   └── @scene_forest.md
+│   └── shots/                  # Storyboards & animation scripts
+│       ├── Script.md           # Static composition
+│       └── Shotlist.md         # Motion & animation
+├── artifacts/                  # Generated outputs
+│   └── drafts_N/               # Batch N rendering drafts
+├── queue/                      # Job queues
+│   ├── jobs.json               # Image generation jobs
+│   └── video_jobs.json         # Video generation jobs
+├── GEMINI.md                   # Gemini persona config
+└── AGENTS.md                   # OpenCode/Trae unified protocol
 ```
 
 ---
@@ -69,7 +85,7 @@ project/
 ## 4. Vocabulary
 
 | Concept | Definition |
-|------|------|
+|---------|------------|
 | **Spec-as-Code** | Using structured Markdown as the source code for video production. |
 | **Dependency Graph** | `New in v0.5`. Performs topological parsing at compile time. Blocks generation if prerequisite assets are not formally approved. |
 | **Review UI** | `New in v0.5`. Local Express Web interface replacing legacy CLI logic, allowing visual image selection, naming, and automated metadata writebacks. |
@@ -77,6 +93,7 @@ project/
 | **Motion-Static Separation** | Image pipeline (Script.md + Generator) and Video pipeline (Shotlist.md + Animator) are strictly independent. |
 | **frame_ref** | `New in v0.5`. Replaces schema_0_3. Standard data payload to pass first/last frame reference images to models. |
 | **Two-Stage Validation** | `New in v0.5`. Compile-time format checks combined with runtime hard-constraints (pixel sizes, aspect ratios, model token limits). |
+| **Graceful Degradation** | `New in v0.5.14`. Dispatcher dynamically detects model capability boundaries before dispatch, auto-stripping unsupported parameters with warnings. |
 
 ---
 
@@ -92,19 +109,21 @@ opsv init my-project
 # 3. Configure
 echo "VOLCENGINE_API_KEY=your_key" > .env/secrets.env
 
-# 3. Analyze dependencies
+# 4. Write assets and shots (see Workflow guide)
+
+# 5. Analyze dependencies
 opsv deps
 
-# 4. Generate jobs
+# 6. Generate jobs
 opsv generate
 
-# 5. Image generation
+# 7. Image generation
 opsv gen-image
 
-# 6. Web Review
+# 8. Web Review
 opsv review
 
-# 7. Animate & generate video
+# 9. Animate & generate video
 opsv animate
 opsv gen-video
 ```
@@ -113,12 +132,16 @@ opsv gen-video
 
 ## 6. Documentation (EN)
 
-- [Workflow Guide](./02-WORKFLOW.md)
-- [CLI Reference](./03-CLI-REFERENCE.md)
-- [Agents & Skills](./04-AGENTS-AND-SKILLS.md)
-- [Document Standards](./05-DOCUMENT-STANDARDS.md)
+| Document | Description |
+|----------|-------------|
+| [Workflow Guide](./02-WORKFLOW.md) | Three-role collaboration cycle |
+| [CLI Reference](./03-CLI-REFERENCE.md) | All 9 commands in detail |
+| [Agents & Skills](./04-AGENTS-AND-SKILLS.md) | 3 Agents + 9 Skills |
+| [Document Standards](./05-DOCUMENT-STANDARDS.md) | Four-layer architecture, YAML templates, @ syntax |
+| [Configuration](./06-CONFIGURATION.md) | .env directory & engine parameters |
+| [API Reference](./07-API-REFERENCE.md) | Multi-model interface protocol |
 
 ---
 
 > *"Code is for humans to read, and only incidentally for machines to execute."*
-> *OpsV 0.5.0 | Latest Update: 2026-04-09*
+> *OpsV 0.5.19 | Latest Update: 2026-04-17*

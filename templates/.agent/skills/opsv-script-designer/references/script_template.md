@@ -6,8 +6,7 @@ visual_detailed: >
   画面中应有大量的留白，模拟宣纸的质感。
 status: draft
 refs:
-  - story.md#Act 1
-draft_ref: ""
+  - "story.md#Act 1"
 review: []
 ---
 

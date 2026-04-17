@@ -1,29 +1,54 @@
 # OpsV Workflow Guide
 
-> From inspiration to final video in a five-step cycle, understanding Agent collaboration and CLI interaction.
+> From inspiration to final video in a three-role cycle, understanding Agent collaboration and CLI interaction.
 
 ---
 
-## Overall Flowchart
+## Overall Flowchart (Three-Role Collaboration)
 
 ```mermaid
 flowchart TD
     START["💡 Creative Inspiration"] --> INIT["opsv init"]
-    INIT --> ARCH["🏛️ Architect Agent"]
-    ARCH -->|"project.md + story.md"| WRITE["✍️ Screenwriter Agent"]
-    WRITE -->|"story.md + @ anchor"| ASSET["🎨 AssetDesigner Agent"]
-    ASSET -->|"elements/ + scenes/"| SCRIPT["📐 ScriptDesigner Agent"]
-    SCRIPT -->|"Script.md"| GEN["opsv generate"]
-    GEN -->|"jobs.json"| EXEC["opsv gen-image"]
-    EXEC -->|"artifacts/drafts_N/"| REVIEW["opsv review"]
-    REVIEW -->|"Write-back to Script.md"| QA2["🔍 Supervisor /opsv-qa act2"]
-    QA2 -->|"PASS ✅"| ANIM["🎬 Animator Agent"]
-    ANIM -->|"Shotlist.md"| COMPILE["opsv animate"]
-    COMPILE -->|"video_jobs.json"| VIDGEN["opsv gen-video"]
-    VIDGEN -->|"artifacts/videos/"| DONE["🎬 Final Video"]
 
-    style START fill:#f9f,stroke:#333
-    style DONE fill:#9f9,stroke:#333
+    subgraph Creative["🎨 Creative-Agent Domain"]
+        BRAIN["🧠 opsv-brainstorming"]
+        ARCH["🏛️ opsv-architect"]
+        ASSET["🎨 opsv-asset-designer"]
+        SCRIPT["📐 opsv-script-designer"]
+
+        BRAIN --> ARCH
+        ARCH -->|"project.md + story.md"| ASSET
+        ASSET -->|"elements/ + scenes/"| SCRIPT
+    end
+
+    INIT --> BRAIN
+
+    subgraph Guardian["🛡️ Guardian-Agent Domain"]
+        PREGEN["🔍 opsv-pregen-review"]
+        OPS["⚙️ opsv-ops-mastery"]
+
+        PREGEN --> OPS
+    end
+
+    SCRIPT -->|"Script.md"| PREGEN
+
+    subgraph Runner["🚀 Runner-Agent Domain"]
+        GEN["opsv generate"]
+        RENDER["opsv gen-image / gen-video"]
+        REVIEW["opsv review"]
+        ANIM["animation-director + opsv-animator"]
+    end
+
+    OPS -->|"✅ PASS"| GEN
+    GEN --> RENDER
+    RENDER --> REVIEW
+    REVIEW -->|"Approve ✅"| ANIM
+    ANIM -->|"Shotlist.md"| GEN
+    REVIEW -->|"Draft 📝 Rollback"| BRAIN
+
+    style Creative fill:#fef3e2,stroke:#e67e22,stroke-width:2px
+    style Guardian fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Runner fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
 ```
 
 ---
@@ -38,7 +63,7 @@ opsv init [projectName]
 ### What Happens
 1. **Interactive selection** of AI assistant (Gemini / OpenCode / Trae).
 2. **Template copying**:
-   - `.agent/` — Agent role definitions + Skills.
+   - `.agent/` — 3 Agent role definitions + 9 Skills.
    - `.antigravity/` — Workflow templates.
    - `.env/` — API config templates.
 3. **Directory skeleton creation**:
@@ -47,48 +72,48 @@ opsv init [projectName]
 
 ---
 
-## Phase 2: Concept Anchoring
+## Phase 2: Brainstorming & Concept Anchoring
 
 ### Responsible Agent
-**Architect** → Invokes `opsv-architect` skill.
+**Creative-Agent** → Invokes `opsv-brainstorming` + `opsv-architect`
 
-### Two-Phase Workflow
+### Core Actions
+1. **Brainstorming First**: Never settle specs before confirming creative details. Use the Trinity Choice (Standard / Avant-garde / Zen) to deep-dive into the director's vision.
+2. **Spec Settlement**: Generate initial drafts (`project.md` and `story.md`) via creative plugins or user-driven skills.
+3. **Handoff to Guardian**: Once drafts are complete, they must be handed to **Guardian-Agent** for reflective sync.
 
-#### Phase 1: Ideation
-- Input: A lyric, a melody description, or a vague concept.
-- Output: **3 distinct story proposals**, each including title, core plot (3-5 sentences), visual style, and asset list.
-
-#### Phase 2: World-Building
-- Director selects a proposal, generating two core files:
-  - `videospec/project.md` — Global parameters & asset manifest.
-  - `videospec/stories/story.md` — Narrative outline with `@` entity anchors.
+### The Sync Loop — Core Requirement
+**Principle: Body is the Will (Soul), YAML is the Command (CMD).**
+- **Reflective Sync**: When the Markdown body is modified, Guardian-Agent updates the YAML `visual_detailed` field.
+- **Consistency**: After each review dialogue, body description and YAML header must be 100% semantically aligned.
+- **Gatekeeper**: If `opsv validate` detects drift between body and YAML, downstream generation is blocked.
 
 ---
 
 ## Phase 3: Asset Design
 
 ### Responsible Agent
-**AssetDesigner** → Invokes `opsv-asset-designer` skill.
+**Creative-Agent** → Invokes `opsv-asset-designer`
 
-### Design Principles (OPSV-ASSET-0.4)
-
+### Design Principles
 1. **Context Awareness**: Must read `project.md` to align with the overall atmosphere.
 2. **Dual-Channel References**:
-   - `Design References` (d-ref): Images used when creating the asset itself (img2img).
-   - `Approved References` (a-ref): Approved images provided as references when other entities cite this asset.
-3. **Variant Chains**: Linking an existing asset's a-ref to a new asset's d-ref to generate variants (e.g., aging a character).
+   - `Design References` (d-ref): Images used when creating the asset itself.
+   - `Approved References` (a-ref): Approved images for downstream references.
+3. **Quality Gates**: Executed by **Guardian-Agent** via `opsv validate` and `opsv-pregen-review`.
 
 ---
 
 ## Phase 4: Storyboard Compilation & Review
 
 ### 4.1 Scripting
-- **Responsible Agent**: **ScriptDesigner**.
-- Reads `story.md` and converts narrative into structured shot language in `Script.md`.
+- **Responsible Agent**: **Creative-Agent** → `opsv-script-designer`.
 - **Pure Markdown body format**, no YAML configuration array needed.
 - No character descriptions; use `@entity` tags only.
+- **No hardcoded** `target_model` or execution flow configs (v0.5.14+).
 
 ### 4.2 Image Generation
+**Responsible Agent**: **Runner-Agent**
 ```bash
 opsv generate        # Compile Spec -> JSON jobs
 opsv gen-image       # Render images (Parallel Universe Sandbox)
@@ -98,35 +123,47 @@ opsv gen-image       # Render images (Parallel Universe Sandbox)
 ```bash
 opsv review          # Start local Review server
 ```
-This opens a dark-themed Web UI (e.g., `localhost:3456`) where directors can visually select the best rendering drafts (grid view), name variants (e.g., `morning`), and click "Approve" to automatically write the approved images back into the `Script.md` and entity files as `Approved References`.
+Opens a dark-themed Web UI (e.g., `localhost:3456`) for visual selection:
+- **Approve**: Auto write-back to `## Approved References`, update `status: approved`
+- **Draft**: Record modification notes, rollback to Creative-Agent for iteration
 
 ---
 
 ## Phase 5: Animation & Video
 
-### 5.1 Animation Scripting
-- **Responsible Agent**: **Animator**.
-- Reads confirmed `Script.md` and extracts pure motion instructions into `Shotlist.md`.
-- **Statics-Motion Separation**: Only describe camera movement and subject action; appearances are handled by references.
+### Responsible Agent
+**Runner-Agent** → Invokes `opsv-animator` + `animation-director`
 
-### 5.2 Video Generation
+### Core Task
+Read confirmed `Script.md` and extract pure motion instructions into `Shotlist.md`.
+
+### Statics-Motion Separation
+- Only describe camera movement and subject action; appearances are handled by references.
+- **Camera First**: Force camera movement descriptions to prevent AI "slideshow" videos.
+- `motion_prompt_en` must be **English only**.
+
+### Video Generation
 ```bash
 opsv animate         # Compile Shotlist -> Video jobs
-opsv gen-video       # Render videos across enabled models
+opsv gen-video       # Render videos (Seedance 1.5 Pro, 2.0 Fast, etc.)
 ```
+
+### Long-Take Inheritance
+Via `@FRAME:shot_N_last` — the system auto-extracts the last frame of the previous video as the first frame of the next shot.
 
 ---
 
-## Quality Assurance (QA) System
+## Iterative Cycle
 
-| Slash Command | Stage | Checks |
-|-----------|------|---------|
-| `/opsv-qa act1` | After Scripting | Asset manifest completeness |
-| `/opsv-qa act2` | After Review | Dead links and reference paths |
-| `/opsv-qa act3` | After Storyboarding | Concept bleeding (appearance leaks) |
-| `/opsv-qa final` | Before Render | Payload assertions & style injection |
+The five phases are not a one-pass process. Directors iterate based on review results:
+
+```
+Creative-Agent → Guardian-Agent → Runner-Agent → Review → (Unsatisfied) → Rollback to Creative-Agent
+```
+
+The three-role collaboration ensures creativity, specification, and execution each stay in their lane.
 
 ---
 
 > *"Let creativity flow like water, let specification be the dam."*
-> *OpsV 0.5.0 | Latest Update: 2026-04-09*
+> *OpsV 0.5.19 | Latest Update: 2026-04-17*

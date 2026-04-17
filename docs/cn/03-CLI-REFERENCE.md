@@ -1,4 +1,4 @@
-# CLI 命令参考 (v0.5)
+# CLI 命令参考 (v0.5.19)
 
 ## 命令总览
 
@@ -29,6 +29,11 @@ videospec/
 ├── scenes/         # 场景文档
 ├── shots/          # 分镜文档
 └── project.md      # 项目配置
+.agent/
+├── Creative-Agent.md
+├── Guardian-Agent.md
+├── Runner-Agent.md
+└── skills/         # 9 个技能手册
 .env/
 ├── secrets.env     # API 密钥
 └── api_config.yaml # 模型配置
@@ -74,10 +79,10 @@ opsv generate --shots 1,5,12
 opsv gen-image
 
 # 指定模型
-opsv gen-image -m flux-pro
+opsv gen-image -m seadream-5.0-lite
 
 # 多模型逗号分隔
-opsv gen-image -m flux-pro,sdxl
+opsv gen-image -m seadream-5.0-lite,qwen-image
 
 # 仅校验不执行
 opsv gen-image --dry-run
@@ -86,10 +91,9 @@ opsv gen-image --dry-run
 opsv gen-image -s
 ```
 
-**v0.5 变更**:
-- 新增 `--dry-run` 模式，仅做两阶段校验
-- 执行前自动进行模型特定校验（像素约束、宽高比、Prompt 长度）
-- 支持逗号分隔的多模型指定
+**v0.5.16 变更**:
+- SiliconFlow 图像派发正式接入 ImageModelDispatcher
+- 支持 Qwen 多模态文生图与指令式图像编辑模型
 
 ### 选项
 
@@ -118,6 +122,7 @@ opsv review -b 3
 Review 页面功能：
 - 📸 按 Job 分组展示候选图（支持多模型对比）
 - ✅ 多选 Approve（支持自定义变体名，默认使用序号）
+- 📝 Draft 打回（记录修改意见供下轮迭代参考）
 - 📋 格式检查（检测 frontmatter 缺失字段）
 - 🔄 自动 `git commit`
 
@@ -180,8 +185,15 @@ opsv animate
 opsv gen-video
 
 # 指定模型
-opsv gen-video -m seedance
+opsv gen-video -m seedance-1.5-pro
+
+# 仅校验不执行
+opsv gen-video --dry-run
 ```
+
+**v0.5.15 变更**:
+- 新增 Seedance Provider 实现
+- 支持 Seedance 2.0 Fast 极速模式
 
 ### 选项
 
@@ -189,6 +201,7 @@ opsv gen-video -m seedance
 |------|------|--------|
 | `-m, --model <model>` | 目标模型 | `all` |
 | `-s, --skip-failed` | 跳过失败任务 | `false` |
+| `--dry-run` | 仅校验不执行 | `false` |
 
 ## opsv daemon
 

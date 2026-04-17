@@ -1,4 +1,4 @@
-# Document Standards (v0.5.8)
+# Document Standards (v0.5.19)
 
 > OpenSpec-Video v0.5 adopts a **Four-Layer Specification System** to ensure deterministic document-as-code workflows.
 
@@ -34,11 +34,27 @@ reviews:                            # Review history
 
 **v0.5 Specification Evolution (Incremental Specs Logic)**:
 
+- **v0.5.19 (Industrial Pipeline Stabilization)**:
+    - **CI/CD Integration**: Added GitHub Actions automated npm publish workflow.
+    - **Three-Agent Architecture**: Legacy 7-Agent structure officially replaced by Creative/Guardian/Runner triad.
+
+- **v0.5.16 (Precision Editing & Hybrid Model Drive)**:
+    - **SiliconFlow Image Integration**: `ImageModelDispatcher` officially handles SiliconFlow image dispatch, supporting Qwen text-to-image and instruction-based editing.
+    - **Hybrid Provider Architecture**: `SiliconFlowProvider` refactored into dual image/video architecture, auto-switching endpoints by model semantics.
+    - **`requires_reference` Field**: Edit-type models marked with `requires_reference: true`, Provider auto-extracts reference images.
+
+- **v0.5.15 (Multi-Modal Engine Scheduling)**:
+    - **Seedance Provider**: Implemented Seedance video generation Provider, supporting 1.5 Pro and 2.0 Fast dual modes.
+    - **api_config Capability Levels**: Model configs gained `type`, `max_reference_images`, `supports_audio`, `supports_video_ref` capability boundary fields.
+
+- **v0.5.14 (Pure Spec & Dynamic Degradation)**:
+    - **Absolutely Pure Spec**: Hardcoding model implementation details or local workflows (like `target_model`) into Markdown files is strictly forbidden. The Markdown document remains a pure representation of narrative intent. Compatibility checks are handled by the Dispatcher runtime via Graceful Degradation.
+
 - **v0.5.8 (Architectural Robustness)**:
     - **Universal Block Style**: Forced Folded Block (`>`) for all long-text fields to eliminate quotation parsing errors.
 - **v0.5.7 (Visual Semantic Standardization)**:
     - **Visual-First Fields**: Introduced `visual_brief` and `visual_detailed` to force visual-only metadata.
-    - **Process Loop**: Established "Body -> YAML -> Review correction" workflow.
+    - **Process Loop**: Established "Body → YAML → Review correction" workflow.
 - **v0.5.6 (SSOT 2.0)**:
     - **YAML-First Logic**: Rendering pipeline strictly reads YAML metadata.
     - **Skeleton Headers**: Mandatory core Markdown headers enforced.
@@ -49,9 +65,6 @@ reviews:                            # Review history
 
 > [!IMPORTANT]
 > **Maintenance Rule**: All specification updates must be recorded incrementally. Do NOT delete previous version decisions to ensure full design traceability.
-
-- **v0.5.14 (Pure Spec & Dynamic Degradation)**:
-    - **Absolutely Pure Spec**: Hardcoding model implementation details or local workflows (like `target_model`, `comfy_workflow`) into Markdown files (`Shotlist.md`) is strictly forbidden. The Markdown document remains a pure representation of narrative intent. Base model compatibility checks are handled purely by the Dispatcher runtime via the capability boundaries defined in `api_config.yaml` (Graceful Degradation).
 
 ### 2.2 Scene Documents (scenes/*.md)
 
@@ -205,8 +218,7 @@ Video generation jobs use `frame_ref`:
 
 ### 6.1 Dependency Sources
 
-- `reference` field: Variant dependency (younger_brother → elder_brother)
-- `refs` field: Content reference dependency
+- `refs` field: Content reference dependency (variant dependencies unified here)
 
 ### 6.2 Strict Mode
 

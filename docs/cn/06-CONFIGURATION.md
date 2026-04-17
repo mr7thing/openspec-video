@@ -14,7 +14,7 @@ project/
 ```
 
 | 文件 | 存储内容 | Git 跟踪 | 修改频率 |
-|------|---------|---------|---------|
+|------|---------|---------|---------| 
 | `secrets.env` | API Key 等敏感信息 | ❌ 忽略 | 极少（初始化后不变） |
 | `api_config.yaml` | 模型参数、默认值、能力描述 | ❌ 忽略 | 偶尔（切换模型/调参时） |
 
@@ -28,11 +28,11 @@ project/
 # 火山引擎 API Key（SeaDream 图像 + Seedance 视频）
 VOLCENGINE_API_KEY=your_volcengine_key_here
 
-# SeaDream 独立 Key（如与火山引擎不同）
-SEADREAM_API_KEY=your_seadream_key_here
-
-# SiliconFlow API Key（Wan2.1 视频）
+# SiliconFlow API Key（Qwen 图像 + Wan 视频）
 SILICONFLOW_API_KEY=your_siliconflow_key_here
+
+# MiniMax API Key（MiniMax 图像 + Hailuo 视频）
+MINIMAX_API_KEY=your_minimax_key_here
 ```
 
 ### 加载优先级
@@ -52,59 +52,116 @@ CLI 启动时按以下优先级加载环境变量：
 opsv gen-image --dry-run
 ```
 
-输出将显示：
-```
-🔍 Environment Check:
-   - Config Source: .env/secrets.env
-   - VOLCENGINE_API_KEY: Present (****abc1)
-   - SEADREAM_API_KEY: Missing
-```
-
 ---
 
 ## 3. 引擎参数配置 (`api_config.yaml`)
 
-### 完整配置模板
+### 完整配置模板 (v0.5.19)
 
 ```yaml
-# OpsV 0.4 多模态视频引擎调度配置文件
-# 调度器 (Dispatcher) 在发出请求前严格根据此表映射参数
-# gen_command 标注该模型由哪个 CLI 命令执行
+# OpsV 0.5.x 多模态视频引擎调度配置文件
+# 调度器 (Dispatcher) 在发出请求前严格根据此表映射参数并执行优雅降级
 
 models:
 
-  # ==========================================
-  # 图像模型：火山引擎 SeaDream 5.0 Lite
-  # CLI: opsv gen-image -m seadream-5.0-lite
-  # ==========================================
+  # ── 图像模型 ──────────────────────────────────
+
   seadream-5.0-lite:
     provider: "seadream"
+    type: "image"
+    enable: true
     model: "doubao-seedream-5-0-260128"
     gen_command: "gen-image"
-    required_env: ["VOLCENGINE_API_KEY"]       # ← 0.4.1 声明所需 Key
-    fallback_env: ["SEADREAM_API_KEY"]         # ← 备选 Key（任一存在即可）
-    features: ["txt2img", "img2img", "negative_prompt", "seed_control", "aspect_ratio", "sequential_generation"]
+    required_env: ["VOLCENGINE_API_KEY"]
+    features: ["txt2img", "img2img", "negative_prompt", "aspect_ratio"]
     defaults:
       quality: "2K"
-      aspect_ratio: "1:1"
-      max_images: 4
+      aspect_ratio: "16:9"
+      max_images: 1
       steps: 30
       cfg_scale: 7.5
-      negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark"
-    max_size:
-      width: 2048
-      height: 2048
-    max_batch: 12
+      negative_prompt: "blurry, low quality, distorted..."
+    max_size: { width: 1280, height: 720 }
 
-  # ==========================================
-  # 视频模型：SiliconFlow Wan 2.1
-  # CLI: opsv gen-video -m wan2.2-i2v
-  # ==========================================
+  qwen-image:
+    provider: "siliconflow"
+    type: "image"
+    enable: true
+    model: "Qwen/Qwen-Image"
+    gen_command: "gen-image"
+    required_env: ["SILICONFLOW_API_KEY"]
+    features: ["txt2img", "aspect_ratio"]
+    defaults:
+      quality: "1024x1024"
+      aspect_ratio: "1:1"
+
+  qwen-image-edit-2509:
+    provider: "siliconflow"
+    type: "image"
+    enable: true
+    model: "Qwen/Qwen-Image-Edit-2509"
+    gen_command: "gen-image"
+    required_env: ["SILICONFLOW_API_KEY"]
+    features: ["img2img", "edit"]
+    requires_reference: true          # 编辑模型强制要求参考图
+    defaults:
+      quality: "original"
+      aspect_ratio: "original"
+
+  minimax-image-01:
+    provider: "minimax"
+    type: "image"
+    enable: false
+    model: "image-01"
+    gen_command: "gen-image"
+    required_env: ["MINIMAX_API_KEY"]
+    features: ["txt2img", "img2img", "aspect_ratio"]
+    defaults:
+      aspect_ratio: "16:9"
+
+  # ── 视频模型 ──────────────────────────────────
+
+  seedance-1.5-pro:
+    provider: "seedance"
+    type: "video"
+    enable: true
+    model: "doubao-seedance-1-5-pro"
+    gen_command: "gen-video"
+    required_env: ["VOLCENGINE_API_KEY"]
+    defaults:
+      quality: "720p"
+      aspect_ratio: "16:9"
+      duration: 5
+      sound: true
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 9
+
+  seedance-2.0-fast:
+    provider: "seedance"
+    type: "video"
+    enable: true
+    model: "doubao-video-v2-fast"
+    gen_command: "gen-video"
+    required_env: ["VOLCENGINE_API_KEY"]
+    defaults:
+      quality: "720p"
+      aspect_ratio: "16:9"
+      duration: 5
+      sound: true
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 10
+    supports_audio: true
+    supports_video_ref: true
+
   wan2.2-i2v:
     provider: "siliconflow"
+    type: "video"
+    enable: false
     model: "wan-ai/Wan2.1-T2V-14B"
-    api_url: "https://api.siliconflow.cn/v1/video/submit"
-    api_status_url: "https://api.siliconflow.cn/v1/video/status"
     gen_command: "gen-video"
     required_env: ["SILICONFLOW_API_KEY"]
     defaults:
@@ -112,66 +169,60 @@ models:
       fps: 24
       duration: 5
     supports_first_image: true
-    supports_middle_image: false
-    supports_last_image: false
-    supports_reference_images: false
+    max_reference_images: 0
+    supports_audio: false
 
-  # ==========================================
-  # 视频模型：Seedance 1.5 Pro (火山引擎)
-  # CLI: opsv gen-video -m seedance-1.5-pro
-  # ==========================================
-  seedance-1.5-pro:
-    provider: "seedance"
-    model: "doubao-seedance-1-5-pro"
-    api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
+  minimax-video-01:
+    provider: "minimax"
+    type: "video"
+    enable: false
+    model: "MiniMax-Hailuo-2.3"
     gen_command: "gen-video"
-    required_env: ["VOLCENGINE_API_KEY"]
-    fallback_env: ["SEEDANCE_API_KEY"]
-    quality_map:
-      "480p": "480p"
-      "720p": "720p"
-      "1080p": "1080p"
+    required_env: ["MINIMAX_API_KEY"]
     defaults:
-      quality: "720p"
-      aspect_ratio: "16:9"
+      resolution: "1080P"
       duration: 5
-      fps: 24
-      sound: true
     supports_first_image: true
-    supports_middle_image: false
     supports_last_image: true
     supports_reference_images: true
+    max_reference_images: 1
+    supports_audio: false
 ```
 
 ---
 
 ## 4. 模型能力矩阵
 
-| 能力 | SeaDream 5.0 | Wan 2.1 | Seedance 1.5 Pro |
-|------|:---:|:---:|:---:|
-| **类型** | 图像 | 视频 | 视频 |
-| **首帧参考** | N/A | ✅ | ✅ |
-| **尾帧参考** | N/A | ❌ | ✅ |
-| **中间帧** | N/A | ❌ | ❌ |
-| **角色参考图** | N/A | ❌ | ✅ |
-| **组图模式** | ✅ (1-12) | ❌ | ❌ |
-| **负面提示词** | ✅ | ❌ | ❌ |
-| **种子控制** | ✅ | ❌ | ❌ |
-| **空间音频** | N/A | ❌ | ✅ |
-| **画幅选项** | 5 种 | 固定 | 7 种 |
-| **分辨率** | 2K-4K | 720p | 480p-1080p |
+### 图像模型
+
+| 能力 | SeaDream 5.0 | Qwen Image | Qwen Edit | MiniMax Image |
+|------|:---:|:---:|:---:|:---:|
+| **文生图** | ✅ | ✅ | ❌ | ✅ |
+| **图生图** | ✅ | ❌ | ✅ (编辑) | ✅ |
+| **负面提示词** | ✅ | ❌ | ❌ | ❌ |
+| **画幅选项** | 5 种 | 固定 | 原图 | 多种 |
+| **分辨率** | 2K | 1024² | 原图 | 可配置 |
+
+### 视频模型
+
+| 能力 | Seedance 1.5 Pro | Seedance 2.0 Fast | Wan 2.1 | MiniMax Hailuo |
+|------|:---:|:---:|:---:|:---:|
+| **首帧参考** | ✅ | ✅ | ✅ | ✅ |
+| **尾帧参考** | ✅ | ✅ | ❌ | ✅ |
+| **角色参考图** | ✅ (≤9) | ✅ (≤10) | ❌ | ✅ (≤1) |
+| **空间音频** | ✅ | ✅ | ❌ | ❌ |
+| **视频参考** | ❌ | ✅ | ❌ | ❌ |
+| **分辨率** | 480p-1080p | 720p | 720p | 1080P |
 
 ---
 
 ## 5. 关键参数解读
 
-### `max_images`（组图数量）
+### `type` 字段 (v0.5.15+)
+标注模型类型为 `"image"` 或 `"video"`，调度器据此路由到 `ImageModelDispatcher` 或 `VideoModelDispatcher`。
 
-当 `max_images > 1` 时，渲染引擎自动激活"连续生成"模式：
-- 系统向 Prompt 注入连贯性引导词
-- 同一实体的多张图片保持高度特征一致性
-- **推荐值**：`4`（兼顾效率与多样性）
-- **上限**：`12`
+### `requires_reference` 字段 (v0.5.16+)
+当设为 `true` 时，该模型为编辑类模型，Provider 会自动从分镜的 `frame_ref` 中提取参考图并进行 Base64 编码注入。
 
 ### `global_style_postfix`（全局风格后缀）
 
@@ -181,11 +232,19 @@ models:
 [Shot Prompt] + [Asset Description] + [global_style_postfix]
 ```
 
-示例：`"cinematic lighting, ultra detailed, masterpiece, arri alexa 65, 8k"`
+### 模型边界与优雅降级 (v0.5.14+)
+调度器会在派发前进行动态的资源边界测试 (Graceful Degradation)：
+- `max_reference_images`: 如果输入参考图超载，引擎将自动截断并抛出黄色警告。
+- `supports_audio` / `supports_video_ref`: 如果输入多模态音频或视频引用而设定为 false，派发器将自动剔除以免执行错误。
 
-### `quality_map`（质量映射）
+### `required_env` / `fallback_env` 字段
 
-不同模型的分辨率参数名称不统一。`quality_map` 将 OpsV 标准化的质量等级映射到各模型的原生参数。
+声明模型所需的 API Key 环境变量名。CLI 在执行前查表校验，无需硬编码。
+
+| 字段 | 含义 | 示例 |
+|------|------|------|
+| `required_env` | 必需的 Key（至少一个存在） | `["VOLCENGINE_API_KEY"]` |
+| `fallback_env` | 备选 Key（required 不存在时尝试） | `["SEADREAM_API_KEY"]` |
 
 ---
 
@@ -206,45 +265,13 @@ templates/.env/                 .env/
 
 ## 7. 添加新模型
 
-1. 在 `api_config.yaml` 中添加新模型配置块（含 `required_env`）
+1. 在 `api_config.yaml` 中添加新模型配置块（含 `type`、`required_env`）
 2. 在 `secrets.env` 中添加对应的 API Key
 3. 在 `src/executor/providers/` 中实现对应的 Provider 类
 4. 在 `ImageModelDispatcher` 或 `VideoModelDispatcher` 中注册新 Provider
 5. 更新 `docs/07-API-REFERENCE.md` 添加接口文档
 
-```yaml
-# api_config.yaml 新增示例
-models:
-  my-new-model:
-    provider: "custom"
-    model: "model-endpoint-id"
-    api_url: "https://api.example.com/v1/generate"
-    gen_command: "gen-image"          # 或 "gen-video"
-    required_env: ["MY_MODEL_API_KEY"]
-    defaults:
-      quality: "720p"
-      duration: 5
-    supports_first_image: true
-    supports_last_image: false
-    max_reference_images: 0
-    supports_audio: false
-    supports_video_ref: false
-
-### 模型边界与优雅降级 (v0.5.14)
-调度器会在派发前进行动态的资源边界测试 (Graceful Degradation):
-- `max_reference_images`: 如果输入参考图超载，引擎将自动截断并抛出黄色警告。
-- `supports_audio` / `supports_video_ref`: 如果输入多模态音频或视频引用而设定为 false，派发器将自动剔除它们以免执行错误。
-
-### `required_env` / `fallback_env` 字段
-
-声明模型所需的 API Key 环境变量名。CLI 在执行前查表校验，无需硬编码。
-
-| 字段 | 含义 | 示例 |
-|------|------|------|
-| `required_env` | 必需的 Key（至少一个存在） | `["VOLCENGINE_API_KEY"]` |
-| `fallback_env` | 备选 Key（required 不存在时尝试） | `["SEADREAM_API_KEY"]` |
-
 ---
 
 > *"配置即命令，参数即纪律。"*
-> *OpsV 0.5.14 | 最后更新: 2026-04-13*
+> *OpsV 0.5.19 | 最后更新: 2026-04-17*

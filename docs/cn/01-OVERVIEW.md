@@ -1,6 +1,6 @@
 # OpsV 项目全景 (Project Overview)
 
-> **OpenSpec-Video (OpsV) 0.5.0** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
+> **OpenSpec-Video (OpsV) 0.5.19** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
 
 ---
 
@@ -40,16 +40,22 @@ OpsV 是一套 **Spec-as-Code** 视频制作管线。它允许创作者（导演
 ```
 project/
 ├── .agent/                     # AI Agent 配置
-│   ├── Architect.md            # 架构师角色定义
-│   ├── Screenwriter.md         # 编剧角色定义
-│   ├── AssetDesigner.md        # 资产设计师角色定义
-│   ├── ScriptDesigner.md       # 分镜设计师角色定义
-│   ├── Animator.md             # 动画编导角色定义
-│   ├── Supervisor.md           # 质检监制角色定义
-│   └── skills/                 # 技能手册库（10 个 Skill）
+│   ├── Creative-Agent.md       # 创世代理：脑暴 + 创意落盘
+│   ├── Guardian-Agent.md       # 同步守卫：校验 + 反射同步
+│   ├── Runner-Agent.md         # 疾走特遣：编译 + 渲染执行
+│   └── skills/                 # 技能手册库（9 个 Skill）
+│       ├── opsv-architect/
+│       ├── opsv-asset-designer/
+│       ├── opsv-script-designer/
+│       ├── opsv-animator/
+│       ├── opsv-brainstorming/
+│       ├── opsv-pregen-review/
+│       ├── opsv-ops-mastery/
+│       ├── opsv-enlightenment/
+│       └── animation-director/
 ├── .antigravity/               # Antigravity 工具配置
 │   ├── rules/                  # 行为规则
-│   └── workflows/              # 工作流模板（8 个）
+│   └── workflows/              # 工作流模板
 ├── .env/                       # 环境配置（git 忽略）
 │   ├── secrets.env             # API 密钥
 │   └── api_config.yaml         # 引擎参数配置
@@ -87,6 +93,7 @@ project/
 | **动静分离** | 图像管线（Script.md + Generator）与视频管线（Shotlist.md + Animator）互相独立。 |
 | **frame_ref** | `v0.5 引入`，取代 schema_0_3。向模型传递首/尾帧参考图像（first/last）的标准数据结构。 |
 | **两阶段校验** | `v0.5 引入`，编译期格式检查，加上执行期的宽限/拒绝等硬约束（像素、宽高、模型参数上限）。 |
+| **优雅降级** | `v0.5.14 引入`，调度器在派发前动态检测模型能力边界，自动剔除不支持的参数并发出警告。 |
 
 ---
 
@@ -104,19 +111,19 @@ echo "VOLCENGINE_API_KEY=your_key_here" > .env/secrets.env
 
 # 4. 编写资产和分镜（参考工作流文档）
 
-# 3. 依赖图检查
+# 5. 依赖图检查
 opsv deps
 
-# 4. 编译任务
+# 6. 编译任务
 opsv generate
 
-# 5. 执行图像生成
+# 7. 执行图像生成
 opsv gen-image
 
-# 6. Web 模式审阅
+# 8. Web 模式审阅
 opsv review
 
-# 7. 编译并生成视频
+# 9. 编译并生成视频
 opsv animate
 opsv gen-video
 ```
@@ -127,9 +134,9 @@ opsv gen-video
 
 | 文档 | 说明 |
 |------|------|
-| [工作流程说明](./02-WORKFLOW.md) | 五步循环完整流程 |
-| [CLI 命令参考](./03-CLI-REFERENCE.md) | 全部 8 个命令的详细用法 |
-| [Agent 与 Skill 体系](./04-AGENTS-AND-SKILLS.md) | 6 个角色 + 10 个技能 |
+| [工作流程说明](./02-WORKFLOW.md) | 三角色循环完整流程 |
+| [CLI 命令参考](./03-CLI-REFERENCE.md) | 全部 9 个命令的详细用法 |
+| [Agent 与 Skill 体系](./04-AGENTS-AND-SKILLS.md) | 3 个角色 + 9 个技能 |
 | [文档格式规范](./05-DOCUMENT-STANDARDS.md) | 四层架构、YAML 模板、@ 语法（v0.5） |
 | [配置体系](./06-CONFIGURATION.md) | .env 目录与引擎参数 |
 | [API 接口规范](./07-API-REFERENCE.md) | 多模型接口协议 |
@@ -137,4 +144,4 @@ opsv gen-video
 ---
 
 > *"代码是写给人看的，只是顺便让机器运行。"*
-> *OpsV 0.5.0 | 最后更新: 2026-04-09*
+> *OpsV 0.5.19 | 最后更新: 2026-04-17*

@@ -1,4 +1,4 @@
-# CLI Reference (v0.5)
+# CLI Reference (v0.5.19)
 
 ## Command Overview
 
@@ -20,6 +20,23 @@ Initialize OpsV project structure.
 
 ```bash
 opsv init
+```
+
+Creates directory structure:
+```
+videospec/
+├── elements/       # Element documents
+├── scenes/         # Scene documents
+├── shots/          # Storyboard documents
+└── project.md      # Project configuration
+.agent/
+├── Creative-Agent.md
+├── Guardian-Agent.md
+├── Runner-Agent.md
+└── skills/         # 9 skill manuals
+.env/
+├── secrets.env     # API keys
+└── api_config.yaml # Model configuration
 ```
 
 ## opsv generate
@@ -50,16 +67,15 @@ Execute image generation jobs.
 
 ```bash
 opsv gen-image                       # All enabled models
-opsv gen-image -m flux-pro           # Specific model
-opsv gen-image -m flux-pro,sdxl      # Multiple models
+opsv gen-image -m seadream-5.0-lite  # Specific model
+opsv gen-image -m seadream-5.0-lite,qwen-image  # Multiple models
 opsv gen-image --dry-run             # Validate only
 opsv gen-image -s                    # Skip failed, continue
 ```
 
-**v0.5 Changes**:
-- New `--dry-run` mode for two-stage validation only
-- Auto model-specific validation before API dispatch (pixel limits, aspect ratios, prompt length)
-- Comma-separated multi-model specification
+**v0.5.16 Changes**:
+- SiliconFlow image dispatch officially integrated into ImageModelDispatcher
+- Supports Qwen multi-modal text-to-image and instruction-based image editing models
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -81,6 +97,7 @@ opsv review -b 3                     # Specific batch
 Review Page Features:
 - 📸 Candidate images grouped by job (multi-model comparison)
 - ✅ Multi-select approve (custom variant name or auto-numbered)
+- 📝 Draft rollback (record modification notes for iteration)
 - 📋 Format check (detect missing frontmatter fields)
 - 🔄 Automatic `git commit`
 
@@ -120,8 +137,13 @@ Execute video generation jobs.
 
 ```bash
 opsv gen-video                       # All enabled video models
-opsv gen-video -m seedance           # Specific model
+opsv gen-video -m seedance-1.5-pro   # Specific model
+opsv gen-video --dry-run             # Validate only
 ```
+
+**v0.5.15 Changes**:
+- Seedance Provider implemented
+- Supports Seedance 2.0 Fast turbo mode
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -129,9 +151,19 @@ opsv gen-video -m seedance           # Specific model
 | `-s, --skip-failed` | Skip failed jobs | `false` |
 | `--dry-run` | Validate only | `false` |
 
+## opsv daemon
+
+Global background service management.
+
+```bash
+opsv daemon start    # Start
+opsv daemon stop     # Stop
+opsv daemon status   # View status
+```
+
 ## opsv addons
 
-**v0.5 New**: Manage project extensions and domain-specific skill packs (e.g., Comic-Drama SOPs, Music Video brains).
+**v0.5 New**: Manage project extensions and domain-specific skill packs.
 
 ```bash
 # Install addon pack (.zip)

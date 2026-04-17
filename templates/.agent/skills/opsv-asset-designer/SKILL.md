@@ -22,8 +22,8 @@ description: OpenSpec-Video (OpsV) 核心框架技能：资产设计师。负责
 详见 `references/element_template.md` 和 `references/scene_template.md`，两者的语法是互通的。
 
 **硬性约束**：
+- 文件名必须精确匹配花名册里的标签（如 `@boss`）。
 - 顶部必须由符合规范的 YAML 字典组成。
-- `name` 字段必须精确匹配花名册里的标签（如 `@role_boss`）。
-- **废除 `has_image`**：v0.5 中不再使用 `has_image`，而是采用 `status: approved` 代表实体已经定档可用。如果是刚起草的文件，`status` 应当为 `draft`。
+- 采用 `status: approved` 代表实体已经定档可用。如果是刚起草的文件，`status` 应当为 `draft`。
 - 必须设立 `## Design References` 下的列表。用于存放你在画这张角色图时的输入参考图（支持网络 URL 或本地盘路径）。
 - 必须设立 `## Approved References` 下的列表。**定档后的视觉形象将存放在这里（通常在执行 opsv review 命令后被框架自动写入）**。当这里有图片链接时，系统认定资产已定档。
