@@ -16,7 +16,8 @@ export function registerDepsCommand(program: Command) {
             const graph = DependencyGraph.buildFromProject(projectRoot);
             const approvedRefReader = new ApprovedRefReader(projectRoot);
 
-            console.log(graph.prettyPrint(approvedRefReader));
+            const output = await graph.prettyPrint(approvedRefReader);
+            console.log(output);
             console.log(`\n已保存: .opsv/dependency-graph.json`);
         });
 }

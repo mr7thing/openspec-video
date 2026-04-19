@@ -213,10 +213,17 @@ export class DependencyGraph {
     static buildFromProject(projectRoot: string): DependencyGraph {
         const graph = new DependencyGraph();
         const documents: ParsedDocument[] = [];
+
+        // 支持两种目录结构:
+        // 1. {projectRoot}/videospec/elements/  (标准结构)
+        // 2. {projectRoot}/elements/            (扁平结构，brother 测试用)
         const dirs = ['elements', 'scenes'];
 
         for (const dir of dirs) {
-            const dirPath = path.join(projectRoot, 'videospec', dir);
+            // 先尝试标准结构，再尝试扁平结构
+            const standardPath = path.join(projectRoot, 'videospec', dir);
+            const flatPath = path.join(projectRoot, dir);
+            const dirPath = fs.existsSync(standardPath) ? standardPath : flatPath;
             if (!fs.existsSync(dirPath)) continue;
 
             const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
