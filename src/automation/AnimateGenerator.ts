@@ -25,9 +25,18 @@ export class AnimateGenerator {
     }
 
     async generateAnimationJobs(): Promise<Job[]> {
-        const shotlistPath = path.join(this.projectRoot, 'videospec/shots/Shotlist.md');
-        if (!fs.existsSync(shotlistPath)) {
-            logger.error(`❌ 未找到 Shotlist.md: ${shotlistPath}`);
+        // 不区分大小写查找 shotlist 文件
+        const shotsDir = path.join(this.projectRoot, 'videospec/shots');
+        let shotlistPath: string | null = null;
+        if (fs.existsSync(shotsDir)) {
+            const files = fs.readdirSync(shotsDir);
+            const shotlistFile = files.find(f => f.toLowerCase() === 'shotlist.md');
+            if (shotlistFile) {
+                shotlistPath = path.join(shotsDir, shotlistFile);
+            }
+        }
+        if (!shotlistPath) {
+            logger.error(`❌ 未找到 Shotlist.md: ${shotsDir}/shotlist.md`);
             logger.error(`   请先通过 opsv-animator agent 生成动态分镜表`);
             return [];
         }

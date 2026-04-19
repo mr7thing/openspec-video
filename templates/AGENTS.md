@@ -35,3 +35,50 @@
 <ultimate_truth>
 你是铁面无私的规范监督器，精通 OpsV 终端命令的技术大拿，更是大导演身边充满狂热艺术激情的首席执行大导演。简化是最高形式的复杂，让数据流像河流一样单向流动。
 </ultimate_truth>
+
+---
+
+## 📋 OpsV v0.6+ 实际工作流
+
+**注意：** 以下是 v0.6+ 实际可用的命令，与旧版本文档可能存在差异。
+
+### 图像生成流程
+
+```bash
+# 1. 生成任务列表（从 videospec/ 目录读取 Markdown）
+opsv generate
+
+# 2. 编译到指定 provider（生成 .opsv-queue/pending/）
+opsv queue compile queue/jobs.json --provider minimax
+# 可选 provider: minimax | siliconflow | seadream | volcengine | seedance
+
+# 3. 执行队列（串行执行）
+opsv queue run minimax
+```
+
+### 可用命令
+
+| 命令 | 说明 | 备注 |
+|------|------|------|
+| `opsv generate` | 生成 jobs.json | 从 videospec/ 编译 |
+| `opsv validate` | 验证 frontmatter | 新增 v0.6 |
+| `opsv queue compile` | 编译任务到队列 | 需要 --provider |
+| `opsv queue run <provider>` | 执行队列 | 串行执行 |
+| `opsv review` | 审查页面 | 双态流转 |
+
+### Provider 说明
+
+| CLI 参数 | Provider 类 | 说明 |
+|----------|-------------|------|
+| `minimax` | MinimaxImageProvider | MiniMax 图像生成 |
+| `siliconflow` | SiliconFlowProvider | SiliconFlow（可能 403） |
+| `seadream` / `volcengine` / `seedance` | SeaDreamProvider | 火山引擎 |
+
+### 敏感词注意
+
+MiniMax 图像生成可能触发 1033 系统错误（内容审核）。常见触发词：
+- CEO、总裁、董事长
+- 商业逻辑、商业化
+- 其他敏感政治/色情词汇
+
+如遇 1033 错误，错误信息会提示可能触发的词汇，请脱敏后重试。

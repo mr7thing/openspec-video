@@ -11,6 +11,7 @@ import { registerAnimateCommand } from './commands/animate';
 import { registerDepsCommand } from './commands/deps';
 import { registerAddonsCommands } from './commands/addons';
 import { registerQueueCommands } from './commands/queue';
+import { registerValidateCommand } from './commands/validate';
 
 const projectRoot = process.cwd();
 const envSubDir = path.join(projectRoot, '.env');
@@ -46,6 +47,7 @@ registerAnimateCommand(program, VERSION);
 registerDepsCommand(program);
 registerAddonsCommands(program);
 registerQueueCommands(program);
+registerValidateCommand(program, VERSION);
 
 program.parse(process.argv);
 

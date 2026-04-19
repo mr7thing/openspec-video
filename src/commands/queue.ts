@@ -25,10 +25,24 @@ export function registerQueueCommands(program: Command) {
             configLoader.loadConfig(projectRoot);
 
             const provider = options.provider || 'seadream'; // Fallback to a default or require it
-            if (!provider) {
-                console.error("[Queue] You must specify a --provider or configure a default.");
-                process.exit(1);
+
+            // ---- API Key 连通性检查 ----
+            const keyEnvMap: Record<string, string> = {
+                minimax: 'MINIMAX_API_KEY',
+                siliconflow: 'SILICONFLOW_API_KEY',
+                seadream: 'SEADREAM_API_KEY',
+                volcengine: 'VOLCENGINE_API_KEY',
+                seedance: 'SEADREAM_API_KEY',
+            };
+            const keyName = keyEnvMap[provider.toLowerCase()];
+            if (keyName) {
+                const apiKey = process.env[keyName];
+                if (!apiKey || apiKey.trim() === '' || apiKey === '***') {
+                    console.warn(`[Queue] ⚠️ API Key "${keyName}" 未配置或为占位符 "***"，任务可能在执行时失败。`);
+                    console.warn(`[Queue]   请在 .env/secrets.env 中配置有效的 API Key。`);
+                }
             }
+            // ---- 检查结束 ----
 
             console.log(`[Queue] Compiling ${tasksJson} for provider: ${provider}...`);
             const queueDir = path.join(projectRoot, '.opsv-queue');
@@ -87,7 +101,7 @@ export function registerQueueCommands(program: Command) {
                 const runningHubApi = new RunningHubProvider(apiKey);
                 const watcher = new QueueWatcher(queueDir, provider, async (task) => await runningHubApi.processTask(task));
                 await watcher.start();
-            } else if (provider === 'seadream') {
+            } else if (provider === 'seadream' || provider === 'volcengine' || provider === 'seedance') {
                 const seadreamApi = new SeaDreamProvider();
                 const watcher = new QueueWatcher(queueDir, provider, async (task) => await seadreamApi.processTask(task));
                 await watcher.start();

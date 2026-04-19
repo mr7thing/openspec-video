@@ -58,8 +58,21 @@ export class MinimaxImageProvider {
             });
         } catch (error: any) {
             if (error.response) {
+                const statusMsg = error.response.data?.base_resp?.status_msg || error.response.status;
                 logger.error('Minimax API Error:', { jobId: job.id, status: error.response.status, data: JSON.stringify(error.response.data) });
-                throw new Error(`Minimax API Error: ${error.response.data?.base_resp?.status_msg || error.response.status}`);
+                
+                // 检测是否是内容审核触发（1033 系统错误）
+                if (error.response.data?.base_resp?.status_code === 1033 || 
+                    String(statusMsg).toLowerCase().includes('sensitive') ||
+                    String(statusMsg).toLowerCase().includes('审核')) {
+                    const sensitiveTerms = this.detectSensitiveTerms(prompt);
+                    const suggestion = sensitiveTerms.length > 0
+                        ? `可能触发审核的词汇: ${sensitiveTerms.join(', ')}。请尝试脱敏处理后重试。`
+                        : '内容可能触发审核，请检查 prompt 是否有敏感内容后重试。';
+                    throw new Error(`Minimax 内容审核 (1033): ${suggestion}`);
+                }
+                
+                throw new Error(`Minimax API Error: ${statusMsg}`);
             }
             throw new Error(`Minimax Network Error: ${error.message}`);
         }
@@ -81,5 +94,30 @@ export class MinimaxImageProvider {
         logger.logExecution(job.id, 'MINIMAX_SAVE_SUCCESS', { path: job.output_path });
 
         return true;
+    }
+
+    /**
+     * 检测可能触发内容审核的敏感词汇
+     */
+    private detectSensitiveTerms(prompt: string): string[] {
+        // 常见审核敏感词（基于实际测试反馈）
+        const sensitivePatterns = [
+            /\bCEO\b|\b总裁\b|\b董事长\b|\b总经理\b/i,
+            /\b商业\b|\bcorporate\b|\bbusiness\b/i,
+            /\b政治\b|\bpolitics\b|\bgovernment\b/i,
+            /\b色情\b|\b情色\b|\bsexy\b|\berotic\b/i,
+            /\b暴力\b|\bmurder\b|\bkill\b/i,
+            /\b赌博\b|\bgambling\b|\bcasino\b/i,
+            /\b迷信\b|\b宗教\b|\breligion\b|\bsuperstition\b/i,
+        ];
+
+        const detected: string[] = [];
+        for (const pattern of sensitivePatterns) {
+            const match = prompt.match(pattern);
+            if (match) {
+                detected.push(match[0]);
+            }
+        }
+        return detected;
     }
 }
