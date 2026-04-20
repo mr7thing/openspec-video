@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import { Job, PromptPayload } from '../types/PromptSchema';
@@ -28,8 +28,9 @@ export class AnimateGenerator {
         // 不区分大小写查找 shotlist 文件
         const shotsDir = path.join(this.projectRoot, 'videospec/shots');
         let shotlistPath: string | null = null;
-        if (fs.existsSync(shotsDir)) {
-            const files = fs.readdirSync(shotsDir);
+        const shotsDirExists = await fs.access(shotsDir).then(() => true).catch(() => false);
+        if (shotsDirExists) {
+            const files = await fs.readdir(shotsDir);
             const shotlistFile = files.find(f => f.toLowerCase() === 'shotlist.md');
             if (shotlistFile) {
                 shotlistPath = path.join(shotsDir, shotlistFile);
@@ -41,7 +42,7 @@ export class AnimateGenerator {
             return [];
         }
 
-        const content = fs.readFileSync(shotlistPath, 'utf-8');
+        const content = await fs.readFile(shotlistPath, 'utf-8');
 
         // ---- 解析正文 ## Shot NN ----
         const shotSections = this.parseShotSections(content);
@@ -58,7 +59,7 @@ export class AnimateGenerator {
 
         // ---- 输出目录 ----
         const videoOutDir = path.join(this.projectRoot, 'artifacts', 'videos');
-        if (!fs.existsSync(videoOutDir)) fs.mkdirSync(videoOutDir, { recursive: true });
+        await fs.mkdir(videoOutDir, { recursive: true });
 
         const jobs: Job[] = [];
 
@@ -81,9 +82,12 @@ export class AnimateGenerator {
             }
 
             // 检查 @FRAME 指针或实体文件
-            if (absFirst && !absFirst.startsWith('@FRAME:') && !fs.existsSync(absFirst)) {
-                logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
-                continue;
+            if (absFirst && !absFirst.startsWith('@FRAME:')) {
+                const exists = await fs.access(absFirst).then(() => true).catch(() => false);
+                if (!exists) {
+                    logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
+                    continue;
+                }
             }
 
             // 获取最后一帧设置
@@ -102,7 +106,7 @@ export class AnimateGenerator {
             try {
                 // 将形如 (@hero), @scene 展开为标准 Prompt 描述
                 const refs = await this.refResolver.parseAll(rawPrompt);
-                const expansion = this.refResolver.expandRefsInText(rawPrompt, refs);
+                const expansion = await this.refResolver.expandRefsInText(rawPrompt, refs);
                 rawPrompt = expansion.expandedText;
                 // 将附件图合并到 job 的参考图中
                 if (expansion.attachments.length > 0) {
@@ -146,9 +150,9 @@ export class AnimateGenerator {
         // ---- 写入队列 ----
         if (jobs.length > 0) {
             const queueDir = path.join(this.projectRoot, 'queue');
-            if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
+            await fs.mkdir(queueDir, { recursive: true });
 
-            fs.writeFileSync(
+            await fs.writeFile(
                 path.join(queueDir, 'video_jobs.json'),
                 JSON.stringify(jobs, null, 2)
             );

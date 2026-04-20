@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { ApprovedRefReader } from './ApprovedRefReader';
 
@@ -64,7 +64,7 @@ export class RefResolver {
         const assetId = colonIdx > 0 ? identifier.slice(0, colonIdx) : identifier;
         const variant = colonIdx > 0 ? identifier.slice(colonIdx + 1) : undefined;
 
-        const targetDoc = this.findAssetDoc(assetId);
+        const targetDoc = await this.findAssetDoc(assetId);
         let resolvedImagePath: string | undefined;
 
         if (targetDoc) {
@@ -87,10 +87,10 @@ export class RefResolver {
      * 将正文中的 @ 引用展开为 prompt 文本
      * @younger_brother:portrait 弟弟肖像 → "弟弟肖像 [参考图 1]"
      */
-    expandRefsInText(
+    async expandRefsInText(
         markdown: string,
         refs: RefResult[]
-    ): { expandedText: string; attachments: string[] } {
+    ): Promise<{ expandedText: string; attachments: string[] }> {
         let text = markdown;
         const attachments: string[] = [];
 
@@ -109,13 +109,16 @@ export class RefResolver {
                 : refPatternNoBracket;
 
             // 替换为展开后的文本
-            if (ref.resolvedImagePath && fs.existsSync(ref.resolvedImagePath)) {
-                attachments.push(ref.resolvedImagePath);
-                const imageIndex = attachments.length;
-                text = text.replace(targetPattern, `${ref.label} [参考图 ${imageIndex}]`);
-            } else {
-                text = text.replace(targetPattern, ref.label);
+            if (ref.resolvedImagePath) {
+                const exists = await fs.access(ref.resolvedImagePath).then(() => true).catch(() => false);
+                if (exists) {
+                    attachments.push(ref.resolvedImagePath);
+                    const imageIndex = attachments.length;
+                    text = text.replace(targetPattern, `${ref.label} [参考图 ${imageIndex}]`);
+                    continue;
+                }
             }
+            text = text.replace(targetPattern, ref.label);
         }
 
         return { expandedText: text, attachments };
@@ -123,7 +126,7 @@ export class RefResolver {
 
     // ---- 内部方法 ----
 
-    private resolveFrame(identifier: string, label: string): RefResult {
+    private async resolveFrame(identifier: string, label: string): Promise<RefResult> {
         const framePart = identifier.slice(6); // 去掉 "FRAME:"
 
         // shot_01_last → shot = shot_01, frame = last
@@ -136,12 +139,14 @@ export class RefResolver {
             this.projectRoot, 'artifacts', `${shotId}_${frameType}.png`
         );
 
+        const exists = await fs.access(framePath).then(() => true).catch(() => false);
+
         return {
             type: 'frame',
             assetId: framePart,
             label,
             targetDoc: '',
-            resolvedImagePath: fs.existsSync(framePath) ? framePath : undefined
+            resolvedImagePath: exists ? framePath : undefined
         };
     }
 
@@ -150,7 +155,7 @@ export class RefResolver {
      * 搜索顺序: elements/ → scenes/
      * 文件名: @asset_id.md 或 asset_id.md
      */
-    private findAssetDoc(assetId: string): string | null {
+    private async findAssetDoc(assetId: string): Promise<string | null> {
         const dirs = ['elements', 'scenes'];
         const prefixes = ['@', ''];
 
@@ -159,7 +164,8 @@ export class RefResolver {
                 const p = path.join(
                     this.projectRoot, 'videospec', dir, `${prefix}${assetId}.md`
                 );
-                if (fs.existsSync(p)) return p;
+                const exists = await fs.access(p).then(() => true).catch(() => false);
+                if (exists) return p;
             }
         }
         return null;

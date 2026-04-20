@@ -1,4 +1,4 @@
-# OpenSpec-Video Server Architecture (v0.6.0)
+# OpenSpec-Video Server Architecture (v0.6.1)
 
 ## 1. 架构拓扑 (Arch Topology)
 
@@ -21,8 +21,10 @@ OpenSpec-Video 推行严格的服务生态分类协议："Global vs. Contextual"
 ### 1.3 Local Task Worker (Spooler Queue)
 **职责定位**: 单点任务消费者（不监听任何网络端口），通过 QueueWatcher 逐一处理物理信箱中的原子任务。
 - 生命周期: 随 `opsv queue run <provider>` 启停
-- 执行模式: 单线程顺序消费，物理状态流转 (`pending → processing → completed/failed`)
-- 断点恢复: 支持 Ctrl+C 中断后从 `processing` 目录恢复
+- 执行模式: 单线程顺序消费，物理状态流转 (`inbox → working → done`)
+- **原子提取**: `dequeue()` 使用原子 `fs.rename` 消除竞态条件，支持多进程并发消费
+- **优雅关机**: `SIGINT`/`SIGTERM` 信号捕获，自动将 `working/` 中任务回滚至 `inbox/`
+- **损坏隔离**: JSON 解析失败的任务自动移至 `corrupted/` 目录，不阻断队列
 
 ---
 
@@ -59,16 +61,27 @@ OPSV_REVIEW_PORT=3456
 
 ```
 .opsv-queue/                    # 由 opsv init 自动创建
-├── pending/{provider}/         # 待执行任务（queue compile 投递）
-├── processing/{provider}/      # 执行中任务（QueueWatcher 原子提取）
-├── completed/{provider}/       # 已完成任务（归档含结果）
-└── failed/{provider}/          # 已失败任务（归档含错误信息）
+├── inbox/{provider}/           # 待执行任务（queue compile 投递）
+├── working/{provider}/         # 执行中任务（QueueWatcher 原子提取）
+├── done/{provider}/            # 已完成/失败任务（归档含结果或错误）
+└── corrupted/{provider}/       # 损坏任务（JSON 解析失败时隔离）
 ```
 
 ### 状态流转协议
-- `opsv queue compile` → 将意图 JSON 切碎为原子 `UUID.json` 投入 `pending/`
-- `opsv queue run` → QueueWatcher 从 `pending/` 原子提取到 `processing/`
-- 成功 → 移动到 `completed/`，失败 → 移动到 `failed/`
-- 人工重试 → 将 `failed/` 中的文件移回 `pending/`
+- `opsv queue compile` → 将意图 JSON 切碎为原子 `UUID.json` 投入 `inbox/`
+- `opsv queue run` → QueueWatcher 从 `inbox/` **原子提取**到 `working/`
+- 成功 → 移动到 `done/`，失败 → 保留在 `done/`（含错误信息）
+- 优雅关机 → `working/` 中任务自动回滚至 `inbox/`
+- 损坏隔离 → `corrupted/` 保存解析失败的 JSON 供人工排查
+
+### 架构决策 (ADR)
+
+**ADR-1: 物理文件锁替代内存锁**
+- 使用原子 `fs.rename` 实现 dequeue，而非 in-memory mutex
+- 价值: 支持崩溃恢复、多进程并发、无外部依赖
+
+**ADR-2: 运行时 fs/promises 标准化**
+- 所有运行时文件 I/O 统一使用 `fs/promises`
+- 顶层 boot 代码（env 加载、CLI 解析）保留 sync fs
 
 通过此规范，OpenSpec-Video 实现了强隔离、无依赖冲突的微服务架构体验，从手工环境干预演化至无感知工程自动接管。

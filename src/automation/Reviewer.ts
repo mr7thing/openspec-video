@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 
@@ -14,14 +14,15 @@ export class Reviewer {
      */
     public async reviewAll(options: { allDrafts?: boolean } = {}): Promise<void> {
         const artifactsDir = path.join(this.projectRoot, 'artifacts');
-        if (!fs.existsSync(artifactsDir)) {
+        const artifactsExists = await fs.access(artifactsDir).then(() => true).catch(() => false);
+        if (!artifactsExists) {
              console.warn('No artifacts directory found. Nothing to review.');
              return;
         }
 
         if (options.allDrafts) {
             // --all mode: process all drafts_* folders
-            const folders = fs.readdirSync(artifactsDir)
+            const folders = (await fs.readdir(artifactsDir))
                 .filter(f => f.startsWith('drafts_'))
                 .sort((a, b) => {
                     const numA = this._parseDraftNum(a);
@@ -34,7 +35,7 @@ export class Reviewer {
             }
         } else {
             // Default: process only the latest drafts_N
-            const latestFolder = this.getLatestDraftFolder();
+            const latestFolder = await this.getLatestDraftFolder();
             if (latestFolder) {
                 await this.reviewTarget(path.join('artifacts', latestFolder));
             } else {
@@ -51,19 +52,22 @@ export class Reviewer {
      */
     public async reviewTarget(targetPath: string): Promise<void> {
         const fullPath = path.resolve(this.projectRoot, targetPath);
-        if (!fs.existsSync(fullPath)) {
+        const fullPathExists = await fs.access(fullPath).then(() => true).catch(() => false);
+        if (!fullPathExists) {
             console.error(`Error: Path not found: ${fullPath}`);
             return;
         }
 
         let jobsJsonPath = '';
-        if (fs.statSync(fullPath).isDirectory()) {
+        const stat = await fs.stat(fullPath);
+        if (stat.isDirectory()) {
             jobsJsonPath = path.join(fullPath, 'jobs.json');
         } else if (fullPath.endsWith('.json')) {
             jobsJsonPath = fullPath;
         }
 
-        if (fs.existsSync(jobsJsonPath)) {
+        const jobsJsonExists = await fs.access(jobsJsonPath).then(() => true).catch(() => false);
+        if (jobsJsonExists) {
             console.log(`\n🔍 Reviewing via task manifest: ${path.relative(this.projectRoot, jobsJsonPath)}`);
             await this.processJobsJson(jobsJsonPath);
         } else {
@@ -79,7 +83,7 @@ export class Reviewer {
     private async processJobsJson(jsonPath: string): Promise<void> {
         let jobs: any[] = [];
         try {
-            const data = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+            const data = JSON.parse(await fs.readFile(jsonPath, 'utf-8'));
             jobs = Array.isArray(data) ? data : (data.jobs || []);
         } catch (e) {
             console.error(`Failed to parse ${jsonPath}:`, e);
@@ -118,28 +122,36 @@ export class Reviewer {
         ];
 
         for (const p of searchPaths) {
-            if (fs.existsSync(p)) return p;
+            const exists = await fs.access(p).then(() => true).catch(() => false);
+            if (exists) return p;
         }
 
         // Special case: if it's a shot, it's likely in Script.md
         if (id.startsWith('shot_') || id.startsWith('shot')) {
             const scriptPath = path.join(this.projectRoot, 'videospec/shots', 'Script.md');
-            if (fs.existsSync(scriptPath)) return scriptPath;
+            const exists = await fs.access(scriptPath).then(() => true).catch(() => false);
+            if (exists) return scriptPath;
         }
 
         return null;
     }
 
     private async updateDocument(docPath: string, newImages: string[]): Promise<void> {
-        let content = fs.readFileSync(docPath, 'utf-8');
+        let content = await fs.readFile(docPath, 'utf-8');
         const fileName = path.basename(docPath);
         let modified = false;
 
         // 1. Resolve @ references to markdown links
         const atRefRegex = /(?<!\[)@([a-zA-Z0-9_-]+)/g;
-        if (atRefRegex.test(content)) {
+        const entities = [...content.matchAll(atRefRegex)].map(m => m[1]);
+        const uniqueEntities = [...new Set(entities)];
+        if (uniqueEntities.length > 0) {
+            const entityPaths = new Map<string, string | null>();
+            await Promise.all(uniqueEntities.map(async entity => {
+                entityPaths.set(entity, await this.findEntityDoc(entity));
+            }));
             content = content.replace(atRefRegex, (match, entity) => {
-                const entityPath = this.findEntityDoc(entity);
+                const entityPath = entityPaths.get(entity);
                 if (entityPath) {
                     const rel = path.relative(path.dirname(docPath), entityPath).replace(/\\/g, '/');
                     return `[@${entity}](${rel})`;
@@ -167,7 +179,7 @@ export class Reviewer {
                     const shotId = path.basename(imgPath).split('_')[0] + '_' + path.basename(imgPath).split('_')[1]; // e.g. shot_1
                     const shotNum = shotId.replace(/shot_?/i, '');
                     
-                    const headerRegex = new RegExp(`^#+\\s+Shot\\s+${shotNum}\\b`, 'im');
+                    const headerRegex = new RegExp(`^#+\s+Shot\s+${shotNum}\\b`, 'im');
                     const match = content.match(headerRegex);
                     if (match) {
                         const index = match.index! + match[0].length;
@@ -190,27 +202,29 @@ export class Reviewer {
         }
 
         if (modified) {
-            fs.writeFileSync(docPath, content, 'utf-8');
+            await fs.writeFile(docPath, content, 'utf-8');
         }
     }
 
-    private findEntityDoc(entity: string): string | null {
+    private async findEntityDoc(entity: string): Promise<string | null> {
         const dirs = [
             path.join(this.projectRoot, 'videospec/elements'),
             path.join(this.projectRoot, 'videospec/scenes')
         ];
         for (const d of dirs) {
             const p = path.join(d, `${entity}.md`);
-            if (fs.existsSync(p)) return p;
+            const exists = await fs.access(p).then(() => true).catch(() => false);
+            if (exists) return p;
         }
         return null;
     }
 
-    private getLatestDraftFolder(): string | null {
+    private async getLatestDraftFolder(): Promise<string | null> {
         const artifactsDir = path.join(this.projectRoot, 'artifacts');
-        if (!fs.existsSync(artifactsDir)) return null;
+        const artifactsExists = await fs.access(artifactsDir).then(() => true).catch(() => false);
+        if (!artifactsExists) return null;
 
-        const folders = fs.readdirSync(artifactsDir)
+        const folders = (await fs.readdir(artifactsDir))
             .filter(f => f.startsWith('drafts_'))
             .sort((a, b) => {
                 const numA = this._parseDraftNum(a);
@@ -242,7 +256,7 @@ export class Reviewer {
      * Legacy mode: scans directory for images by naming pattern
      */
     private async legacyScanReview(dirPath: string): Promise<void> {
-        const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.png') || f.endsWith('.jpg'));
+        const files = (await fs.readdir(dirPath)).filter(f => f.endsWith('.png') || f.endsWith('.jpg'));
         const mapDocToImages: Map<string, string[]> = new Map();
 
         for (const file of files) {
@@ -269,15 +283,17 @@ export class Reviewer {
      */
     public async reviewVideos(): Promise<void> {
         const videosDir = path.join(this.projectRoot, 'artifacts', 'videos');
-        if (!fs.existsSync(videosDir)) return;
+        const videosDirExists = await fs.access(videosDir).then(() => true).catch(() => false);
+        if (!videosDirExists) return;
 
         const shotlistPath = path.join(this.projectRoot, 'videospec/shots/Shotlist.md');
-        if (!fs.existsSync(shotlistPath)) return;
+        const shotlistExists = await fs.access(shotlistPath).then(() => true).catch(() => false);
+        if (!shotlistExists) return;
 
-        const files = fs.readdirSync(videosDir).filter(f => f.endsWith('.mp4'));
+        const files = (await fs.readdir(videosDir)).filter(f => f.endsWith('.mp4'));
         if (files.length === 0) return;
 
-        let content = fs.readFileSync(shotlistPath, 'utf-8');
+        let content = await fs.readFile(shotlistPath, 'utf-8');
         let modified = false;
 
         const docDir = path.dirname(shotlistPath);
@@ -291,7 +307,7 @@ export class Reviewer {
 
             // We must locate the corresponding ## Shot section and its YAML
             // Match pattern for the specific shot's YAML block
-            const shotSectionRegex = new RegExp(`(##\\s+Shot\\s+0*${parseInt(shotMatch[1], 10)}\\b[\\s\\S]*?)(##\\s+Shot|$)`, 'i');
+            const shotSectionRegex = new RegExp(`(##\s+Shot\s+0*${parseInt(shotMatch[1], 10)}\b[\s\S]*?)(##\s+Shot|$)`, 'i');
             const sectionMatch = content.match(shotSectionRegex);
             
             if (sectionMatch) {
@@ -310,7 +326,8 @@ export class Reviewer {
                             
                             // Check if last_frame has been generated by video completion process
                             const expectedLastFrame = path.resolve(this.projectRoot, `artifacts/drafts_frame_cache/${targetId}_last.jpg`);
-                            if (fs.existsSync(expectedLastFrame) && !state.last_frame) {
+                            const lastFrameExists = await fs.access(expectedLastFrame).then(() => true).catch(() => false);
+                            if (lastFrameExists && !state.last_frame) {
                                 state.last_frame = path.relative(docDir, expectedLastFrame).replace(/\\/g, '/');
                             }
                             
@@ -349,7 +366,7 @@ export class Reviewer {
         }
 
         if (modified) {
-            fs.writeFileSync(shotlistPath, content, 'utf-8');
+            await fs.writeFile(shotlistPath, content, 'utf-8');
         }
     }
 }

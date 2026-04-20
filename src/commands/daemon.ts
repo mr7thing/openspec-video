@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { isDaemonRunning, startDaemon, stopDaemon, registerProject } from '../utils/daemonUtils';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
@@ -11,8 +11,8 @@ export function registerDaemonCommands(program: Command, VERSION: string) {
         .command('serve')
         .description('Start the OpsV background server')
         .action(async () => {
-            if (!isDaemonRunning()) {
-                startDaemon();
+            if (!(await isDaemonRunning())) {
+                await startDaemon();
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
                 console.log('Server is already running.');
@@ -24,8 +24,8 @@ export function registerDaemonCommands(program: Command, VERSION: string) {
         .command('start')
         .description('Alias for serve')
         .action(async () => {
-            if (!isDaemonRunning()) {
-                startDaemon();
+            if (!(await isDaemonRunning())) {
+                await startDaemon();
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
                 console.log('Server is already running.');
@@ -36,16 +36,16 @@ export function registerDaemonCommands(program: Command, VERSION: string) {
     program
         .command('stop')
         .description('Stop the OpsV background server')
-        .action(() => {
-            stopDaemon();
+        .action(async () => {
+            await stopDaemon();
         });
 
     program
         .command('status')
         .description('Check OpsV Server status')
-        .action(() => {
-            if (isDaemonRunning()) {
-                const pid = fs.readFileSync(PID_FILE, 'utf-8');
+        .action(async () => {
+            if (await isDaemonRunning()) {
+                const pid = await fs.readFile(PID_FILE, 'utf-8');
                 const port = process.env.OPSV_DAEMON_PORT || '3061';
                 console.log(`✅ OpsV Server is RUNNING (PID: ${pid})`);
                 console.log(`   Listening on: ws://127.0.0.1:${port}`);

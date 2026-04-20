@@ -1,4 +1,4 @@
-# OpenSpec-Video v0.6.0 Specification
+# OpenSpec-Video v0.6.1 Specification
 
 > 从 v0.5.19 到 v0.6.0 的架构升级总览
 
@@ -44,6 +44,19 @@
 | `genImage.ts` | `src/commands/` | `opsv queue run <provider>` |
 | `genVideo.ts` | `src/commands/` | `opsv queue run <provider>` |
 
+## 架构决策记录 (ADRs)
+
+### ADR-1: 物理文件锁替代内存锁
+SpoolerQueue 使用原子 `fs.rename` 实现 dequeue，支持崩溃恢复和多进程并发，无需 Redis 等外部依赖。
+
+### ADR-2: Runtime fs/promises 标准化
+所有运行时文件 I/O 统一使用 `fs/promises`，顶层 boot 代码保留 sync fs。
+
+### ADR-3: Per-projectRoot ConfigLoader 缓存
+ConfigLoader 不使用全局单例，而是按 `projectRoot` 缓存实例，支持 monorepo 和多项目并发。
+
+---
+
 ## 文档体系
 
 | 文档 | 路径 | 状态 |
@@ -58,3 +71,4 @@
 | Addon 开发 | `docs/cn/08-ADDONS-DEVELOPMENT.md` | ✅ 更新 |
 | 服务架构 | `docs/Server-Architecture.md` | ✅ 更新 |
 | 英文文档 | `docs/en/01-07` | ✅ 全部同步 |
+| 代码审查报告 | `docs/OPSV_v0.6.1_CODE_REVIEW_COMPLETION.md` | ✅ 新增 |

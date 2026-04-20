@@ -1,6 +1,6 @@
 # OpsV Project Overview
 
-> **OpenSpec-Video (OpsV) 0.6.0** — An automation framework that compiles Markdown narrative specs into video/image generation tasks.
+> **OpenSpec-Video (OpsV) 0.6.1** — An automation framework that compiles Markdown narrative specs into video/image generation tasks.
 
 ---
 
@@ -18,7 +18,7 @@ With the v0.6.0 architecture revolution, OpsV achieves **physical isolation of i
 - **Docs as Code**: `.md` files are the single source of truth; images and videos are merely compiled artifacts
 - **Dependency Driven**: `## Approved References` establishes causal constraints between entities
 - **Intent-Execution Separation**: Generate produces intent, Compile translates to API instructions, Run passively consumes
-- **Physical State Machine**: Tasks flow as atomic files through `pending → processing → completed/failed` directories
+- **Physical State Machine**: Tasks flow as atomic files through `inbox → working → done` directories via atomic `fs.rename`
 - **Static-Dynamic Separation**: Image and video pipelines are independent, non-interfering
 
 ---
@@ -56,10 +56,10 @@ project/
 ├── .opsv/                      # Runtime state (git ignored)
 │   └── dependency-graph.json   # Dependency graph snapshot
 ├── .opsv-queue/                # Spooler physical mailbox (git ignored)
-│   ├── pending/{provider}/     # Pending tasks
-│   ├── processing/{provider}/  # In-progress tasks
-│   ├── completed/{provider}/   # Completed tasks
-│   └── failed/{provider}/      # Failed tasks
+│   ├── inbox/{provider}/       # Pending tasks
+│   ├── working/{provider}/     # In-progress tasks
+│   ├── done/{provider}/        # Completed/failed tasks
+│   └── corrupted/{provider}/   # Corrupted JSON isolation
 ├── videospec/                  # Core narrative assets (source of truth)
 │   ├── project.md
 │   ├── stories/
@@ -79,7 +79,7 @@ project/
 | Concept | Description |
 |---------|-------------|
 | **Spec-as-Code** | Using structured Markdown as the source code for video production. |
-| **Spooler Queue** | `v0.6` Physical file-based state machine for task scheduling, replacing the old in-memory Dispatcher. |
+| **Spooler Queue** | `v0.6` Physical file-based state machine with atomic `fs.rename` dequeue, replacing the old in-memory Dispatcher. |
 | **Dependency Graph** | `v0.5` Topological parsing at compile time; blocks tasks whose dependencies aren't Approved. |
 | **Review UI** | `v0.5` Local Express web page for visual image selection, naming, and metadata writeback. |
 | **@ Reference Syntax** | Tags like `@role_K`, `@scene_bar` to invoke approved asset variants. |
@@ -135,4 +135,4 @@ opsv review
 ---
 
 > *"Code is written for humans to read, and only incidentally for machines to execute."*
-> *OpsV 0.6.0 | Last updated: 2026-04-17*
+> *OpsV 0.6.1 | Last updated: 2026-04-20*

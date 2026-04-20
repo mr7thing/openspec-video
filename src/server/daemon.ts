@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import os from 'os';
 import dotenv from 'dotenv';
@@ -10,9 +11,9 @@ const envSubDir = path.join(projectRoot, '.env');
 const secretsEnvPath = path.join(envSubDir, 'secrets.env');
 const rootEnvPath = path.join(projectRoot, '.env');
 
-if (fs.existsSync(secretsEnvPath)) {
+if (fsSync.existsSync(secretsEnvPath)) {
     dotenv.config({ path: secretsEnvPath });
-} else if (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory()) {
+} else if (fsSync.existsSync(rootEnvPath) && !fsSync.lstatSync(rootEnvPath).isDirectory()) {
     dotenv.config({ path: rootEnvPath });
 } else {
     dotenv.config();
@@ -44,14 +45,16 @@ interface AssetPayload {
 console.log(`[OpsV Global Daemon] Starting...`);
 
 // 1. Setup global PID file
-try {
-    fs.ensureDirSync(path.dirname(PID_FILE));
-    fs.writeFileSync(PID_FILE, process.pid.toString());
-    console.log(`[OpsV Global Daemon] PID ${process.pid} written to ${PID_FILE}`);
-} catch (error) {
-    console.error('[OpsV Global Daemon] Failed to write PID file:', error);
-    process.exit(1);
-}
+(async () => {
+    try {
+        await fs.mkdir(path.dirname(PID_FILE), { recursive: true });
+        await fs.writeFile(PID_FILE, process.pid.toString());
+        console.log(`[OpsV Global Daemon] PID ${process.pid} written to ${PID_FILE}`);
+    } catch (error) {
+        console.error('[OpsV Global Daemon] Failed to write PID file:', error);
+        process.exit(1);
+    }
+})();
 
 // 2. Start WebSocket Server
 const wss = new WebSocketServer({ host: '127.0.0.1', port: PORT });
@@ -68,7 +71,18 @@ wss.on('connection', (ws) => {
 
     ws.on('message', async (message: string) => {
         try {
-            const msg: ClientMessage = JSON.parse(message.toString());
+            const parsed = JSON.parse(message.toString());
+            // 运行时消息校验
+            if (!parsed || typeof parsed.type !== 'string') {
+                console.warn('[OpsV Global Daemon] Invalid message structure');
+                return;
+            }
+            const validTypes = ['GET_JOBS', 'SAVE_ASSET', 'UPDATE_JOB_STATUS', 'HEARTBEAT', 'REGISTER_PROJECT'];
+            if (!validTypes.includes(parsed.type)) {
+                console.warn(`[OpsV Global Daemon] Unknown message type: ${parsed.type}`);
+                return;
+            }
+            const msg: ClientMessage = parsed;
             handleMessage(ws, msg);
         } catch (err) {
             console.error('[OpsV Global Daemon] Invalid message:', err);
@@ -88,9 +102,11 @@ wss.on('connection', (ws) => {
 async function broadcastJobs() {
     let allJobs: any[] = [];
     for (const [projectRoot, state] of activeProjects.entries()) {
-        if (fs.existsSync(state.jobsPath)) {
+        const jobsPathExists = await fs.access(state.jobsPath).then(() => true).catch(() => false);
+        if (jobsPathExists) {
             try {
-                const jobs = fs.readJsonSync(state.jobsPath);
+                const jobsRaw = await fs.readFile(state.jobsPath, 'utf-8');
+                const jobs = JSON.parse(jobsRaw);
                 allJobs = allJobs.concat(jobs);
             } catch (err) {
                 console.error(`[OpsV Global Daemon] Error reading queue for project ${state.name}:`, err);
@@ -180,12 +196,14 @@ async function handleSaveAsset(ws: WebSocket, payload: AssetPayload) {
         const base = path.basename(fullPath, ext);
         const dir = path.dirname(fullPath);
 
-        while (fs.existsSync(finalPath)) {
+        let pathExists = await fs.access(finalPath).then(() => true).catch(() => false);
+        while (pathExists) {
             finalPath = path.join(dir, `${base}_${counter}${ext}`);
             counter++;
+            pathExists = await fs.access(finalPath).then(() => true).catch(() => false);
         }
 
-        await fs.ensureDir(path.dirname(finalPath));
+        await fs.mkdir(path.dirname(finalPath), { recursive: true });
         await fs.writeFile(finalPath, buffer);
 
         console.log(`[OpsV Global Daemon] Saved asset: ${finalPath}`);
@@ -203,8 +221,30 @@ process.on('SIGTERM', cleanup);
 
 function cleanup() {
     console.log('[OpsV Global Daemon] Shutting down...');
-    if (fs.existsSync(PID_FILE)) {
-        fs.unlinkSync(PID_FILE);
+
+    // 优雅关闭所有客户端连接
+    for (const client of connectedClients) {
+        if (client.readyState === WebSocket.OPEN) {
+            client.close(1000, 'Server shutting down');
+        }
     }
-    process.exit(0);
+    connectedClients = [];
+
+    // 关闭 WebSocket 服务器
+    wss.close(async () => {
+        console.log('[OpsV Global Daemon] WebSocket server closed.');
+        try {
+            await fs.unlink(PID_FILE);
+        } catch { /* ignore */ }
+        process.exit(0);
+    });
+
+    // 兜底：如果 5 秒内未关闭，强制退出
+    setTimeout(async () => {
+        console.error('[OpsV Global Daemon] Forced exit after timeout.');
+        try {
+            await fs.unlink(PID_FILE);
+        } catch { /* ignore */ }
+        process.exit(1);
+    }, 5000);
 }

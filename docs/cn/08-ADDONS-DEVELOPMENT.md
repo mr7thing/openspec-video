@@ -1,4 +1,4 @@
-# OpenSpec-Video Addon 开发规范指南 (v0.6.0)
+# OpenSpec-Video Addon 开发规范指南 (v0.6.1)
 
 本指南定义了在 OpenSpec-Video 中开发、发布以及维护扩展（Addon，如 `comic-drama`）的架构准则。在 v0.6.0 的 **Spooler Queue 架构** 下，系统确立了"代码归核心，参数归插件"的绝对解耦原则。
 
@@ -109,4 +109,4 @@ opsv addons install ./addons/comic-drama-v0.6.zip
 ---
 
 > *"Addon 是灵魂注入器，Spooler Queue 是它的透明传送门。"*
-> *OpsV 0.6.0 | 最后更新: 2026-04-17*
+> *OpsV 0.6.1 | 最后更新: 2026-04-20*

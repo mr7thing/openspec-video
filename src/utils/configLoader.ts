@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import { logger } from './logger';
@@ -33,31 +33,36 @@ export interface ApiConfig {
 }
 
 export class ConfigLoader {
-    private static instance: ConfigLoader;
+    private static instances = new Map<string, ConfigLoader>();
     private config: ApiConfig;
+    private projectRoot: string;
 
-    private constructor() {
+    private constructor(projectRoot: string) {
+        this.projectRoot = projectRoot;
         this.config = { models: {} };
     }
 
-    public static getInstance(): ConfigLoader {
-        if (!ConfigLoader.instance) {
-            ConfigLoader.instance = new ConfigLoader();
+    public static getInstance(projectRoot?: string): ConfigLoader {
+        const root = projectRoot || process.cwd();
+        if (!ConfigLoader.instances.has(root)) {
+            ConfigLoader.instances.set(root, new ConfigLoader(root));
         }
-        return ConfigLoader.instance;
+        return ConfigLoader.instances.get(root)!;
     }
 
-    public loadConfig(projectRoot: string): ApiConfig {
-        const configPath = path.join(projectRoot, '.env', 'api_config.yaml');
+    public async loadConfig(projectRoot?: string): Promise<ApiConfig> {
+        const root = projectRoot || this.projectRoot;
+        const configPath = path.join(root, '.env', 'api_config.yaml');
         
-        if (!fs.existsSync(configPath)) {
+        const configExists = await fs.access(configPath).then(() => true).catch(() => false);
+        if (!configExists) {
             logger.warn(`API config not found at ${configPath}, using empty config`);
             this.config = { models: {} };
             return this.config;
         }
 
         try {
-            const raw = fs.readFileSync(configPath, 'utf8');
+            const raw = await fs.readFile(configPath, 'utf8');
             this.config = yaml.load(raw) as ApiConfig;
             return this.config;
         } catch (e: any) {

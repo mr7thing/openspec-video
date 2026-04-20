@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { AssetManager } from '../core/AssetManager';
 import { AssetCompiler } from '../core/AssetCompiler';
@@ -57,7 +57,7 @@ export class JobGenerator {
         const globalConfig = this.assetCompiler.getProjectConfig();
 
         // ---- 构建依赖图（每次 generate 前重新构建，确保最新） ----
-        const depGraph = DependencyGraph.buildFromProject(this.projectRoot);
+        const depGraph = await DependencyGraph.buildFromProject(this.projectRoot);
         logger.info(await depGraph.prettyPrint(this.approvedRefReader));
 
         // ---- 扫描目标目录 ----
@@ -73,12 +73,12 @@ export class JobGenerator {
         const explicitFilePaths = new Set<string>();
         for (const target of targets) {
             const targetPath = path.resolve(this.projectRoot, target);
-            if (!fs.existsSync(targetPath)) continue;
-            const stats = fs.statSync(targetPath);
+            if (!await fs.access(targetPath).then(() => true).catch(() => false)) continue;
+            const stats = await fs.stat(targetPath);
             if (stats.isFile() && targetPath.endsWith('.md')) {
                 explicitFilePaths.add(targetPath.replace(/\\/g, '/'));
             } else if (stats.isDirectory()) {
-                const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
+                const files = (await fs.readdir(targetPath)).filter(f => f.endsWith('.md'));
                 for (const file of files) {
                     explicitFilePaths.add(path.join(targetPath, file).replace(/\\/g, '/'));
                 }
@@ -90,11 +90,11 @@ export class JobGenerator {
 
         for (const target of targets) {
             const targetPath = path.resolve(this.projectRoot, target);
-            if (!fs.existsSync(targetPath)) continue;
+            if (!await fs.access(targetPath).then(() => true).catch(() => false)) continue;
 
-            const stats = fs.statSync(targetPath);
+            const stats = await fs.stat(targetPath);
             if (stats.isDirectory()) {
-                const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
+                const files = (await fs.readdir(targetPath)).filter(f => f.endsWith('.md'));
                 for (const file of files) {
                     const filePath = path.join(targetPath, file);
                     const jobs = await this.processFile(filePath, globalConfig, options, skippedLog, explicitFilePaths);
@@ -127,19 +127,21 @@ export class JobGenerator {
 
         // ---- 写入 queue ----
         const queueDir = path.join(this.projectRoot, 'queue');
-        if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
+        if (!await fs.access(queueDir).then(() => true).catch(() => false)) {
+            await fs.mkdir(queueDir, { recursive: true });
+        }
 
         if (options.skipDependsLayer) {
             // ---- 扁平模式：所有 job 写入单个 jobs.json ----
-            this.batchIndex = this._nextDraftIndex();
+            this.batchIndex = await this._nextDraftIndex();
             this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`);
-            fs.mkdirSync(this.currentDraftDir, { recursive: true });
+            await fs.mkdir(this.currentDraftDir, { recursive: true });
 
-            fs.writeFileSync(
+            await fs.writeFile(
                 path.join(queueDir, 'jobs.json'),
                 JSON.stringify(executable, null, 2)
             );
-            fs.writeFileSync(
+            await fs.writeFile(
                 path.join(this.currentDraftDir, 'jobs.json'),
                 JSON.stringify(executable, null, 2)
             );
@@ -152,22 +154,23 @@ export class JobGenerator {
                 const layerJobs = executable.filter(j => idToLayer.get(j.id) === layerNum);
                 if (layerJobs.length === 0) continue;
 
-                this.batchIndex = this._nextDraftIndex(layerNum);
+                this.batchIndex = await this._nextDraftIndex(layerNum);
                 this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_L${layerNum}_${this.batchIndex}`);
-                fs.mkdirSync(this.currentDraftDir, { recursive: true });
+                await fs.mkdir(this.currentDraftDir, { recursive: true });
 
                 // output_path 在 processFile() 时 currentDraftDir 尚未设置，需要在此修正
                 for (const job of layerJobs) {
-                    job.output_path = this.nextOutputPath(job.id.replace(/[^\w]/g, '_'));
+                    job.output_path = await this.nextOutputPath(job.id.replace(/[^\w]/g, '_'));
+                    if (!job._meta) job._meta = {};
                     job._meta.batch = `batch_${this.batchIndex}`;
                 }
 
                 const filename = `layer_${layerNum}.json`;
-                fs.writeFileSync(
+                await fs.writeFile(
                     path.join(queueDir, filename),
                     JSON.stringify(layerJobs, null, 2)
                 );
-                fs.writeFileSync(
+                await fs.writeFile(
                     path.join(this.currentDraftDir, filename),
                     JSON.stringify(layerJobs, null, 2)
                 );
@@ -177,14 +180,14 @@ export class JobGenerator {
         // ---- 输出跳过日志 ----
         if (skippedLog.length > 0) {
             const logPath = path.join(queueDir, 'skipped.json');
-            fs.writeFileSync(logPath, JSON.stringify(skippedLog, null, 2));
+            await fs.writeFile(logPath, JSON.stringify(skippedLog, null, 2));
             logger.info(`\n📋 已跳过 ${skippedLog.length} 个 Approved 文档 (详见 queue/skipped.json):`);
             for (const s of skippedLog) {
                 logger.info(`  ⏭️  ${s.id} — ${s.reason}`);
             }
         }
 
-        const total = executable.reduce((sum, j) => sum + 1, 0);
+        const total = executable.length;
         logger.info(
             `\n✅ 编译完成: ${total} 个可执行任务` +
             (blocked.length > 0 ? ` (${blocked.length} 个等待依赖)` : '') +
@@ -198,10 +201,10 @@ export class JobGenerator {
      * 查找下一个可用的 draft 序号
      * @param layerHint 可选，用于分层模式的 L{n} 前缀
      */
-    private _nextDraftIndex(layerHint?: number): number {
+    private async _nextDraftIndex(layerHint?: number): Promise<number> {
         let idx = 1;
         const prefix = layerHint ? `drafts_L${layerHint}_` : 'drafts_';
-        while (fs.existsSync(path.join(this.projectRoot, `artifacts/${prefix}${idx}`))) {
+        while (await fs.access(path.join(this.projectRoot, `artifacts/${prefix}${idx}`)).then(() => true).catch(() => false)) {
             idx++;
         }
         return idx;
@@ -247,7 +250,7 @@ export class JobGenerator {
         skippedLog: { id: string; file: string; reason: string }[],
         explicitFilePaths: Set<string>
     ): Promise<Job[]> {
-        const content = fs.readFileSync(filePath, 'utf-8');
+        const content = await fs.readFile(filePath, 'utf-8');
         const id = path.parse(filePath).name.replace(/^@/, '');
 
         let frontmatter: any;
@@ -285,7 +288,7 @@ export class JobGenerator {
         const res = globalConfig.resolution || '1920x1080';
 
         // ---- 输出路径 ----
-        const outputPath = this.nextOutputPath(id);
+        const outputPath = await this.nextOutputPath(id);
 
         // ---- 构建 Job ----
         const payload: PromptPayload = {
@@ -318,7 +321,7 @@ export class JobGenerator {
         skippedLog: { id: string; file: string; reason: string }[],
         explicitFilePaths: Set<string>
     ): Promise<Job[]> {
-        const content = fs.readFileSync(filePath, 'utf-8');
+        const content = await fs.readFile(filePath, 'utf-8');
         const jobs: Job[] = [];
 
         let frontmatter: any;
@@ -362,12 +365,12 @@ export class JobGenerator {
             }
 
             // ---- 解析 @ 引用并展开 ----
-            const { expandedText, attachments: assetAttachments } = this.refResolver.expandRefsInText(
+            const { expandedText, attachments: assetAttachments } = await this.refResolver.expandRefsInText(
                 shot.body, shot.refs
             );
 
             // ---- v0.5.12: 解析镜头局部参考图 (Shot-Local References) ----
-            const localAttachments = this.extractLocalImageRefs(shot.body, filePath);
+            const localAttachments = await this.extractLocalImageRefs(shot.body, filePath);
             const allAttachments = Array.from(new Set([...assetAttachments, ...localAttachments]));
 
             // ---- 全局配置 ----
@@ -380,7 +383,7 @@ export class JobGenerator {
             if (stylePostfix) promptEn += `, ${stylePostfix}`;
 
             // ---- 输出路径 ----
-            const outputPath = this.nextOutputPath(shot.id);
+            const outputPath = await this.nextOutputPath(shot.id);
 
             const payload: PromptPayload = {
                 prompt: `[分镜: ${shot.id} - ${shot.title}]\n${shot.body}`,
@@ -453,10 +456,10 @@ export class JobGenerator {
     /**
      * 生成不重复的输出路径
      */
-    private nextOutputPath(baseName: string): string {
+    private async nextOutputPath(baseName: string): Promise<string> {
         let counter = 1;
         let outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
-        while (fs.existsSync(outputPath)) {
+        while (await fs.access(outputPath).then(() => true).catch(() => false)) {
             counter++;
             outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
         }
@@ -478,7 +481,7 @@ export class JobGenerator {
     /**
      * v0.5.12: 从文本中提取 Markdown 图片链接并转为绝对路径
      */
-    private extractLocalImageRefs(text: string, sourcePath: string): string[] {
+    private async extractLocalImageRefs(text: string, sourcePath: string): Promise<string[]> {
         const refs: string[] = [];
         const imgRegex = /!\[.*?\]\(([^)]+)\)/g;
         let match;
@@ -489,7 +492,7 @@ export class JobGenerator {
             const absPath = path.isAbsolute(imgPath) 
                 ? imgPath 
                 : path.resolve(baseDir, imgPath);
-            if (fs.existsSync(absPath)) {
+            if (await fs.access(absPath).then(() => true).catch(() => false)) {
                 refs.push(absPath.replace(/\\/g, '/'));
             } else {
                 logger.warn(`镜头局部参考图不存: ${absPath}`);

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
@@ -88,9 +88,9 @@ export class MinimaxImageProvider {
         const buffer = Buffer.from(imageBase64, 'base64');
         
         const dirname = path.dirname(job.output_path);
-        if (!fs.existsSync(dirname)) fs.mkdirSync(dirname, { recursive: true });
+        await fs.mkdir(dirname, { recursive: true });
         
-        fs.writeFileSync(job.output_path, buffer);
+        await fs.writeFile(job.output_path, buffer);
         logger.logExecution(job.id, 'MINIMAX_SAVE_SUCCESS', { path: job.output_path });
 
         return true;

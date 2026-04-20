@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 
 export interface ShotStatus {
@@ -22,10 +22,11 @@ export class ShotManager {
     /**
      * Parsing the shotslist.md markdown table manually for robustness.
      */
-    getShotList(): ShotStatus[] {
-        if (!fs.existsSync(this.shotsListPath)) return [];
+    async getShotList(): Promise<ShotStatus[]> {
+        const exists = await fs.access(this.shotsListPath).then(() => true).catch(() => false);
+        if (!exists) return [];
 
-        const content = fs.readFileSync(this.shotsListPath, 'utf-8');
+        const content = await fs.readFile(this.shotsListPath, 'utf-8');
         const lines = content.split('\n');
         const shots: ShotStatus[] = [];
 
@@ -56,10 +57,11 @@ export class ShotManager {
         return shots;
     }
 
-    updateShotStatus(shotId: string, status: 'Pending' | 'Draft' | 'Approved' | 'Revision') {
-        if (!fs.existsSync(this.shotsListPath)) return;
+    async updateShotStatus(shotId: string, status: 'Pending' | 'Draft' | 'Approved' | 'Revision') {
+        const exists = await fs.access(this.shotsListPath).then(() => true).catch(() => false);
+        if (!exists) return;
 
-        let content = fs.readFileSync(this.shotsListPath, 'utf-8');
+        let content = await fs.readFile(this.shotsListPath, 'utf-8');
         const lines = content.split('\n');
         const newLines: string[] = [];
 
@@ -79,22 +81,23 @@ export class ShotManager {
             }
         }
 
-        fs.writeFileSync(this.shotsListPath, newLines.join('\n'), 'utf-8');
+        await fs.writeFile(this.shotsListPath, newLines.join('\n'), 'utf-8');
         console.log(`Updated Shot ${shotId} status to ${status}`);
     }
 
     /**
      * Initializes the shots list file if it doesn't exist.
      */
-    initShotsList() {
-        if (fs.existsSync(this.shotsListPath)) return;
+    async initShotsList() {
+        const exists = await fs.access(this.shotsListPath).then(() => true).catch(() => false);
+        if (exists) return;
 
         const template = `# Master Shot List
 
 | Shot ID | Act | Scene | Description | Status | Reference |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 `;
-        fs.ensureDirSync(path.dirname(this.shotsListPath));
-        fs.writeFileSync(this.shotsListPath, template, 'utf-8');
+        await fs.mkdir(path.dirname(this.shotsListPath), { recursive: true });
+        await fs.writeFile(this.shotsListPath, template, 'utf-8');
     }
 }

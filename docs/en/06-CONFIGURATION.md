@@ -1,4 +1,4 @@
-# OpsV Configuration Guide (v0.6.0)
+# OpsV Configuration Guide (v0.6.1)
 
 > Triple configuration: services, secrets, and parameters — all behavior driven by config files.
 
@@ -97,4 +97,4 @@ models:
 
 ---
 
-> *OpsV 0.6.0 | Last updated: 2026-04-17*
+> *OpsV 0.6.1 | Last updated: 2026-04-20*

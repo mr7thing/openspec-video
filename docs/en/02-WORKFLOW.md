@@ -154,4 +154,4 @@ Three roles ensure creativity, standards, and execution remain properly separate
 ---
 
 > *"Let creativity flow like water, let standards stand firm like dams."*
-> *OpsV 0.6.0 | Last updated: 2026-04-17*
+> *OpsV 0.6.1 | Last updated: 2026-04-20*

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import chalk from 'chalk';
@@ -18,13 +18,15 @@ export function registerAddonsCommands(program: Command) {
 
             // 1. 验证项目环境
             const videospecDir = path.join(projectRoot, 'videospec');
-            if (!fs.existsSync(videospecDir)) {
+            const videospecExists = await fs.access(videospecDir).then(() => true).catch(() => false);
+            if (!videospecExists) {
                 console.error(chalk.red('Error: Current directory is not a valid OpsV project. Please run "opsv init" first.'));
                 process.exit(1);
             }
 
             // 2. 验证 Zip 文件
-            if (!fs.existsSync(absZipPath)) {
+            const zipExists = await fs.access(absZipPath).then(() => true).catch(() => false);
+            if (!zipExists) {
                 console.error(chalk.red(`Error: Addon file not found: ${absZipPath}`));
                 process.exit(1);
             }

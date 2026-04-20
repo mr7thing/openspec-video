@@ -10,7 +10,7 @@ import { MinimaxImageProvider } from '../executor/providers/MinimaxImageProvider
 import { Job } from '../types/PromptSchema';
 import { ConfigLoader } from '../utils/configLoader';
 import * as path from 'path';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 
 export function registerQueueCommands(program: Command) {
     const queueCmd = program.command('queue').description('Manage the file-based spooler queue');
@@ -22,7 +22,7 @@ export function registerQueueCommands(program: Command) {
         .action(async (tasksJson, options) => {
             const projectRoot = process.cwd();
             const configLoader = ConfigLoader.getInstance();
-            configLoader.loadConfig(projectRoot);
+            await configLoader.loadConfig(projectRoot);
 
             const provider = options.provider || 'seadream'; // Fallback to a default or require it
 
@@ -48,7 +48,8 @@ export function registerQueueCommands(program: Command) {
             const queueDir = path.join(projectRoot, '.opsv-queue');
             const absoluteTaskPath = path.resolve(projectRoot, tasksJson);
             
-            if (!fs.existsSync(absoluteTaskPath)) {
+            const taskPathExists = await fs.access(absoluteTaskPath).then(() => true).catch(() => false);
+            if (!taskPathExists) {
                  console.error(`[Queue] Tasks file missing: ${absoluteTaskPath}`);
                  process.exit(1);
             }

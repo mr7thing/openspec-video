@@ -202,4 +202,4 @@ opsv addons install ./addons/comic-drama-v0.6.zip
 ---
 
 > *"Agent 是灵魂，规范 Skill 是骨架，创意 Skill 是血肉，Spooler Queue 是神经。"*
-> *OpsV 0.6.0 | 最后更新: 2026-04-17*
+> *OpsV 0.6.1 | 最后更新: 2026-04-20*

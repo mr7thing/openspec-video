@@ -728,18 +728,6 @@ function checkRecovery() {
     });
 }
 
-// Duplicate state definitions removed
-
-// Hook into state changes
-const originalRunAll = runAllBtn.onclick; // Note: we used addEventListener, so this is just for logic flow comment
-// We need to call saveState() whenever isRunningAll or currentJobIndex changes.
-
-// Update runAllBtn listener
-runAllBtn.addEventListener('click', () => {
-    // ... existing logic ...
-    saveState();
-});
-
 // Update stopBtn listener
 function stopRunAll() {
     isRunningAll = false;

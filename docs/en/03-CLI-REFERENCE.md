@@ -1,4 +1,4 @@
-# CLI Reference (v0.6.0)
+# CLI Reference (v0.6.1)
 
 ## Command Overview
 
@@ -6,6 +6,7 @@
 |---------|-------------|-------|
 | `opsv init` | Initialize project structure | Project Setup |
 | `opsv generate` | Compile docs to intent outline (jobs.json) | Intent Compilation |
+| `opsv validate` | Validate Markdown YAML frontmatter | Quality Gate |
 | `opsv queue compile` | Compile intent to API atomic tasks | Task Delivery |
 | `opsv queue run` | Start QueueWatcher to consume tasks | Task Execution |
 | `opsv review` | Start Review page server | Review |
@@ -70,7 +71,7 @@ opsv queue compile queue/jobs.json --provider runninghub    # ComfyUI workflow
 | `comfyui_local` / `runninghub` | `ComfyUITaskCompiler` | Loads Addon workflow templates |
 | Others (seadream, minimax...) | `StandardAPICompiler` | Standard HTTP API payload |
 
-**Output**: Individual `UUID.json` files in `.opsv-queue/pending/{provider}/`
+**Output**: Individual `UUID.json` files in `.opsv-queue/inbox/{provider}/`
 
 ---
 
@@ -86,9 +87,9 @@ opsv queue run comfyui_local
 opsv queue run runninghub
 ```
 
-- Single-threaded sequential processing
-- Physical state flow: `pending → processing → completed/failed`
-- Ctrl+C breakpoint recovery supported
+- Single-threaded sequential processing with atomic `fs.rename` extraction
+- Physical state flow: `inbox → working → done`
+- Ctrl+C graceful shutdown: tasks in `working/` automatically rollback to `inbox/`
 - Provider names are case-insensitive
 
 ---
@@ -172,4 +173,4 @@ opsv queue run seedance
 
 ---
 
-> *OpsV 0.6.0 | Last updated: 2026-04-17*
+> *OpsV 0.6.1 | Last updated: 2026-04-20*

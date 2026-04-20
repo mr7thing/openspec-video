@@ -1,4 +1,4 @@
-# Document Standards (v0.6.0)
+# Document Standards (v0.6.1)
 
 > OpenSpec-Video uses a **four-layer specification system** ensuring document-as-code determinism.
 
@@ -87,4 +87,4 @@ Topological sorting with strict mode: all dependencies must be Approved before e
 
 ---
 
-> *OpsV 0.6.0 | Last updated: 2026-04-17*
+> *OpsV 0.6.1 | Last updated: 2026-04-20*

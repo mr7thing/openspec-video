@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import inquirer from 'inquirer';
 import { projectAgentTemplates } from '../utils/projector';
@@ -21,12 +21,16 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 targetDir = path.resolve(process.cwd(), projectName);
             }
 
-            if (projectName && projectName !== '.' && fs.existsSync(targetDir)) {
-                console.error(`Error: Directory ${projectName} already exists.`);
-                return;
+            if (projectName && projectName !== '.') {
+                const targetExists = await fs.access(targetDir).then(() => true).catch(() => false);
+                if (targetExists) {
+                    console.error(`Error: Directory ${projectName} already exists.`);
+                    return;
+                }
             }
 
-            if (!fs.existsSync(TEMPLATE_DIR)) {
+            const templateDirExists = await fs.access(TEMPLATE_DIR).then(() => true).catch(() => false);
+            if (!templateDirExists) {
                 console.error(`CRITICAL ERROR: Template directory not found at ${TEMPLATE_DIR}`);
                 return;
             }
@@ -62,46 +66,49 @@ export function registerInitCommand(program: Command, VERSION: string) {
             console.log(`Initializing project in ${targetDir}...`);
 
             try {
-                await fs.ensureDir(targetDir);
+                await fs.mkdir(targetDir, { recursive: true });
 
                 // 1. Core Projection (All core genes from .agent are projected here)
                 await projectAgentTemplates(targetDir, tools, TEMPLATE_DIR);
 
-                if (fs.existsSync(path.join(TEMPLATE_DIR, '.env'))) {
-                    await fs.copy(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
+                const templateEnvExists = await fs.access(path.join(TEMPLATE_DIR, '.env')).then(() => true).catch(() => false);
+                if (templateEnvExists) {
+                    await fs.copyFile(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
                 }
 
                 // 2. Selective copy based on tools (Legacy & Metadata)
                 if (tools.includes('gemini')) {
-                    if (fs.existsSync(path.join(TEMPLATE_DIR, 'GEMINI.md'))) {
-                        await fs.copy(path.join(TEMPLATE_DIR, 'GEMINI.md'), path.join(targetDir, 'GEMINI.md'));
+                    const geminiExists = await fs.access(path.join(TEMPLATE_DIR, 'GEMINI.md')).then(() => true).catch(() => false);
+                    if (geminiExists) {
+                        await fs.copyFile(path.join(TEMPLATE_DIR, 'GEMINI.md'), path.join(targetDir, 'GEMINI.md'));
                     }
                 }
 
                 if (tools.includes('opencode') || tools.includes('trae')) {
-                    if (fs.existsSync(path.join(TEMPLATE_DIR, 'AGENTS.md'))) {
-                        await fs.copy(path.join(TEMPLATE_DIR, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
+                    const agentsExists = await fs.access(path.join(TEMPLATE_DIR, 'AGENTS.md')).then(() => true).catch(() => false);
+                    if (agentsExists) {
+                        await fs.copyFile(path.join(TEMPLATE_DIR, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
                     }
                 }
 
                 if (tools.includes('opencode')) {
                     // Still ensuring the physical directory exists for OpenCode specific reasons
-                    await fs.ensureDir(path.join(targetDir, '.opencode'));
+                    await fs.mkdir(path.join(targetDir, '.opencode'), { recursive: true });
                 }
 
                 // 3. Create normative videospec structure
                 const specDir = path.join(targetDir, 'videospec');
-                await fs.ensureDir(specDir);
-                await fs.ensureDir(path.join(specDir, 'stories'));
-                await fs.ensureDir(path.join(specDir, 'elements'));
-                await fs.ensureDir(path.join(specDir, 'scenes'));
-                await fs.ensureDir(path.join(specDir, 'shots'));
+                await fs.mkdir(specDir, { recursive: true });
+                await fs.mkdir(path.join(specDir, 'stories'), { recursive: true });
+                await fs.mkdir(path.join(specDir, 'elements'), { recursive: true });
+                await fs.mkdir(path.join(specDir, 'scenes'), { recursive: true });
+                await fs.mkdir(path.join(specDir, 'shots'), { recursive: true });
 
                 // 4. Create operational directories
-                await fs.ensureDir(path.join(targetDir, 'artifacts'));
-                await fs.ensureDir(path.join(targetDir, 'queue'));
-                await fs.ensureDir(path.join(targetDir, '.opsv-queue'));
-                await fs.ensureDir(path.join(targetDir, '.opsv'));
+                await fs.mkdir(path.join(targetDir, 'artifacts'), { recursive: true });
+                await fs.mkdir(path.join(targetDir, 'queue'), { recursive: true });
+                await fs.mkdir(path.join(targetDir, '.opsv-queue'), { recursive: true });
+                await fs.mkdir(path.join(targetDir, '.opsv'), { recursive: true });
 
                 // 5. Create .gitignore and initialize Git
                 const defaultGitignore = `# System Files
@@ -130,7 +137,8 @@ queue/
                     // Check if git is installed
                     execSync('git --version', { stdio: 'ignore' });
                     
-                    if (!fs.existsSync(path.join(targetDir, '.git'))) {
+                    const gitExists = await fs.access(path.join(targetDir, '.git')).then(() => true).catch(() => false);
+                    if (!gitExists) {
                         execSync('git init', { cwd: targetDir, stdio: 'ignore' });
                         execSync('git add .', { cwd: targetDir, stdio: 'ignore' });
                         execSync('git commit -m "chore: initial project structure by OpsV"', { cwd: targetDir, stdio: 'ignore' });

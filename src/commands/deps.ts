@@ -13,7 +13,7 @@ export function registerDepsCommand(program: Command) {
         .description('分析资产依赖关系，显示推荐生成顺序')
         .action(async () => {
             const projectRoot = process.cwd();
-            const graph = DependencyGraph.buildFromProject(projectRoot);
+            const graph = await DependencyGraph.buildFromProject(projectRoot);
             const approvedRefReader = new ApprovedRefReader(projectRoot);
 
             const output = await graph.prettyPrint(approvedRefReader);

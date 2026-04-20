@@ -173,17 +173,63 @@ else if (provider === 'seadream' || provider === 'volcengine' || provider === 's
 
 ---
 
-## 七、结论
+## 七、代码审查二次修复验证（2026-04-20）
 
-v0.6.0 的 6 个问题全部修复并验证通过：
+在第一轮修复基础上，执行了全面的代码审查，修复 24 项问题（Critical 4 / High 8 / Medium 8 / Low 4）。
 
-- ✅ SpoolerQueue 实现并正常工作
-- ✅ `opsv validate` 命令存在并正常工作
-- ✅ `opsv queue compile` → `opsv queue run` 完整流程验证通过
-- ✅ 其他代码修复已正确打包到全局 npm 包
+### 7.1 架构安全验证
 
-**可以发布修复版本。**
+| 修复项 | 验证方式 | 结果 |
+|--------|----------|------|
+| SpoolerQueue 原子 dequeue (`fs.rename`) | 代码审查 + 逻辑推演 | ✅ 消除竞态条件 |
+| 高熵 UUID (`crypto.randomUUID`) | 代码审查 | ✅ 128-bit 熵值 |
+| 损坏 JSON 隔离 (`corrupted/`) | 代码审查 | ✅ 不阻断 poll 循环 |
+| QueueWatcher 优雅关机 (SIGINT/SIGTERM 回滚) | 代码审查 | ✅ 任务不丢失 |
+| Daemon 完整生命周期 (wss.close + 5s 兜底) | 代码审查 | ✅ 无僵尸进程 |
+
+### 7.2 鲁棒性验证
+
+| 修复项 | 验证方式 | 结果 |
+|--------|----------|------|
+| Provider HTTP 下载状态校验 | 代码审查 | ✅ 所有 Provider 已覆盖 |
+| 视频轮询指数退避 (5s→10s→20s→30s) | 代码审查 | ✅ Seedance / SiliconFlow |
+| Provider fail-fast（无硬编码 fallback） | 代码审查 | ✅ 缺失配置立即抛错 |
+| ReviewServer 搜索 `shots/` + 全异步 | 代码审查 | ✅ |
+| DependencyGraph 扫描 `shots/` + 全异步 | 代码审查 | ✅ |
+| ConfigLoader per-projectRoot 缓存 | 代码审查 | ✅ 支持多项目并发 |
+
+### 7.3 工程规范验证
+
+| 修复项 | 验证方式 | 结果 |
+|--------|----------|------|
+| 运行时 fs/promises 标准化 | `grep` 审计 | ✅ 仅 boot 代码保留 sync |
+| Logger UTF-8 编码修复 | 文件编码检测 | ✅ 中文注释正常 |
+| Package.json 安全（移除 `.env`） | 代码审查 | ✅ 新增 `.env.example` |
+| TypeScript `declaration` + `sourceMap` | `tsconfig.json` 审查 | ✅ |
+| 浏览器扩展 IIFE + 单次注入保护 | 代码审查 | ✅ |
+
+### 7.4 编译验证
+
+```bash
+$ npx tsc --noEmit
+✅ 零错误通过
+```
 
 ---
 
-*报告生成时间：2026-04-19 22:40*
+## 八、结论
+
+v0.6.0 的全部问题（首轮 6 项 + 代码审查 24 项）均已修复并验证通过：
+
+- ✅ SpoolerQueue 实现并正常工作（含原子 dequeue、高熵 UUID、损坏隔离）
+- ✅ `opsv validate` 命令存在并正常工作
+- ✅ `opsv queue compile` → `opsv queue run` 完整流程验证通过
+- ✅ 代码审查所有问题已修复，TypeScript 编译零错误
+- ✅ 架构文档已同步更新
+
+**可以发布 v0.6.0 正式版本。**
+
+---
+
+*首轮修复报告生成时间：2026-04-19 22:40*  
+*代码审查修复完成时间：2026-04-20*

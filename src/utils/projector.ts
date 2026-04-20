@@ -9,7 +9,7 @@ export async function projectAgentTemplates(targetDir: string, tools: string[], 
     const agentSource = path.join(templateBase, '.agent');
     
     // 1. 强制复制 .agent 核心
-    if (fs.existsSync(agentSource)) {
+    if (await fs.pathExists(agentSource)) {
         await fs.copy(agentSource, path.join(targetDir, '.agent'));
     }
 
@@ -33,7 +33,7 @@ async function projectToClaude(targetDir: string, agentSource: string) {
     // 汇总 AGENTS.md 和关键指令到 CLAUDE_INSTRUCTIONS.md
     const agentsMd = path.join(path.dirname(agentSource), 'AGENTS.md');
     let content = '# Claude Code Instructions for OpsV\n\n';
-    if (fs.existsSync(agentsMd)) {
+    if (await fs.pathExists(agentsMd)) {
         content += await fs.readFile(agentsMd, 'utf-8');
     }
     await fs.writeFile(path.join(targetDir, 'CLAUDE_INSTRUCTIONS.md'), content);
@@ -44,8 +44,8 @@ async function projectToCursor(targetDir: string, agentSource: string) {
     const guardian = path.join(agentSource, 'Guardian-Agent.md');
     const creative = path.join(agentSource, 'Creative-Agent.md');
     let rules = '';
-    if (fs.existsSync(guardian)) rules += await fs.readFile(guardian, 'utf-8');
-    if (fs.existsSync(creative)) rules += '\n\n' + await fs.readFile(creative, 'utf-8');
+    if (await fs.pathExists(guardian)) rules += await fs.readFile(guardian, 'utf-8');
+    if (await fs.pathExists(creative)) rules += '\n\n' + await fs.readFile(creative, 'utf-8');
     
     await fs.writeFile(path.join(targetDir, '.cursorrules'), rules);
 }
@@ -55,7 +55,7 @@ async function projectToTrae(targetDir: string, agentSource: string) {
     await fs.ensureDir(traeRulesDir);
     // 物理复用 Guardian 逻辑作为 Trae 的核心 Rule
     const guardian = path.join(agentSource, 'Guardian-Agent.md');
-    if (fs.existsSync(guardian)) {
+    if (await fs.pathExists(guardian)) {
         await fs.copy(guardian, path.join(traeRulesDir, 'opsv_guardian.md'));
     }
 }

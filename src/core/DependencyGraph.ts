@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader } from './ApprovedRefReader';
@@ -216,16 +216,16 @@ export class DependencyGraph {
     /**
      * 持久化到 .opsv/ 目录
      */
-    save(projectRoot: string): void {
+    async save(projectRoot: string): Promise<void> {
         const opsvDir = path.join(projectRoot, '.opsv');
-        if (!fs.existsSync(opsvDir)) fs.mkdirSync(opsvDir, { recursive: true });
+        await fs.mkdir(opsvDir, { recursive: true });
 
         const serialized: Record<string, string[]> = {};
         for (const [node, deps] of this.graph) {
             serialized[node] = [...deps];
         }
 
-        fs.writeFileSync(
+        await fs.writeFile(
             path.join(opsvDir, 'dependency-graph.json'),
             JSON.stringify(serialized, null, 2)
         );
@@ -235,27 +235,29 @@ export class DependencyGraph {
      * 从文档目录扫描并重建依赖图
      * 确保每次 generate 前都是最新版本
      */
-    static buildFromProject(projectRoot: string): DependencyGraph {
+    static async buildFromProject(projectRoot: string): Promise<DependencyGraph> {
         const graph = new DependencyGraph();
         const documents: ParsedDocument[] = [];
 
         // 支持两种目录结构:
         // 1. {projectRoot}/videospec/elements/  (标准结构)
         // 2. {projectRoot}/elements/            (扁平结构，brother 测试用)
-        const dirs = ['elements', 'scenes'];
+        const dirs = ['elements', 'scenes', 'shots'];
 
         for (const dir of dirs) {
             // 先尝试标准结构，再尝试扁平结构
             const standardPath = path.join(projectRoot, 'videospec', dir);
             const flatPath = path.join(projectRoot, dir);
-            const dirPath = fs.existsSync(standardPath) ? standardPath : flatPath;
-            if (!fs.existsSync(dirPath)) continue;
+            const standardExists = await fs.access(standardPath).then(() => true).catch(() => false);
+            const dirPath = standardExists ? standardPath : flatPath;
+            const dirExists = await fs.access(dirPath).then(() => true).catch(() => false);
+            if (!dirExists) continue;
 
-            const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+            const files = (await fs.readdir(dirPath)).filter(f => f.endsWith('.md'));
             for (const file of files) {
                 const filePath = path.join(dirPath, file);
                 try {
-                    const content = fs.readFileSync(filePath, 'utf-8');
+                    const content = await fs.readFile(filePath, 'utf-8');
                     const { frontmatter } = FrontmatterParser.parseRaw(content);
                     const id = file.replace(/^@/, '').replace(/\.md$/, '');
 
@@ -267,7 +269,7 @@ export class DependencyGraph {
         }
 
         graph.build(documents);
-        graph.save(projectRoot);
+        await graph.save(projectRoot);
         return graph;
     }
 }

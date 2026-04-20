@@ -193,6 +193,7 @@ await queue.markFailed(uuid, error);
 
 - `docs/OPSV_v0.6.0_FIX_VERIFICATION.md` — 修复验证报告
 - `docs/OPSV_v0.6.0_TEST_FEEDBACK.md` — 测试反馈原始记录
+- `docs/OPSV_v0.6.1_CODE_REVIEW_COMPLETION.md` — 代码审查完成报告（新增）
 - `templates/AGENTS.md` — 更新 v0.6.0 工作流说明
 
 ---
@@ -240,12 +241,26 @@ opsv validate -d .  ✅ 发现4个预期内的问题
 
 ---
 
+## 代码审查后续修复（第二波）
+
+在 PR 合并后，执行了全面的代码审查，修复 24 项问题：
+
+| 优先级 | 数量 | 关键修复 |
+|--------|------|----------|
+| 🔴 Critical | 4 | SpoolerQueue 原子 dequeue、高熵 UUID、损坏隔离、QueueWatcher 优雅关机 |
+| 🟠 High | 8 | Daemon 生命周期、Provider HTTP 校验、指数退避、fail-fast、ReviewServer 完整性、DependencyGraph 准确性、ConfigLoader 多实例、全库 async I/O |
+| 🟡 Medium | 8 | Logger 编码、Package 安全、TS 配置、扩展安全性等 |
+| 🟢 Low | 4 | 语法错误、细节优化 |
+
+详见：`docs/OPSV_v0.6.1_CODE_REVIEW_COMPLETION.md`
+
 ## 待解决（不在本 PR 范围）
 
 | 问题 | 原因 |
 |------|------|
 | SEADREAM_API_KEY 未配置 | 环境问题，需用户配置 |
 | SiliconFlow 403 | API Key 无效，需获取有效 Key |
+| Provider 命名统一（volcengine/seadream/seedance） | 设计问题，建议 v0.6.1 处理 |
 
 ---
 
@@ -253,4 +268,6 @@ opsv validate -d .  ✅ 发现4个预期内的问题
 
 ```
 fix: v0.6.0 紧急修复 — 实现 SpoolerQueue + validate 命令 + 依赖图流程
+
+review: v0.6.0 代码审查修复 — 原子 dequeue、优雅关机、async I/O 标准化、Provider 鲁棒性
 ```

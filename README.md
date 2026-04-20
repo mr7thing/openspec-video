@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.6.0 (Spooler Queue Era)
+# OpenSpec-Video (OpsV) 0.6.1 (Spooler Queue Era)
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
@@ -55,11 +55,12 @@ In v0.6.0, we replaced the in-memory **Dispatcher** with a robust **Physical Sta
 
 在 v0.6.0 中，我们用稳健的**物理状态机**取代了内存中的 **Dispatcher**。所有生成任务现在都流经 `.opsv-queue/` 目录：
 
-1. **Pending**: Tasks waiting to be executed.
-2. **Processing**: Atomic task being handled by a provider (Locked).
-3. **Completed / Failed**: Final archival with full result traces or error logs.
+1. **Inbox**: Tasks waiting to be executed.
+2. **Working**: Atomic task being handled by a provider (Locked via atomic `fs.rename`).
+3. **Done**: Final archival with full result traces or error logs.
+4. **Corrupted**: Isolated JSON parse failures (non-blocking).
 
-This allows for **breakpoint recovery**, **single-threaded safety**, and **zero-collision execution**.
+This allows for **breakpoint recovery**, **single-threaded safety**, **multi-process safety**, and **zero-collision execution**.
 
 ---
 
@@ -83,20 +84,23 @@ This allows for **breakpoint recovery**, **single-threaded safety**, and **zero-
 | **Agents & Skills** / 角色与技能 | [Link](./docs/en/04-AGENTS-AND-SKILLS.md)  | [链接](./docs/cn/04-AGENTS-AND-SKILLS.md)  |
 | **Spec Standards** / 规范标准    | [Link](./docs/en/05-DOCUMENT-STANDARDS.md) | [链接](./docs/cn/05-DOCUMENT-STANDARDS.md) |
 | **Server Arch** / 服务架构       | [Link](./docs/Server-Architecture.md)      | [链接](./docs/Server-Architecture.md)      |
+| **Code Review** / 审查报告       | —                                          | [链接](./docs/OPSV_v0.6.0_CODE_REVIEW_COMPLETION.md) |
 
 ---
 
-> *OpsV 0.6.0 | 2026-04-17*
+> *OpsV 0.6.1 | 2026-04-20*
 
 ---
 
 ## 🆕 Release Notes / 更新说明
 
-## 🚀 架构革命：Spooler Queue 物理排队论 (v0.6.0)
+## 🚀 架构革命：Spooler Queue 物理排队论 (v0.6.1)
 
 ### 1. Dispatcher 灭亡与意图解耦
 - **三步式管线**: `generate` (编译意图) → `queue compile` (原子拆分) → `queue run` (消费执行)。
-- **物理状态机**: 任务以 `.json` 文件形式在 `pending`, `processing`, `completed`, `failed` 目录流转，彻底解决崩溃丢任务的问题。
+- **物理状态机**: 任务以 `.json` 文件形式在 `inbox`, `working`, `done`, `corrupted` 目录流转，彻底解决崩溃丢任务的问题。
+- **原子提取**: `dequeue()` 使用 `fs.rename` 保证多进程安全，无需内存锁。
+- **优雅关机**: `SIGINT`/`SIGTERM` 信号捕获，自动将 `working/` 中任务回滚至 `inbox/`。
 - **单线程安全**: 每个 Provider 顺序消费，杜绝 API 并发冲突，支持 Ctrl+C 断点恢复。
 
 ### 2. 服务管理标准化 (Server Topology)
@@ -109,7 +113,7 @@ This allows for **breakpoint recovery**, **single-threaded safety**, and **zero-
 
 ### 4. 命令集精简与优化
 - **删除废弃指令**: 移除 `gen-image` 与 `gen-video`，统一并入 `queue` 指令集。
-- **鲁棒性增强**: `queue run` 命令的 Provider 名称支持大小写模糊匹配。
+- **鲁棒性增强**: `queue run` 命令的 Provider 名称支持大小写模糊匹配；Provider HTTP 下载增加状态校验；视频轮询采用指数退避。
 - **Generate 纯净化**: `generate` 指令回归“纯编译”本质，不再主动拉起网络服务。
 
 ---

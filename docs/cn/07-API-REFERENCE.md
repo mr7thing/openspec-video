@@ -1,4 +1,4 @@
-# OpsV Provider 接口规范（v0.6.0）
+# OpsV Provider 接口规范（v0.6.1）
 
 > 本文件记录所有图像/视频生成 Provider 必须遵守的接口契约与 Spooler Queue 接入规范。
 
@@ -118,17 +118,19 @@ await queue.markFailed(task.uuid, error);
   ❌ 在 Provider 内部假设载荷结构（从 task.payload 读取）
 ```
 
-### 4.3 超时约定
+### 4.3 超时与退避约定
 
 ```typescript
 // Provider 内部应自行管理超时
 const TIMEOUT_MS = 5 * 60 * 1000; // 5 分钟
 const deadline = Date.now() + TIMEOUT_MS;
+let waitTime = 5000;  // 初始轮询间隔 5 秒
 
 while (Date.now() < deadline) {
     const status = await pollStatus(requestId);
     if (status === 'completed') break;
-    await sleep(3000);
+    await sleep(waitTime);
+    waitTime = Math.min(waitTime * 2, 30000);  // 指数退避，上限 30 秒
 }
 
 if (Date.now() >= deadline) {
@@ -136,28 +138,41 @@ if (Date.now() >= deadline) {
 }
 ```
 
+**指数退避策略：** 视频生成 Provider（Seedance、SiliconFlow）采用指数退避轮询，降低长视频生成时的 API 压力：
+- 第 1 次：5 秒
+- 第 2 次：10 秒
+- 第 3 次：20 秒
+- 第 4 次及以后：30 秒（封顶）
+
 ---
 
 ## 5. Spooler Queue 物理状态机
 
 ```
 .opsv-queue/
-├── pending/{provider}/      # 待执行 — compile 投递的原子 JSON
-├── processing/{provider}/   # 执行中 — QueueWatcher 原子提取
-├── completed/{provider}/    # 已完成 — 归档含结果
-└── failed/{provider}/       # 已失败 — 归档含错误信息
+├── inbox/{provider}/        # 待执行 — compile 投递的原子 JSON
+├── working/{provider}/      # 执行中 — QueueWatcher 原子提取
+├── done/{provider}/         # 已完成/失败 — 归档含结果或错误
+└── corrupted/{provider}/    # 已损坏 — JSON 解析失败时隔离
 ```
 
 ### 状态流转
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending: queue compile
-    pending --> processing: QueueWatcher.dequeue()
-    processing --> completed: processTask 成功
-    processing --> failed: processTask 异常
-    failed --> pending: 人工重试（移动文件）
+    [*] --> inbox: queue compile
+    inbox --> working: QueueWatcher.dequeue() [原子 fs.rename]
+    working --> done: processTask 成功
+    working --> inbox: SIGINT/SIGTERM 回滚
+    working --> corrupted: JSON 解析失败
 ```
+
+### 原子性保证
+
+`dequeue()` 使用 `fs.rename(inboxPath, workingPath)` 实现原子状态转移：
+- POSIX `rename` 保证同一时刻只有一个消费者能成功移动文件
+- `ENOENT` 优雅处理：文件已被其他进程取走时返回 `null`
+- 无需内存锁或外部依赖（Redis/ZooKeeper）
 
 ---
 
@@ -176,4 +191,4 @@ stateDiagram-v2
 ---
 
 > *「物理状态机替代内存调度，文件即证据，目录即状态。」*
-> *OpsV v0.6.0 | 更新时间: 2026-04-17*
+> *OpsV v0.6.1 | 更新时间: 2026-04-20*

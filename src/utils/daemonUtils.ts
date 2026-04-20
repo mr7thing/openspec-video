@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import WebSocket from 'ws';
@@ -7,10 +7,11 @@ import { spawn } from 'child_process';
 const PID_FILE = path.join(os.homedir(), '.opsv', 'daemon.pid');
 const DAEMON_SCRIPT = path.join(__dirname, '..', 'server', 'daemon.js');
 
-export function isDaemonRunning(): boolean {
-    if (!fs.existsSync(PID_FILE)) return false;
+export async function isDaemonRunning(): Promise<boolean> {
+    const pidExists = await fs.access(PID_FILE).then(() => true).catch(() => false);
+    if (!pidExists) return false;
     try {
-        const pid = parseInt(fs.readFileSync(PID_FILE, 'utf-8'));
+        const pid = parseInt(await fs.readFile(PID_FILE, 'utf-8'));
         process.kill(pid, 0); // Check if process exists
         return true;
     } catch (e) {
@@ -18,8 +19,8 @@ export function isDaemonRunning(): boolean {
     }
 }
 
-export function startDaemon() {
-    if (isDaemonRunning()) {
+export async function startDaemon() {
+    if (await isDaemonRunning()) {
         console.log('Server is already running.');
         return;
     }
@@ -36,16 +37,17 @@ export function startDaemon() {
     console.log(`Server started. (PID: ${subprocess.pid})`);
 }
 
-export function stopDaemon() {
-    if (!fs.existsSync(PID_FILE)) {
+export async function stopDaemon() {
+    const pidExists = await fs.access(PID_FILE).then(() => true).catch(() => false);
+    if (!pidExists) {
         console.log('Server is not running.');
         return;
     }
 
     try {
-        const pid = parseInt(fs.readFileSync(PID_FILE, 'utf-8'));
+        const pid = parseInt(await fs.readFile(PID_FILE, 'utf-8'));
         process.kill(pid);
-        fs.unlinkSync(PID_FILE);
+        await fs.unlink(PID_FILE);
         console.log(`Server stopped (PID: ${pid}).`);
     } catch (e) {
         console.error('Failed to stop server:', e);

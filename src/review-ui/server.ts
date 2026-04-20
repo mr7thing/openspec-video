@@ -1,5 +1,5 @@
 import express from 'express';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
@@ -50,14 +50,16 @@ export class ReviewServer {
         // Review UI 静态页面
         // 增加动态路径探测，兼容开发模式 (ts-node) 和 发布模式 (dist)
         let publicPath = path.join(__dirname, 'public');
-        if (!fs.existsSync(publicPath)) {
+        const publicPathExists = await fs.access(publicPath).then(() => true).catch(() => false);
+        if (!publicPathExists) {
             // 如果是在 dist/review-ui/server.js 运行，public 应该在同级
             // 如果是在 src/review-ui/server.ts 运行，public 也在同级
             // 但有些运行环境可能会导致路径偏移，此处做一个向上探测
             publicPath = path.join(__dirname, '../src/review-ui/public');
         }
 
-        if (fs.existsSync(publicPath)) {
+        const finalPublicPathExists = await fs.access(publicPath).then(() => true).catch(() => false);
+        if (finalPublicPathExists) {
             app.use(express.static(publicPath));
         } else {
             logger.error(`❌ Review UI 静态资源目录不存在: ${publicPath}`);
@@ -68,9 +70,9 @@ export class ReviewServer {
         }
 
         // ---- API: 获取批次内所有候选图 ----
-        app.get('/api/candidates', (req: any, res: any) => {
+        app.get('/api/candidates', async (req: any, res: any) => {
             try {
-                const candidates = this.resolveBatchCandidates();
+                const candidates = await this.resolveBatchCandidates();
                 res.json({ success: true, data: candidates });
             } catch (e) {
                 res.status(500).json({ success: false, error: (e as Error).message });
@@ -78,23 +80,27 @@ export class ReviewServer {
         });
 
         // ---- API: 获取文档内容 ----
-        app.get('/api/document/:jobId', (req: any, res: any) => {
+        app.get('/api/document/:jobId', async (req: any, res: any) => {
             try {
-                const docPath = this.findSourceDoc(req.params.jobId);
-                if (docPath && fs.existsSync(docPath)) {
-                    res.json({ success: true, data: fs.readFileSync(docPath, 'utf-8') });
-                } else {
-                    res.status(404).json({ success: false, error: '文档不存在' });
+                const docPath = await this.findSourceDoc(req.params.jobId);
+                if (docPath) {
+                    const exists = await fs.access(docPath).then(() => true).catch(() => false);
+                    if (exists) {
+                        const data = await fs.readFile(docPath, 'utf-8');
+                        res.json({ success: true, data });
+                        return;
+                    }
                 }
+                res.status(404).json({ success: false, error: '文档不存在' });
             } catch (e) {
                 res.status(500).json({ success: false, error: (e as Error).message });
             }
         });
 
         // ---- API: 格式检查 ----
-        app.get('/api/format-check', (req: any, res: any) => {
+        app.get('/api/format-check', async (req: any, res: any) => {
             try {
-                const issues = this.runFormatCheck();
+                const issues = await this.runFormatCheck();
                 res.json({ success: true, data: issues });
             } catch (e) {
                 res.status(500).json({ success: false, error: (e as Error).message });
@@ -157,12 +163,12 @@ export class ReviewServer {
                     return res.status(400).json({ success: false, error: '缺少 jobId' });
                 }
 
-                const docPath = this.findSourceDoc(jobId);
+                const docPath = await this.findSourceDoc(jobId);
                 if (!docPath) {
                     return res.status(404).json({ success: false, error: '源文档不存在' });
                 }
 
-                let content = fs.readFileSync(docPath, 'utf-8');
+                let content = await fs.readFile(docPath, 'utf-8');
 
                 // 1. 设置 status → draft
                 content = FrontmatterParser.updateField(content, 'status', 'draft');
@@ -177,7 +183,7 @@ export class ReviewServer {
                 const reviewEntry = `${new Date().toISOString().split('T')[0]}: [DRAFT] ${feedback || '需要调整'}`;
                 content = FrontmatterParser.appendReview(content, reviewEntry);
 
-                fs.writeFileSync(docPath, content, 'utf-8');
+                await fs.writeFile(docPath, content, 'utf-8');
                 logger.info(`📝 Draft: ${jobId} — ${feedback || '(无具体意见)'}`);
 
                 // 自动 git commit
@@ -208,19 +214,25 @@ export class ReviewServer {
     // 批次候选图扫描
     // ================================================================
 
-    private resolveBatchCandidates(): CandidateGroup[] {
+    private async resolveBatchCandidates(): Promise<CandidateGroup[]> {
         const groups = new Map<string, CandidateGroup>();
 
         for (const dir of this.batchDirs) {
-            if (!fs.existsSync(dir)) continue;
+            const dirExists = await fs.access(dir).then(() => true).catch(() => false);
+            if (!dirExists) continue;
             const batchId = path.basename(dir);
 
             // 读取批次 jobs json 获取任务元信息
-            const jobsJsonFiles = fs.readdirSync(dir).filter(f => f.startsWith('jobs_batch'));
+            let jobsJsonFiles: string[] = [];
+            try {
+                jobsJsonFiles = (await fs.readdir(dir)).filter(f => f.startsWith('jobs_batch'));
+            } catch { /* ignore */ }
+
             let jobMeta: Record<string, string> = {};
             if (jobsJsonFiles.length > 0) {
                 try {
-                    const jobs = JSON.parse(fs.readFileSync(path.join(dir, jobsJsonFiles[0]), 'utf-8'));
+                    const jobsRaw = await fs.readFile(path.join(dir, jobsJsonFiles[0]), 'utf-8');
+                    const jobs = JSON.parse(jobsRaw);
                     for (const job of jobs) {
                         jobMeta[job.id] = job._meta?.source || '';
                     }
@@ -228,14 +240,14 @@ export class ReviewServer {
             }
 
             // 遍历批次目录下所有子目录（每个子目录对应一个模型）
-            const entries = fs.readdirSync(dir);
+            const entries = await fs.readdir(dir);
             for (const entry of entries) {
                 const entryPath = path.join(dir, entry);
-                const stat = fs.statSync(entryPath);
+                const stat = await fs.stat(entryPath);
 
                 if (stat.isDirectory()) {
                     // 模型子目录
-                    this.scanModelDir(entryPath, entry, batchId, groups, jobMeta);
+                    await this.scanModelDir(entryPath, entry, batchId, groups, jobMeta);
                 } else if (stat.isFile() && /\.(png|jpg|webp)$/i.test(entry)) {
                     // 直接在批次根目录的图片
                     this.addCandidate(groups, entry, entryPath, 'default', batchId, jobMeta);
@@ -246,14 +258,14 @@ export class ReviewServer {
         return Array.from(groups.values());
     }
 
-    private scanModelDir(
+    private async scanModelDir(
         dirPath: string,
         modelName: string,
         batchId: string,
         groups: Map<string, CandidateGroup>,
         jobMeta: Record<string, string>
-    ): void {
-        const files = fs.readdirSync(dirPath).filter(f => /\.(png|jpg|webp)$/i.test(f));
+    ): Promise<void> {
+        const files = (await fs.readdir(dirPath)).filter(f => /\.(png|jpg|webp)$/i.test(f));
         for (const file of files) {
             const filePath = path.join(dirPath, file);
             this.addCandidate(groups, file, filePath, modelName, batchId, jobMeta);
@@ -310,22 +322,22 @@ export class ReviewServer {
         const ext = path.extname(imagePath);
         const approvedName = `${jobId}_${variant}${ext}`;
         const approvedPath = path.join(this.projectRoot, 'artifacts', approvedName);
-        fs.copyFileSync(imagePath, approvedPath);
+        await fs.copyFile(imagePath, approvedPath);
 
         // 2. 找到源文档并回写 Approved References
-        const docPath = this.findSourceDoc(jobId);
+        const docPath = await this.findSourceDoc(jobId);
         if (docPath) {
             this.approvedRefReader.appendApprovedRef(docPath, variant, approvedPath);
 
             // 3. 更新 status → approved
-            let content = fs.readFileSync(docPath, 'utf-8');
+            let content = await fs.readFile(docPath, 'utf-8');
             content = FrontmatterParser.updateField(content, 'status', 'approved');
 
             // 4. 追加 reviews 记录
             const reviewEntry = `${new Date().toISOString().split('T')[0]}: ${reviewNote || 'approved via review UI'}`;
             content = FrontmatterParser.appendReview(content, reviewEntry);
 
-            fs.writeFileSync(docPath, content, 'utf-8');
+            await fs.writeFile(docPath, content, 'utf-8');
             logger.info(`✅ Approve: ${jobId}:${variant} → ${approvedPath}`);
         }
 
@@ -333,20 +345,21 @@ export class ReviewServer {
     }
 
     private async countExistingApproved(jobId: string): Promise<number> {
-        const docPath = this.findSourceDoc(jobId);
+        const docPath = await this.findSourceDoc(jobId);
         if (!docPath) return 0;
         const approvedRefs = await this.approvedRefReader.getAll(docPath);
         return approvedRefs.length;
     }
 
-    private findSourceDoc(jobId: string): string | null {
-        const dirs = ['elements', 'scenes'];
+    private async findSourceDoc(jobId: string): Promise<string | null> {
+        const dirs = ['elements', 'scenes', 'shots'];
         const prefixes = ['@', ''];
 
         for (const dir of dirs) {
             for (const prefix of prefixes) {
                 const p = path.join(this.projectRoot, 'videospec', dir, `${prefix}${jobId}.md`);
-                if (fs.existsSync(p)) return p;
+                const exists = await fs.access(p).then(() => true).catch(() => false);
+                if (exists) return p;
             }
         }
         return null;
@@ -356,18 +369,19 @@ export class ReviewServer {
     // 格式检查
     // ================================================================
 
-    private runFormatCheck(): { file: string; issues: string[] }[] {
+    private async runFormatCheck(): Promise<{ file: string; issues: string[] }[]> {
         const results: { file: string; issues: string[] }[] = [];
         const dirs = ['elements', 'scenes', 'shots'];
 
         for (const dir of dirs) {
             const dirPath = path.join(this.projectRoot, 'videospec', dir);
-            if (!fs.existsSync(dirPath)) continue;
+            const dirExists = await fs.access(dirPath).then(() => true).catch(() => false);
+            if (!dirExists) continue;
 
-            const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+            const files = (await fs.readdir(dirPath)).filter(f => f.endsWith('.md'));
             for (const file of files) {
                 const filePath = path.join(dirPath, file);
-                const issues = this.checkDocFormat(filePath);
+                const issues = await this.checkDocFormat(filePath);
                 if (issues.length > 0) {
                     results.push({ file: `${dir}/${file}`, issues });
                 }
@@ -376,9 +390,9 @@ export class ReviewServer {
         return results;
     }
 
-    private checkDocFormat(filePath: string): string[] {
+    private async checkDocFormat(filePath: string): Promise<string[]> {
         const issues: string[] = [];
-        const content = fs.readFileSync(filePath, 'utf-8');
+        const content = await fs.readFile(filePath, 'utf-8');
 
         // 1. 检查 frontmatter 存在
         if (!content.match(/^---\r?\n/)) {

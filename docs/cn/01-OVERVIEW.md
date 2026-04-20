@@ -1,6 +1,6 @@
 # OpsV 项目全景 (Project Overview)
 
-> **OpenSpec-Video (OpsV) 0.6.0** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
+> **OpenSpec-Video (OpsV) 0.6.1** — 将 Markdown 叙事规范编译为视频/图像生成任务的自动化框架
 
 ---
 
@@ -65,10 +65,10 @@ project/
 ├── .opsv/                      # 运行时状态（git 忽略）
 │   └── dependency-graph.json   # 依赖图快照
 ├── .opsv-queue/                # Spooler 物理信箱（git 忽略）
-│   ├── pending/{provider}/     # 待执行任务
-│   ├── processing/{provider}/  # 执行中任务
-│   ├── completed/{provider}/   # 已完成任务
-│   └── failed/{provider}/      # 失败任务
+│   ├── inbox/{provider}/       # 待执行任务
+│   ├── working/{provider}/     # 执行中任务
+│   ├── done/{provider}/        # 已完成/失败任务
+│   └── corrupted/{provider}/   # 损坏任务（JSON 解析失败时隔离）
 ├── videospec/                  # 核心叙事资产（真相源）
 │   ├── project.md              # 项目全局配置与资产花名册
 │   ├── stories/                # 故事大纲
@@ -95,7 +95,7 @@ project/
 | 概念 | 含义 |
 |------|------|
 | **Spec-as-Code** | 用结构化 Markdown 作为视频制作的源代码。 |
-| **Spooler Queue** | `v0.6 引入`，基于物理文件状态机的任务调度系统，取代旧版内存 Dispatcher。 |
+| **Spooler Queue** | `v0.6 引入`，基于物理文件状态机的任务调度系统，原子 `fs.rename` dequeue，取代旧版内存 Dispatcher。 |
 | **Dependency Graph** | `v0.5 引入`，在编译期进行拓扑解析，如果前置资产没有被 Approved 会被阻断。 |
 | **Review UI** | `v0.5 引入`，本地 Express Web 页面，实现可视化的图像筛选、命名、和元数据写回。 |
 | **@ 引用语法** | 用 `@role_K`、`@scene_bar` 或 `@asset:variant` 等标签调用已 approved 的资产变体。 |
@@ -154,4 +154,4 @@ opsv review
 ---
 
 > *"代码是写给人看的，只是顺便让机器运行。"*
-> *OpsV 0.6.0 | 最后更新: 2026-04-17*
+> *OpsV 0.6.1 | 最后更新: 2026-04-20*

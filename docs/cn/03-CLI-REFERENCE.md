@@ -1,4 +1,4 @@
-# CLI 命令参考 (v0.6.0)
+# CLI 命令参考 (v0.6.1)
 
 ## 命令总览
 
@@ -6,6 +6,7 @@
 |------|------|------|
 | `opsv init` | 初始化项目结构 | 项目启动 |
 | `opsv generate` | 编译文档为意图大纲 (jobs.json) | 意图编译 |
+| `opsv validate` | 验证 Markdown 文档的 YAML frontmatter | 质检 |
 | `opsv queue compile` | 将意图编译为 API 原子任务 | 任务投递 |
 | `opsv queue run` | 启动 QueueWatcher 消费任务 | 任务执行 |
 | `opsv review` | 启动 Review 页面服务 | 审阅 |
@@ -52,6 +53,35 @@ project/
 ├── queue/
 └── .gitignore              # 内建生成 (v0.6 新增)
 ```
+
+---
+
+## opsv validate
+
+验证 `videospec/` 目录下 Markdown 文档的 YAML frontmatter 是否符合 Zod schema。
+
+```bash
+# 验证当前目录
+opsv validate
+
+# 指定目录
+opsv validate -d ./videospec
+
+# 自动修复（预留）
+opsv validate --fix
+```
+
+### 校验规则
+
+| 字段 | 约束 |
+|------|------|
+| `type` | 必须是 `character`/`prop`/`costume`/`scene`/`shot-design`/`shot-production`/`project` |
+| `status` | 必须是 `drafting` 或 `approved` |
+| `visual_detailed` | 长文本字段必须使用折叠块语法 (`>`) |
+
+### 产出
+- 输出每个文件的校验结果，包含行号和修复建议
+- 返回码：0（全部通过）/ 1（发现问题）
 
 ---
 
@@ -108,7 +138,7 @@ opsv queue compile queue/jobs.json --provider runninghub
 
 ### 产出
 - 每个 Job 被切碎为独立的 `UUID.json` 文件
-- 投递到 `.opsv-queue/pending/{provider}/` 目录
+- 投递到 `.opsv-queue/inbox/{provider}/` 目录
 
 ---
 
@@ -126,8 +156,9 @@ opsv queue run runninghub
 
 ### 执行机制
 - **单线程安全**：逐一提取任务，处理完一个再拉下一个
-- **物理状态流转**：`pending → processing → completed/failed`
-- **断点恢复**：Ctrl+C 中断后，`processing` 中的任务不会丢失
+- **物理状态流转**：`inbox → working → done`
+- **断点恢复**：Ctrl+C 中断后，`working` 中的任务自动回滚至 `inbox`
+- **原子提取**：使用 `fs.rename` 保证多进程安全
 - **Provider 名称不区分大小写**：`SeaDream` 和 `seadream` 均可
 
 ### 支持的 Provider
@@ -277,4 +308,4 @@ opsv queue run seedance
 ---
 
 > *"命令是意志的延伸，管线是纪律的化身。"*
-> *OpsV 0.6.0 | 最后更新: 2026-04-17*
+> *OpsV 0.6.1 | 最后更新: 2026-04-20*

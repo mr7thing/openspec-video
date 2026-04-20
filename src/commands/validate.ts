@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import {
@@ -38,13 +38,14 @@ export function registerValidateCommand(program: Command, VERSION: string) {
             logger.info(`\n🔍 OpsV Validate v${VERSION}`);
             logger.info(`   目录: ${targetDir}`);
 
-            if (!fs.existsSync(targetDir)) {
+            const dirExists = await fs.access(targetDir).then(() => true).catch(() => false);
+            if (!dirExists) {
                 logger.error(`❌ 目录不存在: ${targetDir}`);
                 process.exit(1);
             }
 
             const issues: ValidationIssue[] = [];
-            const files = findMarkdownFiles(targetDir);
+            const files = await findMarkdownFiles(targetDir);
 
             if (files.length === 0) {
                 logger.info('ℹ️ 未找到 .md 文件');
@@ -54,7 +55,7 @@ export function registerValidateCommand(program: Command, VERSION: string) {
             logger.info(`   文件: ${files.length} 个\n`);
 
             for (const file of files) {
-                const fileIssues = validateFile(file);
+                const fileIssues = await validateFile(file);
                 issues.push(...fileIssues);
             }
 
@@ -78,16 +79,17 @@ export function registerValidateCommand(program: Command, VERSION: string) {
         });
 }
 
-function findMarkdownFiles(dir: string): string[] {
+async function findMarkdownFiles(dir: string): Promise<string[]> {
     const files: string[] = [];
 
-    if (!fs.existsSync(dir)) return files;
+    const dirExists = await fs.access(dir).then(() => true).catch(() => false);
+    if (!dirExists) return files;
 
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-            files.push(...findMarkdownFiles(fullPath));
+            files.push(...await findMarkdownFiles(fullPath));
         } else if (entry.name.endsWith('.md')) {
             files.push(fullPath);
         }
@@ -96,9 +98,9 @@ function findMarkdownFiles(dir: string): string[] {
     return files;
 }
 
-function validateFile(filePath: string): ValidationIssue[] {
+async function validateFile(filePath: string): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = await fs.readFile(filePath, 'utf-8');
     const relativePath = path.relative(process.cwd(), filePath);
 
     // 提取 YAML frontmatter

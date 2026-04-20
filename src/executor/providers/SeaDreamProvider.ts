@@ -1,5 +1,5 @@
 import axios from 'axios';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
@@ -24,8 +24,11 @@ export class SeaDreamProvider {
             if (!apiKey) throw new Error("Missing SEADREAM_API_KEY");
         }
 
-        const modelConfig = (configLoader.getModelConfig('seadream') || {}) as any;
-        const actualModel = modelConfig.model || 'ep-20250225184203-g2t55';
+        const modelConfig = configLoader.getModelConfig('seadream');
+        if (!modelConfig || !modelConfig.model) {
+            throw new Error("Missing 'seadream' model configuration. Please set 'model' in api_config.yaml.");
+        }
+        const actualModel = modelConfig.model;
         
         logger.logExecution(job.id, 'SEADREAM_START', { model: actualModel, uuid: task.uuid });
 
@@ -80,11 +83,11 @@ export class SeaDreamProvider {
             const basename = path.basename(job.output_path, ext);
             const dirname = path.dirname(job.output_path);
 
-            if (!fs.existsSync(dirname)) fs.mkdirSync(dirname, { recursive: true });
+            await fs.mkdir(dirname, { recursive: true });
 
             let fileIndex = i + 1;
             let candidatePath = path.join(dirname, `${basename}_${fileIndex}${ext}`);
-            while (fs.existsSync(candidatePath)) {
+            while (await fs.access(candidatePath).then(() => true).catch(() => false)) {
                 fileIndex++;
                 candidatePath = path.join(dirname, `${basename}_${fileIndex}${ext}`);
             }
@@ -134,9 +137,13 @@ export class SeaDreamProvider {
 
     private async downloadImage(url: string, outputPath: string): Promise<void> {
         const response = await axios({ method: 'GET', url: url, responseType: 'stream', timeout: 60000 });
-        const writer = fs.createWriteStream(outputPath);
+        if (response.status !== 200) {
+            throw new Error(`Download failed with status ${response.status}: ${url}`);
+        }
+        const writer = require('fs').createWriteStream(outputPath);
         response.data.pipe(writer);
         return new Promise((resolve, reject) => {
+            response.data.on('error', reject);
             writer.on('finish', () => { writer.close(); resolve(); });
             writer.on('error', reject);
         });

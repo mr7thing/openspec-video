@@ -1,4 +1,4 @@
-# OpsV Provider API Reference (v0.6.0)
+# OpsV Provider API Reference (v0.6.1)
 
 > Interface contracts and Spooler Queue integration specs for all image/video generation Providers.
 
@@ -10,7 +10,7 @@ The old `ImageModelDispatcher` / `VideoModelDispatcher` have been **permanently 
 
 ```
 opsv generate        → jobs.json (pure intent)
-opsv queue compile   → .opsv-queue/pending/{provider}/UUID.json (atomic payload)
+opsv queue compile   → .opsv-queue/inbox/{provider}/UUID.json (atomic payload)
 opsv queue run       → QueueWatcher → provider.processTask(task)
 ```
 
@@ -79,13 +79,22 @@ QueueWatcher calls: `dequeue() → processTask() → markCompleted/markFailed()`
 
 ```
 .opsv-queue/
-├── pending/{provider}/      ← queue compile delivers here
-├── processing/{provider}/   ← QueueWatcher atomically extracts
-├── completed/{provider}/    ← successful results archived
-└── failed/{provider}/       ← failures archived with error info
+├── inbox/{provider}/        ← queue compile delivers here
+├── working/{provider}/      ← QueueWatcher atomically extracts
+├── done/{provider}/         ← successful/failed results archived
+└── corrupted/{provider}/    ← corrupted JSON isolation
 ```
 
-Flow: `pending → processing → completed/failed`. Manual retry: move files from `failed/` back to `pending/`.
+Flow:
+- `inbox → working`: atomic `fs.rename` guarantees single-consumer safety
+- `working → done`: task completion or failure
+- `working → inbox`: SIGINT/SIGTERM rollback on graceful shutdown
+- `working → corrupted`: JSON parse failure isolation (non-blocking)
+
+**Atomicity Guarantee**: `dequeue()` uses `fs.rename(inboxPath, workingPath)`:
+- POSIX `rename` ensures only one consumer succeeds per file
+- `ENOENT` gracefully handled (file already taken by another process)
+- No memory locks or external dependencies (Redis/ZooKeeper) required
 
 ---
 
@@ -96,4 +105,4 @@ Flow: `pending → processing → completed/failed`. Manual retry: move files fr
 
 ---
 
-> *OpsV v0.6.0 | Last updated: 2026-04-17*
+> *OpsV v0.6.1 | Last updated: 2026-04-20*

@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 export function getProjectRoot(): string {
@@ -13,11 +13,17 @@ export function getEnvPaths(projectRoot: string) {
     };
 }
 
-export function showEnvCheck(projectRoot: string) {
+export async function showEnvCheck(projectRoot: string) {
     const { secretsEnvPath, rootEnvPath } = getEnvPaths(projectRoot);
-    const envPath = fs.existsSync(secretsEnvPath) 
-        ? secretsEnvPath 
-        : (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory() ? rootEnvPath : 'default');
+    const secretsExists = await fs.access(secretsEnvPath).then(() => true).catch(() => false);
+    let envPath = secretsExists ? secretsEnvPath : 'default';
+    if (!secretsExists) {
+        const rootExists = await fs.access(rootEnvPath).then(() => true).catch(() => false);
+        if (rootExists) {
+            const stat = await fs.stat(rootEnvPath);
+            if (!stat.isDirectory()) envPath = rootEnvPath;
+        }
+    }
         
     const volceKey = process.env.VOLCENGINE_API_KEY;
     const seaKey = process.env.SEADREAM_API_KEY;

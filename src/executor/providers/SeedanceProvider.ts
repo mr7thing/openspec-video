@@ -1,5 +1,5 @@
 import axios from 'axios';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { VideoProvider } from './VideoProvider';
 import { Job } from '../../types/PromptSchema';
@@ -11,18 +11,19 @@ import { logger } from '../../utils/logger';
 export class SeedanceProvider implements VideoProvider {
     providerName = 'seedance';
 
-    private getBase64Image(filePath: string): string {
+    private async getBase64Image(filePath: string): Promise<string> {
         try {
             const ext = path.extname(filePath).toLowerCase();
             let mimeType = 'image/png';
             if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
             if (ext === '.webp') mimeType = 'image/webp';
 
-            if (!fs.existsSync(filePath)) {
+            const stat = await fs.stat(filePath).catch(() => null);
+            if (!stat) {
                 throw new Error(`Local file not found: ${filePath}`);
             }
 
-            const data = fs.readFileSync(filePath);
+            const data = await fs.readFile(filePath);
             const base64Str = data.toString('base64');
             return `data:${mimeType};base64,${base64Str}`;
         } catch (e: any) {
@@ -40,9 +41,9 @@ export class SeedanceProvider implements VideoProvider {
         const frameRef = job.payload.frame_ref;
         let imageArg = undefined;
         if (frameRef && frameRef.first) {
-            imageArg = this.getBase64Image(frameRef.first);
+            imageArg = await this.getBase64Image(frameRef.first);
         } else if (job.reference_images && job.reference_images.length > 0) {
-            imageArg = this.getBase64Image(job.reference_images[0]);
+            imageArg = await this.getBase64Image(job.reference_images[0]);
         }
 
         const requestBody: any = {
@@ -95,12 +96,15 @@ export class SeedanceProvider implements VideoProvider {
         const url = `https://ark.cn-beijing.volces.com/api/v3/video/status?id=${requestId}`;
         let retries = 0;
         const maxRetries = 150;
+        let pollIntervalMs = 5000;
 
         logger.info(`[Seedance] Start polling for TaskID: ${requestId}`);
 
         while (retries < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
             retries++;
+            // 指数退避：5s -> 10s -> 20s -> 30s 封顶
+            pollIntervalMs = Math.min(pollIntervalMs * 2, 30000);
 
             try {
                 const response = await axios.get(url, {
@@ -141,18 +145,22 @@ export class SeedanceProvider implements VideoProvider {
         const response = await axios({
             method: 'GET',
             url: videoUrl,
-            responseType: 'stream'
+            responseType: 'stream',
+            timeout: 300000
         });
 
-        const dir = path.dirname(outputFilePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        if (response.status !== 200) {
+            throw new Error(`Download failed with status ${response.status}: ${videoUrl}`);
         }
 
-        const writer = fs.createWriteStream(outputFilePath);
+        const dir = path.dirname(outputFilePath);
+        await fs.mkdir(dir, { recursive: true });
+
+        const writer = require('fs').createWriteStream(outputFilePath);
         response.data.pipe(writer);
 
         return new Promise((resolve, reject) => {
+            response.data.on('error', reject);
             writer.on('finish', () => resolve());
             writer.on('error', reject);
         });

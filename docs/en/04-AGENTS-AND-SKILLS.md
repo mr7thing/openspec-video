@@ -95,4 +95,4 @@ opsv addons install ./addons/comic-drama-v0.6.zip
 ---
 
 > *"Agent is the soul, standard Skill is the skeleton, creative Skill is the flesh, Spooler Queue is the nervous system."*
-> *OpsV 0.6.0 | Last updated: 2026-04-17*
+> *OpsV 0.6.1 | Last updated: 2026-04-20*

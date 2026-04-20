@@ -69,7 +69,7 @@ export class AssetCompiler {
         const refs = await this.refResolver.parseAll(markdown);
 
         // 2. 展开引用为 prompt 文本 + 收集附件
-        const { expandedText, attachments } = this.refResolver.expandRefsInText(markdown, refs);
+        const { expandedText, attachments } = await this.refResolver.expandRefsInText(markdown, refs);
 
         // 3. 清理 Markdown 格式化标记
         let prompt = this.cleanMarkdown(expandedText);
@@ -87,7 +87,7 @@ export class AssetCompiler {
      */
     public async assembleAssetPrompt(assetId: string, description: string): Promise<CompiledPrompt> {
         const refs = await this.refResolver.parseAll(description);
-        const { expandedText, attachments } = this.refResolver.expandRefsInText(description, refs);
+        const { expandedText, attachments } = await this.refResolver.expandRefsInText(description, refs);
 
         let prompt = this.cleanMarkdown(expandedText);
         if (this.projectConfig.global_style_postfix) {

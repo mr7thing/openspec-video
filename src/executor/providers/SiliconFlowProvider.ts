@@ -1,5 +1,5 @@
 import axios from 'axios';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
@@ -44,7 +44,7 @@ export class SiliconFlowProvider {
         }
 
         if (job.reference_images && job.reference_images.length > 0) {
-            requestBody.image = this.getBase64Image(job.reference_images[0]);
+            requestBody.image = await this.getBase64Image(job.reference_images[0]);
         }
 
         logger.logExecution(job.id, 'SILICONFLOW_IMAGE_START', { model: modelName, uuid });
@@ -73,7 +73,7 @@ export class SiliconFlowProvider {
         };
 
         if (job.reference_images && job.reference_images.length > 0) {
-            requestBody.image = this.getBase64Image(job.reference_images[0]);
+            requestBody.image = await this.getBase64Image(job.reference_images[0]);
         }
 
         logger.logExecution(job.id, 'SILICONFLOW_VIDEO_SUBMIT', { model: modelName, uuid });
@@ -98,9 +98,11 @@ export class SiliconFlowProvider {
     private async pollVideoStatus(requestId: string, apiKey: string, outputPath: string): Promise<void> {
         const url = 'https://api.siliconflow.cn/v1/video/status';
         let retries = 0;
+        let pollIntervalMs = 5000;
         while (retries < 120) {
-            await new Promise(r => setTimeout(r, 10000));
+            await new Promise(r => setTimeout(r, pollIntervalMs));
             retries++;
+            pollIntervalMs = Math.min(pollIntervalMs * 2, 30000);
             const response = await axios.post(url, { requestId }, {
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
             });
@@ -117,21 +119,28 @@ export class SiliconFlowProvider {
         throw new Error(`Polling timeout for ${requestId}`);
     }
 
-    private getBase64Image(filePath: string): string {
+    private async getBase64Image(filePath: string): Promise<string> {
         const ext = path.extname(filePath).toLowerCase();
         let mimeType = 'image/png';
         if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
         if (ext === '.webp') mimeType = 'image/webp';
-        const data = fs.readFileSync(filePath);
+        const data = await fs.readFile(filePath);
         return `data:${mimeType};base64,${data.toString('base64')}`;
     }
 
     private async downloadFile(url: string, outputFilePath: string): Promise<void> {
-        const response = await axios({ method: 'GET', url, responseType: 'stream' });
+        const response = await axios({ method: 'GET', url, responseType: 'stream', timeout: 60000 });
+        if (response.status !== 200) {
+            throw new Error(`Download failed with status ${response.status}: ${url}`);
+        }
         const dir = path.dirname(outputFilePath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        const writer = fs.createWriteStream(outputFilePath);
+        await fs.mkdir(dir, { recursive: true });
+        const writer = require('fs').createWriteStream(outputFilePath);
         response.data.pipe(writer);
-        return new Promise((res, rej) => { writer.on('finish', res); writer.on('error', rej); });
+        return new Promise((res, rej) => {
+            response.data.on('error', rej);
+            writer.on('finish', res);
+            writer.on('error', rej);
+        });
     }
 }

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { ReviewServer } from '../review-ui/server';
 import { logger } from '../utils/logger';
@@ -19,7 +19,7 @@ export function registerReviewCommand(program: Command) {
             const projectRoot = process.cwd();
 
             // 解析批次目录列表
-            const batchDirs = resolveBatchDirs(projectRoot, options.batch);
+            const batchDirs = await resolveBatchDirs(projectRoot, options.batch);
             if (batchDirs.length === 0) {
                 logger.error('❌ 未找到匹配的批次目录。请先执行 "opsv generate" + "opsv gen-image"');
                 return;
@@ -36,11 +36,12 @@ export function registerReviewCommand(program: Command) {
         });
 }
 
-function resolveBatchDirs(projectRoot: string, batchInput: string): string[] {
+async function resolveBatchDirs(projectRoot: string, batchInput: string): Promise<string[]> {
     const artifactsDir = path.join(projectRoot, 'artifacts');
-    if (!fs.existsSync(artifactsDir)) return [];
+    const artifactsExists = await fs.access(artifactsDir).then(() => true).catch(() => false);
+    if (!artifactsExists) return [];
 
-    const allBatches = fs.readdirSync(artifactsDir)
+    const allBatches = (await fs.readdir(artifactsDir))
         .filter(f => f.startsWith('drafts_'))
         .sort((a, b) => {
             const aNum = parseDraftNum(a);

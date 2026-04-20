@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import util from 'util';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
 const execPromise = util.promisify(exec);
@@ -20,9 +20,7 @@ export class FrameExtractor {
 
         // 确保输出目录存在
         const dir = path.dirname(outputPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
+        await fs.mkdir(dir, { recursive: true });
 
         // FFmpeg command 核心：
         // -sseof -3 表示只看最后 3 秒 (大幅减少 I/O)
