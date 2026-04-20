@@ -24,8 +24,8 @@ export class Reviewer {
             const folders = fs.readdirSync(artifactsDir)
                 .filter(f => f.startsWith('drafts_'))
                 .sort((a, b) => {
-                    const numA = parseInt(a.replace('drafts_', ''), 10);
-                    const numB = parseInt(b.replace('drafts_', ''), 10);
+                    const numA = this._parseDraftNum(a);
+                    const numB = this._parseDraftNum(b);
                     return numA - numB; // Ascending for historical context
                 });
             
@@ -213,12 +213,29 @@ export class Reviewer {
         const folders = fs.readdirSync(artifactsDir)
             .filter(f => f.startsWith('drafts_'))
             .sort((a, b) => {
-                const numA = parseInt(a.replace('drafts_', ''), 10);
-                const numB = parseInt(b.replace('drafts_', ''), 10);
+                const numA = this._parseDraftNum(a);
+                const numB = this._parseDraftNum(b);
                 return numB - numA;
             });
         
         return folders[0] || null;
+    }
+
+    /**
+     * 解析 draft 目录名称中的序号
+     * 支持:
+     *   drafts_5       → 5
+     *   drafts_L1_1    → layer=1, seq=1
+     *   drafts_L2_3    → layer=2, seq=3
+     */
+    private _parseDraftNum(name: string): number {
+        const layerMatch = name.match(/^drafts_L(\d+)_(\d+)$/);
+        if (layerMatch) {
+            const layer = parseInt(layerMatch[1], 10);
+            const seq = parseInt(layerMatch[2], 10);
+            return layer * 10000 + seq;
+        }
+        return parseInt(name.replace('drafts_', ''), 10) || 0;
     }
 
     /**

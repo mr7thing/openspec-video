@@ -99,6 +99,31 @@ export class DependencyGraph {
     }
 
     /**
+     * 为指定的任务列表构建层次索引
+     * @param jobs 任务列表（只需 id 字段）
+     * @returns layers: Array of job ID 数组（按层排列），idToLayer: id → 层号（1-based）
+     */
+    buildLayerIndex(jobs: { id: string }[]): { layers: string[][]; idToLayer: Map<string, number> } {
+        const jobIds = new Set(jobs.map(j => j.id));
+        const { batches } = this.topologicalSort();
+        const layers: string[][] = [];
+        const idToLayer = new Map<string, number>();
+
+        for (const [layerIdx, batch] of batches.entries()) {
+            const layerNum = layerIdx + 1;
+            const filtered = batch.filter(id => jobIds.has(id));
+            if (filtered.length > 0) {
+                layers.push(filtered);
+                for (const id of filtered) {
+                    idToLayer.set(id, layerNum);
+                }
+            }
+        }
+
+        return { layers, idToLayer };
+    }
+
+    /**
      * 核心方法: 根据 Approved References 就绪状态分解任务
      * 严格模式: 只返回依赖已全部就绪（有 approved 图）的任务
      */

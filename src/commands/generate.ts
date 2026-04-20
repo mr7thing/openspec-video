@@ -15,7 +15,8 @@ export function registerGenerateCommand(program: Command, VERSION: string) {
         .description('编译 Markdown 文档为图像生成任务 (jobs.json)')
         .option('-p, --preview', '预览模式（仅生成第一个分镜）', false)
         .option('--shots <list>', '指定分镜 ID（逗号分隔: 1,5,12）', (val) => val.split(','))
-        .option('--skip-approved', '跳过已 Approve 的文档，不纳入生成队列', false)
+        .option('--skip-approved', '跳过已 Approve 的文档，不纳入生成队列（默认开启）', false)
+        .option('--skip-depend-layer', '跳过依赖层次，生成扁平的大任务列表', false)
         .action(async (targets, options) => {
             try {
                 const projectRoot = process.cwd();
@@ -25,12 +26,14 @@ export function registerGenerateCommand(program: Command, VERSION: string) {
                 if (options.preview) logger.info('   👀 预览模式');
                 if (options.shots) logger.info(`   🎯 指定分镜: ${options.shots.join(', ')}`);
                 if (options.skipApproved) logger.info('   ✅ 已启用: 跳过 Approved 文档');
+                if (options.skipDependLayer) logger.info('   🔗 跳过依赖层次（扁平模式）');
 
                 const generator = new JobGenerator(projectRoot);
                 const jobs = await generator.generateJobs(targets, {
                     preview: options.preview,
                     shots: options.shots,
                     skipApproved: options.skipApproved,
+                    skipDependsLayer: options.skipDependLayer,
                 });
 
                 logger.info('\n📂 意图生成完毕。接下来请执行编译命令：');

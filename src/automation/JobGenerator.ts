@@ -36,6 +36,7 @@ export class JobGenerator {
     private jobValidator: JobValidator;
     private currentDraftDir: string = '';
     private batchIndex: number = 1;
+    private layerIndex: number = 0; // 0 = flat/legacy mode
 
     constructor(projectRoot: string) {
         this.projectRoot = path.resolve(projectRoot);
@@ -48,20 +49,12 @@ export class JobGenerator {
 
     async generateJobs(
         targets: string[],
-        options: { preview?: boolean; shots?: string[]; skipApproved?: boolean } = {}
+        options: { preview?: boolean; shots?: string[]; skipApproved?: boolean; skipDependsLayer?: boolean } = {}
     ): Promise<Job[]> {
         // ---- 初始化 ----
         await this.assetManager.loadAssets();
         this.assetCompiler.loadProjectConfig();
         const globalConfig = this.assetCompiler.getProjectConfig();
-
-        // ---- 计算批次目录 ----
-        this.batchIndex = 1;
-        while (fs.existsSync(path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`))) {
-            this.batchIndex++;
-        }
-        this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`);
-        fs.mkdirSync(this.currentDraftDir, { recursive: true });
 
         // ---- 构建依赖图（每次 generate 前重新构建，确保最新） ----
         const depGraph = DependencyGraph.buildFromProject(this.projectRoot);
@@ -76,6 +69,22 @@ export class JobGenerator {
             ];
         }
 
+        // ---- 收集显式指定的文件路径集合 ----
+        const explicitFilePaths = new Set<string>();
+        for (const target of targets) {
+            const targetPath = path.resolve(this.projectRoot, target);
+            if (!fs.existsSync(targetPath)) continue;
+            const stats = fs.statSync(targetPath);
+            if (stats.isFile() && targetPath.endsWith('.md')) {
+                explicitFilePaths.add(targetPath.replace(/\\/g, '/'));
+            } else if (stats.isDirectory()) {
+                const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
+                for (const file of files) {
+                    explicitFilePaths.add(path.join(targetPath, file).replace(/\\/g, '/'));
+                }
+            }
+        }
+
         let allJobs: Job[] = [];
         const skippedLog: { id: string; file: string; reason: string }[] = [];
 
@@ -88,11 +97,11 @@ export class JobGenerator {
                 const files = fs.readdirSync(targetPath).filter(f => f.endsWith('.md'));
                 for (const file of files) {
                     const filePath = path.join(targetPath, file);
-                    const jobs = await this.processFile(filePath, globalConfig, options, skippedLog);
+                    const jobs = await this.processFile(filePath, globalConfig, options, skippedLog, explicitFilePaths);
                     allJobs = allJobs.concat(jobs);
                 }
             } else if (stats.isFile() && targetPath.endsWith('.md')) {
-                const jobs = await this.processFile(targetPath, globalConfig, options, skippedLog);
+                const jobs = await this.processFile(targetPath, globalConfig, options, skippedLog, explicitFilePaths);
                 allJobs = allJobs.concat(jobs);
             }
         }
@@ -120,17 +129,50 @@ export class JobGenerator {
         const queueDir = path.join(this.projectRoot, 'queue');
         if (!fs.existsSync(queueDir)) fs.mkdirSync(queueDir);
 
-        // 主任务队列
-        fs.writeFileSync(
-            path.join(queueDir, 'jobs.json'),
-            JSON.stringify(executable, null, 2)
-        );
+        if (options.skipDependsLayer) {
+            // ---- 扁平模式：所有 job 写入单个 jobs.json ----
+            this.batchIndex = this._nextDraftIndex();
+            this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`);
+            fs.mkdirSync(this.currentDraftDir, { recursive: true });
 
-        // 带批次号的备份（用于 review 时按批次检索）
-        fs.writeFileSync(
-            path.join(this.currentDraftDir, `jobs_batch_${this.batchIndex}.json`),
-            JSON.stringify(executable, null, 2)
-        );
+            fs.writeFileSync(
+                path.join(queueDir, 'jobs.json'),
+                JSON.stringify(executable, null, 2)
+            );
+            fs.writeFileSync(
+                path.join(this.currentDraftDir, 'jobs.json'),
+                JSON.stringify(executable, null, 2)
+            );
+        } else {
+            // ---- 分层模式：按依赖层次分文件 ----
+            const { layers, idToLayer } = depGraph.buildLayerIndex(executable);
+
+            for (const [layerIdx, layerJobIds] of layers.entries()) {
+                const layerNum = layerIdx + 1;
+                const layerJobs = executable.filter(j => idToLayer.get(j.id) === layerNum);
+                if (layerJobs.length === 0) continue;
+
+                this.batchIndex = this._nextDraftIndex(layerNum);
+                this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_L${layerNum}_${this.batchIndex}`);
+                fs.mkdirSync(this.currentDraftDir, { recursive: true });
+
+                // output_path 在 processFile() 时 currentDraftDir 尚未设置，需要在此修正
+                for (const job of layerJobs) {
+                    job.output_path = this.nextOutputPath(job.id.replace(/[^\w]/g, '_'));
+                    job._meta.batch = `batch_${this.batchIndex}`;
+                }
+
+                const filename = `layer_${layerNum}.json`;
+                fs.writeFileSync(
+                    path.join(queueDir, filename),
+                    JSON.stringify(layerJobs, null, 2)
+                );
+                fs.writeFileSync(
+                    path.join(this.currentDraftDir, filename),
+                    JSON.stringify(layerJobs, null, 2)
+                );
+            }
+        }
 
         // ---- 输出跳过日志 ----
         if (skippedLog.length > 0) {
@@ -142,13 +184,27 @@ export class JobGenerator {
             }
         }
 
+        const total = executable.reduce((sum, j) => sum + 1, 0);
         logger.info(
-            `\n✅ 编译完成: ${executable.length} 个可执行任务` +
+            `\n✅ 编译完成: ${total} 个可执行任务` +
             (blocked.length > 0 ? ` (${blocked.length} 个等待依赖)` : '') +
             (skippedLog.length > 0 ? ` (${skippedLog.length} 个已跳过)` : '')
         );
 
         return executable;
+    }
+
+    /**
+     * 查找下一个可用的 draft 序号
+     * @param layerHint 可选，用于分层模式的 L{n} 前缀
+     */
+    private _nextDraftIndex(layerHint?: number): number {
+        let idx = 1;
+        const prefix = layerHint ? `drafts_L${layerHint}_` : 'drafts_';
+        while (fs.existsSync(path.join(this.projectRoot, `artifacts/${prefix}${idx}`))) {
+            idx++;
+        }
+        return idx;
     }
 
     // ================================================================
@@ -159,12 +215,13 @@ export class JobGenerator {
         filePath: string,
         globalConfig: any,
         options: { preview?: boolean; shots?: string[]; skipApproved?: boolean },
-        skippedLog: { id: string; file: string; reason: string }[]
+        skippedLog: { id: string; file: string; reason: string }[],
+        explicitFilePaths: Set<string>
     ): Promise<Job[]> {
         const normalizedPath = filePath.replace(/\\/g, '/');
 
         if (normalizedPath.includes('/elements/') || normalizedPath.includes('/scenes/')) {
-            return this.processAssetFile(filePath, globalConfig, options, skippedLog);
+            return this.processAssetFile(filePath, globalConfig, options, skippedLog, explicitFilePaths);
         } else if (normalizedPath.includes('/shots/')) {
             // v0.5: 支持多样化命名。包含 'shotlist.md' 的文件被视为生产辅助文档并跳过解析
             const fileName = path.basename(filePath).toLowerCase();
@@ -172,7 +229,7 @@ export class JobGenerator {
                 logger.info(`跳过 ${path.basename(filePath)} (视频编译管线专用)`);
                 return [];
             }
-            return this.processShotDesignFile(filePath, globalConfig, options, skippedLog);
+            return this.processShotDesignFile(filePath, globalConfig, options, skippedLog, explicitFilePaths);
         }
 
         logger.warn(`跳过非规范目录文件: ${filePath}`);
@@ -187,7 +244,8 @@ export class JobGenerator {
         filePath: string,
         globalConfig: any,
         options: { skipApproved?: boolean },
-        skippedLog: { id: string; file: string; reason: string }[]
+        skippedLog: { id: string; file: string; reason: string }[],
+        explicitFilePaths: Set<string>
     ): Promise<Job[]> {
         const content = fs.readFileSync(filePath, 'utf-8');
         const id = path.parse(filePath).name.replace(/^@/, '');
@@ -202,11 +260,15 @@ export class JobGenerator {
             return [];
         }
 
-        // v0.5: 如果开启了 --skip-approved 且 status 已经是 approved，跳过图像生成
-        if (options.skipApproved && frontmatter.status === 'approved') {
-            logger.info(`  ⏭️  跳过已 approved 资产: ${id}`);
-            skippedLog.push({ id, file: filePath, reason: 'status: approved' });
-            return [];
+        // Approved 检查: 显式指定的文档跳过 approved 检查；其他文档检查 Approved References 区
+        const isExplicit = explicitFilePaths.has(filePath.replace(/\\/g, '/'));
+        if (options.skipApproved && !isExplicit) {
+            const hasApproved = await this.approvedRefReader.hasAnyApproved(id);
+            if (hasApproved) {
+                logger.info(`  ⏭️  跳过已有 approved 图的资产: ${id}`);
+                skippedLog.push({ id, file: filePath, reason: 'has approved image' });
+                return [];
+            }
         }
 
         logger.info(`  处理资产: ${id} (type: ${frontmatter.type}, status: ${frontmatter.status})`);
@@ -253,7 +315,8 @@ export class JobGenerator {
         filePath: string,
         globalConfig: any,
         options: { preview?: boolean; shots?: string[]; skipApproved?: boolean },
-        skippedLog: { id: string; file: string; reason: string }[]
+        skippedLog: { id: string; file: string; reason: string }[],
+        explicitFilePaths: Set<string>
     ): Promise<Job[]> {
         const content = fs.readFileSync(filePath, 'utf-8');
         const jobs: Job[] = [];
@@ -269,12 +332,18 @@ export class JobGenerator {
             return [];
         }
 
-        // v0.5: 如果开启了 --skip-approved 且剧本 status 已经是 approved，跳过分镜生成
-        if (options.skipApproved && frontmatter.status === 'approved') {
-            const fileName = path.basename(filePath);
-            logger.info(`  ⏭️  跳过已 approved 脚本: ${fileName}`);
-            skippedLog.push({ id: fileName, file: filePath, reason: 'status: approved' });
-            return [];
+        // Approved 检查: 显式指定的文档跳过 approved 检查；其他文档检查 Approved References 区
+        const isExplicit = explicitFilePaths.has(filePath.replace(/\\/g, '/'));
+        if (options.skipApproved && !isExplicit) {
+            // shots 的 approved 检查按 shot 设计文档本身来（通过 findDocPath 查找）
+            const docId = path.basename(filePath).replace(/\.md$/, '');
+            const hasApproved = await this.approvedRefReader.hasAnyApproved(docId);
+            if (hasApproved) {
+                const fileName = path.basename(filePath);
+                logger.info(`  ⏭️  跳过已有 approved 图的脚本: ${fileName}`);
+                skippedLog.push({ id: fileName, file: filePath, reason: 'has approved image' });
+                return [];
+            }
         }
 
         // ---- v0.5 核心: 从正文 ## Shot NN 标题解析 shots ----
