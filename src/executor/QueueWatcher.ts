@@ -15,14 +15,14 @@ export class QueueWatcher {
   
   private baseQueueDir: string;
   private provider: string;
-  private cycle: string;
+  private targetCircle: string | null; // e.g. "zerocircle_1"
 
-  constructor(baseQueueDir: string, provider: string, handler: TaskHandler, pollIntervalMs = 5000, cycle = 'ZeroCircle_1') {
+  constructor(baseQueueDir: string, provider: string, handler: TaskHandler, pollIntervalMs = 5000, targetCircle?: string) {
     this.baseQueueDir = baseQueueDir;
     this.provider = provider;
     this.handler = handler;
     this.pollIntervalMs = pollIntervalMs;
-    this.cycle = cycle;
+    this.targetCircle = targetCircle || null;
   }
 
   async start() {
@@ -30,25 +30,41 @@ export class QueueWatcher {
     this.isShuttingDown = false;
     this.setupGracefulShutdown();
     
-    // Auto-discover the active batch
-    const providerDir = path.join(this.baseQueueDir, this.cycle, this.provider);
-    try {
-        const entries = await fs.readdir(providerDir);
-        const batchFolders = entries.filter(e => e.startsWith('queue_'));
-        if (batchFolders.length === 0) {
-            console.log(`[QueueWatcher] No batches found for ${this.provider} in ${this.cycle}. Waiting...`);
-        } else {
-            const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''))).filter(n => !isNaN(n));
-            const latestBatch = Math.max(...nums);
-            const batchDir = path.join(providerDir, `queue_${latestBatch}`);
-            this.manager = new BatchManifestManager(batchDir);
-            console.log(`[QueueWatcher] Started watching ${this.provider} in ${batchDir}`);
-        }
-    } catch (e) {
-        console.warn(`[QueueWatcher] Provider dir not ready: ${providerDir}`);
-    }
+    // Auto-discover the active batch / circle
+    await this.discoverAndBind();
 
     this.poll();
+  }
+
+  private async discoverAndBind() {
+      try {
+          let circleDir: string;
+          
+          if (this.targetCircle) {
+              circleDir = path.join(this.baseQueueDir, this.targetCircle);
+          } else {
+              // 自动发现最近创建的 Circle
+              const circles = await fs.readdir(this.baseQueueDir);
+              if (circles.length === 0) return;
+              // 简单的排序算法：按修改时间或名称排序
+              const latestCircle = circles.sort().reverse()[0];
+              circleDir = path.join(this.baseQueueDir, latestCircle);
+          }
+
+          const providerDir = path.join(circleDir, this.provider);
+          const entries = await fs.readdir(providerDir).catch(() => []);
+          const batchFolders = entries.filter(e => e.startsWith('queue_'));
+          
+          if (batchFolders.length > 0) {
+              const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''))).filter(n => !isNaN(n));
+              const latestBatch = Math.max(...nums);
+              const batchPath = path.join(providerDir, `queue_${latestBatch}`);
+              this.manager = new BatchManifestManager(batchPath);
+              console.log(`[QueueWatcher] Bound to ${batchPath}`);
+          } else {
+              console.log(`[QueueWatcher] No batches found in ${providerDir}`);
+          }
+      } catch (e) {}
   }
 
   private setupGracefulShutdown() {
@@ -72,16 +88,9 @@ export class QueueWatcher {
     if (!this.isWatching || this.isShuttingDown) return;
 
     try {
-      // Re-initialize manager if it was missing (dir created later)
+      // Re-initialize manager if it was missing
       if (!this.manager) {
-          const providerDir = path.join(this.baseQueueDir, this.cycle, this.provider);
-          const entries = await fs.readdir(providerDir).catch(() => []);
-          const batchFolders = entries.filter(e => e.startsWith('queue_'));
-          if (batchFolders.length > 0) {
-              const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''))).filter(n => !isNaN(n));
-              const batchDir = path.join(providerDir, `queue_${Math.max(...nums)}`);
-              this.manager = new BatchManifestManager(batchDir);
-          }
+          await this.discoverAndBind();
       }
 
       const task = await this.manager?.getNextPendingTask();
@@ -89,24 +98,26 @@ export class QueueWatcher {
         this.currentTaskId = task.id;
         console.log(`[QueueWatcher] Processing task ${task.id}`);
         
-        // Mark as processing in manifest
         await this.manager?.updateTaskStatus(task.id, 'processing');
         
         try {
-          // Get pure intention JSON
           const intention = await this.manager?.getTaskIntention(task.id);
           
-          // Execute handler (Note: Provider needs to know the final outputPath)
-          // We pass a virtual 'SpoolerTask' like object for compatibility
+          // 根据意图类型确定后缀
+          const isVideo = intention.type === 'video_generation';
+          const ext = isVideo ? 'mp4' : 'png';
+          
+          // 资产落盘路径：和 queue.json 在同一个目录下
+          const outputPath = path.join((this.manager as any).batchDir, `${task.id}.${ext}`);
+
           const virtualTask = {
               uuid: task.id,
-              payload: { job: { ...intention, id: task.id } },
-              // In v0.6.2, we tell the provider EXACTLY where to put the file
-              outputPath: path.join((this.manager as any).batchDir, `${task.id}.${intention.job?.type === 'video_generation' ? 'mp4' : 'png'}`)
+              payload: intention, // 扁平化意图
+              outputPath: outputPath
           };
 
           const result = await this.handler(virtualTask);
-          await this.manager?.updateTaskStatus(task.id, 'completed', result);
+          await this.manager?.updateTaskStatus(task.id, 'completed', result, outputPath);
           console.log(`[QueueWatcher] Task ${task.id} completed.`);
         } catch (err: any) {
           console.error(`[QueueWatcher] Task ${task.id} failed:`, err.message);

@@ -1,27 +1,25 @@
-import { Job } from '../../types/PromptSchema';
-
 /**
- * 视频模型提供者（Provider）接口
- * 所有第三方 API (SiliconFlow, Luma, Sora 等) 需实现此契约，以接入调度器。
+ * 视频模型提供者 (Provider) 契约 (v0.6.2)
+ * 
+ * 所有的 Provider (SiliconFlow, Volcengine, Minimax, ComfyUI 等) 
+ * 必须实现 processTask 方法来消费 QueueWatcher 分发的任务。
  */
 export interface VideoProvider {
-    /** 唯一提供商标识符，对应 api_config.yaml 中的 provider */
-    providerName: string;
-
-    /**
-     * 发起生成请求
-     * @param job 由编译器生成的原子视频作业结构
-     * @param modelName 具体的模型标识符（如 wan2.2-i2v）
-     * @param apiKey 注入的 API 鉴权密钥
-     * @returns 返回远程的 taskId / requestId 用于后续轮询
+    /** 
+     * 执行生成任务
+     * @param task 标准任务对象
+     * {
+     *   uuid: string,           // 任务唯一标识
+     *   payload: {              // 已编译的请求负荷
+     *     prompt: string,       // 提示词
+     *     model: string,        // 模型名称
+     *     type: string,         // 任务类型 (image_generation/video_generation)
+     *     params: any,          // API 特定参数 (尺寸, 步数等)
+     *     shotId: string,       // 关联的镜头 ID
+     *     ...                   // 其他 Provider 特定的扩展 (如 frame_ref, comfyui_payload)
+     *   },
+     *   outputPath: string      // 物理输出绝对路径 (由 QueueWatcher 自动计算并分发)
+     * }
      */
-    submitJob(job: Job, modelName: string, apiKey: string): Promise<string>;
-
-    /**
-     * 轮询作业状态并下载视频
-     * @param requestId 由 submitJob 返回的远程追踪 ID
-     * @param apiKey 注入的 API 鉴权密钥
-     * @param outputFilePath 期望在本地存放视频的物理绝对路径
-     */
-    pollAndDownload(requestId: string, apiKey: string, outputFilePath: string): Promise<void>;
+    processTask(task: any): Promise<boolean>;
 }

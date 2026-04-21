@@ -3,6 +3,7 @@ import * as path from 'path';
 
 export interface TaskStatus {
     id: string;
+    shotId: string;
     status: 'pending' | 'processing' | 'completed' | 'failed';
     updatedAt: string;
     log?: any;
@@ -12,8 +13,7 @@ export interface TaskStatus {
 
 export interface BatchManifest {
     version: string;
-    provider: string;
-    cycle: string;
+    circle: string;
     batchNum: number;
     tasks: Record<string, TaskStatus>;
 }
@@ -30,14 +30,13 @@ export class BatchManifestManager {
     /**
      * Initializes the batch directory and the manifest file.
      */
-    async init(provider: string, cycle: string, batchNum: number) {
+    async init(circle: string, batchNum: number) {
         await fs.mkdir(this.batchDir, { recursive: true });
         const exists = await fs.access(this.manifestPath).then(() => true).catch(() => false);
         if (!exists) {
             const manifest: BatchManifest = {
                 version: '0.6.2',
-                provider,
-                cycle,
+                circle,
                 batchNum,
                 tasks: {}
             };
@@ -57,13 +56,15 @@ export class BatchManifestManager {
     /**
      * Registers a new task intention into the batch.
      */
-    async registerTask(taskId: string, intention: any): Promise<string> {
-        const jsonPath = path.join(this.batchDir, `${taskId}.json`);
+    async registerTask(id: string, shotId: string, intention: any): Promise<string> {
+        const jsonPath = path.join(this.batchDir, `${id}.json`);
         await fs.writeFile(jsonPath, JSON.stringify(intention, null, 2), 'utf-8');
 
+        // Force reload manifest to prevent race conditions during registration
         const manifest = await this.getManifest();
-        manifest.tasks[taskId] = {
-            id: taskId,
+        manifest.tasks[id] = {
+            id: id,
+            shotId: shotId,
             status: 'pending',
             updatedAt: new Date().toISOString()
         };

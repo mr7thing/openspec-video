@@ -1,16 +1,17 @@
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
-import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
-// Removed SpoolerQueue dependency for v0.6.2 Batch Pipeline
 import { ConfigLoader } from '../../utils/configLoader';
-import { SequenceCounter } from '../../utils/sequenceCounter';
 
 export class SiliconFlowProvider {
+    /**
+     * 执行 SiliconFlow 任务
+     * task 结构由 QueueWatcher 提供: { uuid, payload: { prompt, params, model, type }, outputPath }
+     */
     async processTask(task: any): Promise<boolean> {
-        const job = task.payload.job as Job;
-        if (!job) throw new Error("SiliconFlow Provider requires task.payload.job");
+        const { payload, outputPath, uuid } = task;
+        if (!payload) throw new Error("SiliconFlow Provider: Missing payload");
 
         const configLoader = ConfigLoader.getInstance();
         let apiKey: string;
@@ -21,47 +22,35 @@ export class SiliconFlowProvider {
             if (!apiKey) throw new Error("Missing SILICONFLOW_API_KEY");
         }
 
-        const jobType = job.type || 'image_generation';
-        const models = configLoader.findModelsByCapability('siliconflow', jobType as any);
-        if (models.length === 0) {
-            throw new Error(`SiliconFlow Provider does not have an enabled model supporting type: ${jobType}`);
-        }
-
-        const targetModelItem = models[0];
-        const actualModel = targetModelItem.config.model || 'black-forest-labs/FLUX.1-schnell';
+        const modelName = payload.model || 'black-forest-labs/FLUX.1-schnell';
+        const jobType = payload.type || 'image_generation';
         
-        // Generate output path dynamically
-        const projectRoot = process.cwd();
-        const batchName = job._meta?.batch || 'draft_1';
-        const sequence = await SequenceCounter.getInstance().getNextGlobalSequence(projectRoot, batchName, job.id);
-        const ext = jobType === 'video_generation' ? 'mp4' : 'png';
-        
-        const outputDir = path.join(projectRoot, 'artifacts', batchName, 'siliconflow');
-        const outputPath = path.join(outputDir, `${job.id}_${sequence}.${ext}`);
-
         if (jobType === 'video_generation') {
-            return await this.processVideoTask(job, actualModel, apiKey, task.uuid, outputPath);
+            return await this.processVideoTask(payload, modelName, apiKey, uuid, outputPath);
         } else {
-            return await this.processImageTask(job, actualModel, apiKey, task.uuid, outputPath);
+            return await this.processImageTask(payload, modelName, apiKey, uuid, outputPath);
         }
     }
 
-    private async processImageTask(job: Job, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
+    private async processImageTask(payload: any, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
         const url = 'https://api.siliconflow.cn/v1/images/generations';
+        const params = payload.params || {};
+
         const requestBody: any = {
             model: modelName,
-            prompt: job.prompt_en || job.payload.prompt || "Cinematic image."
+            prompt: payload.prompt || "Cinematic image."
         };
 
+        // 仅在非 Edit 模型时注入尺寸
         if (!modelName.includes('Edit')) {
-            requestBody.image_size = (job.payload.global_settings as any)?.quality || "1024x1024";
+            requestBody.image_size = params.image_size || params.size || "1024x1024";
         }
 
-        if (job.reference_images && job.reference_images.length > 0) {
-            requestBody.image = await this.getBase64Image(job.reference_images[0]);
+        if (payload.reference_images && payload.reference_images.length > 0) {
+            requestBody.image = await this.getBase64Image(payload.reference_images[0]);
         }
 
-        logger.logExecution(job.id, 'SILICONFLOW_IMAGE_START', { model: modelName, uuid, outputPath });
+        logger.logExecution(payload.shotId, 'SILICONFLOW_IMAGE_START', { model: modelName, uuid, outputPath });
 
         try {
             const response = await axios.post(url, requestBody, {
@@ -69,28 +58,31 @@ export class SiliconFlowProvider {
                 timeout: 60000
             });
             const imageUrl = response.data.images?.[0]?.url;
-            if (!imageUrl) throw new Error(`Invalid response: no image URL found`);
+            if (!imageUrl) throw new Error(`Invalid response: ${JSON.stringify(response.data)}`);
+            
             await this.downloadFile(imageUrl, outputPath);
-            logger.logExecution(job.id, 'SILICONFLOW_SAVE_SUCCESS', { path: outputPath });
             return true;
         } catch (error: any) {
-            throw new Error(`SiliconFlow API Error: ${error.message}`);
+            const apiError = error.response?.data || error.message;
+            throw new Error(`SiliconFlow API Error: ${JSON.stringify(apiError)}`);
         }
     }
 
-    private async processVideoTask(job: Job, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
+    private async processVideoTask(payload: any, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
         const url = 'https://api.siliconflow.cn/v1/video/submit';
+        const params = payload.params || {};
+        
         const requestBody: any = {
             model: modelName,
-            prompt: job.prompt_en || job.payload.prompt || "Cinematic video.",
-            image_size: "1280x720"
+            prompt: payload.prompt || "Cinematic video.",
+            image_size: params.image_size || "1280x720"
         };
 
-        if (job.reference_images && job.reference_images.length > 0) {
-            requestBody.image = await this.getBase64Image(job.reference_images[0]);
+        if (payload.reference_images && payload.reference_images.length > 0) {
+            requestBody.image = await this.getBase64Image(payload.reference_images[0]);
         }
 
-        logger.logExecution(job.id, 'SILICONFLOW_VIDEO_SUBMIT', { model: modelName, uuid, outputPath });
+        logger.logExecution(payload.shotId, 'SILICONFLOW_VIDEO_SUBMIT', { model: modelName, uuid, outputPath });
 
         try {
             const submitRes = await axios.post(url, requestBody, {
@@ -99,13 +91,13 @@ export class SiliconFlowProvider {
             });
 
             const requestId = submitRes.data?.requestId;
-            if (!requestId) throw new Error(`Invalid submission response`);
+            if (!requestId) throw new Error(`Invalid submission: ${JSON.stringify(submitRes.data)}`);
             
             await this.pollVideoStatus(requestId, apiKey, outputPath);
-            logger.logExecution(job.id, 'SILICONFLOW_SAVE_SUCCESS', { path: outputPath });
             return true;
         } catch (error: any) {
-            throw new Error(`SiliconFlow Video Error: ${error.message}`);
+            const apiError = error.response?.data || error.message;
+            throw new Error(`SiliconFlow Video Error: ${JSON.stringify(apiError)}`);
         }
     }
 
@@ -116,7 +108,8 @@ export class SiliconFlowProvider {
         while (retries < 120) {
             await new Promise(r => setTimeout(r, pollIntervalMs));
             retries++;
-            pollIntervalMs = Math.min(pollIntervalMs * 2, 30000);
+            pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
+
             const response = await axios.post(url, { requestId }, {
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
             });
@@ -134,19 +127,14 @@ export class SiliconFlowProvider {
     }
 
     private async getBase64Image(filePath: string): Promise<string> {
-        const ext = path.extname(filePath).toLowerCase();
-        let mimeType = 'image/png';
-        if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-        if (ext === '.webp') mimeType = 'image/webp';
         const data = await fs.readFile(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : (ext === '.webp' ? 'image/webp' : 'image/png');
         return `data:${mimeType};base64,${data.toString('base64')}`;
     }
 
     private async downloadFile(url: string, outputFilePath: string): Promise<void> {
         const response = await axios({ method: 'GET', url, responseType: 'stream', timeout: 60000 });
-        if (response.status !== 200) {
-            throw new Error(`Download failed with status ${response.status}: ${url}`);
-        }
         const dir = path.dirname(outputFilePath);
         await fs.mkdir(dir, { recursive: true });
         const writer = require('fs').createWriteStream(outputFilePath);

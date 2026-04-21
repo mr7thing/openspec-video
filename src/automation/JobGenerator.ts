@@ -49,14 +49,24 @@ export class JobGenerator {
 
     async generateJobs(
         targets: string[],
-        options: { preview?: boolean; shots?: string[]; skipApproved?: boolean; skipDependsLayer?: boolean } = {}
+        options: { 
+            preview?: boolean; 
+            shots?: string[]; 
+            skipApproved?: boolean; 
+            skipDependsLayer?: boolean;
+            circleIndex?: number; // 指定运行哪个环 (N-Circle)
+            iterationIndex?: number; // 指定本次运行的序号 (_N)
+        } = {}
     ): Promise<Job[]> {
         // ---- 初始化 ----
         await this.assetManager.loadAssets();
-        this.assetCompiler.loadProjectConfig();
+        await this.assetCompiler.loadProjectConfig();
         const globalConfig = this.assetCompiler.getProjectConfig();
 
-        // ---- 构建依赖图（每次 generate 前重新构建，确保最新） ----
+        // 默认模型逻辑 (从 project.md 或默认设定获取)
+        const defaultImageProvider = globalConfig.engine || 'siliconflow';
+
+        // ---- 构建依赖图 ----
         const depGraph = await DependencyGraph.buildFromProject(this.projectRoot);
         logger.info(await depGraph.prettyPrint(this.approvedRefReader));
 
@@ -69,7 +79,6 @@ export class JobGenerator {
             ];
         }
 
-        // ---- 收集显式指定的文件路径集合 ----
         const explicitFilePaths = new Set<string>();
         for (const target of targets) {
             const targetPath = path.resolve(this.projectRoot, target);
@@ -116,83 +125,76 @@ export class JobGenerator {
         }
         allJobs = sanitized || allJobs;
 
-        // ---- 依赖图严格模式: 仅保留可执行的任务 ----
+        // ---- 过滤器: 确定可执行任务 ----
         const { executable, blocked, reasons } = await depGraph.filterExecutable(allJobs, this.approvedRefReader);
         if (blocked.length > 0) {
             logger.warn(`\n⚠️ ${blocked.length} 个任务因依赖未就绪被暂缓:`);
-            for (const [id, reason] of reasons) {
-                logger.warn(`  ⏸️ ${id}: ${reason}`);
+        }
+
+        if (executable.length === 0) {
+            logger.info("没有可执行的新任务。");
+            return [];
+        }
+
+        // ---- 分层逻辑: 确定本次要下发的 Circle ----
+        const { idToLayer } = depGraph.buildLayerIndex(executable);
+        
+        // 如果没有指定 circleIndex，默认下发第一层 (ZeroCircle)
+        const targetLayerIdx = options.circleIndex !== undefined ? options.circleIndex : 0;
+        
+        // 过滤出属于当前 Circle 的任务
+        // 注意：idToLayer 返回的是 1-based (Layer 1 = ZeroCircle)，所以这里要 +1
+        const targetLayerJobs = executable.filter(j => (idToLayer.get(j.id)) === (targetLayerIdx + 1));
+
+        if (targetLayerJobs.length === 0) {
+            logger.warn(`Circle ${targetLayerIdx} 无可执行任务，请检查依赖关系。`);
+            return [];
+        }
+
+        // ---- 下发编译: 直接调用 Compiler 写入 opsv-queue ----
+        const baseQueueDir = path.join(this.projectRoot, 'opsv-queue');
+        const compiler = new StandardAPICompiler(baseQueueDir);
+        
+        // 如果没有指定迭代序号，自动计算下一个可用的序号
+        const iterationIndex = options.iterationIndex || await this._nextCircleIteration(targetLayerIdx);
+
+        for (const job of targetLayerJobs) {
+            const provider = defaultImageProvider; 
+            const modelKey = this.resolveModelKey(provider, job.type);
+
+            await compiler.compileAndEnqueue({
+                provider,
+                modelKey,
+                job
+            }, targetLayerIdx, iterationIndex);
+        }
+
+        const circleWord = StandardAPICompiler.getCircleWord(targetLayerIdx);
+        logger.info(`\n✅ ${circleWord}_${iterationIndex} 编译完成: ${targetLayerJobs.length} 个任务已进入队列`);
+
+        return targetLayerJobs;
+    }
+
+    private resolveModelKey(provider: string, type: Job['type']): string {
+        if (provider === 'volcengine') return type === 'video_generation' ? 'sea_dream_video' : 'sea_dream_image';
+        if (provider === 'siliconflow') return 'flux_pro';
+        return 'default';
+    }
+
+    /**
+     * 自动寻找当前环的下一个可用序号
+     */
+    private async _nextCircleIteration(circleIndex: number): Promise<number> {
+        const circleWord = StandardAPICompiler.getCircleWord(circleIndex);
+        let idx = 1;
+        while (true) {
+            const circlePath = path.join(this.projectRoot, 'opsv-queue', `${circleWord}_${idx}`);
+            if (!await fs.access(circlePath).then(() => true).catch(() => false)) {
+                break;
             }
+            idx++;
         }
-
-        // ---- 写入 queue ----
-        const queueDir = path.join(this.projectRoot, 'queue');
-        if (!await fs.access(queueDir).then(() => true).catch(() => false)) {
-            await fs.mkdir(queueDir, { recursive: true });
-        }
-
-        if (options.skipDependsLayer) {
-            // ---- 扁平模式：所有 job 写入单个 jobs.json ----
-            this.batchIndex = await this._nextDraftIndex();
-            this.currentDraftDir = path.join(this.projectRoot, `artifacts/draft_${this.batchIndex}`);
-            await fs.mkdir(this.currentDraftDir, { recursive: true });
-
-            await fs.writeFile(
-                path.join(queueDir, 'jobs.json'),
-                JSON.stringify(executable, null, 2)
-            );
-            await fs.writeFile(
-                path.join(this.currentDraftDir, 'jobs.json'),
-                JSON.stringify(executable, null, 2)
-            );
-        } else {
-            // ---- 分层模式：按依赖层次分文件 ----
-            const { layers, idToLayer } = depGraph.buildLayerIndex(executable);
-
-            for (const [layerIdx, layerJobIds] of layers.entries()) {
-                const layerNum = layerIdx + 1;
-                const layerJobs = executable.filter(j => idToLayer.get(j.id) === layerNum);
-                if (layerJobs.length === 0) continue;
-
-                this.batchIndex = await this._nextDraftIndex(layerNum);
-                this.currentDraftDir = path.join(this.projectRoot, `artifacts/draft_L${layerNum}_${this.batchIndex}`);
-                await fs.mkdir(this.currentDraftDir, { recursive: true });
-
-                for (const job of layerJobs) {
-                    if (!job._meta) job._meta = {};
-                    job._meta.batch = `draft_L${layerNum}_${this.batchIndex}`;
-                }
-
-                const filename = `layer_${layerNum}.json`;
-                await fs.writeFile(
-                    path.join(queueDir, filename),
-                    JSON.stringify(layerJobs, null, 2)
-                );
-                await fs.writeFile(
-                    path.join(this.currentDraftDir, filename),
-                    JSON.stringify(layerJobs, null, 2)
-                );
-            }
-        }
-
-        // ---- 输出跳过日志 ----
-        if (skippedLog.length > 0) {
-            const logPath = path.join(queueDir, 'skipped.json');
-            await fs.writeFile(logPath, JSON.stringify(skippedLog, null, 2));
-            logger.info(`\n📋 已跳过 ${skippedLog.length} 个 Approved 文档 (详见 queue/skipped.json):`);
-            for (const s of skippedLog) {
-                logger.info(`  ⏭️  ${s.id} — ${s.reason}`);
-            }
-        }
-
-        const total = executable.length;
-        logger.info(
-            `\n✅ 编译完成: ${total} 个可执行任务` +
-            (blocked.length > 0 ? ` (${blocked.length} 个等待依赖)` : '') +
-            (skippedLog.length > 0 ? ` (${skippedLog.length} 个已跳过)` : '')
-        );
-
-        return executable;
+        return idx;
     }
 
     /**
