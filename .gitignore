@@ -13,9 +13,7 @@ dist/
 .opencode/
 .opsv/
 .opsv-queue/
-artifacts/
-queue/
-videospec/
+
 
 # Test Projects & Demos
 project-demo/
