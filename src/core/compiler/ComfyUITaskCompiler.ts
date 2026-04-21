@@ -13,12 +13,9 @@ export interface TaskIntent {
 export class ComfyUITaskCompiler {
   private baseQueueDir: string;
   private templateDir: string;
-  private batchManager: BatchManifestManager;
-
   constructor(baseQueueDir: string, templateDir: string) {
     this.baseQueueDir = baseQueueDir;
     this.templateDir = templateDir;
-    this.batchManager = new BatchManifestManager(baseQueueDir);
   }
 
   /**
@@ -26,6 +23,23 @@ export class ComfyUITaskCompiler {
    * and pushes it to the correct provider batch queue.
    */
   async compileAndEnqueue(intent: TaskIntent, cycle: string = 'ZeroCircle_1'): Promise<string> {
+    // 0. Setup Provider Batch Directory
+    const providerDir = path.join(this.baseQueueDir, cycle, intent.provider);
+    let batchNum = 1;
+    try {
+        await fs.mkdir(providerDir, { recursive: true });
+        const entries = await fs.readdir(providerDir);
+        const batchFolders = entries.filter(e => e.startsWith('queue_'));
+        if (batchFolders.length > 0) {
+            const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''))).filter(n => !isNaN(n));
+            batchNum = Math.max(...nums);
+        }
+    } catch (e) {}
+
+    const batchDir = path.join(providerDir, `queue_${batchNum}`);
+    const manager = new BatchManifestManager(batchDir);
+    await manager.init(intent.provider, cycle, batchNum);
+
     // 1. Load the requested workflow template
     const templatePath = path.join(this.templateDir, intent.templateName);
     let workflowStr = await fs.readFile(templatePath, 'utf-8');
@@ -49,7 +63,7 @@ export class ComfyUITaskCompiler {
       comfyui_payload: payload
     };
 
-    const taskFile = await this.batchManager.registerTask(cycle, intent.provider, intent.shotId, compiledJob);
+    const taskFile = await manager.registerTask(intent.shotId, compiledJob);
     console.log(`[Compiler] Compiled Shot ${intent.shotId} -> Batch: ${path.basename(path.dirname(taskFile))}`);
     return intent.shotId;
   }

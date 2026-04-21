@@ -63,3 +63,6 @@ docs/0.5/*
 addons/*
 CLAUDE.md
 .claude/*
+docs/OPSV_v0.6.0_FIX_VERIFICATION.md
+docs/OPSV_v0.6.0_TEST_FEEDBACK.md
+docs/OPSV_v0.6.1_CODE_REVIEW_COMPLETION.md

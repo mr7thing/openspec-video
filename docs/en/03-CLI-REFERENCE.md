@@ -1,4 +1,4 @@
-# CLI Reference (v0.6.1)
+# CLI Reference (v0.6.2)
 
 ## Command Overview
 
@@ -53,7 +53,7 @@ opsv generate -p                   # Preview mode (first shot only)
 opsv generate --shots 1,5,12       # Specific shots
 ```
 
-**Output**: `queue/jobs.json` â€” pure business intent, no API-specific parameters.
+**Output**: `queue/jobs.json` â€?pure business intent, no API-specific parameters.
 
 ---
 
@@ -88,7 +88,7 @@ opsv queue run runninghub
 ```
 
 - Single-threaded sequential processing with atomic `fs.rename` extraction
-- Physical state flow: `inbox â†’ working â†’ done`
+- Physical state flow: `inbox â†?working â†?done`
 - Ctrl+C graceful shutdown: tasks in `working/` automatically rollback to `inbox/`
 - Provider names are case-insensitive
 
@@ -173,4 +173,4 @@ opsv queue run seedance
 
 ---
 
-> *OpsV 0.6.1 | Last updated: 2026-04-20*
+> *OpsV 0.6.2 | Last updated: 2026-04-20*

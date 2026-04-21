@@ -82,4 +82,26 @@
 核心信念：文档与代码同源，未更新文档的架构调整等同于未完成的半成品。
 </documentation_protocol>
 
+
+<system_architecture>
+# OpsV v0.6.2 架构镜像
+
+## 核心拓扑
+- **Compilers**: `StandardAPICompiler` (AOT 意图产出) -> `BatchManifestManager` (清单注册)
+- **Queue**: `opsv-queue/{Cycle}/{Provider}/Batch/` (物理状态持久化)
+- **Executor**: `QueueWatcher` (递归扫描器) -> `Providers` (原子转换器)
+- **Review**: `ReviewServer` (批次感知渲染)
+
+## 模块依赖
+- `src/core/queue`: 真相源 (Manifest + Pure Intention)
+- `src/executor/providers`: 执行末梢 (Stateless Transformer)
+- `src/commands`: CLI 交互层 (Cycle-Aware Logic)
+
+## 技术栈
+- **Runtime**: Node.js + TypeScript
+- **I/O**: fs-extra + Atomic Rename
+- **Manifest**: JSON (queue.json)
+- **Spec**: Markdown + YAML Frontmatter
+</system_architecture>
+
 <ultimate_truth> 简化是最高形式的复杂。能消失的分支永远比能写对的分支更优雅。架构即认知，文档即记忆，变更即进化。 </ultimate_truth>
