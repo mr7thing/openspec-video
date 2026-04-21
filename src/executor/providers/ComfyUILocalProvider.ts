@@ -1,4 +1,4 @@
-import { SpoolerTask } from '../../core/queue/SpoolerQueue';
+// Removed SpoolerQueue dependency for v0.6.2 Batch Pipeline
 
 export class ComfyUILocalProvider {
   private endpoint: string;
@@ -12,7 +12,7 @@ export class ComfyUILocalProvider {
    * Takes a fully compiled machine payload, sends to local ComfyUI,
    * polls for completion, and returns the result metadata.
    */
-  async processTask(task: SpoolerTask): Promise<any> {
+  async processTask(task: any): Promise<any> {
     const payloadJson = task.payload.comfyui_payload;
     if (!payloadJson) throw new Error('Task payload is missing comfyui_payload');
 

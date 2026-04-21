@@ -1,4 +1,4 @@
-import { SpoolerTask } from '../../core/queue/SpoolerQueue';
+// Removed SpoolerQueue dependency for v0.6.2 Batch Pipeline
 
 export class RunningHubProvider {
   private endpointBase: string = 'https://www.runninghub.cn/task/openapi';
@@ -11,7 +11,7 @@ export class RunningHubProvider {
     this.apiKey = apiKey;
   }
 
-  async processTask(task: SpoolerTask): Promise<any> {
+  async processTask(task: any): Promise<any> {
     const payloadJson = task.payload.comfyui_payload;
     if (!payloadJson) throw new Error('Task payload is missing comfyui_payload');
 

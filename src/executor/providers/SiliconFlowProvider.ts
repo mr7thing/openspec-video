@@ -3,12 +3,12 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
-import { SpoolerTask } from '../../core/queue/SpoolerQueue';
+// Removed SpoolerQueue dependency for v0.6.2 Batch Pipeline
 import { ConfigLoader } from '../../utils/configLoader';
 import { SequenceCounter } from '../../utils/sequenceCounter';
 
 export class SiliconFlowProvider {
-    async processTask(task: SpoolerTask): Promise<boolean> {
+    async processTask(task: any): Promise<boolean> {
         const job = task.payload.job as Job;
         if (!job) throw new Error("SiliconFlow Provider requires task.payload.job");
 

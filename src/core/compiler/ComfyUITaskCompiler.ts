@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { SpoolerQueue } from '../queue/SpoolerQueue';
+import { BatchManifestManager } from '../queue/BatchManifestManager';
 
 export interface TaskIntent {
   shotId: string;
@@ -13,17 +13,19 @@ export interface TaskIntent {
 export class ComfyUITaskCompiler {
   private baseQueueDir: string;
   private templateDir: string;
+  private batchManager: BatchManifestManager;
 
   constructor(baseQueueDir: string, templateDir: string) {
     this.baseQueueDir = baseQueueDir;
     this.templateDir = templateDir;
+    this.batchManager = new BatchManifestManager(baseQueueDir);
   }
 
   /**
    * Compiles the high-level intent into a low-level machine payload JSON 
-   * and pushes it to the correct provider spooler queue.
+   * and pushes it to the correct provider batch queue.
    */
-  async compileAndEnqueue(intent: TaskIntent): Promise<string> {
+  async compileAndEnqueue(intent: TaskIntent, cycle: string = 'ZeroCircle_1'): Promise<string> {
     // 1. Load the requested workflow template
     const templatePath = path.join(this.templateDir, intent.templateName);
     let workflowStr = await fs.readFile(templatePath, 'utf-8');
@@ -33,7 +35,6 @@ export class ComfyUITaskCompiler {
     const payload = JSON.parse(JSON.stringify(workflow));
 
     // 3. Optional Interceptor: If provider is runninghub, local files must be uploaded FIRST.
-    // This is the AOT (Ahead of Time) preprocessing step.
     if (intent.provider === 'runninghub') {
       await this.interceptForRunningHub(intent.parameters);
     }
@@ -41,21 +42,16 @@ export class ComfyUITaskCompiler {
     // 4. Inject Parameters based on Node Title matching
     this.injectParameters(payload, intent.parameters);
 
-    // 5. Enqueue the compiled payload to the correct Inbox
-    const queue = new SpoolerQueue(this.baseQueueDir, intent.provider);
-    await queue.init();
-    
-    // Package inside our spooler generic envelope, or strictly save payload
-    // We will save the payload with metadata in the Spooler queue.
+    // 5. Register in Batch Manifest
     const compiledJob = {
       shotId: intent.shotId,
       template: intent.templateName,
       comfyui_payload: payload
     };
 
-    const uuid = await queue.enqueue(compiledJob);
-    console.log(`[Compiler] Compiled Shot ${intent.shotId} -> Queue: ${intent.provider}/${uuid}`);
-    return uuid;
+    const taskFile = await this.batchManager.registerTask(cycle, intent.provider, intent.shotId, compiledJob);
+    console.log(`[Compiler] Compiled Shot ${intent.shotId} -> Batch: ${path.basename(path.dirname(taskFile))}`);
+    return intent.shotId;
   }
 
   /**

@@ -4,7 +4,7 @@ import { StandardAPICompiler } from '../core/compiler/StandardAPICompiler';
 import { QueueWatcher } from '../executor/QueueWatcher';
 import { ComfyUILocalProvider } from '../executor/providers/ComfyUILocalProvider';
 import { RunningHubProvider } from '../executor/providers/RunningHubProvider';
-import { SeaDreamProvider } from '../executor/providers/SeaDreamProvider';
+import { VolcengineProvider } from '../executor/providers/VolcengineProvider';
 import { SiliconFlowProvider } from '../executor/providers/SiliconFlowProvider';
 import { MinimaxImageProvider } from '../executor/providers/MinimaxImageProvider';
 import { Job } from '../types/PromptSchema';
@@ -13,32 +13,25 @@ import * as path from 'path';
 import fs from 'fs/promises';
 
 export function registerQueueCommands(program: Command) {
-    const queueCmd = program.command('queue').description('Manage the file-based spooler queue');
+    const queueCmd = program.command('queue').description('Manage the file-based cycle and batch queue');
 
     queueCmd
         .command('compile <tasksJson>')
-        .description('Compile a business tasks.json into isolated atomic payloads in the pending queue')
+        .description('Compile a business tasks.json into isolated atomic payloads in the pending batch')
         .option('--provider <name>', 'Explicitly designate the target API provider(s)', (val, memo: string[]) => { memo.push(val); return memo; }, [])
+        .option('--cycle <name>', 'Designate the target Cycle (e.g. ZeroCircle_1, FirstCircle)', 'ZeroCircle_1')
+        .option('--file <filename>', 'Only compile tasks belonging to a specific source file')
         .action(async (tasksJson, options) => {
             const projectRoot = process.cwd();
             const configLoader = ConfigLoader.getInstance();
             await configLoader.loadConfig(projectRoot);
 
-            const providers: string[] = options.provider.length > 0 ? options.provider : ['seadream'];
+            const providers: string[] = options.provider.length > 0 ? options.provider : ['volcengine'];
+            const cycle = options.cycle;
+            const targetFile = options.file;
 
-            // ---- API Key 连通性检查 ----
-            for (const provider of providers) {
-                if (provider === 'comfyui_local' || provider === 'runninghub') continue;
-                try {
-                    configLoader.getResolvedApiKey(provider);
-                } catch (err: any) {
-                    console.warn(`[Queue] ⚠️ Provider "${provider}": ${err.message}`);
-                }
-            }
-            // ---- 检查结束 ----
-
-            console.log(`[Queue] Compiling ${tasksJson} for providers: ${providers.join(', ')}...`);
-            const queueDir = path.join(projectRoot, '.opsv-queue');
+            console.log(`[Queue] Compiling ${tasksJson} for providers: ${providers.join(', ')} | Cycle: ${cycle}`);
+            const queueDir = path.join(projectRoot, 'opsv-queue');
             const absoluteTaskPath = path.resolve(projectRoot, tasksJson);
             
             const taskPathExists = await fs.access(absoluteTaskPath).then(() => true).catch(() => false);
@@ -47,80 +40,61 @@ export function registerQueueCommands(program: Command) {
                  process.exit(1);
             }
             
-            const jobs: Job[] = JSON.parse(await fs.readFile(absoluteTaskPath, 'utf-8'));
+            let jobs: Job[] = JSON.parse(await fs.readFile(absoluteTaskPath, 'utf-8'));
+            
+            // Filter by file if requested
+            if (targetFile) {
+                jobs = jobs.filter(j => j.id.startsWith(targetFile.replace('.md', '')));
+                console.log(`[Queue] Filtered to ${jobs.length} jobs for source file: ${targetFile}`);
+            }
 
             for (const provider of providers) {
-                if (provider === 'comfyui_local' || provider === 'runninghub') {
-                    const compiler = new ComfyUITaskCompiler(queueDir, path.join(projectRoot, 'addons/comic-drama/workflows'));
-                    for (const job of jobs) {
-                        const parameters: Record<string, any> = {
-                            'input-prompt': job.prompt_en || job.payload.prompt
-                        };
-                        if (job.reference_images && job.reference_images.length > 0) {
-                            parameters['input-image1'] = job.reference_images[0];
-                        }
-                        
-                        await compiler.compileAndEnqueue({
-                            shotId: job.id,
-                            templateName: 'comic-drama-default.json',
-                            provider: provider,
-                            parameters
-                        });
-                    }
-                } else {
-                    const compiler = new StandardAPICompiler(queueDir);
-                    for (const job of jobs) {
-                        const jobType: 'image_generation' | 'video_generation' = job.type || 'image_generation' as any;
-                        const models = configLoader.findModelsByCapability(provider, jobType);
-                        
-                        if (models.length > 0) {
-                            await compiler.compileAndEnqueue({ provider, job });
-                        } else {
-                            console.warn(`[Queue] Skipping job ${job.id} for provider ${provider}: No capable model exists for type '${jobType}'.`);
-                        }
+                const compiler = new StandardAPICompiler(queueDir);
+                for (const job of jobs) {
+                    const jobType = job.type || 'image_generation';
+                    const models = configLoader.findModelsByCapability(provider, jobType as any);
+                    
+                    if (models.length > 0) {
+                        await compiler.compileAndEnqueue({ provider, job }, cycle);
+                    } else {
+                        console.warn(`[Queue] ⚠️ Skipping job ${job.id} for provider ${provider}: No model matches '${jobType}'`);
                     }
                 }
             }
-            console.log(`[Queue] All tasks compiled into atomic Spooler artifacts perfectly.`);
+            console.log(`[Queue] Compilation successful in ${queueDir}/${cycle}`);
         });
 
     queueCmd
         .command('run [providers...]')
-        .description('Start the queue watcher to process pending files')
-        .action(async (providers: string[]) => {
+        .description('Start the batch watcher for specific providers')
+        .option('--cycle <name>', 'Designate the target Cycle to watch', 'ZeroCircle_1')
+        .action(async (providers: string[], options) => {
             if (!providers || providers.length === 0) {
-                console.error(`[Queue] Please specify at least one provider (e.g. opsv queue run siliconflow seedance)`);
+                console.error(`[Queue] Please specify at least one provider (e.g. volcengine siliconflow)`);
                 process.exit(1);
             }
             
             const projectRoot = process.cwd();
-            const queueDir = path.join(projectRoot, '.opsv-queue');
+            const queueDir = path.join(projectRoot, 'opsv-queue');
+            const cycle = options.cycle;
             
             const watchers: QueueWatcher[] = [];
 
             for (const rawProvider of providers) {
                 const provider = rawProvider.toLowerCase();
-                console.log(`[Queue] Starting provider runner for: ${provider}`);
+                console.log(`[Queue] Starting watcher for [${provider}] in [${cycle}]`);
                 
-                if (provider === 'comfyui_local') {
-                    const localApi = new ComfyUILocalProvider();
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await localApi.processTask(task)));
-                } else if (provider === 'runninghub') {
-                    const apiKey = process.env.RUNNINGHUB_API_KEY || "Bearer YOUR_KEY_MOCK"; 
-                    const runningHubApi = new RunningHubProvider(apiKey);
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await runningHubApi.processTask(task)));
-                } else if (provider === 'seadream' || provider === 'seedance' || provider === 'volcengine') {
-                    const seedanceProviderName = 'seedance'; // Canonical name
-                    const seedanceApi = new SeaDreamProvider(seedanceProviderName);
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await seedanceApi.processTask(task)));
+                if (provider === 'volcengine' || provider === 'seadream' || provider === 'seedance') {
+                    const volcEngineApi = new VolcengineProvider();
+                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await volcEngineApi.processTask(task), 5000, cycle));
                 } else if (provider === 'siliconflow') {
                     const siliconFlowApi = new SiliconFlowProvider() as any;
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await siliconFlowApi.processTask(task)));
+                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await siliconFlowApi.processTask(task), 5000, cycle));
                 } else if (provider === 'minimax') {
                     const minimaxApi = new MinimaxImageProvider();
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await minimaxApi.processTask(task)));
+                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await minimaxApi.processTask(task), 5000, cycle));
                 } else {
-                    console.error(`[Queue] Unhandled provider wrapper yet: ${provider}`);
+                    console.error(`[Queue] Unhandled provider: ${provider}`);
                 }
             }
             

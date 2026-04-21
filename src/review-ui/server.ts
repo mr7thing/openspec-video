@@ -46,6 +46,9 @@ export class ReviewServer {
         app.use('/artifacts', express.static(
             path.join(this.projectRoot, 'artifacts')
         ));
+        app.use('/opsv-queue', express.static(
+            path.join(this.projectRoot, 'opsv-queue')
+        ));
 
         // Review UI 静态页面
         // 增加动态路径探测，兼容开发模式 (ts-node) 和 发布模式 (dist)
@@ -246,11 +249,13 @@ export class ReviewServer {
                 const stat = await fs.stat(entryPath);
 
                 if (stat.isDirectory()) {
-                    // 模型子目录
+                    // 模型子目录 (Legacy or sub-models)
                     await this.scanModelDir(entryPath, entry, batchId, groups, jobMeta);
                 } else if (stat.isFile() && /\.(png|jpg|webp|mp4|webm)$/i.test(entry)) {
-                    // 直接在批次根目录的图片/视频（旧规范）
-                    this.addCandidate(groups, entry, entryPath, 'default', batchId, jobMeta);
+                    // 资产文件 (v0.6.2 moves assets into Batch root)
+                    // The model name is derived from the parent folder of Batch dir (which is Provider name)
+                    const providerName = path.basename(path.dirname(dir));
+                    this.addCandidate(groups, entry, entryPath, providerName, batchId, jobMeta);
                 }
             }
         }
@@ -280,10 +285,8 @@ export class ReviewServer {
         batchId: string,
         jobMeta: Record<string, string>
     ): void {
-        // Match old convention: shot_01_draft_1.png
-        // Match new convention: shot_01_a8f9_1.png or shot_01_a8f9_1.mp4 
-        // regex: captures jobId, then _<number>.ext or _draft_<number>.ext
-        const match = fileName.match(/^(.+?)_(?:draft_)?\d+\.(png|jpg|webp|mp4|webm)$/i);
+        // Match: shot_01.png, shot_01_1.mp4, shot_01_draft_1.png etc.
+        const match = fileName.match(/^(.+?)(?:_(?:draft_)?\d+)?\.(png|jpg|webp|mp4|webm)$/i);
         if (!match) return;
 
         const jobId = match[1];

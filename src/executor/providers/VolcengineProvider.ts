@@ -4,28 +4,30 @@ import path from 'path';
 import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
 import { ErrorFactory } from '../../errors/OpsVError';
-import { SpoolerTask } from '../../core/queue/SpoolerQueue';
+// Removed SpoolerQueue dependency for v0.6.2 Batch Pipeline
 import { ConfigLoader } from '../../utils/configLoader';
 import { SequenceCounter } from '../../utils/sequenceCounter';
 
-export class SeaDreamProvider {
+export class VolcengineProvider {
     private providerName: string;
 
-    constructor(providerName: string = 'seedance') {
+    constructor(providerName: string = 'volcengine') {
         this.providerName = providerName;
     }
     
-    async processTask(task: SpoolerTask): Promise<boolean> {
+    async processTask(task: any): Promise<boolean> {
         const job = task.payload.job as Job;
-        if (!job) throw new Error("SeaDream/Seedance Provider requires task.payload.job");
+        if (!job) throw new Error("Volcengine Provider requires task.payload.job");
 
         const configLoader = ConfigLoader.getInstance();
         let apiKey: string;
         try {
+            // Priority 1: Config lookup
             apiKey = configLoader.getResolvedApiKey(this.providerName);
         } catch {
-            apiKey = process.env.VOLCENGINE_API_KEY || ''; // Usually VOLCENGINE takes precedence
-            if (!apiKey) throw new Error(`Missing API Key for provider ${this.providerName}`);
+            // Priority 2: Fallback to direct env
+            apiKey = process.env.VOLCENGINE_API_KEY || ''; 
+            if (!apiKey) throw new Error(`Missing API Key for provider ${this.providerName} (VOLCENGINE_API_KEY)`);
         }
 
         const jobType = job.type || 'image_generation';
@@ -37,14 +39,16 @@ export class SeaDreamProvider {
         const targetModelItem = models[0];
         const actualModel = targetModelItem.config.model;
         
-        // Generate output path dynamically
-        const projectRoot = process.cwd();
-        const batchName = job._meta?.batch || 'draft_1';
-        const sequence = await SequenceCounter.getInstance().getNextGlobalSequence(projectRoot, batchName, job.id);
-        const ext = jobType === 'video_generation' ? 'mp4' : 'png';
-        
-        const outputDir = path.join(projectRoot, 'artifacts', batchName, this.providerName);
-        const outputPath = path.join(outputDir, `${job.id}_${sequence}.${ext}`);
+        // Output path resolution (Note: V0.6.2 moves this to task.dir, but for now we keep compat if task.dir isn't set)
+        let outputPath = (task as any).outputPath;
+        if (!outputPath) {
+            const projectRoot = process.cwd();
+            const batchName = job._meta?.batch || 'draft_1';
+            const sequence = await SequenceCounter.getInstance().getNextGlobalSequence(projectRoot, batchName, job.id);
+            const ext = jobType === 'video_generation' ? 'mp4' : 'png';
+            const outputDir = path.join(projectRoot, 'artifacts', batchName, this.providerName);
+            outputPath = path.join(outputDir, `${job.id}_${sequence}.${ext}`);
+        }
 
         if (jobType === 'image_generation') {
             return await this.processImageTask(job, actualModel!, apiKey, task.uuid, outputPath);
@@ -56,7 +60,7 @@ export class SeaDreamProvider {
 
     private async processImageTask(job: Job, actualModel: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
         const endpoint = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
-        logger.logExecution(job.id, 'SEADREAM_START', { model: actualModel, uuid: uuid, outputPath });
+        logger.logExecution(job.id, 'VOLCENGINE_IMAGE_START', { model: actualModel, uuid, outputPath });
 
         const requestBody = this.buildImageRequestBody(job, actualModel);
         
@@ -72,13 +76,13 @@ export class SeaDreamProvider {
             );
         } catch (error: any) {
              const errorCode = error.code || 'ETIMEDOUT';
-             logger.warn(`SeaDream API network fail [${errorCode}]: ${error.message}`);
-             throw new Error(`SeaDream Network/Axios Error`);
+             logger.error(`Volcengine Image API fail [${errorCode}]: ${error.message} payload: ${JSON.stringify(error.response?.data)}`);
+             throw new Error(`Volcengine Image Network/API Error: ${error.message}`);
         }
 
         const data = submitRes.data as any;
         if (data.code !== undefined && data.code !== 0) {
-             console.error(`[SeaDreamProvider] API Error:`, JSON.stringify(data));
+             console.error(`[VolcengineProvider] API Error:`, JSON.stringify(data));
              throw new Error(`API Error [${data.code}]: ${data.message || 'No message'}`);
         }
 
@@ -93,14 +97,12 @@ export class SeaDreamProvider {
 
         if (imageEntries.length === 0 || (!imageEntries[0].image_url && !imageEntries[0].url)) {
             throw new Error(`Invalid API response: no image entries found`);
-        } // Ignore max-images multiple outputs for now to keep it deterministic Sequence = 1 output
+        }
 
         const url = imageEntries[0].image_url || imageEntries[0].url;
-        const dirname = path.dirname(outputPath);
-        await fs.mkdir(dirname, { recursive: true });
-
+        await this.ensureDir(path.dirname(outputPath));
         await this.downloadFile(url, outputPath);
-        logger.logExecution(job.id, 'SEADREAM_DOWNLOAD_SUCCESS', { path: outputPath });
+        logger.logExecution(job.id, 'VOLCENGINE_IMAGE_SUCCESS', { path: outputPath });
         return true;
     }
 
@@ -126,8 +128,6 @@ export class SeaDreamProvider {
 
     private async processVideoTask(job: Job, actualModel: string, apiKey: string, uuid: string, outputPath: string, apiUrl: string): Promise<boolean> {
         const payload = job.payload;
-        const globalSettings = (payload.global_settings || {}) as any;
-
         const requestBody: any = {
             model: actualModel,
             prompt: job.prompt_en || payload.prompt || "Cinematic video"
@@ -137,7 +137,7 @@ export class SeaDreamProvider {
             requestBody.image_url = await this.getBase64Image(job.reference_images[0]);
         }
 
-        logger.logExecution(job.id, 'SEEDANCE_VIDEO_SUBMIT', { model: actualModel, uuid, outputPath });
+        logger.logExecution(job.id, 'VOLCENGINE_VIDEO_SUBMIT', { model: actualModel, uuid, outputPath });
 
         let submitRes;
         try {
@@ -146,19 +146,21 @@ export class SeaDreamProvider {
                 timeout: 30000
             });
         } catch (error: any) {
-            throw new Error(`Seedance Video HTTP Error: ${error.message}`);
+            const apiErr = error.response?.data;
+            logger.error(`Volcengine Video Submit Error: ${JSON.stringify(apiErr || error.message)}`);
+            throw new Error(`Volcengine Video Submit Failed`);
         }
 
         const data = submitRes.data;
         if (data.code && data.code !== 0) {
-            throw new Error(`Seedance API Error [${data.code}]: ${data.message}`);
+            throw new Error(`Volcengine API Error [${data.code}]: ${data.message}`);
         }
 
-        const taskId = data.data?.task_id;
-        if (!taskId) throw new Error("Seedance did not return a task_id");
+        const taskId = data.data?.task_id || data.id; // Support multiple response styles
+        if (!taskId) throw new Error("Volcengine did not return a task_id");
 
         await this.pollVideoStatus(taskId, apiKey, outputPath);
-        logger.logExecution(job.id, 'SEEDANCE_SAVE_SUCCESS', { path: outputPath });
+        logger.logExecution(job.id, 'VOLCENGINE_VIDEO_SUCCESS', { path: outputPath });
         return true;
     }
 
@@ -169,21 +171,38 @@ export class SeaDreamProvider {
         while (retries < 120) {
             await new Promise(r => setTimeout(r, pollIntervalMs));
             retries++;
-            pollIntervalMs = Math.min(pollIntervalMs * 2, 30000);
-            const response = await axios.post(url, { task_id: taskId }, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-            });
-            const status = response.data?.data?.status;
-            if (status === 'success') {
-                const videoUrl = response.data?.data?.video_url;
-                if (!videoUrl) throw new Error(`Status success but no video URL.`);
-                await this.downloadFile(videoUrl, outputPath);
-                return;
-            } else if (status === 'failed') {
-                throw new Error(`Video generation failed: ${response.data?.data?.message}`);
+            // Jittered backoff is better, but simple linear/capped is fine here
+            pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000); 
+
+            try {
+                // Try POST first (standard V3)
+                const response = await axios.post(url, { task_id: taskId }, {
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+                });
+                
+                const data = response.data?.data || response.data;
+                const status = data.status;
+
+                if (status === 'success' || status === 'succeeded' || status === 'completed') {
+                    const videoUrl = data.video_url;
+                    if (!videoUrl) throw new Error(`Status success but no video URL.`);
+                    await this.ensureDir(path.dirname(outputPath));
+                    await this.downloadFile(videoUrl, outputPath);
+                    return;
+                } else if (status === 'failed' || status === 'error') {
+                    throw new Error(`Video generation failed: ${data.message || data.error_message || 'Unknown error'}`);
+                }
+            } catch (err: any) {
+                // If it's a specific generation error, bubble it up. Otherwise keep polling if it's network/temporary
+                if (err.message.includes('failed')) throw err;
+                logger.warn(`Polling attempt ${retries} error: ${err.message}`);
             }
         }
-        throw new Error(`Polling timeout for Seedance task ${taskId}`);
+        throw new Error(`Polling timeout for Volcengine task ${taskId}`);
+    }
+
+    private async ensureDir(dir: string) {
+        await fs.mkdir(dir, { recursive: true });
     }
 
     private async getBase64Image(filePath: string): Promise<string> {
@@ -196,12 +215,10 @@ export class SeaDreamProvider {
     }
 
     private async downloadFile(url: string, outputPath: string): Promise<void> {
-        const response = await axios({ method: 'GET', url: url, responseType: 'stream', timeout: 60000 });
+        const response = await axios({ method: 'GET', url: url, responseType: 'stream', timeout: 600000 });
         if (response.status !== 200) {
             throw new Error(`Download failed with status ${response.status}: ${url}`);
         }
-        const dirname = path.dirname(outputPath);
-        await fs.mkdir(dirname, { recursive: true });
         const writer = require('fs').createWriteStream(outputPath);
         response.data.pipe(writer);
         return new Promise((resolve, reject) => {
@@ -211,3 +228,4 @@ export class SeaDreamProvider {
         });
     }
 }
+

@@ -45,7 +45,7 @@ providers:
   # ==========================================
   # 火山引擎 (Volcengine Ark)
   # ==========================================
-  seedance:
+  volcengine:
     required_env: ["VOLCENGINE_API_KEY"]
     models:
       seadream-5.0-lite:
@@ -57,7 +57,7 @@ providers:
         defaults:
           quality: "2K"
           aspect_ratio: "16:9"
-          max_images: 1
+          max_images: 4
           steps: 30
           cfg_scale: 7.5
           negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
