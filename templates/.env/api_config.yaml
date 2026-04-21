@@ -1,190 +1,126 @@
-# OpsV 0.5.x 多模态视频引擎调度配置文件
-# 该文件定义了目前支持的生成引擎的能力级 (Capability Boundary) 与默认参数。
-# 调度器 (Dispatcher) 在发出请求前将严格根据下表映射参数并执行优雅降级 (Graceful Degradation)。
+# OpsV 0.6.2 多模态资产生态系统配置文件
+# 该文件定义了资产生成流水线的供应商及能力。基于 `job.type` 实现精准动态路由。
+# 详情参考：https://github.com/Uncle7/OpenSpec-Video
 
-models:
+providers:
   # ==========================================
-  # 图像模型：火山引擎 SeaDream 5.0 Lite
-  # CLI: opsv gen-image -m seadream-5.0-lite
+  # 硅基流动 (SiliconFlow)
   # ==========================================
-  seadream-5.0-lite:
-    provider: "seadream"
-    type: "image"
-    enable: true
-    # 实际模型/Endpoint ID (对齐火山方舟 V3)
-    model: "doubao-seedream-5-0-260128"
-    # 关联的 CLI 命令
-    gen_command: "gen-image"
-    # 所需 API Key
-    required_env: ["VOLCENGINE_API_KEY"]
-    # 物理限制与能力级
-    features: ["txt2img", "img2img", "negative_prompt", "aspect_ratio"]
-    
-    defaults:
-      quality: "2K"
-      aspect_ratio: "16:9"
-      max_images: 1
-      steps: 30
-      cfg_scale: 7.5
-      negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
-    
-    max_size: { width: 1280, height: 720 }
-
-  # ==========================================
-  # 图像模型：SiliconFlow Qwen-Image (多模态文生图)
-  # ==========================================
-  qwen-image:
-    provider: "siliconflow"
-    type: "image"
-    enable: true
-    model: "Qwen/Qwen-Image"
-    gen_command: "gen-image"
+  siliconflow:
     required_env: ["SILICONFLOW_API_KEY"]
-    features: ["txt2img", "aspect_ratio"]
-    defaults:
-      quality: "1024x1024"
-      aspect_ratio: "1:1"
+    models:
+      qwen-image:
+        enable: true
+        type: "image_generation"
+        input: ["text"]
+        output: "image"
+        model: "Qwen/Qwen-Image"
+        defaults:
+          quality: "1024x1024"
+          aspect_ratio: "1:1"
+
+      qwen-image-edit-2509:
+        enable: true
+        type: "image_generation"
+        input: ["text", "image"]
+        output: "image"
+        model: "Qwen/Qwen-Image-Edit-2509"
+        defaults:
+          quality: "original"
+          aspect_ratio: "original"
+
+      wan2.2-i2v:
+        enable: false
+        type: "video_generation"
+        input: ["text", "image"]
+        output: "video"
+        model: "wan-ai/Wan2.1-T2V-14B"
+        api_url: "https://api.siliconflow.cn/v1/video/submit"
+        api_status_url: "https://api.siliconflow.cn/v1/video/status"
+        defaults:
+          size: "1280x720"
+          fps: 24
+          duration: 5
 
   # ==========================================
-  # 图像模型：SiliconFlow Qwen-Image-Edit (指令式图像编辑)
+  # 火山引擎 (Volcengine Ark)
   # ==========================================
-  qwen-image-edit-2509:
-    provider: "siliconflow"
-    type: "image"
-    enable: true
-    model: "Qwen/Qwen-Image-Edit-2509"
-    gen_command: "gen-image"
-    required_env: ["SILICONFLOW_API_KEY"]
-    features: ["img2img", "edit"]
-    # 编辑模型强制要求参考图
-    requires_reference: true
-    defaults:
-      quality: "original"
-      aspect_ratio: "original"
-
-  # ==========================================
-  # 视频模型：SiliconFlow Wan 2.1
-  # CLI: opsv gen-video -m wan2.2-i2v
-  # ==========================================
-  wan2.2-i2v:
-    provider: "siliconflow"
-    type: "video"
-    enable: false
-    model: "wan-ai/Wan2.1-T2V-14B"
-    api_url: "https://api.siliconflow.cn/v1/video/submit"
-    api_status_url: "https://api.siliconflow.cn/v1/video/status"
-    # 关联的 CLI 命令
-    gen_command: "gen-video"
-    # 所需 API Key
-    required_env: ["SILICONFLOW_API_KEY"]
-    
-    defaults:
-      # 默认视频分辨率
-      size: "1280x720"
-      # 帧率
-      fps: 24
-      # 时长 (秒)
-      duration: 5
-    
-    # 灵活性支持
-    supports_first_image: true
-    supports_middle_image: false
-    supports_last_image: false
-    supports_reference_images: false
-    max_reference_images: 0
-    supports_audio: false
-    supports_video_ref: false
-
-  # ==========================================
-  # 视频模型：Seedance 1.5 Pro (火山引擎)
-  # CLI: opsv gen-video -m seedance-1.5-pro
-  # ==========================================
-  seedance-1.5-pro:
-    provider: "seedance"
-    type: "video"
-    enable: true
-    model: "doubao-seedance-1-5-pro"
-    api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
-    gen_command: "gen-video"
+  seedance:
     required_env: ["VOLCENGINE_API_KEY"]
-    
-    quality_map:
-      "480p": "480p"
-      "720p": "720p"
-      "1080p": "1080p"
-    defaults:
-      quality: "720p"
-      aspect_ratio: "16:9"
-      duration: 5
-      fps: 24
-      sound: true
-    
-    supports_first_image: true
-    supports_last_image: true
-    supports_reference_images: true
-    max_reference_images: 9
+    models:
+      seadream-5.0-lite:
+        enable: true
+        type: "image_generation"
+        input: ["text"]
+        output: "image"
+        model: "doubao-seedream-5-0-260128"
+        defaults:
+          quality: "2K"
+          aspect_ratio: "16:9"
+          max_images: 1
+          steps: 30
+          cfg_scale: 7.5
+          negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
+
+      seedance-1.5-pro:
+        enable: true
+        type: "video_generation"
+        input: ["text", "image"]
+        output: "video"
+        model: "doubao-seedance-1-5-pro"
+        api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
+        quality_map:
+          "480p": "480p"
+          "720p": "720p"
+          "1080p": "1080p"
+        defaults:
+          quality: "720p"
+          aspect_ratio: "16:9"
+          duration: 5
+          fps: 24
+          sound: true
+        max_reference_images: 9
+
+      seedance-2.0-fast:
+        enable: true
+        type: "video_generation"
+        input: ["text", "image"]
+        output: "video"
+        model: "doubao-video-v2-fast"
+        api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
+        defaults:
+          quality: "720p"
+          aspect_ratio: "16:9"
+          duration: 5
+          fps: 24
+          sound: true
+        max_reference_images: 10
 
   # ==========================================
-  # 视频模型：Seedance 2.0 (豆包视频生成 V2) - 极速模式
-  # CLI: opsv gen-video -m seedance-2.0-fast
+  # MiniMax 稀宇科技
   # ==========================================
-  seedance-2.0-fast:
-    provider: "seedance"
-    type: "video"
-    enable: true
-    model: "doubao-video-v2-fast" # 豆包 V2 Fast 核心端点
-    api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
-    gen_command: "gen-video"
-    required_env: ["VOLCENGINE_API_KEY"]
-    
-    defaults:
-      quality: "720p"
-      aspect_ratio: "16:9"
-      duration: 5
-      fps: 24
-      sound: true
-    
-    supports_first_image: true
-    supports_last_image: true
-    supports_reference_images: true
-    max_reference_images: 10
-    supports_audio: true
-    supports_video_ref: true
-
-  # ==========================================
-  # 图像模型：MiniMax Image 01
-  # ==========================================
-  minimax-image-01:
-    provider: "minimax"
-    type: "image"
-    enable: false
-    model: "image-01"
-    api_url: "https://api.minimaxi.com/v1/image_generation"
-    gen_command: "gen-image"
+  minimax:
     required_env: ["MINIMAX_API_KEY"]
-    features: ["txt2img", "img2img", "aspect_ratio"]
-    defaults:
-      aspect_ratio: "16:9"
+    models:
+      minimax-image-01:
+        enable: false
+        type: "image_generation"
+        input: ["text", "image"]
+        output: "image"
+        model: "image-01"
+        api_url: "https://api.minimaxi.com/v1/image_generation"
+        defaults:
+          aspect_ratio: "16:9"
 
-  # ==========================================
-  # 视频模型：MiniMax Hailuo
-  # ==========================================
-  minimax-video-01:
-    provider: "minimax"
-    type: "video"
-    enable: false
-    model: "MiniMax-Hailuo-2.3"
-    api_url: "https://api.minimaxi.com/v1/video_generation"
-    api_status_url: "https://api.minimaxi.com/v1/query/video_generation"
-    gen_command: "gen-video"
-    required_env: ["MINIMAX_API_KEY"]
-    defaults:
-      resolution: "1080P"
-      duration: 5
-    supports_first_image: true
-    supports_middle_image: false
-    supports_last_image: true
-    supports_reference_images: true
-    max_reference_images: 1
-    supports_audio: false
-    supports_video_ref: false
+      minimax-video-01:
+        enable: false
+        type: "video_generation"
+        input: ["text", "image"]
+        output: "video"
+        model: "MiniMax-Hailuo-2.3"
+        api_url: "https://api.minimaxi.com/v1/video_generation"
+        api_status_url: "https://api.minimaxi.com/v1/query/video_generation"
+        defaults:
+          resolution: "1080P"
+          duration: 5
+        max_reference_images: 1

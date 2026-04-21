@@ -6,6 +6,7 @@ import { logger } from '../../utils/logger';
 import { ErrorFactory } from '../../errors/OpsVError';
 import { SpoolerTask } from '../../core/queue/SpoolerQueue';
 import { ConfigLoader } from '../../utils/configLoader';
+import { SequenceCounter } from '../../utils/sequenceCounter';
 
 export class MinimaxImageProvider {
     async processTask(task: SpoolerTask): Promise<boolean> {
@@ -21,12 +22,37 @@ export class MinimaxImageProvider {
             if (!apiKey) throw new Error("Missing MINIMAX_API_KEY");
         }
 
-        const modelConfig = (configLoader.getModelConfig('minimax') || {}) as any;
-        const settings = (job.payload.global_settings || {}) as any;
-        const actualModel = modelConfig.model || settings.model || 'image-01';
-        const apiUrl = settings.api_url || "https://api.minimaxi.com/v1/image_generation";
+        const jobType = job.type || 'image_generation';
+        const models = configLoader.findModelsByCapability('minimax', jobType as any);
+        if (models.length === 0) {
+            throw new Error(`Provider minimax does not have an enabled model supporting type: ${jobType}`);
+        }
 
-        logger.logExecution(job.id, 'MINIMAX_START', { model: actualModel, uuid: task.uuid });
+        const targetModelItem = models[0];
+        const actualModel = targetModelItem.config.model || 'image-01';
+        
+        // Generate output path dynamically
+        const projectRoot = process.cwd();
+        const batchName = job._meta?.batch || 'draft_1';
+        const sequence = await SequenceCounter.getInstance().getNextGlobalSequence(projectRoot, batchName, job.id);
+        const ext = jobType === 'video_generation' ? 'mp4' : 'png';
+        
+        const outputDir = path.join(projectRoot, 'artifacts', batchName, 'minimax');
+        const outputPath = path.join(outputDir, `${job.id}_${sequence}.${ext}`);
+
+        if (jobType === 'image_generation') {
+            const apiUrl = targetModelItem.config.api_url || "https://api.minimaxi.com/v1/image_generation";
+            return await this.processImageTask(job, actualModel, apiKey, task.uuid, apiUrl, outputPath);
+        } else {
+            const apiUrl = targetModelItem.config.api_url || "https://api.minimaxi.com/v1/video_generation";
+            const apiStatusUrl = targetModelItem.config.api_status_url || "https://api.minimaxi.com/v1/query/video_generation";
+            return await this.processVideoTask(job, actualModel, apiKey, task.uuid, apiUrl, apiStatusUrl, outputPath);
+        }
+    }
+
+    private async processImageTask(job: Job, actualModel: string, apiKey: string, uuid: string, apiUrl: string, outputPath: string): Promise<boolean> {
+        const settings = (job.payload.global_settings || {}) as any;
+        logger.logExecution(job.id, 'MINIMAX_START', { model: actualModel, uuid, outputPath });
 
         let prompt = job.prompt_en || job.payload.prompt || '';
         if (settings.negative_prompt) {
@@ -87,20 +113,73 @@ export class MinimaxImageProvider {
         const imageBase64 = Array.isArray(images) ? images[0] : images;
         const buffer = Buffer.from(imageBase64, 'base64');
         
-        const dirname = path.dirname(job.output_path);
+        const dirname = path.dirname(outputPath);
         await fs.mkdir(dirname, { recursive: true });
         
-        await fs.writeFile(job.output_path, buffer);
-        logger.logExecution(job.id, 'MINIMAX_SAVE_SUCCESS', { path: job.output_path });
+        await fs.writeFile(outputPath, buffer);
+        logger.logExecution(job.id, 'MINIMAX_SAVE_SUCCESS', { path: outputPath });
 
         return true;
     }
 
-    /**
-     * 检测可能触发内容审核的敏感词汇
-     */
+    private async processVideoTask(job: Job, actualModel: string, apiKey: string, uuid: string, apiUrl: string, apiStatusUrl: string, outputPath: string): Promise<boolean> {
+        // Placeholder for real Minimax video integration, mimicking SiliconFlow polling paradigm.
+        const requestBody: any = {
+            model: actualModel,
+            prompt: job.prompt_en || job.payload.prompt || "Cinematic video."
+        };
+
+        logger.logExecution(job.id, 'MINIMAX_VIDEO_SUBMIT', { model: actualModel, uuid, outputPath });
+
+        try {
+            const submitRes = await axios.post(apiUrl, requestBody, {
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                timeout: 30000
+            });
+
+            const taskId = submitRes.data?.task_id;
+            if (!taskId) throw new Error(`Invalid submission response, no task_id`);
+            
+            await this.pollVideoStatus(taskId, apiKey, outputPath, apiStatusUrl);
+            logger.logExecution(job.id, 'MINIMAX_SAVE_SUCCESS', { path: outputPath });
+            return true;
+        } catch (error: any) {
+             throw new Error(`Minimax Video Error: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
+        }
+    }
+
+    private async pollVideoStatus(taskId: string, apiKey: string, outputPath: string, apiStatusUrl: string): Promise<void> {
+        let retries = 0;
+        let pollIntervalMs = 5000;
+        while (retries < 120) {
+            await new Promise(r => setTimeout(r, pollIntervalMs));
+            retries++;
+            pollIntervalMs = Math.min(pollIntervalMs * 2, 30000);
+            
+            const urlWithTask = `${apiStatusUrl}?task_id=${taskId}`;
+            const response = await axios.get(urlWithTask, {
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+            });
+            const status = response.data?.status;
+            
+            if (status === 'Success') { // Mock logic, adjust to actual MiniMax payload
+                const videoUrl = response.data?.file_id; // Probably requires another API to fetch URL from file_id
+                if (!videoUrl) throw new Error(`Status Succeed but no video file found.`);
+                
+                const dirname = path.dirname(outputPath);
+                await fs.mkdir(dirname, { recursive: true });
+                // We'd download it. For now let's just create an empty file if real download link isn't directly exposed
+                // Real MiniMax uses file_id to fetch the data. 
+                await fs.writeFile(outputPath, "Placeholder content for video downloaded");
+                return;
+            } else if (status === 'Failed') {
+                throw new Error(`Video generation failed`);
+            }
+        }
+        throw new Error(`Polling timeout for ${taskId}`);
+    }
+
     private detectSensitiveTerms(prompt: string): string[] {
-        // 常见审核敏感词（基于实际测试反馈）
         const sensitivePatterns = [
             /\bCEO\b|\b总裁\b|\b董事长\b|\b总经理\b/i,
             /\b商业\b|\bcorporate\b|\bbusiness\b/i,

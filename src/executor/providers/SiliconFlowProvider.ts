@@ -5,6 +5,7 @@ import { Job } from '../../types/PromptSchema';
 import { logger } from '../../utils/logger';
 import { SpoolerTask } from '../../core/queue/SpoolerQueue';
 import { ConfigLoader } from '../../utils/configLoader';
+import { SequenceCounter } from '../../utils/sequenceCounter';
 
 export class SiliconFlowProvider {
     async processTask(task: SpoolerTask): Promise<boolean> {
@@ -20,19 +21,32 @@ export class SiliconFlowProvider {
             if (!apiKey) throw new Error("Missing SILICONFLOW_API_KEY");
         }
 
-        const modelConfig = (configLoader.getModelConfig('siliconflow') || {}) as any;
-        const settings = (job.payload.global_settings || {}) as any;
-        const actualModel = modelConfig.model || settings.model || 'black-forest-labs/FLUX.1-schnell';
-        const type = modelConfig.type || 'image'; // could be 'video'
+        const jobType = job.type || 'image_generation';
+        const models = configLoader.findModelsByCapability('siliconflow', jobType as any);
+        if (models.length === 0) {
+            throw new Error(`SiliconFlow Provider does not have an enabled model supporting type: ${jobType}`);
+        }
 
-        if (type === 'video') {
-            return await this.processVideoTask(job, actualModel, apiKey, task.uuid);
+        const targetModelItem = models[0];
+        const actualModel = targetModelItem.config.model || 'black-forest-labs/FLUX.1-schnell';
+        
+        // Generate output path dynamically
+        const projectRoot = process.cwd();
+        const batchName = job._meta?.batch || 'draft_1';
+        const sequence = await SequenceCounter.getInstance().getNextGlobalSequence(projectRoot, batchName, job.id);
+        const ext = jobType === 'video_generation' ? 'mp4' : 'png';
+        
+        const outputDir = path.join(projectRoot, 'artifacts', batchName, 'siliconflow');
+        const outputPath = path.join(outputDir, `${job.id}_${sequence}.${ext}`);
+
+        if (jobType === 'video_generation') {
+            return await this.processVideoTask(job, actualModel, apiKey, task.uuid, outputPath);
         } else {
-            return await this.processImageTask(job, actualModel, apiKey, task.uuid);
+            return await this.processImageTask(job, actualModel, apiKey, task.uuid, outputPath);
         }
     }
 
-    private async processImageTask(job: Job, modelName: string, apiKey: string, uuid: string): Promise<boolean> {
+    private async processImageTask(job: Job, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
         const url = 'https://api.siliconflow.cn/v1/images/generations';
         const requestBody: any = {
             model: modelName,
@@ -47,7 +61,7 @@ export class SiliconFlowProvider {
             requestBody.image = await this.getBase64Image(job.reference_images[0]);
         }
 
-        logger.logExecution(job.id, 'SILICONFLOW_IMAGE_START', { model: modelName, uuid });
+        logger.logExecution(job.id, 'SILICONFLOW_IMAGE_START', { model: modelName, uuid, outputPath });
 
         try {
             const response = await axios.post(url, requestBody, {
@@ -56,15 +70,15 @@ export class SiliconFlowProvider {
             });
             const imageUrl = response.data.images?.[0]?.url;
             if (!imageUrl) throw new Error(`Invalid response: no image URL found`);
-            await this.downloadFile(imageUrl, job.output_path);
-            logger.logExecution(job.id, 'SILICONFLOW_SAVE_SUCCESS', { path: job.output_path });
+            await this.downloadFile(imageUrl, outputPath);
+            logger.logExecution(job.id, 'SILICONFLOW_SAVE_SUCCESS', { path: outputPath });
             return true;
         } catch (error: any) {
             throw new Error(`SiliconFlow API Error: ${error.message}`);
         }
     }
 
-    private async processVideoTask(job: Job, modelName: string, apiKey: string, uuid: string): Promise<boolean> {
+    private async processVideoTask(job: Job, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
         const url = 'https://api.siliconflow.cn/v1/video/submit';
         const requestBody: any = {
             model: modelName,
@@ -76,7 +90,7 @@ export class SiliconFlowProvider {
             requestBody.image = await this.getBase64Image(job.reference_images[0]);
         }
 
-        logger.logExecution(job.id, 'SILICONFLOW_VIDEO_SUBMIT', { model: modelName, uuid });
+        logger.logExecution(job.id, 'SILICONFLOW_VIDEO_SUBMIT', { model: modelName, uuid, outputPath });
 
         try {
             const submitRes = await axios.post(url, requestBody, {
@@ -87,8 +101,8 @@ export class SiliconFlowProvider {
             const requestId = submitRes.data?.requestId;
             if (!requestId) throw new Error(`Invalid submission response`);
             
-            await this.pollVideoStatus(requestId, apiKey, job.output_path);
-            logger.logExecution(job.id, 'SILICONFLOW_SAVE_SUCCESS', { path: job.output_path });
+            await this.pollVideoStatus(requestId, apiKey, outputPath);
+            logger.logExecution(job.id, 'SILICONFLOW_SAVE_SUCCESS', { path: outputPath });
             return true;
         } catch (error: any) {
             throw new Error(`SiliconFlow Video Error: ${error.message}`);

@@ -24,13 +24,8 @@
   "files": [
     "dist",
     "templates",
-    "extension",
-    "docs",
     "README.md",
-    "LICENSE",
-    "MANUAL.md",
-    "IMPLEMENTATION-0.3.3.md",
-    "ROADMAP-0.3.3.md"
+    "LICENSE"
   ],
   "keywords": [
     "videospec",

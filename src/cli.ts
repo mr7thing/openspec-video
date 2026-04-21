@@ -5,7 +5,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { registerDaemonCommands } from './commands/daemon';
 import { registerInitCommand } from './commands/init';
-import { registerGenerateCommand } from './commands/generate';
+import { registerImagenCommand } from './commands/imagen';
 import { registerReviewCommand } from './commands/review';
 import { registerAnimateCommand } from './commands/animate';
 import { registerDepsCommand } from './commands/deps';
@@ -36,12 +36,12 @@ const program = new Command();
 program
     .name('opsv')
     .version(VERSION)
-    .description('OpenSpec-Video Automation CLI');
+    .description('OpenSpec-Video Automation CLI (v0.6.2)');
 
 // 注册所有拆分的子命令
 registerDaemonCommands(program, VERSION);
 registerInitCommand(program, VERSION);
-registerGenerateCommand(program, VERSION);
+registerImagenCommand(program, VERSION);
 registerReviewCommand(program);
 registerAnimateCommand(program, VERSION);
 registerDepsCommand(program);

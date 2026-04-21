@@ -79,7 +79,7 @@ export const JobSchema = z.object({
     payload: PromptPayloadSchema,
     // 参考图绝对路径数组
     reference_images: z.array(z.string()).optional(),
-    output_path: z.string(),
+    output_path: z.string().optional(),
     _meta: JobMetaSchema.optional(),
     _skip: z.boolean().optional(),
     image_config: ImageConfigSchema.optional(),

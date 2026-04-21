@@ -322,7 +322,7 @@
     </div>
 
     <div class="preview-overlay" id="previewOverlay" onclick="this.classList.remove('active')">
-        <img id="previewImg">
+        <!-- JS will inject img or video here -->
     </div>
 
     <script>
@@ -397,8 +397,11 @@
                                 return `
                                     <div class="image-card ${isSelected ? 'selected' : ''}" 
                                          onclick="toggleSelect('${jobId}', '${img.path.replace(/\\/g, '\\\\')}')"
-                                         ondblclick="previewImage('/${img.relativePath}')">
-                                        <img src="/${img.relativePath}" loading="lazy">
+                                         ondblclick="previewMedia('/${img.relativePath}')">
+                                        ${img.relativePath.match(/\.(mp4|webm)$/i) 
+                                            ? \`<video src="/\${img.relativePath}" autoplay loop muted style="width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;"></video>\` 
+                                            : \`<img src="/\${img.relativePath}" loading="lazy">\`
+                                        }
                                         <div class="selection-icon">✓</div>
                                         <div class="image-info">
                                             <span class="model">${img.model}</span>
@@ -438,9 +441,14 @@
                 .replace(/^> (.*)/gm, '<blockquote>$1</blockquote>');
         }
 
-        function previewImage(src) {
-            document.getElementById('previewImg').src = src;
-            document.getElementById('previewOverlay').classList.add('active');
+        function previewMedia(src) {
+            const overlay = document.getElementById('previewOverlay');
+            if (src.match(/\.(mp4|webm)$/i)) {
+                overlay.innerHTML = \`<video src="\${src}" controls autoplay loop style="max-width: 95vw; max-height: 95vh;"></video>\`;
+            } else {
+                overlay.innerHTML = \`<img src="\${src}" style="max-width: 95vw; max-height: 95vh; object-fit: contain;">\`;
+            }
+            overlay.classList.add('active');
         }
 
         let currentReviewMode = 'approve';

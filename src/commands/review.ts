@@ -42,7 +42,7 @@ async function resolveBatchDirs(projectRoot: string, batchInput: string): Promis
     if (!artifactsExists) return [];
 
     const allBatches = (await fs.readdir(artifactsDir))
-        .filter(f => f.startsWith('drafts_'))
+        .filter(f => f.startsWith('draft_'))
         .sort((a, b) => {
             const aNum = parseDraftNum(a);
             const bNum = parseDraftNum(b);
@@ -52,22 +52,22 @@ async function resolveBatchDirs(projectRoot: string, batchInput: string): Promis
 /**
  * 解析 draft 目录名称中的序号
  * 支持:
- *   drafts_5       → 5
- *   drafts_L1_1    → layer=1, seq=1
- *   drafts_L2_3    → layer=2, seq=3
+ *   draft_5       → 5
+ *   draft_L1_1    → layer=1, seq=1
+ *   draft_L2_3    → layer=2, seq=3
  * 排序策略: 先按 layer 升序, 再按 seq 升序 (在 review 场景下保持历史顺序)
  */
 function parseDraftNum(name: string): number {
-    // 分层格式: drafts_L{n}_{m}
-    const layerMatch = name.match(/^drafts_L(\d+)_(\d+)$/);
+    // 分层格式: draft_L{n}_{m}
+    const layerMatch = name.match(/^draft_L(\d+)_(\d+)$/);
     if (layerMatch) {
         const layer = parseInt(layerMatch[1], 10);
         const seq = parseInt(layerMatch[2], 10);
         // 编码为一个大数: layer * 10000 + seq
         return layer * 10000 + seq;
     }
-    // 扁平格式: drafts_{n}
-    return parseInt(name.replace('drafts_', ''), 10) || 0;
+    // 扁平格式: draft_{n}
+    return parseInt(name.replace('draft_', ''), 10) || 0;
 }
 
     if (allBatches.length === 0) return [];

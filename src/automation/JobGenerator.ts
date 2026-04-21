@@ -134,7 +134,7 @@ export class JobGenerator {
         if (options.skipDependsLayer) {
             // ---- 扁平模式：所有 job 写入单个 jobs.json ----
             this.batchIndex = await this._nextDraftIndex();
-            this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_${this.batchIndex}`);
+            this.currentDraftDir = path.join(this.projectRoot, `artifacts/draft_${this.batchIndex}`);
             await fs.mkdir(this.currentDraftDir, { recursive: true });
 
             await fs.writeFile(
@@ -155,14 +155,12 @@ export class JobGenerator {
                 if (layerJobs.length === 0) continue;
 
                 this.batchIndex = await this._nextDraftIndex(layerNum);
-                this.currentDraftDir = path.join(this.projectRoot, `artifacts/drafts_L${layerNum}_${this.batchIndex}`);
+                this.currentDraftDir = path.join(this.projectRoot, `artifacts/draft_L${layerNum}_${this.batchIndex}`);
                 await fs.mkdir(this.currentDraftDir, { recursive: true });
 
-                // output_path 在 processFile() 时 currentDraftDir 尚未设置，需要在此修正
                 for (const job of layerJobs) {
-                    job.output_path = await this.nextOutputPath(job.id.replace(/[^\w]/g, '_'));
                     if (!job._meta) job._meta = {};
-                    job._meta.batch = `batch_${this.batchIndex}`;
+                    job._meta.batch = `draft_L${layerNum}_${this.batchIndex}`;
                 }
 
                 const filename = `layer_${layerNum}.json`;
@@ -203,7 +201,7 @@ export class JobGenerator {
      */
     private async _nextDraftIndex(layerHint?: number): Promise<number> {
         let idx = 1;
-        const prefix = layerHint ? `drafts_L${layerHint}_` : 'drafts_';
+        const prefix = layerHint ? `draft_L${layerHint}_` : 'draft_';
         while (await fs.access(path.join(this.projectRoot, `artifacts/${prefix}${idx}`)).then(() => true).catch(() => false)) {
             idx++;
         }
@@ -287,8 +285,8 @@ export class JobGenerator {
         const ar = globalConfig.aspect_ratio || '16:9';
         const res = globalConfig.resolution || '1920x1080';
 
-        // ---- 输出路径 ----
-        const outputPath = await this.nextOutputPath(id);
+        // ---- 移除硬编码 output_path ----
+        // output_path 交由 provider queue run 阶段自动确定
 
         // ---- 构建 Job ----
         const payload: PromptPayload = {
@@ -303,8 +301,7 @@ export class JobGenerator {
             prompt_en: yamlPrompt || undefined,
             payload,
             reference_images: attachments.length > 0 ? attachments : undefined,
-            output_path: outputPath,
-            _meta: { batch: `batch_${this.batchIndex}`, source: filePath },
+            _meta: { batch: `draft_${this.batchIndex}`, source: filePath },
         };
 
         return [job];
@@ -382,8 +379,8 @@ export class JobGenerator {
             let promptEn = this.cleanMarkdown(expandedText);
             if (stylePostfix) promptEn += `, ${stylePostfix}`;
 
-            // ---- 输出路径 ----
-            const outputPath = await this.nextOutputPath(shot.id);
+            // ---- 构建 Job ----
+            // 移除 output_path，由 provider 自行根据全局计数命名
 
             const payload: PromptPayload = {
                 prompt: `[分镜: ${shot.id} - ${shot.title}]\n${shot.body}`,
@@ -396,8 +393,7 @@ export class JobGenerator {
                 prompt_en: promptEn,
                 payload,
                 reference_images: allAttachments.length > 0 ? allAttachments : undefined,
-                output_path: outputPath,
-                _meta: { batch: `batch_${this.batchIndex}`, source: filePath },
+                _meta: { batch: `draft_${this.batchIndex}`, source: filePath },
             };
 
             jobs.push(job);
@@ -452,19 +448,6 @@ export class JobGenerator {
     // ================================================================
     // 工具方法
     // ================================================================
-
-    /**
-     * 生成不重复的输出路径
-     */
-    private async nextOutputPath(baseName: string): Promise<string> {
-        let counter = 1;
-        let outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
-        while (await fs.access(outputPath).then(() => true).catch(() => false)) {
-            counter++;
-            outputPath = path.join(this.currentDraftDir, `${baseName}_draft_${counter}.png`);
-        }
-        return outputPath;
-    }
 
     private cleanMarkdown(text: string): string {
         return text

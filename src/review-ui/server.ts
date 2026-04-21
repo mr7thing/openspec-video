@@ -248,8 +248,8 @@ export class ReviewServer {
                 if (stat.isDirectory()) {
                     // 模型子目录
                     await this.scanModelDir(entryPath, entry, batchId, groups, jobMeta);
-                } else if (stat.isFile() && /\.(png|jpg|webp)$/i.test(entry)) {
-                    // 直接在批次根目录的图片
+                } else if (stat.isFile() && /\.(png|jpg|webp|mp4|webm)$/i.test(entry)) {
+                    // 直接在批次根目录的图片/视频（旧规范）
                     this.addCandidate(groups, entry, entryPath, 'default', batchId, jobMeta);
                 }
             }
@@ -265,7 +265,7 @@ export class ReviewServer {
         groups: Map<string, CandidateGroup>,
         jobMeta: Record<string, string>
     ): Promise<void> {
-        const files = (await fs.readdir(dirPath)).filter(f => /\.(png|jpg|webp)$/i.test(f));
+        const files = (await fs.readdir(dirPath)).filter(f => /\.(png|jpg|webp|mp4|webm)$/i.test(f));
         for (const file of files) {
             const filePath = path.join(dirPath, file);
             this.addCandidate(groups, file, filePath, modelName, batchId, jobMeta);
@@ -280,7 +280,10 @@ export class ReviewServer {
         batchId: string,
         jobMeta: Record<string, string>
     ): void {
-        const match = fileName.match(/^(.+?)_draft_\d+\.(png|jpg|webp)$/i);
+        // Match old convention: shot_01_draft_1.png
+        // Match new convention: shot_01_a8f9_1.png or shot_01_a8f9_1.mp4 
+        // regex: captures jobId, then _<number>.ext or _draft_<number>.ext
+        const match = fileName.match(/^(.+?)_(?:draft_)?\d+\.(png|jpg|webp|mp4|webm)$/i);
         if (!match) return;
 
         const jobId = match[1];
