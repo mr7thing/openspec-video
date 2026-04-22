@@ -73,7 +73,7 @@ export function registerInitCommand(program: Command, VERSION: string) {
 
                 const templateEnvExists = await fs.access(path.join(TEMPLATE_DIR, '.env')).then(() => true).catch(() => false);
                 if (templateEnvExists) {
-                    await fs.copyFile(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
+                    await fs.cp(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'), { recursive: true, force: true });
                 }
 
                 // 2. Selective copy based on tools (Legacy & Metadata)
@@ -105,9 +105,7 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 await fs.mkdir(path.join(specDir, 'shots'), { recursive: true });
 
                 // 4. Create operational directories
-                await fs.mkdir(path.join(targetDir, 'artifacts'), { recursive: true });
-                await fs.mkdir(path.join(targetDir, 'queue'), { recursive: true });
-                await fs.mkdir(path.join(targetDir, '.opsv-queue'), { recursive: true });
+                await fs.mkdir(path.join(targetDir, 'opsv-queue'), { recursive: true });
                 await fs.mkdir(path.join(targetDir, '.opsv'), { recursive: true });
 
                 // 5. Create .gitignore and initialize Git
@@ -120,10 +118,8 @@ node_modules/
 dist/
 
 # Runtime Data & Artifacts
-artifacts/
-queue/
+opsv-queue/
 .opsv/
-.opsv-queue/
 
 # OpenCode & Trae 
 .opencode/

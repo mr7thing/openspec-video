@@ -32,7 +32,7 @@ export class ComfyUITaskCompiler {
         const batchFolders = entries.filter(e => e.startsWith('queue_'));
         if (batchFolders.length > 0) {
             const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''))).filter(n => !isNaN(n));
-            batchNum = Math.max(...nums);
+            batchNum = Math.max(...nums) + 1;
         }
     } catch (e) {}
 

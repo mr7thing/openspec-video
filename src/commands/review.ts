@@ -40,13 +40,8 @@ async function resolveBatchDirs(projectRoot: string, batchInput: string): Promis
     const queueDir = path.join(projectRoot, 'opsv-queue');
     const queueExists = await fs.access(queueDir).then(() => true).catch(() => false);
     
-    // Fallback dir (legacy)
-    const artifactsDir = path.join(projectRoot, 'artifacts');
-    
     if (!queueExists) {
-        const artifactsExists = await fs.access(artifactsDir).then(() => true).catch(() => false);
-        if (!artifactsExists) return [];
-        // Legacy drafting logic ... (omitted for brevity in this replace, but let's keep it robust)
+        return [];
     }
 
     const batchDirs: string[] = [];
@@ -77,18 +72,7 @@ async function resolveBatchDirs(projectRoot: string, batchInput: string): Promis
         // Fallback or empty
     }
     
-    // Also add artifacts/draft_ folders if they exist for compatibility
-    try {
-        const artifactsExists = await fs.access(artifactsDir).then(() => true).catch(() => false);
-        if (artifactsExists) {
-            const afBatches = (await fs.readdir(artifactsDir)).filter(f => f.startsWith('draft_'));
-            for (const b of afBatches) {
-                batchDirs.push(path.join(artifactsDir, b));
-            }
-        }
-    } catch (e) {}
-
-    // Sort: Newest queue_N or newest draft_N first
+    // Sort: Newest queue_N first
     return batchDirs.sort((a, b) => b.localeCompare(a));
 }
 

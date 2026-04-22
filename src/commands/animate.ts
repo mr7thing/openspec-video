@@ -1,27 +1,24 @@
 import { Command } from 'commander';
 import { AnimateGenerator } from '../automation/AnimateGenerator';
-import { isDaemonRunning, startDaemon, registerProject } from '../utils/daemonUtils';
 
 export function registerAnimateCommand(program: Command, VERSION: string) {
     program
         .command('animate')
         .description('Generate video animation jobs from Shotlist.md')
-        .action(async () => {
+        .option('--cycle <name>', '目标 Circle (默认 auto: 自动推断依赖图末端环)', 'auto')
+        .action(async (options) => {
             try {
                 const projectRoot = process.cwd();
                 const generator = new AnimateGenerator(projectRoot);
 
                 console.log('Compiling video jobs from Shotlist.md...');
-                const jobs = await generator.generateAnimationJobs();
+                const jobs = await generator.generateAnimationJobs(options.cycle);
 
                 if (jobs.length > 0) {
-                    if (!isDaemonRunning()) {
-                        console.log('Auto-starting OpsV Global Server for video processing...');
-                        startDaemon();
-                    } else {
-                        console.log('OpsV Global Server is already running. Ready for browser extension.');
-                    }
-                    registerProject(projectRoot);
+                    console.log(`✅ ${jobs.length} video job(s) compiled.`);
+                    console.log('   Next step: opsv queue compile opsv-queue/video_jobs/video_jobs.json --provider <name>');
+                } else {
+                    console.log('ℹ️ No pending video jobs found.');
                 }
             } catch (err) {
                 console.error('Animation job generation failed:', err);

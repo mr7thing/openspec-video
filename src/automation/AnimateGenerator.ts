@@ -5,6 +5,7 @@ import { Job, PromptPayload } from '../types/PromptSchema';
 import { AssetCompiler } from '../core/AssetCompiler';
 import { RefResolver } from '../core/RefResolver';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
+import { DependencyGraph } from '../core/DependencyGraph';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -24,7 +25,11 @@ export class AnimateGenerator {
         this.refResolver = new RefResolver(projectRoot, approvedRefReader);
     }
 
-    async generateAnimationJobs(): Promise<Job[]> {
+    async generateAnimationJobs(circle: string = 'auto'): Promise<Job[]> {
+        // 如果指定 auto，自动推断依赖图的末端 Circle
+        const resolvedCircle = circle === 'auto'
+            ? await this.resolveEndCircle()
+            : circle;
         // 不区分大小写查找 shotlist 文件
         const shotsDir = path.join(this.projectRoot, 'videospec/shots');
         let shotlistPath: string | null = null;
@@ -52,14 +57,14 @@ export class AnimateGenerator {
         }
 
         // ---- 加载全局配置 ----
-        this.assetCompiler.loadProjectConfig();
+        await this.assetCompiler.loadProjectConfig();
         const globalConfig = this.assetCompiler.getProjectConfig();
         const ar = globalConfig.aspect_ratio || '16:9';
         const res = globalConfig.resolution || '1920x1080';
 
         // ---- 输出目录 ----
-        const videoOutDir = path.join(this.projectRoot, 'artifacts', 'videos');
-        await fs.mkdir(videoOutDir, { recursive: true });
+        const circleDir = path.join(this.projectRoot, 'opsv-queue', resolvedCircle);
+        await fs.mkdir(circleDir, { recursive: true });
 
         const jobs: Job[] = [];
 
@@ -116,7 +121,7 @@ export class AnimateGenerator {
                 logger.warn(`⚠️ Shot ${section.id}: 引用展开失败 - ${(e as Error).message}`);
             }
 
-            const outputPath = path.join(videoOutDir, `${section.id}.mp4`);
+            const outputPath = path.join(circleDir, `${section.id}.mp4`);
             
             // 提取多模态引用（供将来使用）
             const mediaLinks = this.extractMediaLinks(section.originalBody);
@@ -149,14 +154,12 @@ export class AnimateGenerator {
 
         // ---- 写入队列 ----
         if (jobs.length > 0) {
-            const queueDir = path.join(this.projectRoot, 'queue');
-            await fs.mkdir(queueDir, { recursive: true });
-
+            const jobsPath = path.join(circleDir, 'video_jobs.json');
             await fs.writeFile(
-                path.join(queueDir, 'video_jobs.json'),
+                jobsPath,
                 JSON.stringify(jobs, null, 2)
             );
-            logger.info(`✅ 编译 ${jobs.length} 个视频生成任务 → queue/video_jobs.json`);
+            logger.info(`✅ 编译 ${jobs.length} 个视频生成任务 → ${jobsPath}`);
         } else {
             logger.info(`ℹ️ 无需要生成的视频任务 (所有分镜非 pending 状态)`);
         }
@@ -278,5 +281,30 @@ export class AnimateGenerator {
         if (p.startsWith('http://') || p.startsWith('https://')) return p;
         
         return path.resolve(this.projectRoot, 'videospec/shots', p);
+    }
+
+    /**
+     * 自动推断依赖图的末端 Circle
+     * 视频生成位于拓扑排序的最后一个 batch
+     */
+    private async resolveEndCircle(): Promise<string> {
+        try {
+            const graph = await DependencyGraph.buildFromProject(this.projectRoot);
+            const { batches } = graph.topologicalSort();
+            if (batches.length === 0) {
+                return 'zerocircle_1';
+            }
+            const lastIdx = batches.length - 1;
+            const circleWord = this.getCircleWord(lastIdx);
+            return `${circleWord}_1`;
+        } catch (e) {
+            logger.warn(`⚠️ 依赖图分析失败，回退到 zerocircle_1: ${(e as Error).message}`);
+            return 'zerocircle_1';
+        }
+    }
+
+    private getCircleWord(index: number): string {
+        const words = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle'];
+        return words[index] || `circle_${index}`;
     }
 }

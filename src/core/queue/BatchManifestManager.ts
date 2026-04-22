@@ -35,7 +35,7 @@ export class BatchManifestManager {
         const exists = await fs.access(this.manifestPath).then(() => true).catch(() => false);
         if (!exists) {
             const manifest: BatchManifest = {
-                version: '0.6.3',
+                version: '0.6.4',
                 circle,
                 batchNum,
                 tasks: {}

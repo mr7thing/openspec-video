@@ -95,7 +95,7 @@ wss.on('connection', (ws) => {
     });
 
     // Send initial status
-    ws.send(JSON.stringify({ type: 'WELCOME', payload: { status: 'connected', version: '0.1.2' } }));
+    ws.send(JSON.stringify({ type: 'WELCOME', payload: { status: 'connected', version: '0.6.4' } }));
 });
 
 // Broadcast jobs to all connected clients

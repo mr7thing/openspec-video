@@ -1,5 +1,6 @@
 import { BatchManifestManager, TaskStatus } from '../core/queue/BatchManifestManager';
 import { logger } from '../utils/logger';
+import { SequenceCounter } from '../utils/sequenceCounter';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
@@ -107,8 +108,11 @@ export class QueueWatcher {
           const isVideo = intention.type === 'video_generation';
           const ext = isVideo ? 'mp4' : 'png';
           
-          // 资产落盘路径：和 queue.json 在同一个目录下
-          const outputPath = path.join((this.manager as any).batchDir, `${task.id}.${ext}`);
+          // 资产落盘路径：全局唯一序号命名
+          const projectRoot = path.resolve(this.baseQueueDir, '..');
+          const sequenceCounter = SequenceCounter.getInstance();
+          const seq = await sequenceCounter.getNextGlobalSequence(projectRoot, task.id);
+          const outputPath = path.join((this.manager as any).batchDir, `${task.id}_${seq}.${ext}`);
 
           const virtualTask = {
               uuid: task.id,

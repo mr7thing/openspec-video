@@ -157,7 +157,7 @@ export function initializeLogger(options: Partial<LoggerOptions> = {}): winston.
         level: mergedOptions.level,
         defaultMeta: {
             service: 'openspec-video',
-            version: '0.6.1'
+            version: '0.6.4'
         },
         transports: createTransports(mergedOptions),
         exitOnError: false

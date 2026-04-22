@@ -103,16 +103,7 @@ export class JobValidator {
                 });
             }
 
-            // 3. 必须有输出路径
-            if (!job.output_path) {
-                errors.push({
-                    jobId: job.id,
-                    field: 'output_path',
-                    message: '缺少输出路径'
-                });
-            }
-
-            // 4. 检查残留双引号
+            // 3. 检查残留双引号
             this.checkResiduaQuotes(job, errors);
         }
 

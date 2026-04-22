@@ -7,10 +7,10 @@ import { RefResolver, RefResult } from '../core/RefResolver';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { DependencyGraph } from '../core/DependencyGraph';
 import { JobValidator } from './JobValidator';
-import { ShotDesignFrontmatterSchema } from '../types/FrontmatterSchema';
+
 import { Job, PromptPayload } from '../types/PromptSchema';
 import { logger } from '../utils/logger';
-import { StandardAPICompiler } from '../core/compiler/StandardAPICompiler';
+
 
 // ============================================================================
 // v0.5 任务生成器（图像编译管线）
@@ -152,60 +152,36 @@ export class JobGenerator {
             return [];
         }
 
-        // ---- 下发编译: 直接调用 Compiler 写入 opsv-queue ----
-        const baseQueueDir = path.join(this.projectRoot, 'opsv-queue');
-        const compiler = new StandardAPICompiler(baseQueueDir);
-        
-        // 如果没有指定迭代序号，自动计算下一个可用的序号
+        // ---- 保存任务列表到 opsv-queue ----
+        const circleWord = this.getCircleWord(targetLayerIdx);
         const iterationIndex = options.iterationIndex || await this._nextCircleIteration(targetLayerIdx);
-
-        for (const job of targetLayerJobs) {
-            const provider = defaultImageProvider; 
-            const modelKey = this.resolveModelKey(provider, job.type);
-
-            await compiler.compileAndEnqueue({
-                provider,
-                modelKey,
-                job
-            }, targetLayerIdx, iterationIndex);
-        }
-
-        const circleWord = StandardAPICompiler.getCircleWord(targetLayerIdx);
-        logger.info(`\n✅ ${circleWord}_${iterationIndex} 编译完成: ${targetLayerJobs.length} 个任务已进入队列`);
-
+        const circleDir = path.join(this.projectRoot, 'opsv-queue', `${circleWord}_${iterationIndex}`);
+        await fs.mkdir(circleDir, { recursive: true });
+        
+        const jobsPath = path.join(circleDir, 'imagen_jobs.json');
+        await fs.writeFile(jobsPath, JSON.stringify(targetLayerJobs, null, 2), 'utf-8');
+        
+        logger.info(`\n✅ ${circleWord}_${iterationIndex} 任务列表生成完毕: ${targetLayerJobs.length} 个任务 → ${jobsPath}`);
+        
         return targetLayerJobs;
     }
 
-    private resolveModelKey(provider: string, type: Job['type']): string {
-        if (provider === 'volcengine') return type === 'video_generation' ? 'sea_dream_video' : 'sea_dream_image';
-        if (provider === 'siliconflow') return 'flux_pro';
-        return 'default';
+    private getCircleWord(index: number): string {
+        const words = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle'];
+        return words[index] || `circle_${index}`;
     }
 
     /**
      * 自动寻找当前环的下一个可用序号
      */
     private async _nextCircleIteration(circleIndex: number): Promise<number> {
-        const circleWord = StandardAPICompiler.getCircleWord(circleIndex);
+        const circleWord = this.getCircleWord(circleIndex);
         let idx = 1;
         while (true) {
             const circlePath = path.join(this.projectRoot, 'opsv-queue', `${circleWord}_${idx}`);
             if (!await fs.access(circlePath).then(() => true).catch(() => false)) {
                 break;
             }
-            idx++;
-        }
-        return idx;
-    }
-
-    /**
-     * 查找下一个可用的 draft 序号
-     * @param layerHint 可选，用于分层模式的 L{n} 前缀
-     */
-    private async _nextDraftIndex(layerHint?: number): Promise<number> {
-        let idx = 1;
-        const prefix = layerHint ? `draft_L${layerHint}_` : 'draft_';
-        while (await fs.access(path.join(this.projectRoot, `artifacts/${prefix}${idx}`)).then(() => true).catch(() => false)) {
             idx++;
         }
         return idx;

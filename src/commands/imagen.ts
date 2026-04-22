@@ -37,8 +37,9 @@ export function registerImagenCommand(program: Command, VERSION: string) {
                     skipDependsLayer: options.skipDependLayer,
                 });
 
-                logger.info('\n📂 意图生成完毕。接下来请执行编译命令分发给供应商：');
-                logger.info('   $ opsv queue compile artifacts/draft_X/jobs.json --provider <目标API>');
+                logger.info('\n📂 图像任务列表已生成。');
+                logger.info('   下一步：执行编译入队');
+                logger.info('   $ opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --provider <目标API>');
             } catch (err) {
                 logger.error(`编译失败: ${(err as Error).message}`);
                 process.exit(1);

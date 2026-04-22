@@ -136,7 +136,7 @@ export class RefResolver {
 
         // 帧文件命名: shot_01_last.png
         const framePath = path.join(
-            this.projectRoot, 'artifacts', `${shotId}_${frameType}.png`
+            this.projectRoot, 'opsv-queue', 'frames', `${shotId}_${frameType}.png`
         );
 
         const exists = await fs.access(framePath).then(() => true).catch(() => false);

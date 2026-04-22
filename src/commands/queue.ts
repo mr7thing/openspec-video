@@ -88,7 +88,7 @@ export function registerQueueCommands(program: Command) {
                     const volcEngineApi = new VolcengineProvider();
                     watchers.push(new QueueWatcher(queueDir, provider, async (task) => await volcEngineApi.processTask(task), 5000, cycle));
                 } else if (provider === 'siliconflow') {
-                    const siliconFlowApi = new SiliconFlowProvider() as any;
+                    const siliconFlowApi = new SiliconFlowProvider();
                     watchers.push(new QueueWatcher(queueDir, provider, async (task) => await siliconFlowApi.processTask(task), 5000, cycle));
                 } else if (provider === 'minimax') {
                     const minimaxApi = new MinimaxImageProvider();

@@ -10,6 +10,8 @@ import { registerReviewCommand } from './commands/review';
 import { registerAnimateCommand } from './commands/animate';
 import { registerDepsCommand } from './commands/deps';
 import { registerAddonsCommands } from './commands/addons';
+import { registerCircleCommand } from './commands/circle';
+import { registerComfyCommand } from './commands/comfy';
 import { registerQueueCommands } from './commands/queue';
 import { registerValidateCommand } from './commands/validate';
 
@@ -36,7 +38,7 @@ const program = new Command();
 program
     .name('opsv')
     .version(VERSION)
-    .description('OpenSpec-Video Automation CLI (v0.6.3)');
+    .description('OpenSpec-Video Automation CLI (v0.6.4)');
 
 // 注册所有拆分的子命令
 registerDaemonCommands(program, VERSION);

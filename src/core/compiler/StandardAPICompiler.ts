@@ -48,7 +48,7 @@ export class StandardAPICompiler {
             const batchFolders = entries.filter(e => e.startsWith('queue_'));
             if (batchFolders.length > 0) {
                 const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''))).filter(n => !isNaN(n));
-                batchNum = Math.max(...nums);
+                batchNum = Math.max(...nums) + 1;
             }
         } catch (e) {
             // Directory is empty/new, use batch 1
@@ -82,7 +82,7 @@ export class StandardAPICompiler {
 
         // 6. 注册任务到 manifest
         const taskId = intent.job.id;
-        await manager.registerTask(taskId, intent.job.id, intention);
+        await manager.registerTask(taskId, taskId, intention);
 
         logger.info(`[Compiler] Circle Enqueued: ${circleFullName}/${provider}/queue_${batchNum}/${taskId}`);
         return taskId;

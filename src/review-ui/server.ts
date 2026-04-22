@@ -42,10 +42,7 @@ export class ReviewServer {
         app.use(express.json());
 
         // ---- 静态文件 ----
-        // 图片代理：让前端通过 /artifacts/ 路径访问图片
-        app.use('/artifacts', express.static(
-            path.join(this.projectRoot, 'artifacts')
-        ));
+        // 图片代理：让前端通过 /opsv-queue/ 路径访问资产
         app.use('/opsv-queue', express.static(
             path.join(this.projectRoot, 'opsv-queue')
         ));
@@ -324,16 +321,13 @@ export class ReviewServer {
             variant = existingCount === 0 ? 'default' : `variant_${existingCount + 1}`;
         }
 
-        // 1. 复制到 artifacts/ 目录并重命名
-        const ext = path.extname(imagePath);
-        const approvedName = `${jobId}_${variant}${ext}`;
-        const approvedPath = path.join(this.projectRoot, 'artifacts', approvedName);
-        await fs.copyFile(imagePath, approvedPath);
+        // 1. 直接使用原产出路径作为 approved 引用（无需复制到单独目录）
+        const approvedPath = imagePath;
 
         // 2. 找到源文档并回写 Approved References
         const docPath = await this.findSourceDoc(jobId);
         if (docPath) {
-            this.approvedRefReader.appendApprovedRef(docPath, variant, approvedPath);
+            await this.approvedRefReader.appendApprovedRef(docPath, variant, approvedPath);
 
             // 3. 更新 status → approved
             let content = await fs.readFile(docPath, 'utf-8');
