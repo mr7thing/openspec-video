@@ -88,7 +88,7 @@ This allows for **breakpoint recovery**, **single-threaded safety**, **multi-pro
 
 ---
 
-> *OpsV 0.6.1 | 2026-04-20*
+> *OpsV 0.6.1 | 2026-04-22*
 
 ---
 

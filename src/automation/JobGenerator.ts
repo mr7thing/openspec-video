@@ -10,6 +10,7 @@ import { JobValidator } from './JobValidator';
 import { ShotDesignFrontmatterSchema } from '../types/FrontmatterSchema';
 import { Job, PromptPayload } from '../types/PromptSchema';
 import { logger } from '../utils/logger';
+import { StandardAPICompiler } from '../core/compiler/StandardAPICompiler';
 
 // ============================================================================
 // v0.5 任务生成器（图像编译管线）

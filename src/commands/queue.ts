@@ -55,7 +55,7 @@ export function registerQueueCommands(program: Command) {
                     const models = configLoader.findModelsByCapability(provider, jobType as any);
                     
                     if (models.length > 0) {
-                        await compiler.compileAndEnqueue({ provider, job }, cycle);
+                        await compiler.compileAndEnqueue({ provider, modelKey: models[0].key, job }, cycle);
                     } else {
                         console.warn(`[Queue] ⚠️ Skipping job ${job.id} for provider ${provider}: No model matches '${jobType}'`);
                     }

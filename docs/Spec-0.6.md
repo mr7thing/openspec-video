@@ -1,6 +1,6 @@
-﻿# OpenSpec-Video v0.6.2 Specification
+﻿# OpenSpec-Video v0.6.3 Specification
 
-> 从 v0.5.19 到 v0.6.2 的架构升级总览 (从 Spooler 演进为 Circle/Batch 管线)
+> 从 v0.5.19 到 v0.6.3 的架构升级总览 (从 Spooler 演进为 Circle/Batch 管线)
 
 ## 重大变更 (Breaking Changes)
 
@@ -13,7 +13,7 @@
 - **新增**: BatchManifestManager.ts 用于管理批次清单 (queue.json)。
 - **新增**: opsv queue compile 支持 --circle 参数，实现跨 Circle 的依赖隔离。
 
-### 2. 生成流程 (v0.6.2)
+### 2. 生成流程 (v0.6.3)
 - **编译器 (Compiler)**: 产出 StandardTaskIntent JSON，包含纯净的任务描述，不带执行状态。
 - **执行器 (Executor)**: QueueWatcher 负责扫描物理批次目录，将意图注入 Provider 并保存执行结果。
 

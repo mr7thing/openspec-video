@@ -1,14 +1,14 @@
-# Document Standards (v0.6.2)
+# Document Standards (v0.6.3)
 
 > OpenSpec-Video uses a **four-layer specification system** ensuring document-as-code determinism.
 
 ## 1. Four-Layer Architecture
 
 ```
-Layer 1: @ Reference Syntax    â†?Standardized inter-document linking
-Layer 2: Frontmatter Schema    â†?YAML metadata type constraints
-Layer 3: Markdown Body         â†?Human-readable body area specs
-Layer 4: Execution Rules       â†?Compile-time + runtime semantic validation
+Layer 1: @ Reference Syntax    ï¿½?Standardized inter-document linking
+Layer 2: Frontmatter Schema    ï¿½?YAML metadata type constraints
+Layer 3: Markdown Body         ï¿½?Human-readable body area specs
+Layer 4: Execution Rules       ï¿½?Compile-time + runtime semantic validation
 ```
 
 ## 2. Frontmatter Schema
@@ -38,7 +38,7 @@ reviews:
 - **v0.5.19**: CI/CD integration, Agent three-role consolidation
 - **v0.5.16**: SiliconFlow image support, hybrid architecture
 - **v0.5.15**: Seedance Provider, api_config capability fields
-- **v0.5.14**: Document purity â€?no hardcoded execution config
+- **v0.5.14**: Document purity ï¿½?no hardcoded execution config
 - **v0.5.8**: Folded block syntax enforced for all long text fields
 - **v0.5.0**: DependencyGraph, pure Markdown `## Shot NN` parsing
 
@@ -52,8 +52,8 @@ reviews:
 ## 3. @ Reference Syntax
 
 ```
-@asset_id           â†?Default variant
-@asset_id:variant   â†?Specified variant
+@asset_id           ï¿½?Default variant
+@asset_id:variant   ï¿½?Specified variant
 ```
 
 Constraints: Target must exist in `elements/` or `scenes/`, variant must be Approved, unapproved dependencies are blocked by DependencyGraph.
@@ -74,7 +74,7 @@ Script.md parses from `## Shot NN` headings (not frontmatter arrays).
 opsv generate                                              # Intent stage
 opsv queue compile queue/jobs.json --provider seadream      # Compile stage
 ```
-Router: Standard API â†?`StandardAPICompiler`, ComfyUI â†?`ComfyUITaskCompiler`
+Router: Standard API ï¿½?`StandardAPICompiler`, ComfyUI ï¿½?`ComfyUITaskCompiler`
 
 ### 5.3 frame_ref
 ```json
@@ -87,4 +87,4 @@ Topological sorting with strict mode: all dependencies must be Approved before e
 
 ---
 
-> *OpsV 0.6.2 | Last updated: 2026-04-20*
+> *OpsV 0.6.3 | Last updated: 2026-04-22*

@@ -1,6 +1,6 @@
 # OpsV Project Overview
 
-> **OpenSpec-Video (OpsV) 0.6.2** �?An automation framework that compiles Markdown narrative specs into video/image generation tasks.
+> **OpenSpec-Video (OpsV) 0.6.3** �?An automation framework that compiles Markdown narrative specs into video/image generation tasks.
 
 ---
 
@@ -18,7 +18,7 @@ With the v0.6.0 architecture revolution, OpsV achieves **physical isolation of i
 - **Docs as Code**: `.md` files are the single source of truth; images and videos are merely compiled artifacts
 - **Dependency Driven**: `## Approved References` establishes causal constraints between entities
 - **Intent-Execution Separation**: Generate produces intent, Compile translates to API instructions, Run passively consumes
-- **Physical State Machine**: Tasks flow as atomic files through `inbox �?working �?done` directories via atomic `fs.rename`
+- **Physical State Machine**: Tasks flow as atomic files through `inbox �?working �?done` directories via atomic `fs.rename`
 - **Static-Dynamic Separation**: Image and video pipelines are independent, non-interfering
 
 ---
@@ -29,7 +29,7 @@ With the v0.6.0 architecture revolution, OpsV achieves **physical isolation of i
 |-------|-----------|---------|
 | Language | TypeScript | Core codebase |
 | CLI Framework | Commander.js | Command-line interface |
-| Communication | WebSocket (ws) | Daemon �?Browser Extension |
+| Communication | WebSocket (ws) | Daemon �?Browser Extension |
 | Configuration | dotenv + js-yaml | Env vars + YAML config |
 | Validation | Zod | Job structure validation |
 | Logging | Winston | Unified logging system |
@@ -45,30 +45,30 @@ Project skeleton created by `opsv init`:
 ```
 project/
 ├── .agent/                     # AI Agent configuration
-�?  ├── Creative-Agent.md       # Creative Agent: brainstorm + spec anchoring
-�?  ├── Guardian-Agent.md       # Guardian Agent: validation + sync
-�?  ├── Runner-Agent.md         # Runner Agent: compile + render
-�?  └── skills/                 # Skill manuals
+�?  ├── Creative-Agent.md       # Creative Agent: brainstorm + spec anchoring
+�?  ├── Guardian-Agent.md       # Guardian Agent: validation + sync
+�?  ├── Runner-Agent.md         # Runner Agent: compile + render
+�?  └── skills/                 # Skill manuals
 ├── .env                        # Service management config (ports)
 ├── .env/                       # Environment config (git ignored)
-�?  ├── secrets.env             # API keys
-�?  └── api_config.yaml         # Engine parameters
+�?  ├── secrets.env             # API keys
+�?  └── api_config.yaml         # Engine parameters
 ├── .opsv/                      # Runtime state (git ignored)
-�?  └── dependency-graph.json   # Dependency graph snapshot
+�?  └── dependency-graph.json   # Dependency graph snapshot
 ├── .opsv-queue/                # Spooler physical mailbox (git ignored)
-�?  ├── inbox/{provider}/       # Pending tasks
-�?  ├── working/{provider}/     # In-progress tasks
-�?  ├── done/{provider}/        # Completed/failed tasks
-�?  └── corrupted/{provider}/   # Corrupted JSON isolation
+�?  ├── inbox/{provider}/       # Pending tasks
+�?  ├── working/{provider}/     # In-progress tasks
+�?  ├── done/{provider}/        # Completed/failed tasks
+�?  └── corrupted/{provider}/   # Corrupted JSON isolation
 ├── videospec/                  # Core narrative assets (source of truth)
-�?  ├── project.md
-�?  ├── stories/
-�?  ├── elements/
-�?  ├── scenes/
-�?  └── shots/
+�?  ├── project.md
+�?  ├── stories/
+�?  ├── elements/
+�?  ├── scenes/
+�?  └── shots/
 ├── artifacts/                  # Generated outputs
 ├── queue/                      # Intent queue
-�?  └── jobs.json
+�?  └── jobs.json
 └── AGENTS.md                   # OpenCode/Trae unified protocol
 ```
 
@@ -135,4 +135,4 @@ opsv review
 ---
 
 > *"Code is written for humans to read, and only incidentally for machines to execute."*
-> *OpsV 0.6.2 | Last updated: 2026-04-20*
+> *OpsV 0.6.3 | Last updated: 2026-04-22*

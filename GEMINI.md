@@ -1,4 +1,4 @@
-﻿# OpsV v0.6.2 架构镜像
+# OpsV v0.6.3 架构镜像
 
 ## 核心拓扑
 - **Compilers**: `StandardAPICompiler` (AOT 意图产出) -> `BatchManifestManager` (清单注册)

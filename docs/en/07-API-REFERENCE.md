@@ -1,4 +1,4 @@
-# OpsV Provider API Reference (v0.6.2)
+# OpsV Provider API Reference (v0.6.3)
 
 > Interface contracts and Spooler Queue integration specs for all image/video generation Providers.
 
@@ -9,9 +9,9 @@
 The old `ImageModelDispatcher` / `VideoModelDispatcher` have been **permanently removed**. All execution uses the **Spooler Queue** architecture:
 
 ```
-opsv generate        â†?jobs.json (pure intent)
-opsv queue compile   â†?.opsv-queue/inbox/{provider}/UUID.json (atomic payload)
-opsv queue run       â†?QueueWatcher â†?provider.processTask(task)
+opsv generate        ï¿½?jobs.json (pure intent)
+opsv queue compile   ï¿½?.opsv-queue/inbox/{provider}/UUID.json (atomic payload)
+opsv queue run       ï¿½?QueueWatcher ï¿½?provider.processTask(task)
 ```
 
 ---
@@ -30,7 +30,7 @@ interface SpoolerTask {
 }
 ```
 
-QueueWatcher calls: `dequeue() â†?processTask() â†?markCompleted/markFailed()`
+QueueWatcher calls: `dequeue() ï¿½?processTask() ï¿½?markCompleted/markFailed()`
 
 ---
 
@@ -61,9 +61,9 @@ QueueWatcher calls: `dequeue() â†?processTask() â†?markCompleted/markFailed()`
 ## 4. New Provider Checklist
 
 **Three Iron Rules** (Defensive API Protocol):
-1. Deep penetrative parsing â€?handle multiple response structures
-2. Evidential logging â€?`JSON.stringify(rawResponse)` for non-2xx
-3. Axios defensive handling â€?distinguish `error.response` from `error.code`
+1. Deep penetrative parsing ï¿½?handle multiple response structures
+2. Evidential logging ï¿½?`JSON.stringify(rawResponse)` for non-2xx
+3. Axios defensive handling ï¿½?distinguish `error.response` from `error.code`
 
 **Implementation Steps**:
 1. Create `src/executor/providers/YourProvider.ts`
@@ -79,17 +79,17 @@ QueueWatcher calls: `dequeue() â†?processTask() â†?markCompleted/markFailed()`
 
 ```
 .opsv-queue/
-â”œâ”€â”€ inbox/{provider}/        â†?queue compile delivers here
-â”œâ”€â”€ working/{provider}/      â†?QueueWatcher atomically extracts
-â”œâ”€â”€ done/{provider}/         â†?successful/failed results archived
-â””â”€â”€ corrupted/{provider}/    â†?corrupted JSON isolation
+â”œâ”€â”€ inbox/{provider}/        ï¿½?queue compile delivers here
+â”œâ”€â”€ working/{provider}/      ï¿½?QueueWatcher atomically extracts
+â”œâ”€â”€ done/{provider}/         ï¿½?successful/failed results archived
+â””â”€â”€ corrupted/{provider}/    ï¿½?corrupted JSON isolation
 ```
 
 Flow:
-- `inbox â†?working`: atomic `fs.rename` guarantees single-consumer safety
-- `working â†?done`: task completion or failure
-- `working â†?inbox`: SIGINT/SIGTERM rollback on graceful shutdown
-- `working â†?corrupted`: JSON parse failure isolation (non-blocking)
+- `inbox ï¿½?working`: atomic `fs.rename` guarantees single-consumer safety
+- `working ï¿½?done`: task completion or failure
+- `working ï¿½?inbox`: SIGINT/SIGTERM rollback on graceful shutdown
+- `working ï¿½?corrupted`: JSON parse failure isolation (non-blocking)
 
 **Atomicity Guarantee**: `dequeue()` uses `fs.rename(inboxPath, workingPath)`:
 - POSIX `rename` ensures only one consumer succeeds per file
@@ -105,4 +105,4 @@ Flow:
 
 ---
 
-> *OpsV v0.6.2 | Last updated: 2026-04-20*
+> *OpsV v0.6.3 | Last updated: 2026-04-22*

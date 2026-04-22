@@ -1,6 +1,6 @@
-# OpsV Configuration Guide (v0.6.2)
+# OpsV Configuration Guide (v0.6.3)
 
-> Triple configuration: services, secrets, and parameters â€?all behavior driven by config files.
+> Triple configuration: services, secrets, and parameters ï¿½?all behavior driven by config files.
 
 ---
 
@@ -16,9 +16,9 @@ project/
 
 | File | Contents | Git Tracked | Change Frequency |
 |------|----------|-------------|-----------------|
-| `.env` (root file) | Service port config | âœ?Tracked | Rarely |
-| `.env/secrets.env` | API Keys | â?Ignored | Rarely |
-| `.env/api_config.yaml` | Model parameters | â?Ignored | Occasionally |
+| `.env` (root file) | Service port config | ï¿½?Tracked | Rarely |
+| `.env/secrets.env` | API Keys | ï¿½?Ignored | Rarely |
+| `.env/api_config.yaml` | Model parameters | ï¿½?Ignored | Occasionally |
 
 ---
 
@@ -93,8 +93,8 @@ models:
 4. Register in `src/commands/queue.ts` run command
 5. Update documentation
 
-> No Dispatcher registration needed â€?Provider is called directly via QueueWatcher.
+> No Dispatcher registration needed ï¿½?Provider is called directly via QueueWatcher.
 
 ---
 
-> *OpsV 0.6.2 | Last updated: 2026-04-20*
+> *OpsV 0.6.3 | Last updated: 2026-04-22*

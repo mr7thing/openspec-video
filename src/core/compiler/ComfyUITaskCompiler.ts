@@ -38,7 +38,7 @@ export class ComfyUITaskCompiler {
 
     const batchDir = path.join(providerDir, `queue_${batchNum}`);
     const manager = new BatchManifestManager(batchDir);
-    await manager.init(intent.provider, cycle, batchNum);
+    await manager.init(cycle, batchNum);
 
     // 1. Load the requested workflow template
     const templatePath = path.join(this.templateDir, intent.templateName);
@@ -63,7 +63,7 @@ export class ComfyUITaskCompiler {
       comfyui_payload: payload
     };
 
-    const taskFile = await manager.registerTask(intent.shotId, compiledJob);
+    const taskFile = await manager.registerTask(intent.shotId, intent.shotId, compiledJob);
     console.log(`[Compiler] Compiled Shot ${intent.shotId} -> Batch: ${path.basename(path.dirname(taskFile))}`);
     return intent.shotId;
   }
