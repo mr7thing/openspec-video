@@ -45,7 +45,12 @@ export class VolcengineProvider {
         await this.handleImageResponse(response.data, outputPath, logLines);
       } else if (meta.type === 'video_generation') {
         if (!meta.api_status_url) throw new Error('Video task missing api_status_url in _opsv');
-        await this.handleVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
+        const isContentGeneration = meta.api_url?.includes('content_generation');
+        if (isContentGeneration) {
+          await this.handleContentGenerationVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
+        } else {
+          await this.handleVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
+        }
       } else {
         throw new Error(`Unknown task type: ${meta.type}`);
       }
@@ -111,6 +116,56 @@ export class VolcengineProvider {
         } else if (statusData.status === 'Failed' || statusData.status === 'failed' || statusData.status === 'Fail') {
           throw new Error(`Video generation failed: ${JSON.stringify(statusData)}`);
         }
+      } catch (err: any) {
+        if (err.message?.includes('Video generation failed')) throw err;
+        if (err.response && err.response.status >= 400 && err.response.status < 500) throw err;
+        logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
+      }
+    }
+    throw new Error(`Video polling timeout for task ${taskId}`);
+  }
+
+  /**
+   * Seedance 2.0 Content Generation API 视频轮询。
+   *
+   * 状态查询: GET /api/v3/content_generation/tasks/{task_id}
+   * 状态值: queued | running | succeeded | failed
+   * 结果提取: response.content.video_url.url
+   */
+  private async handleContentGenerationVideoResponse(data: any, apiKey: string, apiStatusUrl: string, outputPath: string, logLines: any[]) {
+    const taskId = data.id;
+    if (!taskId) throw new Error(`No id in submission response: ${JSON.stringify(data)}`);
+
+    logLines.push({ t: new Date().toISOString(), type: 'video_submitted', taskId });
+
+    let retries = 0;
+    let pollIntervalMs = 5000;
+    while (retries < 120) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+      retries++;
+      pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
+
+      try {
+        // Content Generation API: GET {apiStatusUrl}/{taskId}
+        const statusRes = await axios.get(`${apiStatusUrl}/${taskId}`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+
+        const statusData = statusRes.data;
+        logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: statusData.status });
+
+        if (statusData.status === 'succeeded') {
+          const videoUrl = statusData.content?.video_url?.url;
+          if (!videoUrl) throw new Error('Video generation succeeded but no URL found in content.video_url');
+
+          logLines.push({ t: new Date().toISOString(), type: 'download_start', url: videoUrl });
+          await downloadFile(videoUrl, outputPath);
+          logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+          return;
+        } else if (statusData.status === 'failed') {
+          throw new Error(`Video generation failed: ${JSON.stringify(statusData.error || statusData)}`);
+        }
+        // queued / running: continue polling
       } catch (err: any) {
         if (err.message?.includes('Video generation failed')) throw err;
         if (err.response && err.response.status >= 400 && err.response.status < 500) throw err;

@@ -118,15 +118,14 @@ providers:
         max_reference_images: 1
 
       # --- 视频: Seedance 2.0 (新版 Content Generation API) ---
-      # ⚠️ 使用全新 API (/api/v3/content_generation/tasks)，与旧版参数结构完全不同。
-      #    当前 Provider 代码尚未适配，如需使用请先更新 VolcengineProvider.ts。
+      # 使用全新 API (/api/v3/content_generation/tasks)，支持多模态输入。
       seedance-2.0:
-        enable: false
+        enable: true
         type: "video_generation"
         model: "doubao-seedance-2-0-260128"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
         api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
-        # Seedance 2.0 参数模板（需 Provider 适配后方可使用）
+        # Seedance 2.0 参数模板
         # 文档: https://www.volcengine.com/docs/82379/2291680
         defaults:
           ratio: "16:9"
@@ -136,6 +135,20 @@ providers:
         max_reference_images: 9
         # 支持多模态输入: text(1) + image(0~9) + video(0~3) + audio(0~3)
         # 不支持 "文本+音频"、"纯音频" 输入组合
+
+      # --- 视频: Seedance 2.0 Fast (新版 Content Generation API) ---
+      seedance-2.0-fast:
+        enable: true
+        type: "video_generation"
+        model: "doubao-seedance-2-0-fast-260128"
+        api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        defaults:
+          ratio: "16:9"
+          duration: 5
+          generate_audio: true
+          watermark: false
+        max_reference_images: 9
 
   # ==========================================
   # MiniMax 稀宇科技

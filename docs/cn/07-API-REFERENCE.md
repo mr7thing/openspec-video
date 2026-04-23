@@ -78,7 +78,7 @@ await queue.markFailed(task.uuid, error);
 
 | Provider 类 | 文件 | 供应商 | 队列 Provider 名 |
 |-------------|------|--------|------------------|
-| `SeedanceProvider` | providers/SeedanceProvider.ts | 火山引擎 | `volcengine` |
+| `VolcengineProvider` | providers/VolcengineProvider.ts | 火山引擎（SeaDream / Seedance） | `volcengine` |
 | `SiliconFlowProvider` | providers/SiliconFlowProvider.ts | SiliconFlow | `siliconflow` |
 | `MinimaxVideoProvider` | providers/MinimaxVideoProvider.ts | MiniMax | `minimax` |
 
@@ -211,7 +211,7 @@ v0.6.4 采用 **中心 Manifest 状态管理** 取代旧版的文件系统目录
   | Provider | 防御逻辑 |
   |----------|----------|
   | `siliconflow` | 强制尺寸对齐到推荐列表，清理冗余字段 |
-  | `volcengine` | `2K` → `1920x1080`，默认 `1280x720` |
+  | `volcengine` | `2K` → `1920x1080`，默认 `1280x720`；Seedance 2.0 自动构建 `content` 数组 |
   | `minimax` | 默认启用 `prompt_optimizer: true` |
 
 ### ComfyUITaskCompiler

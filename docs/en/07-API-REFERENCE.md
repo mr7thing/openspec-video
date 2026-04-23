@@ -46,7 +46,7 @@ QueueWatcher calls: `dequeue() �?processTask() �?markCompleted/markFailed()`
 ### Video Providers
 | Class | Provider Name | Vendor |
 |-------|--------------|--------|
-| `SeedanceProvider` | `seedance` | Volcengine |
+| `VolcengineProvider` | `volcengine` | Volcengine (SeaDream / Seedance) |
 | `SiliconFlowProvider` | `siliconflow` | SiliconFlow |
 | `MinimaxVideoProvider` | `minimax` | MiniMax |
 

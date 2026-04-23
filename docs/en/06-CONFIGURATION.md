@@ -73,6 +73,38 @@ models:
     supports_first_image: true
     supports_last_image: true
     max_reference_images: 9
+
+  seedance-2.0:
+    provider: "volcengine"
+    type: "video_generation"
+    enable: true
+    model: "doubao-seedance-2-0-260128"
+    required_env: ["VOLCENGINE_API_KEY"]
+    api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+    api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+    max_reference_images: 9
+    supports_multimodal: true
+
+  seedance-2.0-fast:
+    provider: "volcengine"
+    type: "video_generation"
+    enable: true
+    model: "doubao-seedance-2-0-fast-260128"
+    required_env: ["VOLCENGINE_API_KEY"]
+    api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+    api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+    max_reference_images: 9
+    supports_multimodal: true
 ```
 
 ---

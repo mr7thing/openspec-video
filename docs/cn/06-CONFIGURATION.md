@@ -112,6 +112,32 @@ providers:
           aspect_ratio: "16:9"
           duration: 5
 
+      seedance-2.0:
+        enable: true
+        type: video_generation
+        model: "doubao-seedance-2-0-260128"
+        api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        defaults:
+          ratio: "16:9"
+          duration: 5
+          generate_audio: true
+          watermark: false
+        max_reference_images: 9
+
+      seedance-2.0-fast:
+        enable: true
+        type: video_generation
+        model: "doubao-seedance-2-0-fast-260128"
+        api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        defaults:
+          ratio: "16:9"
+          duration: 5
+          generate_audio: true
+          watermark: false
+        max_reference_images: 9
+
   siliconflow:
     required_env:
       - SILICONFLOW_API_KEY
@@ -180,14 +206,17 @@ ComfyUI **不通过** `api_config.yaml` 指定模型，模型由工作流 JSON �
 
 ### 视频模型
 
-| 能力 | Seedance 1.5 Pro | Seedance 2.0 Fast |
-|------|:---:|:---:|
-| **首帧参考** | ✅ | ✅ |
-| **尾帧参考** | ✅ | ✅ |
-| **角色参考图** | ✅(9) | ✅(10) |
-| **空间音频** | ❌ | ✅ |
-| **视频参考** | ❌ | ✅ |
-| **分辨率** | 480p-1080p | 720p |
+| 能力 | Seedance 1.5 Pro | Seedance 2.0 | Seedance 2.0 Fast |
+|------|:---:|:---:|:---:|
+| **文生视频** | ✅ | ✅ | ✅ |
+| **首帧参考** | ✅ | ✅ | ✅ |
+| **尾帧参考** | ✅ | ✅ | ✅ |
+| **角色参考图** | ✅(1) | ✅(9) | ✅(9) |
+| **视频参考** | ❌ | ✅(3) | ✅(3) |
+| **音频参考** | ❌ | ✅(3) | ✅(3) |
+| **空间音频** | ❌ | ✅ | ✅ |
+| **分辨率** | 480p-1080p | 720p | 720p |
+| **API 版本** | 旧版 `/video/submit` | 新版 Content Generation | 新版 Content Generation |
 
 ---
 

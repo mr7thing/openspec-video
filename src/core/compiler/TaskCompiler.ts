@@ -4,6 +4,13 @@ import { ConfigLoader } from '../../utils/configLoader';
 import { logger } from '../../utils/logger';
 import { Job } from '../../types/PromptSchema';
 
+/**
+ * 检测是否为火山引擎 Seedance 2.0 Content Generation API
+ */
+function isContentGenerationApi(provider: string, modelCfg: any): boolean {
+  return provider === 'volcengine' && modelCfg.api_url?.includes('content_generation');
+}
+
 
 /**
  * TaskCompiler: 将 jobs.json 编译为可直接执行的 Provider 任务 JSON。
@@ -157,16 +164,21 @@ export class TaskCompiler {
     // 参数防御
     this.applyParameterDefense(provider, modelKey, requestBody);
 
-    // 注入 references（通用化，根据 Provider 映射到正确字段）
     const refs = job.reference_images || [];
-    if (refs.length > 0) {
-      this.injectReferences(provider, job.type, requestBody, refs, modelCfg.max_reference_images);
-    }
-
-    // 视频任务：注入 frame_ref 为首帧/尾帧
     const frameRef = (job.payload as any).frame_ref;
-    if (frameRef && job.type === 'video_generation') {
-      this.injectFrameRefs(provider, requestBody, frameRef);
+
+    if (isContentGenerationApi(provider, modelCfg)) {
+      // Seedance 2.0: 构建 content 数组格式的请求体
+      this.buildContentGenerationBody(requestBody, job, refs, frameRef, modelCfg);
+    } else {
+      // 旧版 API：注入 references（通用化，根据 Provider 映射到正确字段）
+      if (refs.length > 0) {
+        this.injectReferences(provider, job.type, requestBody, refs, modelCfg.max_reference_images);
+      }
+      // 视频任务：注入 frame_ref 为首帧/尾帧
+      if (frameRef && job.type === 'video_generation') {
+        this.injectFrameRefs(provider, requestBody, frameRef);
+      }
     }
 
     // 构建元数据
@@ -218,6 +230,77 @@ export class TaskCompiler {
     if (batchFolders.length === 0) return 0;
     const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''), 10)).filter(n => !isNaN(n));
     return Math.max(...nums);
+  }
+
+  /**
+   * 构建 Seedance 2.0 Content Generation API 的请求体（content 数组格式）。
+   *
+   * 参考: https://www.volcengine.com/docs/82379/2291680
+   * content 数组支持: text(1) + image_url(0~9) + video_url(0~3) + audio_url(0~3)
+   */
+  private buildContentGenerationBody(
+    requestBody: any,
+    job: Job,
+    refs: string[],
+    frameRef: any,
+    modelCfg: any
+  ) {
+    const content: any[] = [];
+    const seenUrls = new Set<string>();
+
+    const addContent = (item: any) => {
+      const url = item.image_url?.url || item.video_url?.url || item.audio_url?.url;
+      if (url) {
+        if (seenUrls.has(url)) return;
+        seenUrls.add(url);
+      }
+      content.push(item);
+    };
+
+    // 1. 文本提示词
+    if (requestBody.prompt) {
+      content.push({ type: 'text', text: requestBody.prompt });
+      delete requestBody.prompt;
+    }
+
+    // 2. 参考图（最多 max_reference_images 张）
+    const maxImages = modelCfg.max_reference_images || 9;
+    for (const imgUrl of refs.slice(0, maxImages)) {
+      if (imgUrl.startsWith('@FRAME:')) continue;
+      addContent({ type: 'image_url', image_url: { url: imgUrl }, role: 'reference_image' });
+    }
+
+    // 3. 首帧/尾帧
+    if (frameRef?.first && !frameRef.first.startsWith('@FRAME:')) {
+      addContent({ type: 'image_url', image_url: { url: frameRef.first }, role: 'reference_image' });
+    }
+    if (frameRef?.last && !frameRef.last.startsWith('@FRAME:')) {
+      addContent({ type: 'image_url', image_url: { url: frameRef.last }, role: 'reference_image' });
+    }
+
+    // 4. 媒体引用 (video/audio)
+    const mediaRefs = (job.payload as any).extra?.media_refs || [];
+    for (const mediaUrl of mediaRefs) {
+      const ext = path.extname(mediaUrl).toLowerCase();
+      if (ext === '.mp4') {
+        addContent({ type: 'video_url', video_url: { url: mediaUrl }, role: 'reference_video' });
+      } else if (ext === '.mp3' || ext === '.wav') {
+        addContent({ type: 'audio_url', audio_url: { url: mediaUrl }, role: 'reference_audio' });
+      }
+    }
+
+    requestBody.content = content;
+
+    // 5. 防御性参数处理
+    // duration 从字符串 '5s' 转换为整数 5
+    if (typeof requestBody.duration === 'string') {
+      const match = requestBody.duration.match(/^(\d+)/);
+      if (match) {
+        requestBody.duration = parseInt(match[1], 10);
+      }
+    }
+    // ratio 从 global_settings.aspect_ratio 映射，默认已存在
+    // generate_audio / watermark 由 defaults 覆盖
   }
 
   /**
