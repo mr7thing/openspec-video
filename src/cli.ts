@@ -49,6 +49,7 @@ registerAnimateCommand(program, VERSION);
 registerDepsCommand(program);
 registerAddonsCommands(program);
 registerQueueCommands(program);
+registerCircleCommand(program, VERSION);
 registerValidateCommand(program, VERSION);
 
 program.parse(process.argv);

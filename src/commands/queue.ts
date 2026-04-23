@@ -26,8 +26,8 @@ function getProviderInstance(providerName: string) {
  * 输入可能是 "volcengine.seedance-2.0" 或配置的别名 "volc.sd2"
  */
 async function resolveModel(raw: string, projectRoot: string): Promise<string> {
-  // 已经是 provider.model 格式
-  if (/^[a-z0-9_-]+\.[a-z0-9_-]+$/.test(raw)) {
+  // 已经是 provider.model 格式（model key 可含点号）
+  if (/^[a-z0-9_-]+\.[a-z0-9_.-]+$/.test(raw)) {
     return raw;
   }
 
@@ -133,7 +133,9 @@ export function registerQueueCommands(program: Command) {
       let exitCode = 0;
 
       for (const pm of providerModels) {
-        const [provider, modelKey] = pm.split('.');
+        const dotIndex = pm.indexOf('.');
+        const provider = pm.slice(0, dotIndex);
+        const modelKey = pm.slice(dotIndex + 1);
         const providerDir = path.join(queueDir, circle, provider);
         const batchDir = await findLatestBatchDir(providerDir);
 

@@ -30,17 +30,18 @@ npm install -g videospec
 opsv init my-project
 
 # 1. Generate image assets / 图像资产生成
-opsv imagen
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
-opsv queue run --model volcengine.seadream-5.0-lite
+opsv imagen                          # 自动推断当前开放的 Circle
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volc.sd2
+opsv queue run --model volc.sd2
 
-# 2. Generate video assets / 视频资产生成
-opsv animate
-opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --model volcengine.seedance-2.0
-opsv queue run --model volcengine.seedance-2.0
-
-# 3. Web-based Review / 可视化审阅
+# 2. Review & Approve / 审阅批准
 opsv review
+opsv circle status                   # Approve 后必须刷新状态
+
+# 3. Generate video assets / 视频资产生成（上游 approved 后自动允许）
+opsv animate                         # 自动推断末端 Circle
+opsv queue compile opsv-queue/endcircle_1/video_jobs.json --model volc.seedance2
+opsv queue run --model volc.seedance2
 ```
 
 ---
@@ -93,9 +94,17 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 ### v0.6.4 — Circle Queue & Seedance 2.0
 
 - **Circle Queue 架构**: 任务按依赖层次分 Circle 存储，`opsv-queue/<circle>/<provider>/queue_{N}/`。
+- **`opsv circle` 命令**: 正式注册 `opsv circle status`（状态探针）和 `opsv circle manifest`（快照固化）。
+- **Circle 自动推断**: `imagen` / `animate` 未指定 `--circle` 时自动推断当前开放的 Circle（未全部 approved 的最上游 Circle）。
+- **上游 Circle 检查**: `imagen` / `animate` 执行前自动检测上游 Circle 是否全部 approved，未 approved 时阻止执行（可 `--skip-circle-check` 强制跳过）。
+- **`--skip-approved` 默认开启**: `imagen` 默认跳过已有 approved 参考图的资产，避免重复生成。需重新生成时用 `--no-skip-approved`。
+- **Approved References ↔ status 一致性校验**: `opsv validate` 自动检查 `status: approved` 的文档是否包含有效的 `## Approved References`。
 - **`--model` 选项**: 替换旧的 `--provider.model` 伪选项语法，支持 `provider.model` 和别名两种格式。
-- **别名系统**: `api_config.yaml` 每个模型支持 `aliases: []`，如 `volc.sd2` → `volcengine.seedance-2.0`。
+- **别名系统**: `api_config.yaml` 每个模型支持 `aliases: []`，如 `seedance2` → `volcengine.seedance-2.0`。
+- **模型名含点号支持**: 完整支持 `wan2.2-i2v`、`qwen-image-edit-2509` 等带点号的模型名。
 - **Seedance 2.0 适配**: 完整支持 Content Generation API 的 `content[]` 多模态数组（text/image/video/audio）。
+- **SiliconFlow 增强**: 自动本地文件转 Base64 Data URI 上传；支持多种响应格式解析（`data.url` / `data.images[0].url` / `data.data[0].url`）。
+- **Edit 模型字段保留**: `qwen-image-edit-2509` 等编辑模型的 `edit_image` / `mask_image` 字段在编译时正确保留。
 - **本地文件 Base64 直传**: compile 保留相对路径，run 时 Provider 自动将本地图片/audio 转为 `data:image/png;base64,...` 发送给 API（视频不支持 Base64，仍为 URL）。
 - **API 返回尾帧**: Seedance 2.0 创建任务时传 `return_last_frame: true`，轮询成功后自动下载视频 + 首帧(cover) + 尾帧到 batch 目录，替代 ffmpeg 提取。
 - **@FRAME 引用解析**: shotlist.md 中 `first_frame: "@FRAME:shot_01_last"` 或 `@shot_01:last` 自动解析为同目录相对路径 `shot_01_last.png`。
@@ -112,6 +121,6 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 ---
 
 ## 🚀 历史更新 (v0.5.16)
-- **SiliconFlow 图像接入**: 支持 Qwen 多模态文生图与指令式编辑。
+- **SiliconFlow 全模型支持**: Qwen 文生图 (`qwenimg`)、图像编辑 (`qwenedit`)、Wan2.2 文生视频 (`want2v`)、Wan2.2 图生视频 (`wani2v`)。
 - **混合驱动架构 (Hybrid Provider)**: 根据模型语义自动切换端点。
 - **指令重绘工作流**: 智能图像注入 `frame_ref`。

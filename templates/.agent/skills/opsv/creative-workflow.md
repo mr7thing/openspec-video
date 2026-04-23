@@ -66,7 +66,7 @@ status: draft
 - `aspect_ratio`: 默认 `"16:9"`。
 - `vision`: 一两句话说明总调性。
 - `global_style_postfix`: 全局绘画提示词后缀。
-- `status`: 文档本身的审查状态（`draft` | `approved`）。
+- `status`: 文档本身的审查状态（`draft` / `drafting` | `approved`）。两者等价，`drafting` 为旧版兼容。
 - **严禁**在 project.md 中配置 `engine` 等执行流参数，模型选择由 Runner-Agent 在 `opsv queue compile` 时通过 `--model` 指定。
 
 ### 1.2 故事大纲 (`stories/story.md`)
@@ -129,9 +129,10 @@ reviews: []
 **硬性约束**：
 - 文件名必须精确匹配花名册里的标签（如 `@boss` → `elements/@boss.md`）。
 - 顶部必须由符合规范的 YAML 字典组成。
-- `status: approved` 代表实体已定档可用；刚起草则为 `draft`。
+- `status: approved` 代表实体已定档可用；刚起草则为 `draft` / `drafting`。
 - 必须设立 `## Design References`（输入参考图）和 `## Approved References`（定档后视觉形象，由 `opsv review` 自动回写）。
 - `refs` 字段定义了依赖关系，**直接影响 Circle 分层**。例如：若 `@younger_brother` 的 `refs` 包含 `@elder_brother`，则前者必须等待后者 approved 后才能生成。
+- **一致性约束**: `status: approved` 的文档必须在 `## Approved References` 区域包含至少一张 `![variant](path)` 格式的参考图。`opsv validate` 会自动校验。
 
 ### 资产设计完成后的 Circle 检查
 

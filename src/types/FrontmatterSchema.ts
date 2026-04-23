@@ -13,7 +13,7 @@ export const AssetTypeEnum = z.enum([
 export type AssetType = z.infer<typeof AssetTypeEnum>;
 
 // ---- 文档状态枚举 ----
-export const StatusEnum = z.enum(['drafting', 'approved']);
+export const StatusEnum = z.enum(['drafting', 'draft', 'approved']);
 export type Status = z.infer<typeof StatusEnum>;
 
 // ---- 通用 frontmatter（所有文档类型） ----

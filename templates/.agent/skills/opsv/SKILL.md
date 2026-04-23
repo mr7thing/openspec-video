@@ -32,9 +32,10 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 ### 状态机
 每个可审阅对象拥有 `status` 字段：
-- `draft` — 起草中
-- `pending` — 等待渲染
+- `draft` / `drafting` — 起草中（两者等价，`drafting` 为旧版兼容）
 - `approved` — 已通过审查，可作为下游依赖
+
+**一致性铁律**: `status: approved` 的文档**必须**包含至少一张有效的 `## Approved References` 参考图（`![variant](path)` 格式）。`opsv validate` 会自动校验此项。
 
 ### Circle 状态图标（`opsv circle status` 输出）
 
@@ -110,11 +111,13 @@ opsv circle manifest        # 全部 approved 后固化快照
 # 依赖分析
 opsv deps
 
-# 图像任务生成
-opsv imagen [--circle <name>]
+# 图像任务生成（自动推断 Circle，默认跳过已 approved 资产）
+opsv imagen [targets...]
+# 选项: --preview, --shots, --circle <name>, --no-skip-approved, --skip-circle-check
 
 # 视频任务生成（自动推断末端 Circle）
-opsv animate [--cycle auto]
+opsv animate
+# 选项: --circle <name>, --skip-circle-check
 
 # 编译为可执行 API 请求体
 opsv queue compile <jobs.json> --model <provider.model|alias> --circle <name>

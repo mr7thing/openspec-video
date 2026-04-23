@@ -59,10 +59,12 @@ export class TaskCompiler {
     providerModel: string,
     circle: string = 'zerocircle_1'
   ): Promise<CompileResult> {
-    const [provider, modelKey] = providerModel.split('.');
-    if (!provider || !modelKey) {
+    const dotIndex = providerModel.indexOf('.');
+    if (dotIndex === -1) {
       throw new Error(`Invalid provider.model format: ${providerModel}. Expected "provider.modelKey"`);
     }
+    const provider = providerModel.slice(0, dotIndex);
+    const modelKey = providerModel.slice(dotIndex + 1);
 
     const projectRoot = path.resolve(this.baseQueueDir, '..');
     const configLoader = ConfigLoader.getInstance(projectRoot);
@@ -144,10 +146,15 @@ export class TaskCompiler {
     const userParams = (job.payload as any).global_settings || {};
     const requestBody: any = { ...defaults, ...userParams };
 
+    // 保留编辑相关字段 (edit_image, mask_image)
+    const payload = job.payload as any;
+    if (payload?.edit_image) requestBody.edit_image = payload.edit_image;
+    if (payload?.mask_image) requestBody.mask_image = payload.mask_image;
+
     // 注入核心字段
     const modelName = modelCfg.model || modelKey;
     requestBody.model = modelName;
-    requestBody.prompt = job.prompt_en || (job.payload as any).prompt || '';
+    requestBody.prompt = job.prompt_en || payload?.prompt || '';
 
     // 参数防御
     this.applyParameterDefense(provider, modelKey, requestBody);
@@ -274,7 +281,7 @@ export class TaskCompiler {
    */
   private applyParameterDefense(provider: string, model: string, params: any) {
     if (provider === 'siliconflow') {
-      const recommended = ['1024x1024', '512x1024', '768x1024', '1024x512', '1024x768', '1440x720', '720x1440', '1664x928', '928x1664', '1472x1140', '1140x1472', '1584x1056', '1056x1584', '1328x1328'];
+      const recommended = ['1024x1024', '512x1024', '768x1024', '1024x512', '1024x768', '1280x720', '720x1280', '1440x720', '720x1440', '1664x928', '928x1664', '1472x1140', '1140x1472', '1584x1056', '1056x1584', '1328x1328'];
       const currentSize = params.image_size || params.size || params.resolution || '1024x1024';
       if (!recommended.includes(currentSize)) {
         logger.warn(`[Defense] SiliconFlow: Size ${currentSize} not in recommended list. Fallback to 1024x1024`);

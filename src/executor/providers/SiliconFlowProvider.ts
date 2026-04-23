@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs/promises';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
+import { isLocalFilePath, inlineLocalFile } from '../../utils/fileToBase64';
 
 /**
  * SiliconFlow Provider (v0.6.4 简化版)
@@ -15,6 +16,15 @@ export class SiliconFlowProvider {
     const meta = taskJson._opsv;
     const requestBody = { ...taskJson };
     delete requestBody._opsv;
+
+    // 将本地图片路径转为 base64 Data URI
+    const batchDir = logPath.substring(0, logPath.lastIndexOf('/'));
+    if (requestBody.image && isLocalFilePath(requestBody.image)) {
+      requestBody.image = await inlineLocalFile(requestBody.image, batchDir);
+    }
+    if (requestBody.edit_image && isLocalFilePath(requestBody.edit_image)) {
+      requestBody.edit_image = await inlineLocalFile(requestBody.edit_image, batchDir);
+    }
 
     const apiKey = this.resolveApiKey();
     const logLines: any[] = [];
@@ -47,7 +57,8 @@ export class SiliconFlowProvider {
   }
 
   private async handleImageResponse(data: any, outputPath: string, logLines: any[]) {
-    const imageUrl = data.data?.url || data.data?.image_url || data.url;
+    // SiliconFlow 响应格式: { images: [{url: "..."}], data: [{url: "..."}] }
+    const imageUrl = data.images?.[0]?.url || data.data?.[0]?.url || data.data?.url || data.data?.image_url || data.url;
     if (!imageUrl) throw new Error('Image URL not found in response');
 
     logLines.push({ t: new Date().toISOString(), type: 'download_start', url: imageUrl });

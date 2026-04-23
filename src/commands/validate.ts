@@ -62,6 +62,7 @@ export function registerValidateCommand(program: Command, VERSION: string) {
             // 输出报告
             if (issues.length === 0) {
                 logger.info('✅ 所有文档验证通过');
+                logger.info('💡 建议执行 opsv circle status 查看 Circle 状态');
             } else {
                 logger.error(`❌ 发现 ${issues.length} 个问题:\n`);
                 for (const issue of issues) {
@@ -168,22 +169,49 @@ async function validateFile(filePath: string): Promise<ValidationIssue[]> {
     if (!result.success) {
         for (const error of result.error.errors) {
             const field = error.path.join('.');
-            let suggestion: string | undefined;
-
-            // 常见错误的建议
-            if (field === 'status' && typeof frontmatter.status === 'string') {
-                if (frontmatter.status === 'draft') {
-                    suggestion = '应为 drafting（不是 draft）';
-                }
-            }
-
             issues.push({
                 file: relativePath,
                 field,
                 message: error.message,
-                suggestion
             });
         }
+    }
+
+    // Approved References 与 status 一致性检查
+    const docStatus = frontmatter.status;
+    const hasApprovedSection = content.includes('## Approved References');
+    
+    // 解析 Approved References 区域中的图片引用数量
+    let approvedImageCount = 0;
+    if (hasApprovedSection) {
+        const sectionMatch = content.match(/##\s*Approved\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i);
+        if (sectionMatch) {
+            const imgMatches = sectionMatch[1].match(/!\[[^\]]*\]\([^)]+\)/g);
+            approvedImageCount = imgMatches ? imgMatches.length : 0;
+        }
+    }
+
+    // 规则1: status 为 approved 的非 project 文档必须有 Approved References
+    if (docStatus === 'approved' && docType !== 'project') {
+        if (!hasApprovedSection || approvedImageCount === 0) {
+            issues.push({
+                file: relativePath,
+                field: 'status + ## Approved References',
+                message: `status 为 "approved" 但文档缺少有效的 Approved References（应有至少一张 approved 参考图）`,
+                suggestion: '通过 opsv review 审批至少一张图片，或将 status 改为 drafting/draft'
+            });
+        }
+    }
+
+    // 规则2: 有 Approved References 的文档，status 应为 approved
+    // （project 类型除外，因为 story.md 等也使用 project type）
+    if (approvedImageCount > 0 && docStatus !== 'approved') {
+        issues.push({
+            file: relativePath,
+            field: 'status + ## Approved References',
+            message: `文档包含 ${approvedImageCount} 张 Approved References 但 status 为 "${docStatus}"`,
+            suggestion: '将 status 改为 approved，或移除 Approved References 区域中的图片引用'
+        });
     }
 
     return issues;

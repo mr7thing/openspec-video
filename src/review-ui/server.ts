@@ -5,6 +5,7 @@ import { execFileSync } from 'child_process';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { logger } from '../utils/logger';
+import { printCircleSummary } from '../utils/circleStatus';
 
 // ============================================================================
 // Review 页面服务后端
@@ -149,6 +150,13 @@ export class ReviewServer {
                     logger.warn(`Git commit 失败: ${(e as Error).message}`);
                 }
 
+                // Approve 后打印 Circle 状态摘要
+                try {
+                    await printCircleSummary(this.projectRoot);
+                } catch (e) {
+                    logger.warn(`Circle 摘要打印失败: ${(e as Error).message}`);
+                }
+
                 res.json({ success: true, data: results });
             } catch (e) {
                 res.status(500).json({ success: false, error: (e as Error).message });
@@ -197,6 +205,13 @@ export class ReviewServer {
                     }
                 } catch (e) {
                     logger.warn(`Git commit 失败: ${(e as Error).message}`);
+                }
+
+                // Draft 后打印 Circle 状态摘要
+                try {
+                    await printCircleSummary(this.projectRoot);
+                } catch (e) {
+                    logger.warn(`Circle 摘要打印失败: ${(e as Error).message}`);
                 }
 
                 res.json({ success: true, data: { jobId, status: 'draft' } });

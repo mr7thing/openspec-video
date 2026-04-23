@@ -10,6 +10,8 @@ import { logger } from '../utils/logger';
 // 分析依赖图，按 Circle 分层，显示各环状态和任务清单
 // ============================================================================
 
+const CIRCLE_NAMES = ['ZeroCircle', 'FirstCircle', 'SecondCircle', 'ThirdCircle', 'FourthCircle', 'FifthCircle'];
+
 export function registerCircleCommand(program: Command, VERSION: string) {
     const circleCmd = program
         .command('circle')
@@ -36,10 +38,11 @@ export function registerCircleCommand(program: Command, VERSION: string) {
                 
                 logger.info(`\n📊 依赖分析完成，共 ${batches.length} 个 Circle:\n`);
                 
+                let openCircleName: string | null = null;
+                
                 for (let i = 0; i < batches.length; i++) {
                     const circleIdx = i;
-                    const words = ['ZeroCircle', 'FirstCircle', 'SecondCircle', 'ThirdCircle', 'FourthCircle', 'FifthCircle'];
-                    const circleName = words[circleIdx] || `Circle_${circleIdx}`;
+                    const circleName = CIRCLE_NAMES[circleIdx] || `Circle_${circleIdx}`;
                     const assets = batches[i];
                     
                     // 检查该 Circle 是否已有 opsv-queue 目录
@@ -65,7 +68,12 @@ export function registerCircleCommand(program: Command, VERSION: string) {
                         }
                     }
                     
-                    const statusIcon = approvedCount === assets.length ? '✅' : (approvedCount > 0 ? '⏳' : '⭕');
+                    const isComplete = approvedCount === assets.length;
+                    const statusIcon = isComplete ? '✅' : (approvedCount > 0 ? '⏳' : '⭕');
+                    
+                    if (!isComplete && !openCircleName) {
+                        openCircleName = circleName;
+                    }
                     
                     logger.info(`  ${statusIcon} ${circleName}: ${assets.length} 个资产 (${approvedCount} 已批准)`);
                     if (hasQueueDir) {
@@ -78,8 +86,19 @@ export function registerCircleCommand(program: Command, VERSION: string) {
                     logger.info(`     └─ ${displayAssets.join(', ')}${suffix}`);
                 }
                 
-                logger.info('\n💡 使用 opsv imagen / animate / comfy 生成对应 Circle 的任务列表');
-                logger.info('   使用 opsv queue compile <jobs.json> --provider <name> 编译入队');
+                // 输出执行次序建议
+                logger.info('\n📋 推荐执行次序:');
+                if (openCircleName) {
+                    logger.info(`   1. 当前应优先完成: ${openCircleName}`);
+                    logger.info(`   2. 执行 opsv imagen → opsv queue compile → opsv queue run`);
+                    logger.info(`   3. 执行 opsv review 完成 approve`);
+                    logger.info(`   4. 再执行 opsv circle status 确认可晋升下一 Circle`);
+                } else {
+                    logger.info('   ✅ 所有 Circle 已完成');
+                    logger.info('   可执行 opsv circle manifest 固化快照');
+                }
+                
+                logger.info('\n💡 提示: Circle 隔离保证下游任务使用 approved 参考图，确保生成一致性');
                 
             } catch (err) {
                 logger.error(`Circle 分析失败: ${(err as Error).message}`);

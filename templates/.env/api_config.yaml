@@ -4,6 +4,24 @@
 #
 # 修改 api_url 可切换私有化部署或区域节点；
 # 修改 defaults 可调整生成参数而无需重新编译代码。
+#
+# ============================================================================
+# Alias 命名规范 (v0.6.4+)
+# ============================================================================
+# 每个模型必须配置至少一个纯字母数字的 alias（无点号、无连字符、无下划线）。
+# 原因：OpsV CLI 的 resolveModel() 使用正则 /^[a-z0-9_-]+\.[a-z0-9_.-]+$/ 匹配
+#       provider.model 格式，model key 中的特殊符号可能导致解析歧义。
+#       纯字母数字 alias 可完全规避此问题。
+#
+# 推荐格式：
+#   - 简写型：seedance2, wanimg, qwenimg
+#   - provider前缀型：volcseedance2, sfwanimg
+#   - 禁止：含 . - _ 的 alias（如 volc.sd2, wan22-i2v）
+#
+# 使用示例：
+#   opsv queue compile jobs.json --model seedance2
+#   opsv queue run --model wanimg
+# ============================================================================
 
 providers:
   # ==========================================
@@ -18,6 +36,7 @@ providers:
         type: "image_generation"
         model: "Qwen/Qwen-Image"
         api_url: "https://api.siliconflow.cn/v1/images/generations"
+        aliases: ["qwenimg", "sfqwenimg"]
         # 以下为 SiliconFlow Images Generations API 的完整参数模板
         # 文档: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
         defaults:
@@ -41,9 +60,10 @@ providers:
         type: "image_generation"
         model: "Qwen/Qwen-Image-Edit-2509"
         api_url: "https://api.siliconflow.cn/v1/images/generations"
+        aliases: ["qwenedit", "sfqwenedit"]
         defaults:
           seed: 42
-          # 必填: edit_image (编辑目标图)
+          # 必填: image (编辑目标图)
           # 可选: mask_image (蒙版图)
 
       # --- 视频: Wan-AI/Wan2.2-T2V-A14B (文生视频) ---
@@ -53,6 +73,7 @@ providers:
         model: "Wan-AI/Wan2.2-T2V-A14B"
         api_url: "https://api.siliconflow.cn/v1/video/submit"
         api_status_url: "https://api.siliconflow.cn/v1/video/status"
+        aliases: ["want2v", "sfwant2v"]
         # 以下为 SiliconFlow Video Submit API 的完整参数模板
         # 文档: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
         defaults:
@@ -68,6 +89,7 @@ providers:
         model: "Wan-AI/Wan2.2-I2V-A14B"
         api_url: "https://api.siliconflow.cn/v1/video/submit"
         api_status_url: "https://api.siliconflow.cn/v1/video/status"
+        aliases: ["wani2v", "sfwani2v"]
         defaults:
           image_size: "1280x720"
           seed: 42
@@ -84,6 +106,7 @@ providers:
         type: "image_generation"
         model: "doubao-seedream-5-0-260128"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/images/generations"
+        aliases: ["seedream", "volcseedream"]
         # 以下为 Volcengine Images Generations API 的完整参数模板
         # 文档: https://www.volcengine.com/docs/82379/1824121
         defaults:
@@ -114,6 +137,7 @@ providers:
         model: "doubao-seedance-1-5-pro"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/video/submit"
         api_status_url: "https://ark.cn-beijing.volces.com/api/v3/video/status"
+        aliases: ["seedance15p", "volcseedance15p"]
         defaults: {}
         max_reference_images: 1
 
@@ -125,8 +149,8 @@ providers:
         model: "doubao-seedance-2-0-260128"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
         api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
-        # CLI 别名，可用 --model volc.sd2 代替 --model volcengine.seedance-2.0
-        aliases: ["volc.sd2", "seedance2"]
+        # CLI 别名，可用 --model seedance2 代替 --model volcengine.seedance-2.0
+        aliases: ["seedance2", "volcseedance2"]
         # Seedance 2.0 参数模板
         # 文档: https://www.volcengine.com/docs/82379/2291680
         defaults:
@@ -145,7 +169,7 @@ providers:
         model: "doubao-seedance-2-0-fast-260128"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
         api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
-        aliases: ["volc.sd2f", "seedance2f"]
+        aliases: ["seedance2f", "volcseedance2f"]
         defaults:
           ratio: "16:9"
           duration: 5
@@ -165,6 +189,7 @@ providers:
         type: "image_generation"
         model: "image-01"
         api_url: "https://api.minimaxi.com/v1/image_generation"
+        aliases: ["minimaximg"]
         defaults:
           aspect_ratio: "16:9"
           response_format: "base64"
@@ -178,6 +203,7 @@ providers:
         model: "MiniMax-Hailuo-2.3"
         api_url: "https://api.minimaxi.com/v1/video_generation"
         api_status_url: "https://api.minimaxi.com/v1/query/video_generation"
+        aliases: ["minimaxvid"]
         defaults:
           resolution: "1080P"
           duration: 5

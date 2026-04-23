@@ -87,12 +87,12 @@ opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 | 命令 | 说明 | 核心参数 |
 |------|------|----------|
 | `opsv init` | 初始化项目结构 | `[projectName]` |
-| `opsv validate` | 验证 frontmatter 与引用 | - |
+| `opsv validate` | 验证 frontmatter、引用死链、Approved References ↔ status 一致性 | - |
 | `opsv circle status` | **实时刷新**各 Circle 完成状态（文档变更后必须重跑） | - |
 | `opsv circle manifest` | 将当前拓扑快照写入 `circle_manifest.json` | - |
 | `opsv circle --skip` | 只生成零环和终环 | - |
-| `opsv imagen [targets...]` | 生成图像任务列表 | `--preview`, `--shots`, `--skip-approved` |
-| `opsv animate` | 生成视频任务列表（自动推断末端 Circle） | `--cycle auto` |
+| `opsv imagen [targets...]` | 生成图像任务列表（自动推断 Circle，默认跳过 approved） | `--preview`, `--shots`, `--circle`, `--no-skip-approved`, `--skip-circle-check` |
+| `opsv animate` | 生成视频任务列表（自动推断末端 Circle） | `--circle`, `--skip-circle-check` |
 | `opsv comfy compile <workflow.json>` | 编译 ComfyUI 工作流为 `.json` | `--provider`, `--param`, `--circle` |
 | `opsv queue compile <jobs.json> --model <provider.model\|alias>` | 编译意图到 Provider 队列 | `--circle` |
 | `opsv queue run --model <provider.model\|alias>` | 一次性顺序执行队列任务 | `--file`, `--retry`, `--circle` |
@@ -118,6 +118,13 @@ opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 - **FirstCircle**: 复合资产 (shots/image)。
 - **...**: 中间依赖层。
 - **EndCircle**: 动态视频层 (shots/video)，由 `opsv animate` 自动推断，必须是 `shotlist.md`。
+
+### 状态一致性铁律
+
+`status: approved` 与 `## Approved References` 必须严格一致：
+- `approved` 状态的文档必须有至少一张 `![variant](path)` 格式的 Approved References
+- 包含 Approved References 的文档状态必须为 `approved`
+- `opsv validate` 自动校验此项不一致
 
 ### 敏感词注意 (MiniMax/火山)
 若遇内容审核错误（如 MiniMax 1033），请在 `visual_detailed` 中对敏感词进行脱敏（如使用隐喻或近义词），并重新执行 `opsv imagen` + `opsv queue compile`。
