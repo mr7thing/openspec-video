@@ -84,7 +84,7 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 
 ---
 
-> *OpsV 0.6.1 | 2026-04-22*
+> *OpsV 0.6.4 | 2026-04-23*
 
 ---
 
@@ -96,8 +96,11 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 - **`--model` 选项**: 替换旧的 `--provider.model` 伪选项语法，支持 `provider.model` 和别名两种格式。
 - **别名系统**: `api_config.yaml` 每个模型支持 `aliases: []`，如 `volc.sd2` → `volcengine.seedance-2.0`。
 - **Seedance 2.0 适配**: 完整支持 Content Generation API 的 `content[]` 多模态数组（text/image/video/audio）。
+- **本地文件 Base64 直传**: compile 保留相对路径，run 时 Provider 自动将本地图片/audio 转为 `data:image/png;base64,...` 发送给 API（视频不支持 Base64，仍为 URL）。
+- **API 返回尾帧**: Seedance 2.0 创建任务时传 `return_last_frame: true`，轮询成功后自动下载视频 + 首帧(cover) + 尾帧到 batch 目录，替代 ffmpeg 提取。
+- **@FRAME 引用解析**: shotlist.md 中 `first_frame: "@FRAME:shot_01_last"` 或 `@shot_01:last` 自动解析为同目录相对路径 `shot_01_last.png`。
 - **移除 queue.json**: compile 不再生成 `queue.json`，避免 run 时误执行元数据文件。
-- **编译器防御**: duration 字符串自动转整数，content 数组自动去重。
+- **资产 URL 全记录**: 所有 API 返回的视频/图片 URL 记入 JSONL log（`type: asset_url`），便于审计和二次引用。
 
 ### v0.6.1 — Spooler Queue 物理排队论
 
