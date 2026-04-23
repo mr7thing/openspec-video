@@ -125,6 +125,8 @@ providers:
         model: "doubao-seedance-2-0-260128"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
         api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        # CLI 别名，可用 --model volc.sd2 代替 --model volcengine.seedance-2.0
+        aliases: ["volc.sd2", "seedance2"]
         # Seedance 2.0 参数模板
         # 文档: https://www.volcengine.com/docs/82379/2291680
         defaults:
@@ -143,6 +145,7 @@ providers:
         model: "doubao-seedance-2-0-fast-260128"
         api_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
         api_status_url: "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks"
+        aliases: ["volc.sd2f", "seedance2f"]
         defaults:
           ratio: "16:9"
           duration: 5

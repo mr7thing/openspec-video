@@ -74,17 +74,6 @@ export function registerComfyCommand(program: Command, VERSION: string) {
       const jsonPath = path.join(batchDir, jsonFile);
       await fs.writeFile(jsonPath, JSON.stringify(taskJson, null, 2), 'utf-8');
 
-      // 生成 queue.json 只读索引
-      const queueJson = {
-        version: '0.6.4',
-        circle: options.circle,
-        provider,
-        compiledFrom: path.basename(absWorkflowPath),
-        compiledAt: new Date().toISOString(),
-        tasks: [{ id: options.shotId, type: 'image_generation', jsonFile }]
-      };
-      await fs.writeFile(path.join(batchDir, 'queue.json'), JSON.stringify(queueJson, null, 2), 'utf-8');
-
       // compile.log
       const compileLog = {
         t: new Date().toISOString(),

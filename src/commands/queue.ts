@@ -6,18 +6,9 @@ import { SiliconFlowProvider } from '../executor/providers/SiliconFlowProvider';
 import { MinimaxImageProvider } from '../executor/providers/MinimaxImageProvider';
 import { RunningHubProvider } from '../executor/providers/RunningHubProvider';
 import { ComfyUILocalProvider } from '../executor/providers/ComfyUILocalProvider';
+import { ConfigLoader } from '../utils/configLoader';
 import * as path from 'path';
 import fs from 'fs/promises';
-
-/**
- * 从 process.argv 中提取 --provider.model 格式的参数。
- * 例如：--volcengine.seadream-5.0-lite → volcengine.seadream-5.0-lite
- */
-function extractProviderModels(argv: string[]): string[] {
-  return argv
-    .filter(arg => /^--[a-z0-9_-]+\.[a-z0-9_-]+$/.test(arg))
-    .map(arg => arg.slice(2));
-}
 
 function getProviderInstance(providerName: string) {
   switch (providerName) {
@@ -28,6 +19,34 @@ function getProviderInstance(providerName: string) {
     case 'comfyui_local': return new ComfyUILocalProvider();
     default: throw new Error(`Unknown provider: ${providerName}`);
   }
+}
+
+/**
+ * 解析 --model 参数值，支持别名展开。
+ * 输入可能是 "volcengine.seedance-2.0" 或配置的别名 "volc.sd2"
+ */
+async function resolveModel(raw: string, projectRoot: string): Promise<string> {
+  // 已经是 provider.model 格式
+  if (/^[a-z0-9_-]+\.[a-z0-9_-]+$/.test(raw)) {
+    return raw;
+  }
+
+  const configLoader = ConfigLoader.getInstance(projectRoot);
+  await configLoader.loadConfig(projectRoot);
+
+  // 遍历所有模型查找 alias 匹配
+  const providers = configLoader['config'].providers;
+  for (const [providerName, providerCfg] of Object.entries(providers)) {
+    if (!providerCfg.models) continue;
+    for (const [modelKey, modelCfg] of Object.entries(providerCfg.models)) {
+      const aliases = (modelCfg as any).aliases || [];
+      if (aliases.includes(raw)) {
+        return `${providerName}.${modelKey}`;
+      }
+    }
+  }
+
+  throw new Error(`Unknown model or alias: "${raw}". Expected "provider.model" or a configured alias.`);
 }
 
 async function findLatestBatchDir(providerDir: string): Promise<string | null> {
@@ -45,16 +64,20 @@ export function registerQueueCommands(program: Command) {
   queueCmd
     .command('compile <tasksJson>')
     .description('Compile jobs.json into provider task JSONs')
+    .requiredOption('--model <models...>', 'Target model(s), format: provider.model or alias (e.g. volcengine.seedance-2.0, volc.sd2)')
     .option('--circle <name>', 'Target circle (e.g. zerocircle_1, endcircle_1)', 'zerocircle_1')
     .option('--file <filename>', 'Only compile tasks for a specific source file')
     .action(async (tasksJson, options) => {
-      const providerModels = extractProviderModels(process.argv);
+      const projectRoot = process.cwd();
+      const providerModels: string[] = [];
+      for (const raw of options.model) {
+        providerModels.push(await resolveModel(raw, projectRoot));
+      }
       if (providerModels.length === 0) {
-        console.error('[Queue] Please specify at least one --provider.model (e.g. --volcengine.seadream-5.0-lite)');
+        console.error('[Queue] Please specify at least one --model (e.g. --model volcengine.seedance-2.0)');
         process.exit(1);
       }
 
-      const projectRoot = process.cwd();
       const queueDir = path.join(projectRoot, 'opsv-queue');
       const absoluteTaskPath = path.resolve(projectRoot, tasksJson);
 
@@ -89,17 +112,21 @@ export function registerQueueCommands(program: Command) {
   queueCmd
     .command('run')
     .description('Run provider tasks in the latest batch')
+    .requiredOption('--model <models...>', 'Target model(s), format: provider.model or alias (e.g. volcengine.seedance-2.0, volc.sd2)')
     .option('--circle <name>', 'Target circle', 'zerocircle_1')
     .option('--file <files...>', 'Specific task JSON files to run')
     .option('--retry', 'Retry failed tasks')
     .action(async (options) => {
-      const providerModels = extractProviderModels(process.argv);
+      const projectRoot = process.cwd();
+      const providerModels: string[] = [];
+      for (const raw of options.model) {
+        providerModels.push(await resolveModel(raw, projectRoot));
+      }
       if (providerModels.length === 0) {
-        console.error('[Queue] Please specify at least one --provider.model (e.g. --volcengine.seadream-5.0-lite)');
+        console.error('[Queue] Please specify at least one --model (e.g. --model volcengine.seedance-2.0)');
         process.exit(1);
       }
 
-      const projectRoot = process.cwd();
       const queueDir = path.join(projectRoot, 'opsv-queue');
       const circle = options.circle;
 

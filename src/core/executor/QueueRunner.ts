@@ -95,7 +95,7 @@ export class QueueRunner {
 
     const entries = await fs.readdir(batchDir).catch(() => [] as string[]);
     return entries
-      .filter(e => e.endsWith('.json') && !e.endsWith('_error.log'))
+      .filter(e => e.endsWith('.json') && !e.endsWith('_error.log') && e !== 'queue.json')
       .map(e => path.join(batchDir, e))
       .sort();
   }

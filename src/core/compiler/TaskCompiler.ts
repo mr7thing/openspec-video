@@ -117,18 +117,6 @@ export class TaskCompiler {
       compiled++;
     }
 
-    // 生成 queue.json 只读索引
-    const queueJson = {
-      version: '0.6.4',
-      circle,
-      provider,
-      model: modelKey,
-      compiledFrom: path.basename(jobsPath),
-      compiledAt: new Date().toISOString(),
-      tasks: taskIndex
-    };
-    await fs.writeFile(path.join(batchDir, 'queue.json'), JSON.stringify(queueJson, null, 2), 'utf-8');
-
     // 生成 compile.log
     const compileLog = {
       t: new Date().toISOString(),
@@ -200,28 +188,6 @@ export class TaskCompiler {
       ...requestBody,
       _opsv: meta
     };
-  }
-
-  /**
-   * 确定本次 compile 应该使用哪个 batch 号。
-   * 如果 jobs.json 的 sourceHash 与最新 batch 的 queue.json.sourceHash 一致，则复用。
-   */
-  private async resolveBatchNum(providerDir: string, sourceHash: string): Promise<number> {
-    const latestBatch = await this.getLatestBatchNum(providerDir);
-    if (latestBatch === 0) return 1;
-
-    const queueJsonPath = path.join(providerDir, `queue_${latestBatch}`, 'queue.json');
-    try {
-      const content = await fs.readFile(queueJsonPath, 'utf-8');
-      const queueJson = JSON.parse(content);
-      if (queueJson.sourceHash === `sha256:${sourceHash}`) {
-        logger.info(`[Compile] Source hash matches queue_${latestBatch}, reusing batch.`);
-        return latestBatch;
-      }
-    } catch {
-      // queue.json 不存在或损坏，创建新 batch
-    }
-    return latestBatch + 1;
   }
 
   private async getLatestBatchNum(providerDir: string): Promise<number> {

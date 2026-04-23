@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.6.1 (Spooler Queue Era)
+# OpenSpec-Video (OpsV) 0.6.4 (Circle Queue Era)
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
@@ -14,9 +14,9 @@
 
 ## 💡 What is OpsV? / 什么是 OpsV?
 
-OpsV is a professional, **Spec-First** video production pipeline. v0.6.0 introduces the **Spooler Queue** architecture, a major leap in reliability that isolates creative intent from API execution using a physical file-based state machine.
+OpsV is a professional, **Spec-First** video production pipeline. v0.6.4 introduces the **Circle Queue** architecture with explicit provider/model aliasing and Seedance 2.0 multimodal API support.
 
-OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。v0.6.0 引入了全新的 **Spooler Queue (物理排队论)** 架构，通过物理文件状态机实现了创意意图与 API 执行的彻底解耦，极大提升了工业级生产的鲁棒性。
+OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。v0.6.4 引入 **Circle Queue (环状队列)** 架构，支持 `--model` 别名系统，并完整适配火山引擎 Seedance 2.0 Content Generation API 的多模态输入能力。
 
 ---
 
@@ -26,51 +26,47 @@ OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。
 # Install / 安装
 npm install -g videospec
 
-# Initialize Project / 项目初始化 (v0.6 自动创建运行时目录)
+# Initialize Project / 项目初始化
 opsv init my-project
 
-# 1. Compile Spec -> Intent Outline / 编译意图大纲
-opsv generate        
+# 1. Generate image assets / 图像资产生成
+opsv imagen
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
+opsv queue run --model volcengine.seadream-5.0-lite
 
-# 2. Atomize Intent -> API Tasks / 原子化编译任务 (v0.6 新增)
-opsv queue compile queue/jobs.json --provider seadream
+# 2. Generate video assets / 视频资产生成
+opsv animate
+opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --model volcengine.seedance-2.0
+opsv queue run --model volcengine.seedance-2.0
 
-# 3. Consume & Execute / 顺序执行任务 (v0.6 新增)
-opsv queue run seadream
-
-# 4. Web-based Review / 可视化审阅
-opsv review          
-
-# 5. Video Pipeline / 视频管线
-opsv animate         
-opsv queue compile queue/video_jobs.json --provider seedance
-opsv queue run seedance
+# 3. Web-based Review / 可视化审阅
+opsv review
 ```
 
 ---
 
-## 🏗️ Core Architecture: Spooler Queue (v0.6)
+## 🏗️ Core Architecture: Circle Queue (v0.6.4)
 
-In v0.6.0, we replaced the in-memory **Dispatcher** with a robust **Physical State Machine**. All generation tasks now flow through the `.opsv-queue/` directory:
+In v0.6.4, tasks are organized into **Circles** (dependency layers) and compiled into provider-specific batches under `opsv-queue/<circle>/<provider>/queue_{N}/`:
 
-在 v0.6.0 中，我们用稳健的**物理状态机**取代了内存中的 **Dispatcher**。所有生成任务现在都流经 `.opsv-queue/` 目录：
+在 v0.6.4 中，任务按 **Circle（依赖层次环）** 组织，编译后落在 `opsv-queue/<circle>/<provider>/queue_{N}/` 下：
 
-1. **Inbox**: Tasks waiting to be executed.
-2. **Working**: Atomic task being handled by a provider (Locked via atomic `fs.rename`).
-3. **Done**: Final archival with full result traces or error logs.
-4. **Corrupted**: Isolated JSON parse failures (non-blocking).
+1. **compile**: Reads `jobs.json` and generates atomic `{taskId}.json` payloads.
+2. **run**: Scans `.json` task files, skips already completed results, executes sequentially.
+3. **retry**: Re-runs failed tasks with `--retry` flag.
 
-This allows for **breakpoint recovery**, **single-threaded safety**, **multi-process safety**, and **zero-collision execution**.
+Each batch contains only task JSONs and a `compile.log` — no `queue.json` manifest, preventing accidental execution of metadata files.
 
 ---
 
 ## 🛠️ Key Features / 核心特性
 
-- **Intent-Execution Decoupling**: `generate` only cares about *what* you want; `queue run` only cares about *how* to call the API.
-- **Physical State Machine**: No more lost tasks due to crashes. Everything is persisted on disk.
-- **Unified Server Topology**: Standardized service layers (Global Daemon vs. Local Review) with port configuration via `.env`.
-- **Dependency Graph Engine**: Automated task resolution. The framework understands that a video segment depends on a specific approved frame.
-- **Pure Markdown Spec**: 100% human-readable shot definitions. No more complex YAML arrays.
+- **Circle Queue**: Dependency-layered batch execution with automatic topological sorting.
+- **Model Aliasing**: Use `--model volc.sd2` instead of `--model volcengine.seedance-2.0` via `api_config.yaml` aliases.
+- **Seedance 2.0 Ready**: Full support for multimodal content arrays (text + image + video + audio references).
+- **Intent-Execution Decoupling**: `imagen`/`animate` generates intent; `queue compile/run` handles API execution.
+- **Physical State Machine**: Task state is file existence — no in-memory Dispatcher, crash-safe.
+- **Dependency Graph Engine**: Automated task resolution across Circles with `@FRAME` pointer support.
 
 ---
 
@@ -94,27 +90,21 @@ This allows for **breakpoint recovery**, **single-threaded safety**, **multi-pro
 
 ## 🆕 Release Notes / 更新说明
 
-## 🚀 架构革命：Spooler Queue 物理排队论 (v0.6.1)
+### v0.6.4 — Circle Queue & Seedance 2.0
 
-### 1. Dispatcher 灭亡与意图解耦
-- **三步式管线**: `generate` (编译意图) → `queue compile` (原子拆分) → `queue run` (消费执行)。
-- **物理状态机**: 任务以 `.json` 文件形式在 `inbox`, `working`, `done`, `corrupted` 目录流转，彻底解决崩溃丢任务的问题。
-- **原子提取**: `dequeue()` 使用 `fs.rename` 保证多进程安全，无需内存锁。
-- **优雅关机**: `SIGINT`/`SIGTERM` 信号捕获，自动将 `working/` 中任务回滚至 `inbox/`。
-- **单线程安全**: 每个 Provider 顺序消费，杜绝 API 并发冲突，支持 Ctrl+C 断点恢复。
+- **Circle Queue 架构**: 任务按依赖层次分 Circle 存储，`opsv-queue/<circle>/<provider>/queue_{N}/`。
+- **`--model` 选项**: 替换旧的 `--provider.model` 伪选项语法，支持 `provider.model` 和别名两种格式。
+- **别名系统**: `api_config.yaml` 每个模型支持 `aliases: []`，如 `volc.sd2` → `volcengine.seedance-2.0`。
+- **Seedance 2.0 适配**: 完整支持 Content Generation API 的 `content[]` 多模态数组（text/image/video/audio）。
+- **移除 queue.json**: compile 不再生成 `queue.json`，避免 run 时误执行元数据文件。
+- **编译器防御**: duration 字符串自动转整数，content 数组自动去重。
 
-### 2. 服务管理标准化 (Server Topology)
-- **.env 驱动**: 根目录 `.env` 加入 `OPSV_DAEMON_PORT` 与 `OPSV_REVIEW_PORT` 配置，全面解耦硬编码端口。
-- **服务分层**: 明确 Global Daemon (跨项目连接器) 与 Local Review (项目 Review UI) 的职责边界。
+### v0.6.1 — Spooler Queue 物理排队论
 
-### 3. 项目初始化自动化 (Zero-Config Init)
-- **动态运行时创建**: `opsv init` 现在会自动创建 `.opsv/` 和 `.opsv-queue/` 目录。
-- **内建 Git 策略**: 自动生成防御性 `.gitignore`，确保运行时状态文件不污染仓库。
-
-### 4. 命令集精简与优化
-- **删除废弃指令**: 移除 `gen-image` 与 `gen-video`，统一并入 `queue` 指令集。
-- **鲁棒性增强**: `queue run` 命令的 Provider 名称支持大小写模糊匹配；Provider HTTP 下载增加状态校验；视频轮询采用指数退避。
-- **Generate 纯净化**: `generate` 指令回归“纯编译”本质，不再主动拉起网络服务。
+- **三步式管线**: `generate` → `queue compile` → `queue run`
+- **物理状态机**: 任务以 `.json` 文件在目录间流转，崩溃不丢任务
+- **原子提取**: `fs.rename` 保证多进程安全
+- **服务管理标准化**: `.env` 驱动端口配置
 
 ---
 
