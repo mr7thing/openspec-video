@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
-import { inlineLocalFiles } from '../../utils/fileToBase64';
+import { inlineLocalFiles, inlineLocalFile, isLocalFilePath } from '../../utils/fileToBase64';
 
 /**
  * Volcengine Provider (v0.6.4 简化版)
@@ -19,11 +19,19 @@ export class VolcengineProvider {
     const requestBody = { ...taskJson };
     delete requestBody._opsv;
 
-    // Seedance 2.0: 将 content 数组中的本地文件路径转为 Base64 Data URI
+    const batchDir = path.dirname(outputPath);
     const isContentGeneration = meta.api_url?.includes('content_generation');
+
+    // Seedance 2.0: 将 content 数组中的本地图片/音频转为 Base64 Data URI
     if (isContentGeneration && Array.isArray(requestBody.content)) {
-      const batchDir = path.dirname(outputPath);
       await inlineLocalFiles(requestBody.content, batchDir);
+      // 请求 API 直接返回尾帧图像
+      requestBody.return_last_frame = true;
+    }
+
+    // 旧版 API：如果 image_url 是本地路径，也尝试转为 Base64
+    if (!isContentGeneration && requestBody.image_url && isLocalFilePath(requestBody.image_url)) {
+      requestBody.image_url = await inlineLocalFile(requestBody.image_url, batchDir);
     }
 
     const apiKey = this.resolveApiKey();
@@ -140,6 +148,8 @@ export class VolcengineProvider {
    * 状态查询: GET /api/v3/content_generation/tasks/{task_id}
    * 状态值: queued | running | succeeded | failed
    * 结果提取: response.content.video_url.url
+   *
+   * 若请求时 return_last_frame=true，成功响应还可能包含尾帧图像 URL。
    */
   private async handleContentGenerationVideoResponse(data: any, apiKey: string, apiStatusUrl: string, outputPath: string, logLines: any[]) {
     const taskId = data.id;
@@ -164,12 +174,43 @@ export class VolcengineProvider {
         logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: statusData.status });
 
         if (statusData.status === 'succeeded') {
-          const videoUrl = statusData.content?.video_url?.url;
-          if (!videoUrl) throw new Error('Video generation succeeded but no URL found in content.video_url');
+          const content = statusData.content || {};
+          const batchDir = path.dirname(outputPath);
 
+          // 1. 视频主文件
+          const videoUrl = content.video_url?.url;
+          if (!videoUrl) throw new Error('Video generation succeeded but no URL found in content.video_url');
+          logLines.push({ t: new Date().toISOString(), type: 'asset_url', asset: 'video', url: videoUrl });
           logLines.push({ t: new Date().toISOString(), type: 'download_start', url: videoUrl });
           await downloadFile(videoUrl, outputPath);
           logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+
+          // 2. 首帧 / 封面图
+          const coverUrl = content.cover_image_url?.url;
+          if (coverUrl) {
+            const baseName = path.basename(outputPath, path.extname(outputPath));
+            const firstFramePath = path.join(batchDir, `${baseName}_first.png`);
+            logLines.push({ t: new Date().toISOString(), type: 'asset_url', asset: 'first_frame', url: coverUrl });
+            logLines.push({ t: new Date().toISOString(), type: 'download_start', url: coverUrl });
+            await downloadFile(coverUrl, firstFramePath);
+            logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: firstFramePath });
+          }
+
+          // 3. 尾帧（return_last_frame=true 时 API 返回）
+          const lastFrameUrl = content.last_frame_url?.url
+            || content.last_frame_image_url?.url
+            || content.last_frame?.url;
+          if (lastFrameUrl) {
+            const baseName = path.basename(outputPath, path.extname(outputPath));
+            const lastFramePath = path.join(batchDir, `${baseName}_last.png`);
+            logLines.push({ t: new Date().toISOString(), type: 'asset_url', asset: 'last_frame', url: lastFrameUrl });
+            logLines.push({ t: new Date().toISOString(), type: 'download_start', url: lastFrameUrl });
+            await downloadFile(lastFrameUrl, lastFramePath);
+            logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: lastFramePath });
+          }
+
+          // 记录完整 content 对象（便于调试未知字段）
+          logLines.push({ t: new Date().toISOString(), type: 'response_content', content });
           return;
         } else if (statusData.status === 'failed') {
           throw new Error(`Video generation failed: ${JSON.stringify(statusData.error || statusData)}`);

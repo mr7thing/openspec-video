@@ -45,6 +45,8 @@ export async function fileToDataUri(filePath: string): Promise<string> {
 /**
  * 解析 content 数组中的本地文件路径，转换为 Base64 Data URI。
  * 相对路径基于 batchDir 解析。
+ *
+ * 注意：视频(video_url)不支持 Base64（官方 API 限制），仅转换图片和音频。
  */
 export async function inlineLocalFiles(
   content: any[],
@@ -54,11 +56,25 @@ export async function inlineLocalFiles(
     const url = item.image_url?.url ?? item.video_url?.url ?? item.audio_url?.url;
     if (!url || !isLocalFilePath(url)) continue;
 
+    // 视频不支持 Base64，跳过
+    if (item.video_url) continue;
+
     const absPath = path.isAbsolute(url) ? url : path.resolve(batchDir, url);
     const dataUri = await fileToDataUri(absPath);
 
     if (item.image_url) item.image_url.url = dataUri;
-    if (item.video_url) item.video_url.url = dataUri;
     if (item.audio_url) item.audio_url.url = dataUri;
   }
+}
+
+/**
+ * 将单个本地文件路径转为 Base64 Data URI（用于旧版 API 的顶层字段）。
+ */
+export async function inlineLocalFile(
+  filePath: string,
+  baseDir: string
+): Promise<string> {
+  if (!isLocalFilePath(filePath)) return filePath;
+  const absPath = path.isAbsolute(filePath) ? filePath : path.resolve(baseDir, filePath);
+  return fileToDataUri(absPath);
 }
