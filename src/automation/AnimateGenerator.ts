@@ -77,38 +77,26 @@ export class AnimateGenerator {
                 continue;
             }
 
-            // 解析第一帧（支持 @FRAME:shot_01_last 指针）
-            let absFirst = this.resolvePath(section.state.first_frame);
-            if (absFirst && absFirst.startsWith('@FRAME:')) {
-                const frameResult = await this.refResolver.resolve(absFirst.slice(1), '');
-                if (frameResult.resolvedImagePath) {
-                    absFirst = frameResult.resolvedImagePath;
-                } else {
-                    logger.warn(`⚠️ Shot ${section.id}: @FRAME 指针解析失败 ${section.state.first_frame}，跳过`);
-                    continue;
-                }
-            }
+            // 解析第一帧（支持 @FRAME / @shot:last 语法）
+            const rawFirst = section.state.first_frame;
+            const absFirst = this.resolvePath(rawFirst);
             if (!absFirst) {
                 logger.warn(`⚠️ Shot ${section.id}: 缺少 first_frame (首帧)，跳过`);
                 continue;
             }
-            const firstExists = await fs.access(absFirst).then(() => true).catch(() => false);
-            if (!firstExists) {
-                logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
-                continue;
-            }
-
-            // 获取最后一帧设置（支持 @FRAME 指针）
-            let absLast = this.resolvePath(section.state.last_frame);
-            if (absLast && absLast.startsWith('@FRAME:')) {
-                const frameResult = await this.refResolver.resolve(absLast.slice(1), '');
-                if (frameResult.resolvedImagePath) {
-                    absLast = frameResult.resolvedImagePath;
-                } else {
-                    logger.warn(`⚠️ Shot ${section.id}: @FRAME 尾帧指针解析失败 ${section.state.last_frame}，忽略尾帧`);
-                    absLast = null;
+            // compile 阶段不强制检查由 @FRAME 解析出的相对路径（run 阶段上游任务可能尚未生成）
+            const isFrameRefFirst = rawFirst?.startsWith('@') ?? false;
+            if (!isFrameRefFirst) {
+                const firstExists = await fs.access(absFirst).then(() => true).catch(() => false);
+                if (!firstExists) {
+                    logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
+                    continue;
                 }
             }
+
+            // 获取最后一帧设置
+            const rawLast = section.state.last_frame;
+            const absLast = this.resolvePath(rawLast);
 
             // 提取纯净的 Prompt 并展开 @ID
             let rawPrompt = this.cleanPromptText(section.textBody);
@@ -158,7 +146,7 @@ export class AnimateGenerator {
                 payload,
                 reference_images: absRefs.length > 0 
                     ? absRefs 
-                    : [absFirst],
+                    : (absFirst && !isFrameRefFirst ? [absFirst] : undefined),
                 output_path: outputPath,
             };
             jobs.push(job);
@@ -284,14 +272,40 @@ export class AnimateGenerator {
         return matches;
     }
 
+    /**
+     * 解析路径或 @FRAME 引用为可用路径。
+     *
+     * @FRAME 语法:
+     *   @FRAME:shot_01_last      → shot_01_last.png (相对路径，同目录)
+     *   @shot_01:last            → shot_01_last.png (相对路径，同目录)
+     *   @shot_01:first           → shot_01_first.png (相对路径，同目录)
+     *
+     * 普通路径保持现有解析逻辑。
+     */
     private resolvePath(p: string | null | undefined): string | null {
         if (!p || p.trim() === '') return null;
-        if (p.startsWith('@FRAME:')) return p; // 帧指针
-        // 如果已经是绝对路径，保持不变
+
+        // @FRAME:shot_01_last → shot_01_last.png
+        if (p.startsWith('@FRAME:')) {
+            return `${p.slice(7)}.png`;
+        }
+
+        // @shot_01:last → shot_01_last.png
+        if (p.startsWith('@')) {
+            const clean = p.slice(1);
+            const colonIdx = clean.indexOf(':');
+            if (colonIdx > 0) {
+                const id = clean.slice(0, colonIdx);
+                const frameType = clean.slice(colonIdx + 1);
+                if (frameType === 'first' || frameType === 'last') {
+                    return `${id}_${frameType}.png`;
+                }
+            }
+        }
+
         if (path.isAbsolute(p)) return p;
-        // 支持 URL 这类
         if (p.startsWith('http://') || p.startsWith('https://')) return p;
-        
+
         return path.resolve(this.projectRoot, 'videospec/shots', p);
     }
 

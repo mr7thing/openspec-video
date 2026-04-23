@@ -59,19 +59,11 @@ export class QueueRunner {
         succeeded++;
         logger.info(`[QueueRunner] [${i + 1}/${pendingTasks.length}] ${baseName} → ${path.basename(outputPath)} OK`);
 
-        // 视频任务：自动生成首帧/尾帧
+        // 视频任务：自动生成首帧/尾帧到 batch 目录（供下游任务 @FRAME 引用）
         const taskContent = await fs.readFile(jsonPath, 'utf-8');
         const taskMeta = JSON.parse(taskContent)._opsv;
         if (taskMeta?.type === 'video_generation') {
-          // batch 本地副本（便于查看，与视频同目录）
-          const localFramesDir = path.join(batchDir, 'frames');
-          await extractVideoFrames(outputPath, localFramesDir, baseName);
-          // 全局帧目录（供 RefResolver/@FRAME 引用查找）
-          const projectRoot = batchDir.includes('/opsv-queue/')
-            ? batchDir.split('/opsv-queue/')[0]
-            : path.resolve(batchDir, '../../../..');
-          const globalFramesDir = path.join(projectRoot, 'opsv-queue', 'frames');
-          await extractVideoFrames(outputPath, globalFramesDir, baseName);
+          await extractVideoFrames(outputPath, batchDir, baseName);
         }
       } catch (err: any) {
         failed++;
