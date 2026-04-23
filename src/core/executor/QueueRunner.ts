@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../../utils/logger';
+import { extractVideoFrames } from '../../utils/frameExtractor';
 
 /**
  * QueueRunner: 一次性顺序执行器。
@@ -57,6 +58,21 @@ export class QueueRunner {
         await handler({ jsonPath, outputPath, logPath });
         succeeded++;
         logger.info(`[QueueRunner] [${i + 1}/${pendingTasks.length}] ${baseName} → ${path.basename(outputPath)} OK`);
+
+        // 视频任务：自动生成首帧/尾帧
+        const taskContent = await fs.readFile(jsonPath, 'utf-8');
+        const taskMeta = JSON.parse(taskContent)._opsv;
+        if (taskMeta?.type === 'video_generation') {
+          // batch 本地副本（便于查看，与视频同目录）
+          const localFramesDir = path.join(batchDir, 'frames');
+          await extractVideoFrames(outputPath, localFramesDir, baseName);
+          // 全局帧目录（供 RefResolver/@FRAME 引用查找）
+          const projectRoot = batchDir.includes('/opsv-queue/')
+            ? batchDir.split('/opsv-queue/')[0]
+            : path.resolve(batchDir, '../../../..');
+          const globalFramesDir = path.join(projectRoot, 'opsv-queue', 'frames');
+          await extractVideoFrames(outputPath, globalFramesDir, baseName);
+        }
       } catch (err: any) {
         failed++;
         const errorRecord = {

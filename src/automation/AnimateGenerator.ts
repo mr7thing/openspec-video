@@ -77,26 +77,38 @@ export class AnimateGenerator {
                 continue;
             }
 
-            // 解析第一帧
-            const firstImage = section.state.first_frame;
-            const absFirst = this.resolvePath(firstImage);
-            
+            // 解析第一帧（支持 @FRAME:shot_01_last 指针）
+            let absFirst = this.resolvePath(section.state.first_frame);
+            if (absFirst && absFirst.startsWith('@FRAME:')) {
+                const frameResult = await this.refResolver.resolve(absFirst.slice(1), '');
+                if (frameResult.resolvedImagePath) {
+                    absFirst = frameResult.resolvedImagePath;
+                } else {
+                    logger.warn(`⚠️ Shot ${section.id}: @FRAME 指针解析失败 ${section.state.first_frame}，跳过`);
+                    continue;
+                }
+            }
             if (!absFirst) {
                 logger.warn(`⚠️ Shot ${section.id}: 缺少 first_frame (首帧)，跳过`);
                 continue;
             }
-
-            // 检查 @FRAME 指针或实体文件
-            if (absFirst && !absFirst.startsWith('@FRAME:')) {
-                const exists = await fs.access(absFirst).then(() => true).catch(() => false);
-                if (!exists) {
-                    logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
-                    continue;
-                }
+            const firstExists = await fs.access(absFirst).then(() => true).catch(() => false);
+            if (!firstExists) {
+                logger.error(`❌ Shot ${section.id}: 首帧文件不存在 ${absFirst}，跳过`);
+                continue;
             }
 
-            // 获取最后一帧设置
-            const absLast = this.resolvePath(section.state.last_frame);
+            // 获取最后一帧设置（支持 @FRAME 指针）
+            let absLast = this.resolvePath(section.state.last_frame);
+            if (absLast && absLast.startsWith('@FRAME:')) {
+                const frameResult = await this.refResolver.resolve(absLast.slice(1), '');
+                if (frameResult.resolvedImagePath) {
+                    absLast = frameResult.resolvedImagePath;
+                } else {
+                    logger.warn(`⚠️ Shot ${section.id}: @FRAME 尾帧指针解析失败 ${section.state.last_frame}，忽略尾帧`);
+                    absLast = null;
+                }
+            }
 
             // 提取纯净的 Prompt 并展开 @ID
             let rawPrompt = this.cleanPromptText(section.textBody);
@@ -146,7 +158,7 @@ export class AnimateGenerator {
                 payload,
                 reference_images: absRefs.length > 0 
                     ? absRefs 
-                    : (absFirst && !absFirst.startsWith('@FRAME:') ? [absFirst] : undefined),
+                    : [absFirst],
                 output_path: outputPath,
             };
             jobs.push(job);
