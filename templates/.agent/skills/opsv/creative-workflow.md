@@ -2,6 +2,8 @@
 
 从模糊灵感到可编译视频工程的完整创作管线。分为 5 个阶段，每个阶段有明确的输入、输出与文档规范。
 
+> 当前版本：v0.6.4 (Circle Architecture)
+
 ---
 
 ## 阶段 0：脑暴定调 (Brainstorming)
@@ -40,7 +42,6 @@
 ---
 aspect_ratio: "16:9"
 resolution: "1920x1080"
-engine: "siliconflow"
 vision: >
   一句话阐述整个视频的总体调性和气氛。
 global_style_postfix: >
@@ -66,6 +67,7 @@ status: draft
 - `vision`: 一两句话说明总调性。
 - `global_style_postfix`: 全局绘画提示词后缀。
 - `status`: 文档本身的审查状态（`draft` | `approved`）。
+- **严禁**在 project.md 中配置 `engine` 等执行流参数，模型选择由 Runner-Agent 在 `opsv queue compile` 时通过 `--model` 指定。
 
 ### 1.2 故事大纲 (`stories/story.md`)
 ```yaml
@@ -119,7 +121,7 @@ reviews: []
 <!-- 外部参考与附件 -->
 
 ## Approved References
-<!-- 审批回写区域 -->
+<!-- 审批回写区域 —— 由 opsv review 自动写入，Agent 勿手动修改 -->
 ```
 
 **场景模板** (`scenes/@id.md`)：与角色模板语法互通，`type: "scene"`。
@@ -128,13 +130,26 @@ reviews: []
 - 文件名必须精确匹配花名册里的标签（如 `@boss` → `elements/@boss.md`）。
 - 顶部必须由符合规范的 YAML 字典组成。
 - `status: approved` 代表实体已定档可用；刚起草则为 `draft`。
-- 必须设立 `## Design References`（输入参考图）和 `## Approved References`（定档后视觉形象）。
+- 必须设立 `## Design References`（输入参考图）和 `## Approved References`（定档后视觉形象，由 `opsv review` 自动回写）。
+- `refs` 字段定义了依赖关系，**直接影响 Circle 分层**。例如：若 `@younger_brother` 的 `refs` 包含 `@elder_brother`，则前者必须等待后者 approved 后才能生成。
+
+### 资产设计完成后的 Circle 检查
+
+资产文档全部落盘后，必须建议 Guardian-Agent 执行：
+
+```bash
+opsv validate              # 校验 YAML frontmatter 与引用死链
+opsv circle status         # 查看资产自动分层的 Circle 归属
+opsv deps                  # 查看拓扑排序与依赖阻塞情况
+```
 
 ---
 
 ## 阶段 3：剧本设计 (Script Designer)
 
 **触发时机**：资产文件已定稿（`status: approved`）。
+
+**Circle 约束**：剧本设计通常发生在 ZeroCircle 资产全部 approved 之后。Runner-Agent 会基于 approved 资产生成 FirstCircle 的分镜图像。
 
 ### 多集连续剧架构
 - **文件命名**：支持 `script-01.md`, `script-02.md` 等。
@@ -161,6 +176,8 @@ reviews: []
 
 **触发时机**：`Script.md` 定稿，需要生成视频工程图纸。
 
+**Circle 约束**：视频生成发生在末端 Circle（EndCircle），由 `opsv animate` 自动推断。EndCircle 必须是 `shotlist.md`。
+
 ### 协同工作流
 你是"模具封装者"：
 1. **调用编导能力**：调用 `animation-director` 技能构思机位、推拉摇移、特效指令。
@@ -182,7 +199,11 @@ reviews: []
 **关键帧塌缩 (@FRAME)**：
 如果是连贯分镜，首帧应指向上镜的尾帧。写法：`first_frame: "@FRAME:shot_01_last"`。
 
-**@FRAME 路径解析**（v0.6.4）：`@FRAME:shot_XX_last` 解析到 `opsv-queue/frames/` 目录。
+**@FRAME 路径解析（v0.6.4）**：
+- `@FRAME:shot_XX_last` 在 `opsv animate` 编译时解析为**相对路径** `shot_XX_last.png`
+- 非 `@FRAME` 路径仍按传统方式解析（相对于 `videospec/shots/`）
+- 该 PNG 文件由上游视频的 Provider（如 Volcengine Seedance 2.0 的 `return_last_frame`）或 QueueRunner 的 ffmpeg 提取到 batch 目录
+- **编译时不检查** `@FRAME` 路径的存在性（因为上游视频可能尚未生成）
 
 ### 视频任务生成
 Shotlist.md 定稿后，由 Runner-Agent 调用：
@@ -191,7 +212,12 @@ opsv animate [--cycle auto]
 ```
 - 默认 `--cycle auto`，自动推断依赖图末端 Circle（EndCircle）。
 - 产出：`opsv-queue/<endcircle>/video_jobs.json`。
-- 后续：`opsv queue compile` + `opsv queue run <provider>` 执行渲染。
+- 后续：`opsv queue compile --model <provider.model|alias>` + `opsv queue run --model <provider.model|alias>` 执行渲染。
+
+**v0.6.4 CLI 语法变更**：
+- 旧语法 `--volcengine.seedance-2.0` 已废弃
+- 新语法：`--model volcengine.seedance-2.0` 或别名 `--model volc.sd2`
+- 别名在 `.env/api_config.yaml` 的 `aliases` 字段中定义
 
 ---
 
@@ -202,5 +228,7 @@ opsv animate [--cycle auto]
 | 脑暴 | 导演灵感 | 无（对话共识） | 项目已 init |
 | 架构 | 共识方向 | `project.md` + `story.md` | 脑暴完成 |
 | 资产 | 花名册 | `elements/*.md` + `scenes/*.md` | 架构完成 |
-| 剧本 | 定稿资产 | `shots/Script.md` | 资产 approved |
+| 剧本 | 定稿资产 | `shots/Script.md` | ZeroCircle 资产 approved |
 | 动画 | 定稿剧本 | `shots/Shotlist.md` | 剧本 approved |
+| 图像渲染 | 资产文档 | `opsv-queue/zerocircle_1/*.png` | `opsv imagen` + `queue compile/run` |
+| 视频渲染 | Shotlist.md | `opsv-queue/endcircle_1/*.mp4` | `opsv animate` + `queue compile/run` |

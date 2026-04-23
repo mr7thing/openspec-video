@@ -63,29 +63,77 @@ project/
 
 ## opsv circle status
 
-查看各 Circle 完成状态。
+**实时刷新**各 Circle 的完成状态。每次运行都会重新扫描 `videospec/` 下所有文档，重建依赖图并统计批准状态。
 
 ```bash
 opsv circle status
 ```
 
-输出示例：
-```
-📊 Circle 状态
+**设计原理**：Circle 不是静态配置，而是文档依赖关系的**动态投影**。`opsv circle status` 每次运行都会：
+1. 重新扫描所有 `.md` 文件的 frontmatter
+2. 从 `refs` 字段重建依赖图
+3. 拓扑排序得到 Circle 分层
+4. 读取 `## Approved References` 区域统计批准数
 
-  zerocircle_1:   12/15 completed
-  firstcircle_1:  0/8 pending (等待 zerocircle_1)
-  secondcircle_1: 0/24 pending (等待 firstcircle_1)
+**输出示例**：
 ```
+📊 依赖分析完成，共 3 个 Circle:
+
+  ✅ FirstCircle: 8 个资产 (8 已批准)
+     └─ 已有 2 次迭代记录在 opsv-queue
+     └─ shot_01, shot_02, shot_03 ...等 5 个
+
+  ⏳ SecondCircle: 5 个资产 (2 已批准)
+     └─ shot_04, shot_05, shot_06 ...等 2 个
+
+  ⭕ ThirdCircle: 3 个资产 (0 已批准)
+     └─ shot_07, shot_08, shot_09
+```
+
+**状态图标含义**：
+
+| 图标 | 状态 | 含义 | 后续动作 |
+|------|------|------|----------|
+| ⭕ | 未开始 | 该 Circle 无任何 approved 资产 | 禁止启动下游；执行本 Circle `imagen`/`animate` |
+| ⏳ | 进行中 | 部分资产已批准 | 继续完成未批准资产；仍禁止启动下游 |
+| ✅ | 已完成 | 全部资产已批准 | 允许晋升下一 Circle；执行 `manifest` 固化快照 |
+
+**触发时机**（以下事件后必须刷新）：
+
+| 事件 | 原因 |
+|------|------|
+| 新增/修改/删除 `.md` 文件 | `refs` 依赖关系可能改变 |
+| Review Approve/Draft | 批准状态变化，可能解锁/阻断下游 Circle |
+| 迭代重生成 | 旧结果失效，迭代计数变化 |
+| 手动编辑 `## Approved References` | 引用路径可能变化 |
 
 ---
 
 ## opsv circle manifest
 
-生成 `opsv-queue/circle_manifest.json`，记录各环任务清单。
+将当前拓扑排序与批准状态快照写入 `opsv-queue/circle_manifest.json`，供后续管线步骤消费。
 
 ```bash
 opsv circle manifest
+```
+
+**使用时机**：
+- 某 Circle **全部 approved（✅）**后，执行 `manifest` 固化状态
+- 作为进入下一 Circle 的"关卡检查点"
+- 与 `opsv circle status` 配合使用：`status` 探查当前状态，`manifest` 固化通过快照
+
+**产出结构**：
+```json
+{
+  "version": "0.6.4",
+  "generatedAt": "2026-04-23T10:00:00Z",
+  "totalCircles": 3,
+  "circles": [
+    { "index": 0, "name": "ZeroCircle", "assets": [...], "status": "approved" },
+    { "index": 1, "name": "FirstCircle", "assets": [...], "status": "approved" },
+    { "index": 2, "name": "SecondCircle", "assets": [...], "status": "pending" }
+  ]
+}
 ```
 
 ---
@@ -219,10 +267,9 @@ opsv comfy compile <workflow.json> --provider <comfyui_local|runninghub> --circl
 
 ```bash
 # 原生 API 投递（Volcengine / SiliconFlow / Minimax）
-opsv queue compile <jobs.json> --provider volcengine [--circle <name>]
-
-# ComfyUI 工作流投递
-opsv queue compile <jobs.json> --provider runninghub
+opsv queue compile <jobs.json> --model <provider.model|alias> [--circle <name>]
+# 例: opsv queue compile jobs.json --model volcengine.seadream-5.0-lite --circle zerocircle_1
+# 例: opsv queue compile jobs.json --model volc.sd2 --circle zerocircle_1
 ```
 
 ### 编译器路由
@@ -358,7 +405,7 @@ opsv circle status
 opsv imagen
 
 # 6. 编译入队
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --provider volcengine
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
 
 # 7. 执行任务
 opsv queue run volcengine
@@ -370,7 +417,7 @@ opsv review
 
 # 10. 视频管线
 opsv animate
-opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --provider seedance
+opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --model volcengine.seedance-2.0
 opsv queue run seedance
 ```
 

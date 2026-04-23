@@ -17,10 +17,10 @@
 
 现在（v0.6.4 现行）Circle Queue 模式：
   opsv imagen / animate / comfy → opsv-queue/<circle>/jobs.json (意图)
-  opsv queue compile <jobs.json> --provider <name> --circle <name>
-    → opsv-queue/<circle>/<provider>/queue_{N}/queue.json (manifest)
+  opsv queue compile <jobs.json> --model <provider.model|alias> --circle <name>
+    → opsv-queue/<circle>/<provider>/queue_{N}/ (batch 目录)
     → opsv-queue/<circle>/<provider>/queue_{N}/{taskId}.json (原子任务)
-  opsv queue run <provider> --circle <name>
+  opsv queue run --model <provider.model|alias> --circle <name>
     → QueueWatcher → provider.processTask(task)
   优势: Circle 分层依赖、全局唯一序号、批次隔离
 ```

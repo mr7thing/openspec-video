@@ -109,10 +109,10 @@ opsv deps
 opsv generate
 
 # 7. Compile to API-specific atomic tasks
-opsv queue compile queue/jobs.json --provider seadream
+opsv queue compile queue/jobs.json --model volcengine.seadream-5.0-lite
 
 # 8. Execute tasks (single-threaded sequential)
-opsv queue run seadream
+opsv queue run --model volcengine.seadream-5.0-lite
 
 # 9. Visual review
 opsv review

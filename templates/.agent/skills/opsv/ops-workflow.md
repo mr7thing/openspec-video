@@ -88,7 +88,7 @@ opsv comfy compile workflow.json --provider <comfyui_local|runninghub> --circle 
 `opsv queue compile` 将意图层 jobs.json 编译为执行层可直接发送的 API 请求体 `.json`。
 
 ```bash
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --volcengine.seadream-5.0-lite --circle zerocircle_1
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite --circle zerocircle_1
 ```
 
 - **每次 compile 必然创建新 batch**：`queue_{N+1}/`。
@@ -100,8 +100,8 @@ opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --volcengine.seadrea
 一次性顺序执行队列任务。
 
 ```bash
-opsv queue run --volcengine.seadream-5.0-lite --circle zerocircle_1
-opsv queue run --siliconflow.qwen-image --circle zerocircle_1
+opsv queue run --model volcengine.seadream-5.0-lite --circle zerocircle_1
+opsv queue run --model siliconflow.qwen-image --circle zerocircle_1
 ```
 
 - 默认执行最新 `queue_N/` 目录。
@@ -115,7 +115,7 @@ opsv queue run --siliconflow.qwen-image --circle zerocircle_1
 # 复制现有任务，修改参数后重新执行
 cp queue_1/shot_01.json queue_1/shot_01_v2.json
 # 编辑 shot_01_v2.json（修改 prompt、seed 等字段）
-opsv queue run --volcengine.seadream-5.0-lite --file shot_01_v2.json
+opsv queue run --model volcengine.seadream-5.0-lite --file shot_01_v2.json
 # → 生成 shot_01_v2_1.png
 ```
 
@@ -140,7 +140,91 @@ Runner-Agent 必须理解依赖图的批次概念：
 
 ---
 
-## 5. 故障处理 (Emergency)
+## 5. Circle 状态刷新协议 (Circle Refresh Protocol)
+
+**核心原则**：`opsv circle` 不是一次性命令，而是状态探针。任何影响资产依赖关系或批准状态的变更后，必须重新执行以获取最新拓扑视图。
+
+### 5.1 触发时机 (When to Refresh)
+
+以下任一事件发生后，**必须**执行 `opsv circle status`：
+
+| 事件类型 | 具体场景 | 后续动作 |
+|----------|----------|----------|
+| **文档依赖变更** | 新增/删除/修改 `.md` 文件中的 `refs` 字段 | 重新分析 Circle 分层，确认资产归属是否漂移 |
+| **Review Approve** | 某资产在 `opsv review` 中被标记为 Approve | 检查该 Circle 是否全部 approved，决定能否晋升下一 Circle |
+| **Review Draft** | 某资产被打回 Draft 状态 | 确认该 Circle 退回未完成状态，阻止下游 Circle 启动 |
+| **迭代重生成** | 对某资产执行迭代生成（修改 prompt 重新 render） | 确认迭代计数增加，旧版本不再计入 approved |
+| **手动编辑 Approved References** | 人工修改 markdown 中的 `## Approved References` 区域 | 验证 approved 引用路径有效，状态统计准确 |
+| **目录结构变更** | 新增/删除 `videospec/` 子目录或文件 | 重新扫描全部资产，重建依赖图 |
+
+### 5.2 命令语义与决策矩阵
+
+```bash
+# 状态探针 — 实时扫描文档目录，重新计算拓扑排序和批准状态
+opsv circle status
+
+# 清单固化 — 将当前拓扑快照写入 opsv-queue/circle_manifest.json，供后续步骤消费
+opsv circle manifest
+```
+
+**`opsv circle status` 输出解读**：
+
+```
+  ✅ FirstCircle: 8 个资产 (8 已批准)
+     └─ 已有 2 次迭代记录在 opsv-queue
+     └─ shot_01, shot_02, shot_03 ...等 5 个
+
+  ⭕ SecondCircle: 5 个资产 (0 已批准)
+     └─ shot_04, shot_05, shot_06 ...等 2 个
+```
+
+| 图标 | 含义 | Agent 决策 |
+|------|------|------------|
+| ⭕ | 该 Circle 无任何资产被批准 | **禁止**启动下游 Circle 生成；优先执行本 Circle 的 `imagen` / `animate` |
+| ⏳ | 部分资产已批准（未全部完成） | 继续完成未批准资产的生成与 review；仍**禁止**启动下游 Circle |
+| ✅ | 全部资产已批准 | **允许**启动下一 Circle 的生成管线；执行 `opsv circle manifest` 固化快照 |
+
+### 5.3 状态流转工作流
+
+**场景 A：依赖变更后的重新分层**
+
+```bash
+# 导演修改了 scenes/classroom.md，新增 refs: ["@blackboard"]
+opsv validate              # 1. 先校验文档语法
+opsv circle status         # 2. 刷新！确认 classroom 是否从 ZeroCircle 漂移到 FirstCircle
+opsv deps                  # 3. 查看新的拓扑排序
+# → 根据新分层决定是否需要重新编译任务列表
+```
+
+**场景 B：Review Approve 后的晋升检查**
+
+```bash
+# 导演在 opsv review 中 approve 了 shot_03
+opsv circle status         # 1. 刷新！检查 FirstCircle 是否全部 approved
+# → 若输出显示 "✅ FirstCircle: 8 个资产 (8 已批准)"
+opsv circle manifest       # 2. 固化当前状态快照
+opsv animate               # 3. 基于 approved 资产，生成视频任务（自动推断 SecondCircle）
+opsv queue compile ...     # 4. 进入下一 Circle 的编译与执行
+```
+
+**场景 C：Draft 打回后的阻断**
+
+```bash
+# 导演将 shot_03 标记为 Draft，要求修改 prompt
+opsv circle status         # 1. 刷新！确认 FirstCircle 退回 ⏳ 或 ⭕ 状态
+# → 输出显示 "⏳ FirstCircle: 8 个资产 (7 已批准)"
+# → Agent 必须阻止 SecondCircle 启动，直到 shot_03 重新 approved
+```
+
+### 5.4 铁律
+
+- **禁止缓存 Circle 状态**：Agent 不得将之前 `opsv circle status` 的结果缓存用于后续决策。每次操作前必须重新执行。
+- **禁止跨越未批准 Circle**：即使技术层面可以编译下游任务，只要 `opsv circle status` 显示上游 Circle 未全部 ✅，就不得启动 `queue compile` 或 `queue run`。
+- **manifest 是承诺**：`opsv circle manifest` 生成的 `circle_manifest.json` 是当前状态的快照。在变更后如果未重新执行 `manifest`，该文件即为过期状态，不得作为决策依据。
+
+---
+
+## 6. 故障处理 (Emergency)
 
 - 若 API 报错（401/429/500），应立即检查 `.env` 配置，不得凭空猜测参数名。
 - 所有非 2xx 响应保留在 `{jobId}.log`（JSONL 格式）中，用于证据链追溯。

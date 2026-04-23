@@ -228,10 +228,16 @@ Camera: 特写，浅景深。
 ### 4.1 状态层
 
 ```bash
-opsv circle status          # 查看各 Circle 完成状态
-opsv circle manifest        # 生成 opsv-queue/circle_manifest.json
+opsv circle status          # 实时刷新各 Circle 完成状态（文档变更后必须重跑）
+opsv circle manifest        # 将拓扑快照写入 opsv-queue/circle_manifest.json
 opsv deps                   # 依赖图分析（文本输出）
 ```
+
+**`opsv circle` 刷新协议**：
+- `status` 每次运行都**重新扫描**所有 `.md` 文档，重建依赖图并统计批准状态，不可依赖缓存
+- `manifest` 将当前状态固化为 `circle_manifest.json`，作为进入下一 Circle 的"关卡检查点"
+
+**触发刷新的事件**：修改 `.md` 文件的 `refs` 字段、Review Approve/Draft、迭代重生成、手动编辑 `## Approved References`、新增/删除 `.md` 文件
 
 ### 4.2 任务生成层（按媒介类型）
 
@@ -486,16 +492,18 @@ Creative-Agent ──→ Guardian-Agent ──→ Runner-Agent ──→ Review
 - 任一节非空时 → 使用 `visual_brief` + 参考图
 
 ### 阶段四：编译与执行
-1. `opsv circle status` 查看当前该做哪一环
+1. `opsv circle status` **实时刷新**当前 Circle 状态（文档变更后必须重跑）
 2. `opsv imagen / animate / comfy` 生成任务列表
 3. `opsv queue compile <jobs.json> --model <provider.model|alias> --circle <name>` 编译为可直接执行的 `.json`
 4. `opsv queue run --model <provider.model|alias> --circle <name>` 一次性顺序执行
 5. `opsv review` 审阅产出
 6. **Agent 迭代**：复制 `.json` → 修改参数 → `opsv queue run --model <provider.model|alias> --file <json>` 重新执行
 
-### 阶段五：迭代
-- Approve 的资产进入下一环的依赖池
-- Draft 的资产回滚到 Creative-Agent 重新迭代
+### 阶段五：迭代与晋升
+- **Review 后必须刷新**：`opsv circle status` 重新计算批准状态
+- **全部 Approved（✅）**：执行 `opsv circle manifest` 固化快照，允许晋升下一 Circle
+- **部分 Approved（⏳）**：继续完成未批准资产，禁止启动下游 Circle
+- **Draft 回滚**：阻断下游 Circle，回到 Creative-Agent 重新迭代
 
 ---
 

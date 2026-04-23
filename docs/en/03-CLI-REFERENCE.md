@@ -62,8 +62,8 @@ opsv generate --shots 1,5,12       # Specific shots
 Compile intent outline to API-specific atomic task cards.
 
 ```bash
-opsv queue compile queue/jobs.json --provider seadream      # Standard API
-opsv queue compile queue/jobs.json --provider runninghub    # ComfyUI workflow
+opsv queue compile queue/jobs.json --model volcengine.seadream-5.0-lite      # Standard API
+opsv queue compile queue/jobs.json --model runninghub.default    # ComfyUI workflow
 ```
 
 | Provider | Compiler | Description |
@@ -80,10 +80,10 @@ opsv queue compile queue/jobs.json --provider runninghub    # ComfyUI workflow
 Start QueueWatcher for single-threaded task consumption.
 
 ```bash
-opsv queue run seadream
-opsv queue run minimax
-opsv queue run siliconflow
-opsv queue run comfyui_local
+opsv queue run --model volcengine.seadream-5.0-lite
+opsv queue run --model minimax.minimax-image-01
+opsv queue run --model siliconflow.qwen-image
+opsv queue run --model comfyui_local.default
 opsv queue run runninghub
 ```
 
@@ -162,13 +162,13 @@ opsv init
 # Write docs...
 opsv deps
 opsv generate
-opsv queue compile queue/jobs.json --provider seadream
-opsv queue run seadream
+opsv queue compile queue/jobs.json --model volcengine.seadream-5.0-lite
+opsv queue run --model volcengine.seadream-5.0-lite
 opsv review
 # Iterate...
 opsv animate
-opsv queue compile queue/video_jobs.json --provider seedance
-opsv queue run seedance
+opsv queue compile queue/video_jobs.json --model volcengine.seedance-2.0
+opsv queue run --model volcengine.seedance-2.0
 ```
 
 ---

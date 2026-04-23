@@ -55,10 +55,10 @@ opsv imagen
 opsv animate
 
 # 2. 使用 ComfyUI 编译器投递到 Addon 工作流
-opsv queue compile opsv-queue/<circle>/imagen_jobs.json --provider runninghub
+opsv queue compile opsv-queue/<circle>/imagen_jobs.json --model runninghub.default
 
-# 3. QueueWatcher 消费执行
-opsv queue run runninghub
+# 3. 执行
+opsv queue run --model runninghub.default
 ```
 
 ### 3.2 编译器路由规则

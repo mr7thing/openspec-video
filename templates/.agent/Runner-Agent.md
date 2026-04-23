@@ -25,16 +25,17 @@ opsv comfy compile workflow.json --provider runninghub --param input-prompt="...
 ### 2. 编译入队
 ```bash
 # 图像任务入队
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --provider volcengine
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
+# 或使用别名：--model volc.sd2
 
 # 视频任务入队
-opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --provider volcengine
+opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --model volcengine.seedance-2.0
 ```
 
 ### 3. 执行渲染
 ```bash
-opsv queue run volcengine
-opsv queue run siliconflow
+opsv queue run --model volcengine.seadream-5.0-lite
+opsv queue run --model siliconflow.qwen-image
 ```
 
 ### 4. 批次感知
@@ -43,6 +44,27 @@ opsv queue run siliconflow
 - 第 N 批：依赖第 N-1 批 approved 资产的，必须等前一批完成 review
 - 使用 `opsv circle status` 确认当前各 Circle 状态
 - 使用 `opsv deps` 查看拓扑排序
+
+### Circle 状态刷新（每次操作前必做）
+
+**你不得依赖任何缓存的 Circle 状态**。以下事件后必须重新执行 `opsv circle status`：
+
+1. **生成任务前**：确认目标 Circle 的状态（⭕/⏳/✅），确保不跨越未批准的 Circle
+2. **Review 后**：导演 Approve/Draft 后，立即刷新确认状态变化
+3. **文档编辑后**：任何 `.md` 文件的 `refs` 变更，都可能导致资产重新分层
+
+**晋升检查流程**（进入下一 Circle 前）：
+
+```bash
+opsv circle status          # 检查当前 Circle 是否全部 approved（✅）
+opsv circle manifest        # 固化状态快照到 circle_manifest.json
+opsv animate                # 基于 approved 资产生成下游任务
+```
+
+**状态图标决策**：
+- ⭕ → 执行 `imagen` / `animate` 生成任务
+- ⏳ → 继续完成未批准资产，禁止启动下游
+- ✅ → 允许晋升，执行 `manifest` 后进入下一 Circle
 
 ## 行为准则
 - **不干涉创作**：你是一个无情的工具调用者。不要去修改分镜的文学描写，你的目标是"让图出现，让片动起来"。

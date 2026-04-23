@@ -142,10 +142,10 @@ opsv circle status
 opsv imagen
 
 # 8. 编译入队
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --provider volcengine
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
 
 # 9. 执行任务
-opsv queue run volcengine
+opsv queue run --model volcengine.seadream-5.0-lite
 
 # 10. Web 模式审阅
 opsv review

@@ -42,25 +42,29 @@
 # 1. 验证规范
 opsv validate
 
-# 2. 查看当前 Circle 状态
+# 2. 查看当前 Circle 状态（文档变更后必须重新执行）
 opsv circle status
 
 # 3. 生成图像任务列表（ZeroCircle / FirstCircle）
 opsv imagen
 
-# 4. 编译为可执行 API 请求体（指定精确模型）
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --volcengine.seadream-5.0-lite --circle zerocircle_1
+# 4. 编译为可执行 API 请求体（指定精确模型或别名）
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite --circle zerocircle_1
+# 或使用别名：--model volc.sd2
 
 # 5. 执行渲染（一次性顺序执行）
-opsv queue run --volcengine.seadream-5.0-lite --circle zerocircle_1
+opsv queue run --model volcengine.seadream-5.0-lite --circle zerocircle_1
 
 # 6. 审阅（Approve 后方可进入下一 Circle）
 opsv review
+#    → Approve 后必须重新执行 opsv circle status 确认状态
+#    → 全部 approved 后执行 opsv circle manifest 固化快照
 
 # 7. 视频生成（自动推断末端 Circle）
 opsv animate
-opsv queue compile opsv-queue/endcircle_1/video_jobs.json --volcengine.seedance-1.5-pro --circle endcircle_1
-opsv queue run --volcengine.seedance-1.5-pro --circle endcircle_1
+opsv queue compile opsv-queue/endcircle_1/video_jobs.json --model volcengine.seedance-2.0 --circle endcircle_1
+# 或使用别名：--model volc.sd2
+opsv queue run --model volcengine.seedance-2.0 --circle endcircle_1
 ```
 
 ### Agent 迭代操作
@@ -71,11 +75,11 @@ cp opsv-queue/firstcircle_1/volcengine/queue_1/shot_01.json opsv-queue/firstcirc
 # 编辑 shot_01_v2.json（修改 prompt、seed、cfg_scale 等字段）
 
 # 执行修改后的任务
-opsv queue run --volcengine.seadream-5.0-lite --file shot_01_v2.json --circle firstcircle_1
+opsv queue run --model volcengine.seadream-5.0-lite --file shot_01_v2.json --circle firstcircle_1
 # → 生成 shot_01_v2_1.png
 
 # 重试失败任务
-opsv queue run --siliconflow.qwen-image --retry --circle zerocircle_1
+opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 ```
 
 ### 常用命令矩阵
@@ -84,15 +88,29 @@ opsv queue run --siliconflow.qwen-image --retry --circle zerocircle_1
 |------|------|----------|
 | `opsv init` | 初始化项目结构 | `[projectName]` |
 | `opsv validate` | 验证 frontmatter 与引用 | - |
-| `opsv circle status` | 查看各 Circle 完成状态 | - |
+| `opsv circle status` | **实时刷新**各 Circle 完成状态（文档变更后必须重跑） | - |
+| `opsv circle manifest` | 将当前拓扑快照写入 `circle_manifest.json` | - |
 | `opsv circle --skip` | 只生成零环和终环 | - |
 | `opsv imagen [targets...]` | 生成图像任务列表 | `--preview`, `--shots`, `--skip-approved` |
 | `opsv animate` | 生成视频任务列表（自动推断末端 Circle） | `--cycle auto` |
 | `opsv comfy compile <workflow.json>` | 编译 ComfyUI 工作流为 `.json` | `--provider`, `--param`, `--circle` |
-| `opsv queue compile <jobs.json> --<provider.model>` | 编译意图到 Provider 队列 | `--circle` |
-| `opsv queue run --<provider.model>` | 一次性顺序执行队列任务 | `--file`, `--retry`, `--circle` |
+| `opsv queue compile <jobs.json> --model <provider.model\|alias>` | 编译意图到 Provider 队列 | `--circle` |
+| `opsv queue run --model <provider.model\|alias>` | 一次性顺序执行队列任务 | `--file`, `--retry`, `--circle` |
 | `opsv review` | 启动 Web UI 进行 Approve 审核 | `--port`, `--batch` |
 | `opsv deps` | 分析资产依赖关系与推荐顺序 | - |
+
+### Circle 状态刷新触发时机
+
+以下事件发生后，**必须**重新执行 `opsv circle status`：
+
+| 触发事件 | 原因 | 后续决策 |
+|----------|------|----------|
+| 修改 `.md` 文件的 `refs` 字段 | 依赖关系改变，资产可能重新分层 | 检查 Circle 归属是否漂移 |
+| Review Approve | 批准状态解锁下游 Circle | 全部 ✅ 则允许晋升下一 Circle |
+| Review Draft | 批准状态回退 | 阻断下游 Circle，直到重新 approved |
+| 迭代重生成 | 旧结果失效，迭代计数增加 | 确认新迭代已纳入统计 |
+| 手动编辑 `## Approved References` | 引用路径可能变化 | 验证状态统计准确性 |
+| 新增/删除 `.md` 文件 | 资产总数变化 | 重建完整依赖图 |
 
 ### Circle 资产层级定义
 

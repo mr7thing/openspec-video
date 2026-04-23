@@ -72,7 +72,7 @@ Script.md parses from `## Shot NN` headings (not frontmatter arrays).
 ### 5.2 Spooler Queue Compilation (v0.6.0)
 ```bash
 opsv generate                                              # Intent stage
-opsv queue compile queue/jobs.json --provider seadream      # Compile stage
+opsv queue compile queue/jobs.json --model volcengine.seadream-5.0-lite      # Compile stage
 ```
 Router: Standard API �?`StandardAPICompiler`, ComfyUI �?`ComfyUITaskCompiler`
 

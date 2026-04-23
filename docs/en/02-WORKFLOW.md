@@ -108,14 +108,14 @@ opsv generate    # Produces queue/jobs.json �?pure business intent
 
 ### 4.3 Atomic Delivery
 ```bash
-opsv queue compile queue/jobs.json --provider seadream     # Standard API
-opsv queue compile queue/jobs.json --provider runninghub   # ComfyUI workflow
+opsv queue compile queue/jobs.json --model volcengine.seadream-5.0-lite     # Standard API
+opsv queue compile queue/jobs.json --model runninghub.default   # ComfyUI workflow
 ```
 - Each job becomes an independent `UUID.json` in `.opsv-queue/pending/{provider}/`
 
 ### 4.4 Single-Threaded Consumption
 ```bash
-opsv queue run seadream
+opsv queue run --model volcengine.seadream-5.0-lite
 ```
 - Sequential processing, no concurrency conflicts
 - Success �?`completed/`, Failure �?`failed/`
@@ -135,8 +135,8 @@ opsv review    # Port configured via OPSV_REVIEW_PORT
 
 ```bash
 opsv animate
-opsv queue compile queue/video_jobs.json --provider seedance
-opsv queue run seedance
+opsv queue compile queue/video_jobs.json --model volcengine.seedance-2.0
+opsv queue run --model volcengine.seedance-2.0
 ```
 
 **Static-Dynamic Separation**: Describe only camera motion, character actions, dynamic changes �?never appearance details.

@@ -154,15 +154,42 @@ my-project/
 ### 4.1 Circle 状态检查
 
 ```bash
-opsv circle status          # 查看各 Circle 完成状态
-opsv circle manifest        # 生成 opsv-queue/circle_manifest.json
+opsv circle status          # 实时刷新各 Circle 完成状态（文档变更后必须重跑）
+opsv circle manifest        # 将拓扑快照写入 opsv-queue/circle_manifest.json
 ```
+
+**设计原理**：Circle 不是静态配置，而是文档依赖关系的**动态投影**。`opsv circle status` 每次运行都会重新扫描 `videospec/` 下所有 `.md` 文件，从 frontmatter 的 `refs` 字段重建依赖图，拓扑排序得到分层，并读取 `## Approved References` 区域统计批准状态。
 
 Circle 序号由 `DependencyGraph` 的拓扑排序自动计算：
 - 无依赖资产 → ZeroCircle
 - 依赖 ZeroCircle 资产 → FirstCircle
 - 依赖 FirstCircle 资产 → SecondCircle
 - 依此类推
+
+**状态图标与 Agent 决策**：
+
+| 图标 | 状态 | 含义 | Agent 动作 |
+|------|------|------|------------|
+| ⭕ | 未开始 | 该 Circle 无任何 approved 资产 | 禁止启动下游；执行本 Circle `imagen`/`animate` |
+| ⏳ | 进行中 | 部分资产已批准 | 继续完成未批准资产；仍禁止启动下游 |
+| ✅ | 已完成 | 全部资产已批准 | 执行 `manifest` 固化快照，允许晋升下一 Circle |
+
+**触发刷新的事件**（以下任一事件发生后必须重新执行 `opsv circle status`）：
+
+| 事件 | 原因 |
+|------|------|
+| 新增/修改/删除 `.md` 文件 | `refs` 依赖关系可能改变，资产可能重新分层 |
+| Review Approve/Draft | 批准状态变化，可能解锁/阻断下游 Circle |
+| 迭代重生成 | 旧结果失效，迭代计数增加 |
+| 手动编辑 `## Approved References` | 引用路径可能变化 |
+
+**晋升检查流程**（进入下一 Circle 前）：
+
+```bash
+opsv circle status          # 检查当前 Circle 是否全部 approved（✅）
+opsv circle manifest        # 固化状态快照到 circle_manifest.json
+opsv animate                # 基于 approved 资产生成下游任务（自动推断末端 Circle）
+```
 
 ### 4.2 分镜设计
 
@@ -196,7 +223,7 @@ opsv comfy compile <workflow.json> --provider <comfyui_local|runninghub> --circl
 
 ```bash
 # 将意图编译为特定 API 的原子任务卡片
-opsv queue compile <jobs.json> --provider <name> [--circle <name>]
+opsv queue compile <jobs.json> --model <provider.model|alias> [--circle <name>]
 ```
 
 - 在 `opsv-queue/<circle>/<provider>/` 下创建新 batch：`queue_{max+1}/`
@@ -253,7 +280,7 @@ opsv review
 opsv animate
 
 # 编译为特定视频 API 任务
-opsv queue compile opsv-queue/<circle>/video_jobs.json --provider seedance
+opsv queue compile opsv-queue/<circle>/video_jobs.json --model volcengine.seedance-2.0
 
 # 执行视频生成
 opsv queue run seedance
@@ -270,6 +297,23 @@ opsv queue run seedance
 
 ```
 Creative-Agent → Guardian-Agent → Runner-Agent → Review → (不满意) → 回滚 → Creative-Agent
+```
+
+### Review 后的 Circle 状态刷新
+
+每次 Review（Approve 或 Draft）后，**必须**执行 `opsv circle status` 重新计算状态：
+
+- **Approve 后**：检查该 Circle 是否全部 approved（✅）。若是，执行 `opsv circle manifest` 固化快照，然后允许启动下一 Circle 的生成管线。
+- **Draft 后**：确认该 Circle 退回 ⏳ 或 ⭕ 状态，**必须阻断**下游 Circle 的启动，直到问题资产重新 approved。
+
+### 文档变更后的重新分层
+
+当导演修改 `videospec/` 下任何 `.md` 文件（尤其是修改 `refs` 字段）后：
+
+```bash
+opsv validate              # 1. 校验文档语法
+opsv circle status         # 2. 刷新 Circle 状态（依赖关系可能已改变）
+opsv deps                  # 3. 查看新的拓扑排序
 ```
 
 三角色协作确保每一轮迭代中，创意、规范、执行三个维度各司其职、互不越界。
