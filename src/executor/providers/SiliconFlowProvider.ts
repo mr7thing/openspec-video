@@ -1,148 +1,104 @@
 import axios from 'axios';
 import fs from 'fs/promises';
-import path from 'path';
 import { logger } from '../../utils/logger';
-import { ConfigLoader } from '../../utils/configLoader';
+import { downloadFile } from '../../utils/download';
+
+/**
+ * SiliconFlow Provider (v0.6.4 简化版)
+ *
+ * 职责：读取 .json 任务文件 → 发送请求 → 下载结果 → 写 JSONL log。
+ */
 
 export class SiliconFlowProvider {
-    /**
-     * 执行 SiliconFlow 任务
-     * task 结构由 QueueWatcher 提供: { uuid, payload: { prompt, params, model, type }, outputPath }
-     */
-    async processTask(task: any): Promise<boolean> {
-        const { payload, outputPath, uuid } = task;
-        if (!payload) throw new Error("SiliconFlow Provider: Missing payload");
+  async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
+    const { taskJson, outputPath, logPath } = input;
+    const meta = taskJson._opsv;
+    const requestBody = { ...taskJson };
+    delete requestBody._opsv;
 
-        const configLoader = ConfigLoader.getInstance();
-        let apiKey: string;
-        try {
-            apiKey = configLoader.getResolvedApiKey('siliconflow');
-        } catch {
-            apiKey = process.env.SILICONFLOW_API_KEY || '';
-            if (!apiKey) throw new Error("Missing SILICONFLOW_API_KEY");
-        }
+    const apiKey = this.resolveApiKey();
+    const logLines: any[] = [];
 
-        const modelName = payload.model || 'black-forest-labs/FLUX.1-schnell';
-        const jobType = payload.type || 'image_generation';
-        
-        if (jobType === 'video_generation') {
-            return await this.processVideoTask(payload, modelName, apiKey, uuid, outputPath);
-        } else {
-            return await this.processImageTask(payload, modelName, apiKey, uuid, outputPath);
-        }
+    logLines.push({ t: new Date().toISOString(), type: 'request', method: 'POST', url: meta.api_url, body: requestBody });
+
+    try {
+      const response = await axios.post(meta.api_url, requestBody, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: 120000
+      });
+
+      logLines.push({ t: new Date().toISOString(), type: 'response', status: response.status, body: response.data });
+
+      if (meta.type === 'image_generation') {
+        await this.handleImageResponse(response.data, outputPath, logLines);
+      } else if (meta.type === 'video_generation') {
+        if (!meta.api_status_url) throw new Error('Video task missing api_status_url in _opsv');
+        await this.handleVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
+      } else {
+        throw new Error(`Unknown task type: ${meta.type}`);
+      }
+
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+    } catch (err: any) {
+      logLines.push({ t: new Date().toISOString(), type: 'error', message: err.message, code: err.code || err.response?.status });
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+      throw err;
     }
+  }
 
-    private async processImageTask(payload: any, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
-        const url = 'https://api.siliconflow.cn/v1/images/generations';
-        const params = payload.params || {};
+  private async handleImageResponse(data: any, outputPath: string, logLines: any[]) {
+    const imageUrl = data.data?.url || data.data?.image_url || data.url;
+    if (!imageUrl) throw new Error('Image URL not found in response');
 
-        const requestBody: any = {
-            model: modelName,
-            prompt: payload.prompt || "Cinematic image."
-        };
+    logLines.push({ t: new Date().toISOString(), type: 'download_start', url: imageUrl });
+    await downloadFile(imageUrl, outputPath);
+    logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+  }
 
-        // 仅在非 Edit 模型时注入尺寸
-        if (!modelName.includes('Edit')) {
-            requestBody.image_size = params.image_size || params.size || "1024x1024";
-        }
+  private async handleVideoResponse(data: any, apiKey: string, apiStatusUrl: string, outputPath: string, logLines: any[]) {
+    const requestId = data.requestId || data.request_id || data.id;
+    if (!requestId) throw new Error(`No requestId in submission response: ${JSON.stringify(data)}`);
 
-        if (payload.reference_images && payload.reference_images.length > 0) {
-            requestBody.image = await this.getBase64Image(payload.reference_images[0]);
-        }
+    logLines.push({ t: new Date().toISOString(), type: 'video_submitted', requestId });
 
-        logger.logExecution(payload.shotId, 'SILICONFLOW_IMAGE_START', { model: modelName, uuid, outputPath });
+    let retries = 0;
+    let pollIntervalMs = 5000;
+    while (retries < 120) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+      retries++;
+      pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
 
-        try {
-            const response = await axios.post(url, requestBody, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 60000
-            });
-            const imageUrl = response.data.images?.[0]?.url;
-            if (!imageUrl) throw new Error(`Invalid response: ${JSON.stringify(response.data)}`);
-            
-            await this.downloadFile(imageUrl, outputPath);
-            return true;
-        } catch (error: any) {
-            const apiError = error.response?.data || error.message;
-            throw new Error(`SiliconFlow API Error: ${JSON.stringify(apiError)}`);
-        }
-    }
-
-    private async processVideoTask(payload: any, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
-        const url = 'https://api.siliconflow.cn/v1/video/submit';
-        const params = payload.params || {};
-        
-        const requestBody: any = {
-            model: modelName,
-            prompt: payload.prompt || "Cinematic video.",
-            image_size: params.image_size || "1280x720"
-        };
-
-        if (payload.reference_images && payload.reference_images.length > 0) {
-            requestBody.image = await this.getBase64Image(payload.reference_images[0]);
-        }
-
-        logger.logExecution(payload.shotId, 'SILICONFLOW_VIDEO_SUBMIT', { model: modelName, uuid, outputPath });
-
-        try {
-            const submitRes = await axios.post(url, requestBody, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 30000
-            });
-
-            const requestId = submitRes.data?.requestId;
-            if (!requestId) throw new Error(`Invalid submission: ${JSON.stringify(submitRes.data)}`);
-            
-            await this.pollVideoStatus(requestId, apiKey, outputPath);
-            return true;
-        } catch (error: any) {
-            const apiError = error.response?.data || error.message;
-            throw new Error(`SiliconFlow Video Error: ${JSON.stringify(apiError)}`);
-        }
-    }
-
-    private async pollVideoStatus(requestId: string, apiKey: string, outputPath: string): Promise<void> {
-        const url = 'https://api.siliconflow.cn/v1/video/status';
-        let retries = 0;
-        let pollIntervalMs = 5000;
-        while (retries < 120) {
-            await new Promise(r => setTimeout(r, pollIntervalMs));
-            retries++;
-            pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
-
-            const response = await axios.post(url, { requestId }, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-            });
-            const status = response.data.status;
-            if (status === 'Succeed') {
-                const videoUrl = response.data.results?.videos?.[0]?.url;
-                if (!videoUrl) throw new Error(`Status Succeed but no video URL.`);
-                await this.downloadFile(videoUrl, outputPath);
-                return;
-            } else if (status === 'Failed') {
-                throw new Error(`Video generation failed: ${response.data.reason}`);
-            }
-        }
-        throw new Error(`Polling timeout for ${requestId}`);
-    }
-
-    private async getBase64Image(filePath: string): Promise<string> {
-        const data = await fs.readFile(filePath);
-        const ext = path.extname(filePath).toLowerCase();
-        const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : (ext === '.webp' ? 'image/webp' : 'image/png');
-        return `data:${mimeType};base64,${data.toString('base64')}`;
-    }
-
-    private async downloadFile(url: string, outputFilePath: string): Promise<void> {
-        const response = await axios({ method: 'GET', url, responseType: 'stream', timeout: 60000 });
-        const dir = path.dirname(outputFilePath);
-        await fs.mkdir(dir, { recursive: true });
-        const writer = require('fs').createWriteStream(outputFilePath);
-        response.data.pipe(writer);
-        return new Promise((res, rej) => {
-            response.data.on('error', rej);
-            writer.on('finish', res);
-            writer.on('error', rej);
+      try {
+        const statusRes = await axios.post(apiStatusUrl, { requestId }, {
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
         });
+
+        const statusData = statusRes.data;
+        logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: statusData.status });
+
+        if (statusData.status === 'Succeed' || statusData.status === 'success') {
+          const videoUrl = statusData.results?.videos?.[0]?.url || statusData.video_url;
+          if (!videoUrl) throw new Error('Status Succeed but no video URL found');
+
+          logLines.push({ t: new Date().toISOString(), type: 'download_start', url: videoUrl });
+          await downloadFile(videoUrl, outputPath);
+          logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+          return;
+        } else if (statusData.status === 'Failed' || statusData.status === 'failed') {
+          throw new Error(`Video generation failed: ${statusData.reason || JSON.stringify(statusData)}`);
+        }
+      } catch (err: any) {
+        if (err.message?.includes('Video generation failed')) throw err;
+        if (err.response && err.response.status >= 400 && err.response.status < 500) throw err;
+        logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
+      }
     }
+    throw new Error(`Video polling timeout for request ${requestId}`);
+  }
+
+  private resolveApiKey(): string {
+    const key = process.env.SILICONFLOW_API_KEY;
+    if (!key) throw new Error('Missing SILICONFLOW_API_KEY environment variable');
+    return key;
+  }
 }

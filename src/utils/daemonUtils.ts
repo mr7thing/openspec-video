@@ -63,7 +63,7 @@ export function registerProject(projectRoot: string) {
             payload: {
                 name: path.basename(projectRoot),
                 root: projectRoot,
-                jobsPath: path.join(projectRoot, 'opsv-queue', 'jobs.json')
+                queueDir: path.join(projectRoot, 'opsv-queue')
             }
         });
         ws.send(payload, (err) => {

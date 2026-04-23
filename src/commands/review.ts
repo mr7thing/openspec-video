@@ -21,7 +21,7 @@ export function registerReviewCommand(program: Command) {
             // 解析批次目录列表
             const batchDirs = await resolveBatchDirs(projectRoot, options.batch);
             if (batchDirs.length === 0) {
-                logger.error('❌ 未找到匹配的批次目录。请先执行 "opsv generate" + "opsv gen-image"');
+                logger.error('❌ 未找到匹配的批次目录。请先执行 "opsv imagen" + "opsv queue compile" + "opsv queue run"');
                 return;
             }
 

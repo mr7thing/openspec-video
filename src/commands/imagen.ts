@@ -17,7 +17,7 @@ export function registerImagenCommand(program: Command, VERSION: string) {
         .option('--shots <list>', '指定分镜 ID（逗号分隔: 1,5,12）', (val) => val.split(','))
         .option('--skip-approved', '跳过已 Approve 的文档，不纳入生成队列（默认开启）', false)
         .option('--skip-depend-layer', '跳过依赖层次，生成扁平的大任务列表', false)
-        .option('--cycle <name>', '指定生成环 (Cycle)', 'ZeroCircle_1')
+        .option('--circle <name>', '指定生成环 (Circle)', 'zerocircle_1')
         .action(async (targets, options) => {
             try {
                 const projectRoot = process.cwd();

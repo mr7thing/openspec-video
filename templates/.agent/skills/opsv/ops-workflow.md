@@ -66,7 +66,7 @@
 执行 `opsv validate` 确保无死链，执行 `opsv circle status` 理解当前任务所属 Circle：
 - **ZeroCircle**: 基础资产（角色、场景）。
 - **FirstCircle**: 基于资产的分镜草图（Image）。
-- **EndCircle**: 基于 Image 的动态视频（Video），由 `opsv animate` 自动推断。
+- **EndCircle**: 基于 Image 的动态视频（Video），由 `opsv animate` 自动推断（必须是 `shotlist.md`）。
 
 ### 步骤 2：生成任务列表
 根据导演指令下发对应的媒介类型：
@@ -80,34 +80,50 @@ opsv imagen [targets...]
 opsv animate
 # 产出: opsv-queue/<endcircle>/video_jobs.json
 
-# ComfyUI 工作流
-opsv comfy compile workflow.json --provider <comfyui_local|runninghub>
+# ComfyUI 工作流（直接编译为可执行 .json）
+opsv comfy compile workflow.json --provider <comfyui_local|runninghub> --circle <name>
 ```
 
 ### 步骤 3：编译入队 (Compile)
+`opsv queue compile` 将意图层 jobs.json 编译为执行层可直接发送的 API 请求体 `.json`。
+
 ```bash
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --provider volcengine
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --volcengine.seadream-5.0-lite --circle zerocircle_1
 ```
 
-- **Iteration 机制**：`queue compile` 每次都会新建 batch（`queue_{max+1}`），不会追加到已有 batch。
-- **检查意图**：检查 `opsv-queue/{CircleFullName}/{Provider}/queue_1/queue.json` 是否已生成。
+- **每次 compile 必然创建新 batch**：`queue_{N+1}/`。
+- 产出 `{jobId}.json`（完整 API 请求体，含 `_opsv` 元数据）。
+- `queue.json` 为只读索引，`compile.log` 记录编译摘要。
+- compile **仅读取 api_config**，将配置固化到 `.json` 中；run 时不再读取配置。
 
 ### 步骤 4：物理渲染 (Run)
-执行物理队列。必须指定 Provider。
+一次性顺序执行队列任务。
 
 ```bash
-opsv queue run volcengine
-opsv queue run siliconflow
+opsv queue run --volcengine.seadream-5.0-lite --circle zerocircle_1
+opsv queue run --siliconflow.qwen-image --circle zerocircle_1
 ```
 
-- 产出文件命名：`{taskId}_{seq}.{ext}`（全局唯一序号）。
-- 资产直接落在 queue 目录下，无 `approved/` 中转。
+- 默认执行最新 `queue_N/` 目录。
+- 跳过已有 `_{seq}.png` 结果的任务。
+- 跳过已有 `_error.log` 的任务（除非 `--retry`）。
+- 产出文件命名：`{jobId}_{runSeq}.{ext}`（本地递增，无全局锁）。
+- 资产平铺在 queue 目录下，无子目录。
+
+**Agent 迭代操作**：
+```bash
+# 复制现有任务，修改参数后重新执行
+cp queue_1/shot_01.json queue_1/shot_01_v2.json
+# 编辑 shot_01_v2.json（修改 prompt、seed 等字段）
+opsv queue run --volcengine.seadream-5.0-lite --file shot_01_v2.json
+# → 生成 shot_01_v2_1.png
+```
 
 ### 步骤 5：审查与引用 (Review)
 - 调用 `opsv review` 启动 Web UI（默认端口 3456）。
-- **Approve 闭环**：Approve 后直接引用原队列路径（`opsv-queue/...`），不再复制到 `approved/` 目录。
-- 静态路由：`/opsv-queue` 替代旧 `/artifacts`。
+- **Approve 闭环**：Approve 后直接引用原队列路径（`opsv-queue/...`）。
 - 只有 `Approve` 的资产才能作为下一 Circle 的参考底图。
+- Review 后刷新 circle：有变化 → `circle_N+1`；全部 approve → 创建下一环。
 
 ### 步骤 6：下一 Circle
 基于 approved 资产，继续 FirstCircle → ... → EndCircle。
@@ -127,7 +143,7 @@ Runner-Agent 必须理解依赖图的批次概念：
 ## 5. 故障处理 (Emergency)
 
 - 若 API 报错（401/429/500），应立即检查 `.env` 配置，不得凭空猜测参数名。
-- 所有非 2xx 响应必须保留原始错误 JSON，用于证据链追溯。
+- 所有非 2xx 响应保留在 `{jobId}.log`（JSONL 格式）中，用于证据链追溯。
 - Circle 隔离铁律：严禁在 ZeroCircle 未完成 Approve 时强行下发 FirstCircle。
 
 ---
@@ -140,11 +156,12 @@ Runner-Agent 必须理解依赖图的批次概念：
 | `opsv deps` | 分析资产依赖关系与推荐顺序 |
 | `opsv circle status` | 扫描各 Circle 目录，统计任务/完成/失败/批准数 |
 | `opsv circle manifest` | 生成 `opsv-queue/circle_manifest.json` |
+| `opsv circle --skip` | 只生成零环和终环（终环=shotlist.md） |
 | `opsv imagen` | 编译文档为图像任务列表 |
 | `opsv animate` | 编译 Shotlist 为视频任务列表 |
-| `opsv comfy compile` | ComfyUI 工作流编译入队 |
-| `opsv queue compile <jobs.json>` | 将任务按 Provider 编译入队 |
-| `opsv queue run <provider>` | 执行队列物理渲染 |
+| `opsv comfy compile <workflow.json>` | ComfyUI 工作流直接编译为可执行 `.json` |
+| `opsv queue compile <jobs.json> --<provider.model>` | 将任务按 Provider+Model 编译为 `.json` |
+| `opsv queue run --<provider.model>` | 一次性顺序执行队列任务 |
 | `opsv review` | 启动 Web Review UI |
 
 完整 CLI 参考见 `references/cli_reference.md`。

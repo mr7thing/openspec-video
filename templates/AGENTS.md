@@ -48,17 +48,34 @@ opsv circle status
 # 3. 生成图像任务列表（ZeroCircle / FirstCircle）
 opsv imagen
 
-# 4. 编译入队并执行
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --provider volcengine
-opsv queue run volcengine
+# 4. 编译为可执行 API 请求体（指定精确模型）
+opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --volcengine.seadream-5.0-lite --circle zerocircle_1
 
-# 5. 审阅（Approve 后方可进入下一 Circle）
+# 5. 执行渲染（一次性顺序执行）
+opsv queue run --volcengine.seadream-5.0-lite --circle zerocircle_1
+
+# 6. 审阅（Approve 后方可进入下一 Circle）
 opsv review
 
-# 6. 视频生成（自动推断末端 Circle）
+# 7. 视频生成（自动推断末端 Circle）
 opsv animate
-opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --provider volcengine
-opsv queue run volcengine
+opsv queue compile opsv-queue/endcircle_1/video_jobs.json --volcengine.seedance-1.5-pro --circle endcircle_1
+opsv queue run --volcengine.seedance-1.5-pro --circle endcircle_1
+```
+
+### Agent 迭代操作
+
+```bash
+# 复制并修改任务参数
+cp opsv-queue/firstcircle_1/volcengine/queue_1/shot_01.json opsv-queue/firstcircle_1/volcengine/queue_1/shot_01_v2.json
+# 编辑 shot_01_v2.json（修改 prompt、seed、cfg_scale 等字段）
+
+# 执行修改后的任务
+opsv queue run --volcengine.seadream-5.0-lite --file shot_01_v2.json --circle firstcircle_1
+# → 生成 shot_01_v2_1.png
+
+# 重试失败任务
+opsv queue run --siliconflow.qwen-image --retry --circle zerocircle_1
 ```
 
 ### 常用命令矩阵
@@ -68,11 +85,12 @@ opsv queue run volcengine
 | `opsv init` | 初始化项目结构 | `[projectName]` |
 | `opsv validate` | 验证 frontmatter 与引用 | - |
 | `opsv circle status` | 查看各 Circle 完成状态 | - |
+| `opsv circle --skip` | 只生成零环和终环 | - |
 | `opsv imagen [targets...]` | 生成图像任务列表 | `--preview`, `--shots`, `--skip-approved` |
 | `opsv animate` | 生成视频任务列表（自动推断末端 Circle） | `--cycle auto` |
-| `opsv comfy compile <workflow.json>` | 编译 ComfyUI 工作流 | `--provider`, `--param`, `--cycle` |
-| `opsv queue compile <jobs.json>` | 编译意图到 Provider 队列 | `--provider <name>` |
-| `opsv queue run <providers...>` | 执行物理队列中的任务 | `--cycle` |
+| `opsv comfy compile <workflow.json>` | 编译 ComfyUI 工作流为 `.json` | `--provider`, `--param`, `--circle` |
+| `opsv queue compile <jobs.json> --<provider.model>` | 编译意图到 Provider 队列 | `--circle` |
+| `opsv queue run --<provider.model>` | 一次性顺序执行队列任务 | `--file`, `--retry`, `--circle` |
 | `opsv review` | 启动 Web UI 进行 Approve 审核 | `--port`, `--batch` |
 | `opsv deps` | 分析资产依赖关系与推荐顺序 | - |
 
@@ -81,7 +99,7 @@ opsv queue run volcengine
 - **ZeroCircle**: 基础资产 (elements, scenes)。
 - **FirstCircle**: 复合资产 (shots/image)。
 - **...**: 中间依赖层。
-- **EndCircle**: 动态视频层 (shots/video)，由 `opsv animate` 自动推断依赖图末端。
+- **EndCircle**: 动态视频层 (shots/video)，由 `opsv animate` 自动推断，必须是 `shotlist.md`。
 
 ### 敏感词注意 (MiniMax/火山)
 若遇内容审核错误（如 MiniMax 1033），请在 `visual_detailed` 中对敏感词进行脱敏（如使用隐喻或近义词），并重新执行 `opsv imagen` + `opsv queue compile`。

@@ -1,151 +1,140 @@
 import axios from 'axios';
 import fs from 'fs/promises';
-import path from 'path';
 import { logger } from '../../utils/logger';
-import { ConfigLoader } from '../../utils/configLoader';
+import { downloadFile } from '../../utils/download';
+
+/**
+ * Minimax Provider (v0.6.4 简化版)
+ *
+ * 职责：读取 .json 任务文件 → 发送请求 → 下载结果 → 写 JSONL log。
+ * Minimax 图像返回 base64，视频需要轮询后获取下载 URL。
+ */
 
 export class MinimaxImageProvider {
-    /**
-     * 执行 Minimax 任务
-     * task 结构: { uuid, payload: { prompt, params, model, type, shotId }, outputPath }
-     */
-    async processTask(task: any): Promise<boolean> {
-        const { payload, outputPath, uuid } = task;
-        if (!payload) throw new Error("Minimax Provider: Missing payload");
+  async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
+    const { taskJson, outputPath, logPath } = input;
+    const meta = taskJson._opsv;
+    const requestBody = { ...taskJson };
+    delete requestBody._opsv;
 
-        const configLoader = ConfigLoader.getInstance();
-        let apiKey: string;
-        try {
-            apiKey = configLoader.getResolvedApiKey('minimax');
-        } catch {
-            apiKey = process.env.MINIMAX_API_KEY || '';
-            if (!apiKey) throw new Error("Missing MINIMAX_API_KEY");
-        }
+    const apiKey = this.resolveApiKey();
+    const logLines: any[] = [];
 
-        const modelName = payload.model || 'image-01';
-        const jobType = payload.type || 'image_generation';
-        
-        if (jobType === 'image_generation') {
-            const apiUrl = "https://api.minimaxi.com/v1/image_generation";
-            return await this.processImageTask(payload, modelName, apiKey, uuid, apiUrl, outputPath);
-        } else {
-            const apiUrl = "https://api.minimaxi.com/v1/video_generation";
-            const apiStatusUrl = "https://api.minimaxi.com/v1/query/video_generation";
-            return await this.processVideoTask(payload, modelName, apiKey, uuid, apiUrl, apiStatusUrl, outputPath);
-        }
+    logLines.push({ t: new Date().toISOString(), type: 'request', method: 'POST', url: meta.api_url, body: requestBody });
+
+    try {
+      const response = await axios.post(meta.api_url, requestBody, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: 120000
+      });
+
+      logLines.push({ t: new Date().toISOString(), type: 'response', status: response.status, body: response.data });
+
+      if (meta.type === 'image_generation') {
+        await this.handleImageResponse(response.data, outputPath, logLines);
+      } else if (meta.type === 'video_generation') {
+        if (!meta.api_status_url) throw new Error('Video task missing api_status_url in _opsv');
+        await this.handleVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
+      } else {
+        throw new Error(`Unknown task type: ${meta.type}`);
+      }
+
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+    } catch (err: any) {
+      logLines.push({ t: new Date().toISOString(), type: 'error', message: err.message, code: err.code || err.response?.status });
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+      throw err;
+    }
+  }
+
+  private async handleImageResponse(data: any, outputPath: string, logLines: any[]) {
+    if (!data || !data.data || !data.data.image_base64) {
+      if (data.base_resp?.status_code === 1033) {
+        const terms = this.detectSensitiveTerms(data.base_resp.status_msg || '');
+        throw new Error(`Minimax content moderation (1033): ${terms.join(', ')}`);
+      }
+      throw new Error(`Invalid response format: ${JSON.stringify(data.base_resp || data)}`);
     }
 
-    private async processImageTask(payload: any, modelName: string, apiKey: string, uuid: string, apiUrl: string, outputPath: string): Promise<boolean> {
-        const params = payload.params || {};
-        logger.logExecution(payload.shotId, 'MINIMAX_START', { model: modelName, uuid, outputPath });
+    const images = data.data.image_base64;
+    const imageBase64 = Array.isArray(images) ? images[0] : images;
+    const buffer = Buffer.from(imageBase64, 'base64');
 
-        let prompt = payload.prompt || '';
-        if (params.negative_prompt) {
-            prompt += ` (Negative prompt: ${params.negative_prompt})`;
+    await fs.writeFile(outputPath, buffer);
+    logLines.push({ t: new Date().toISOString(), type: 'save_complete', path: outputPath, size_bytes: buffer.length });
+  }
+
+  private async handleVideoResponse(data: any, apiKey: string, apiStatusUrl: string, outputPath: string, logLines: any[]) {
+    const taskId = data.task_id || data.id;
+    if (!taskId) throw new Error(`No task_id in submission response: ${JSON.stringify(data)}`);
+
+    logLines.push({ t: new Date().toISOString(), type: 'video_submitted', taskId });
+
+    let retries = 0;
+    let pollIntervalMs = 5000;
+    while (retries < 120) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+      retries++;
+      pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
+
+      try {
+        const statusRes = await axios.get(`${apiStatusUrl}?task_id=${taskId}`, {
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+        });
+
+        const statusData = statusRes.data;
+        const status = statusData?.status;
+        logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status });
+
+        if (status === 'Success') {
+          const fileId = statusData?.file_id;
+          if (!fileId) throw new Error('Status Success but no file_id found');
+
+          const videoUrl = await this.getVideoDownloadUrl(fileId, apiKey);
+          if (!videoUrl) throw new Error('Failed to get video download URL');
+
+          logLines.push({ t: new Date().toISOString(), type: 'download_start', url: videoUrl });
+          await downloadFile(videoUrl, outputPath);
+          logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+          return;
+        } else if (status === 'Failed' || status === 'Fail') {
+          throw new Error(`Video generation failed: ${JSON.stringify(statusData)}`);
         }
-
-        const requestBody: any = {
-            model: modelName,
-            prompt: prompt,
-            aspect_ratio: params.aspect_ratio || "16:9",
-            response_format: "base64"
-        };
-
-        if (payload.reference_images && payload.reference_images.length > 0) {
-            const firstRef = payload.reference_images[0];
-            if (firstRef.startsWith('http')) {
-                requestBody.subject_reference = [{ type: "character", image_file: firstRef }];
-            }
+      } catch (err: any) {
+        if (err.message?.includes('Video generation failed')) throw err;
+        if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND') {
+          logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
+          continue;
         }
-
-        try {
-            const response = await axios.post(apiUrl, requestBody, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 120000
-            });
-
-            const data = response.data;
-            if (!data || !data.data || !data.data.image_base64) {
-                // 处理 1033 或敏感内容审核
-                if (data.base_resp?.status_code === 1033) {
-                    const terms = this.detectSensitiveTerms(prompt);
-                    throw new Error(`Minimax 内容审核 (1033): ${terms.join(', ')}`);
-                }
-                throw new Error(`Invalid response format: ${JSON.stringify(data.base_resp || data)}`);
-            }
-
-            const images = data.data.image_base64;
-            const imageBase64 = Array.isArray(images) ? images[0] : images;
-            const buffer = Buffer.from(imageBase64, 'base64');
-            
-            await fs.mkdir(path.dirname(outputPath), { recursive: true });
-            await fs.writeFile(outputPath, buffer);
-            return true;
-        } catch (error: any) {
-            const apiError = error.response?.data || error.message;
-            throw new Error(`Minimax Image Error: ${JSON.stringify(apiError)}`);
-        }
+        logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
+      }
     }
+    throw new Error(`Video polling timeout for task ${taskId}`);
+  }
 
-    private async processVideoTask(payload: any, modelName: string, apiKey: string, uuid: string, apiUrl: string, apiStatusUrl: string, outputPath: string): Promise<boolean> {
-        const requestBody: any = {
-            model: modelName,
-            prompt: payload.prompt || "Cinematic video."
-        };
-
-        logger.logExecution(payload.shotId, 'MINIMAX_VIDEO_SUBMIT', { model: modelName, uuid, outputPath });
-
-        try {
-            const submitRes = await axios.post(apiUrl, requestBody, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 30000
-            });
-
-            const taskId = submitRes.data?.task_id;
-            if (!taskId) throw new Error(`Invalid submission: ${JSON.stringify(submitRes.data)}`);
-            
-            await this.pollVideoStatus(taskId, apiKey, outputPath, apiStatusUrl);
-            return true;
-        } catch (error: any) {
-             const apiError = error.response?.data || error.message;
-             throw new Error(`Minimax Video Error: ${JSON.stringify(apiError)}`);
-        }
+  private async getVideoDownloadUrl(fileId: string, apiKey: string): Promise<string | null> {
+    try {
+      const response = await axios.get(`https://api.minimaxi.com/v1/files/${fileId}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+      });
+      return response.data?.file?.download_url || response.data?.download_url || null;
+    } catch (err: any) {
+      logger.error(`Failed to get video download URL for file ${fileId}: ${err.message}`);
+      return null;
     }
+  }
 
-    private async pollVideoStatus(taskId: string, apiKey: string, outputPath: string, apiStatusUrl: string): Promise<void> {
-        let retries = 0;
-        let pollIntervalMs = 5000;
-        while (retries < 120) {
-            await new Promise(r => setTimeout(r, pollIntervalMs));
-            retries++;
-            pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
-            
-            const response = await axios.get(`${apiStatusUrl}?task_id=${taskId}`, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-            });
-            const status = response.data?.status;
-            
-            if (status === 'Success') {
-                // Minimax 视频通常返回 file_id, 需要后续获取 URL
-                const fileId = response.data?.file_id;
-                if (!fileId) throw new Error(`Status Success but no file_id found.`);
-                
-                // 此处简化，实际逻辑可能需要调用下载接口
-                await fs.mkdir(path.dirname(outputPath), { recursive: true });
-                await fs.writeFile(outputPath, "Minimax video successfully generated (Placeholder for real download)");
-                return;
-            } else if (status === 'Failed') {
-                throw new Error(`Video generation failed: ${JSON.stringify(response.data)}`);
-            }
-        }
-        throw new Error(`Polling timeout for ${taskId}`);
-    }
+  private detectSensitiveTerms(prompt: string): string[] {
+    const sensitivePatterns = [
+      /\b总裁\b|\b政治\b|\b色情\b|\b暴力\b|\b赌博\b/i,
+      /\bpolitics\b|\bsexy\b|\bmurder\b|\bgambling\b/i
+    ];
+    return sensitivePatterns.filter(p => prompt.match(p)).map(p => p.source);
+  }
 
-    private detectSensitiveTerms(prompt: string): string[] {
-        const sensitivePatterns = [
-            /\b总裁\b|\b政治\b|\b色情\b|\b暴力\b|\b赌博\b/i,
-            /\bpolitics\b|\bsexy\b|\bmurder\b|\bgambling\b/i
-        ];
-        return sensitivePatterns.filter(p => prompt.match(p)).map(p => p.source);
-    }
+  private resolveApiKey(): string {
+    const key = process.env.MINIMAX_API_KEY;
+    if (!key) throw new Error('Missing MINIMAX_API_KEY environment variable');
+    return key;
+  }
 }

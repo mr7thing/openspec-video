@@ -1,103 +1,144 @@
 import { Command } from 'commander';
-import { ComfyUITaskCompiler } from '../core/compiler/ComfyUITaskCompiler';
-import { StandardAPICompiler } from '../core/compiler/StandardAPICompiler';
-import { QueueWatcher } from '../executor/QueueWatcher';
-import { ComfyUILocalProvider } from '../executor/providers/ComfyUILocalProvider';
-import { RunningHubProvider } from '../executor/providers/RunningHubProvider';
+import { TaskCompiler } from '../core/compiler/TaskCompiler';
+import { QueueRunner } from '../core/executor/QueueRunner';
 import { VolcengineProvider } from '../executor/providers/VolcengineProvider';
 import { SiliconFlowProvider } from '../executor/providers/SiliconFlowProvider';
 import { MinimaxImageProvider } from '../executor/providers/MinimaxImageProvider';
-import { Job } from '../types/PromptSchema';
-import { ConfigLoader } from '../utils/configLoader';
+import { RunningHubProvider } from '../executor/providers/RunningHubProvider';
+import { ComfyUILocalProvider } from '../executor/providers/ComfyUILocalProvider';
 import * as path from 'path';
 import fs from 'fs/promises';
 
+/**
+ * 从 process.argv 中提取 --provider.model 格式的参数。
+ * 例如：--volcengine.seadream-5.0-lite → volcengine.seadream-5.0-lite
+ */
+function extractProviderModels(argv: string[]): string[] {
+  return argv
+    .filter(arg => /^--[a-z0-9_-]+\.[a-z0-9_-]+$/.test(arg))
+    .map(arg => arg.slice(2));
+}
+
+function getProviderInstance(providerName: string) {
+  switch (providerName) {
+    case 'volcengine': return new VolcengineProvider();
+    case 'siliconflow': return new SiliconFlowProvider();
+    case 'minimax': return new MinimaxImageProvider();
+    case 'runninghub': return new RunningHubProvider();
+    case 'comfyui_local': return new ComfyUILocalProvider();
+    default: throw new Error(`Unknown provider: ${providerName}`);
+  }
+}
+
+async function findLatestBatchDir(providerDir: string): Promise<string | null> {
+  const entries = await fs.readdir(providerDir).catch(() => [] as string[]);
+  const batchFolders = entries.filter(e => /^queue_\d+$/.test(e));
+  if (batchFolders.length === 0) return null;
+  const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''), 10)).filter(n => !isNaN(n));
+  const latest = Math.max(...nums);
+  return path.join(providerDir, `queue_${latest}`);
+}
+
 export function registerQueueCommands(program: Command) {
-    const queueCmd = program.command('queue').description('Manage the file-based cycle and batch queue');
+  const queueCmd = program.command('queue').description('Manage the file-based cycle and batch queue');
 
-    queueCmd
-        .command('compile <tasksJson>')
-        .description('Compile a business tasks.json into isolated atomic payloads in the pending batch')
-        .option('--provider <name>', 'Explicitly designate the target API provider(s)', (val, memo: string[]) => { memo.push(val); return memo; }, [])
-        .option('--cycle <name>', 'Designate the target Cycle (e.g. ZeroCircle_1, FirstCircle)', 'ZeroCircle_1')
-        .option('--file <filename>', 'Only compile tasks belonging to a specific source file')
-        .action(async (tasksJson, options) => {
-            const projectRoot = process.cwd();
-            const configLoader = ConfigLoader.getInstance();
-            await configLoader.loadConfig(projectRoot);
+  queueCmd
+    .command('compile <tasksJson>')
+    .description('Compile jobs.json into provider task JSONs')
+    .option('--circle <name>', 'Target circle (e.g. zerocircle_1, endcircle_1)', 'zerocircle_1')
+    .option('--file <filename>', 'Only compile tasks for a specific source file')
+    .action(async (tasksJson, options) => {
+      const providerModels = extractProviderModels(process.argv);
+      if (providerModels.length === 0) {
+        console.error('[Queue] Please specify at least one --provider.model (e.g. --volcengine.seadream-5.0-lite)');
+        process.exit(1);
+      }
 
-            const providers: string[] = options.provider.length > 0 ? options.provider : ['volcengine'];
-            const cycle = options.cycle;
-            const targetFile = options.file;
+      const projectRoot = process.cwd();
+      const queueDir = path.join(projectRoot, 'opsv-queue');
+      const absoluteTaskPath = path.resolve(projectRoot, tasksJson);
 
-            console.log(`[Queue] Compiling ${tasksJson} for providers: ${providers.join(', ')} | Cycle: ${cycle}`);
-            const queueDir = path.join(projectRoot, 'opsv-queue');
-            const absoluteTaskPath = path.resolve(projectRoot, tasksJson);
-            
-            const taskPathExists = await fs.access(absoluteTaskPath).then(() => true).catch(() => false);
-            if (!taskPathExists) {
-                 console.error(`[Queue] Tasks file missing: ${absoluteTaskPath}`);
-                 process.exit(1);
-            }
-            
-            let jobs: Job[] = JSON.parse(await fs.readFile(absoluteTaskPath, 'utf-8'));
-            
-            // Filter by file if requested
-            if (targetFile) {
-                jobs = jobs.filter(j => j.id.startsWith(targetFile.replace('.md', '')));
-                console.log(`[Queue] Filtered to ${jobs.length} jobs for source file: ${targetFile}`);
-            }
+      const exists = await fs.access(absoluteTaskPath).then(() => true).catch(() => false);
+      if (!exists) {
+        console.error(`[Queue] Tasks file missing: ${absoluteTaskPath}`);
+        process.exit(1);
+      }
 
-            for (const provider of providers) {
-                const compiler = new StandardAPICompiler(queueDir);
-                for (const job of jobs) {
-                    const jobType = job.type || 'image_generation';
-                    const models = configLoader.findModelsByCapability(provider, jobType as any);
-                    
-                    if (models.length > 0) {
-                        await compiler.compileAndEnqueue({ provider, modelKey: models[0].key, job }, cycle);
-                    } else {
-                        console.warn(`[Queue] ⚠️ Skipping job ${job.id} for provider ${provider}: No model matches '${jobType}'`);
-                    }
-                }
-            }
-            console.log(`[Queue] Compilation successful in ${queueDir}/${cycle}`);
+      let jobsContent = await fs.readFile(absoluteTaskPath, 'utf-8');
+      let jobs = JSON.parse(jobsContent);
+
+      // Filter by source file if requested
+      if (options.file) {
+        jobs = jobs.filter((j: any) => j.id.startsWith(options.file.replace('.md', '')));
+        console.log(`[Queue] Filtered to ${jobs.length} jobs for source: ${options.file}`);
+      }
+
+      // 先写过滤后的 jobs 到临时变量（不需要写文件，TaskCompiler 直接接收 jobs 数组）
+      // 但 TaskCompiler 目前接收的是 jobsPath... 需要调整
+      // 暂时先写回同目录的临时文件，或者修改 TaskCompiler 接口
+
+      const compiler = new TaskCompiler(queueDir);
+
+      for (const pm of providerModels) {
+        console.log(`[Queue] Compiling ${tasksJson} → ${pm} | Circle: ${options.circle}`);
+        const result = await compiler.compile(absoluteTaskPath, pm, options.circle);
+        console.log(`[Queue] ${pm} → ${options.circle}/queue_${result.batchNum} | compiled: ${result.tasksCompiled}, skipped: ${result.tasksSkipped}`);
+      }
+    });
+
+  queueCmd
+    .command('run')
+    .description('Run provider tasks in the latest batch')
+    .option('--circle <name>', 'Target circle', 'zerocircle_1')
+    .option('--file <files...>', 'Specific task JSON files to run')
+    .option('--retry', 'Retry failed tasks')
+    .action(async (options) => {
+      const providerModels = extractProviderModels(process.argv);
+      if (providerModels.length === 0) {
+        console.error('[Queue] Please specify at least one --provider.model (e.g. --volcengine.seadream-5.0-lite)');
+        process.exit(1);
+      }
+
+      const projectRoot = process.cwd();
+      const queueDir = path.join(projectRoot, 'opsv-queue');
+      const circle = options.circle;
+
+      let exitCode = 0;
+
+      for (const pm of providerModels) {
+        const [provider, modelKey] = pm.split('.');
+        const providerDir = path.join(queueDir, circle, provider);
+        const batchDir = await findLatestBatchDir(providerDir);
+
+        if (!batchDir) {
+          console.error(`[Queue] No batch found for ${provider} in ${circle}`);
+          exitCode = 1;
+          continue;
+        }
+
+        console.log(`[Queue] Running ${pm} → ${batchDir}`);
+
+        const providerInstance = getProviderInstance(provider);
+        const runner = new QueueRunner();
+
+        const result = await runner.run(batchDir, async ({ jsonPath, outputPath, logPath }) => {
+          const content = await fs.readFile(jsonPath, 'utf-8');
+          const taskJson = JSON.parse(content);
+
+          // 验证 provider 一致性
+          if (taskJson._opsv?.provider !== provider) {
+            throw new Error(`Task ${path.basename(jsonPath)} provider (${taskJson._opsv?.provider}) does not match specified (${provider})`);
+          }
+
+          await providerInstance.processTask({ taskJson, outputPath, logPath });
+        }, {
+          files: options.file,
+          retry: options.retry
         });
 
-    queueCmd
-        .command('run [providers...]')
-        .description('Start the batch watcher for specific providers')
-        .option('--cycle <name>', 'Designate the target Cycle to watch', 'ZeroCircle_1')
-        .action(async (providers: string[], options) => {
-            if (!providers || providers.length === 0) {
-                console.error(`[Queue] Please specify at least one provider (e.g. volcengine siliconflow)`);
-                process.exit(1);
-            }
-            
-            const projectRoot = process.cwd();
-            const queueDir = path.join(projectRoot, 'opsv-queue');
-            const cycle = options.cycle;
-            
-            const watchers: QueueWatcher[] = [];
+        if (result.failed > 0) exitCode = 1;
+      }
 
-            for (const rawProvider of providers) {
-                const provider = rawProvider.toLowerCase();
-                console.log(`[Queue] Starting watcher for [${provider}] in [${cycle}]`);
-                
-                if (provider === 'volcengine' || provider === 'seadream' || provider === 'seedance') {
-                    const volcEngineApi = new VolcengineProvider();
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await volcEngineApi.processTask(task), 5000, cycle));
-                } else if (provider === 'siliconflow') {
-                    const siliconFlowApi = new SiliconFlowProvider();
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await siliconFlowApi.processTask(task), 5000, cycle));
-                } else if (provider === 'minimax') {
-                    const minimaxApi = new MinimaxImageProvider();
-                    watchers.push(new QueueWatcher(queueDir, provider, async (task) => await minimaxApi.processTask(task), 5000, cycle));
-                } else {
-                    console.error(`[Queue] Unhandled provider: ${provider}`);
-                }
-            }
-            
-            await Promise.all(watchers.map(watcher => watcher.start()));
-        });
+      process.exitCode = exitCode;
+    });
 }

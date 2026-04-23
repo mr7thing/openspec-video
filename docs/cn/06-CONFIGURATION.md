@@ -1,150 +1,168 @@
-# OpsV 配置体系 (Configuration Guide) (v0.6.3)
+# OpsV 配置体系 (Configuration Guide) (v0.6.4)
 
-> 三重配置体系：服务归服务，密钥归密钥，参数归参数。一切行为由配置文件驱动�?
+> 三重配置体系：服务归服务，密钥归密钥，参数归参数。一切行为由配置文件驱动。
+
 ---
 
 ## 1. 配置架构总览
 
 ```
 project/
-├── .env                        # 服务管理配置（端口等，v0.6 新增�?├── .env.example                # 配置模板（可�?npm 打包�?└── .env/                       # 环境配置目录（git 忽略�?    ├── secrets.env             # API 密钥（绝密）
-    └── api_config.yaml         # 引擎参数（可共享�?```
+├── .env/                       # 环境配置目录（git 忽略）
+│   ├── secrets.env             # API 密钥（绝密）
+│   └── api_config.yaml         # 引擎参数（可共享）
+└── .opsv/                      # 运行时状态（git 忽略）
+    └── dependency-graph.json   # 依赖图缓存
+```
 
 | 文件 | 存储内容 | Git 跟踪 | 修改频率 |
 |------|---------|---------|---------| 
-| `.env`（根目录文件�?| 服务端口配置（Daemon / Review�?| �?跟踪 | 极少 |
-| `.env.example` | 配置模板（不含真实密钥） | �?跟踪 | 极少 |
-| `.env/secrets.env` | API Key 等敏感信�?| �?忽略 | 极少（初始化后不变） |
-| `.env/api_config.yaml` | 模型参数、默认值、能力描�?| �?忽略 | 偶尔（切换模�?调参时） |
+| `.env/secrets.env` | API Key 等敏感信息 | ❌ 忽略 | 极少（初始化后不变） |
+| `.env/api_config.yaml` | 模型参数、默认值、能力描述 | ❌ 忽略 | 偶尔（切换模型/调参时） |
 
 ---
 
-## 2. 服务管理配置 (`.env` 根文件，v0.6.0 新增)
-
-```env
-# 全局 Daemon 服务端口 (支持 Chrome 浏览器扩�?
-OPSV_DAEMON_PORT=3061
-
-# Local UI Review 服务端口 (可视化审阅与交互)
-OPSV_REVIEW_PORT=3456
-```
-
-### 加载机制
-- `opsv daemon` 启动时通过 `dotenv` 加载，读�?`OPSV_DAEMON_PORT`
-- `opsv review` 启动时通过 `dotenv` 加载，读�?`OPSV_REVIEW_PORT`
-- 所有服务端口均提供默认值回退
-
-> **v0.6.0 设计原则**：服务端口从硬编码解耦至环境变量，第三方 Agent 或子系统在对接时**必须优先读取环境变量**进行连接�?
----
-
-## 3. API 密钥配置 (`secrets.env`)
+## 2. API 密钥配置 (secrets.env)
 
 ### 格式
 
 ```env
-# 火山引擎 API Key（SeaDream 图像 + Seedance 视频�?VOLCENGINE_API_KEY=your_volcengine_key_here
+# 火山引擎 API Key（SeaDream 图像 + Seedance 视频）
+VOLCENGINE_API_KEY=your_volcengine_key_here
 
-# SiliconFlow API Key（Qwen 图像 + Wan 视频�?SILICONFLOW_API_KEY=your_siliconflow_key_here
+# SiliconFlow API Key（Qwen 图像 + Wan 视频）
+SILICONFLOW_API_KEY=your_siliconflow_key_here
 
-# MiniMax API Key（MiniMax 图像 + Hailuo 视频�?MINIMAX_API_KEY=your_minimax_key_here
+# MiniMax API Key（MiniMax 图像/视频）
+MINIMAX_API_KEY=your_minimax_key_here
 ```
 
-### 加载优先�?
+### 加载优先级
+
 CLI 启动时按以下优先级加载环境变量：
 
 ```
-1 (最�? �?.env/secrets.env    # 推荐存放位置
-2        �?.env (文件)          # 根目�?dotenv 文件（服务配置）
-3 (最�? �?系统环境变量         # process.env 兜底
+1 (最高): .env/secrets.env    # 推荐存放位置
+2        : .env (文件)          # 根目录 dotenv 文件（服务配置）
+3 (最低): 系统环境变量         # process.env 兜底
 ```
 
 ---
 
-## 4. 引擎参数配置 (`api_config.yaml`)
+## 3. 引擎参数配置 (api_config.yaml)
 
-### 完整配置模板 (v0.6.0)
+位于项目 `.env/api_config.yaml`，由 `opsv init` 从模板复制。
+
+### Schema
 
 ```yaml
-# OpsV 0.6.x Spooler Queue 模型配置
-# QueueWatcher 根据此表实例化对�?Provider
-
-models:
-
-  # ── 图像模型 ──────────────────────────────────
-
-  seadream-5.0-lite:
-    provider: "seadream"
-    type: "image"
-    enable: true
-    model: "doubao-seedream-5-0-260128"
-    required_env: ["VOLCENGINE_API_KEY"]
-    features: ["txt2img", "img2img", "negative_prompt", "aspect_ratio"]
-    defaults:
-      quality: "2K"
-      aspect_ratio: "16:9"
-      max_images: 1
-      steps: 30
-      cfg_scale: 7.5
-      negative_prompt: "blurry, low quality, distorted..."
-    max_size: { width: 1280, height: 720 }
-
-  qwen-image:
-    provider: "siliconflow"
-    type: "image"
-    enable: true
-    model: "Qwen/Qwen-Image"
-    required_env: ["SILICONFLOW_API_KEY"]
-    features: ["txt2img", "aspect_ratio"]
-    defaults:
-      quality: "1024x1024"
-      aspect_ratio: "1:1"
-
-  minimax-image-01:
-    provider: "minimax"
-    type: "image"
-    enable: false
-    model: "image-01"
-    required_env: ["MINIMAX_API_KEY"]
-    features: ["txt2img", "img2img", "aspect_ratio"]
-    defaults:
-      aspect_ratio: "16:9"
-
-  # ── 视频模型 ──────────────────────────────────
-
-  seedance-1.5-pro:
-    provider: "seedance"
-    type: "video"
-    enable: true
-    model: "doubao-seedance-1-5-pro"
-    required_env: ["VOLCENGINE_API_KEY"]
-    defaults:
-      quality: "720p"
-      aspect_ratio: "16:9"
-      duration: 5
-      sound: true
-    supports_first_image: true
-    supports_last_image: true
-    supports_reference_images: true
-    max_reference_images: 9
-
-  seedance-2.0-fast:
-    provider: "seedance"
-    type: "video"
-    enable: true
-    model: "doubao-video-v2-fast"
-    required_env: ["VOLCENGINE_API_KEY"]
-    defaults:
-      quality: "720p"
-      aspect_ratio: "16:9"
-      duration: 5
-      sound: true
-    supports_first_image: true
-    supports_last_image: true
-    supports_reference_images: true
-    max_reference_images: 10
-    supports_audio: true
-    supports_video_ref: true
+providers:
+  <providerName>:
+    required_env:
+      - ENV_VAR_NAME
+    models:
+      <modelKey>:
+        enable: true|false
+        type: image_generation | video_generation
+        model: "model-name"
+        api_url: "..."
+        api_status_url: "..."
+        defaults:
+          quality: "1024x1024"
+          aspect_ratio: "16:9"
 ```
+
+### 当前支持的 Provider
+
+| Provider | 类型 | 环境变量 |
+|----------|------|----------|
+| `volcengine` | 图像/视频 | `VOLCENGINE_API_KEY` |
+| `siliconflow` | 图像/视频 | `SILICONFLOW_API_KEY` |
+| `minimax` | 图像/视频 | `MINIMAX_API_KEY` |
+| `runninghub` | ComfyUI 工作流 | `RUNNINGHUB_API_KEY` |
+| `comfyui_local` | 本地 ComfyUI | 无 |
+
+### 完整配置模板 (v0.6.4)
+
+```yaml
+# OpsV 0.6.x Circle Queue 模型配置
+# QueueWatcher 根据此表实例化对应 Provider
+
+providers:
+
+  volcengine:
+    required_env:
+      - VOLCENGINE_API_KEY
+    models:
+      seadream-5.0-lite:
+        enable: true
+        type: image_generation
+        model: "doubao-seedream-5-0-260128"
+        api_url: "..."
+        defaults:
+          quality: "2K"
+          aspect_ratio: "16:9"
+
+      seedance-1.5-pro:
+        enable: true
+        type: video_generation
+        model: "doubao-seedance-1-5-pro"
+        defaults:
+          quality: "720p"
+          aspect_ratio: "16:9"
+          duration: 5
+
+  siliconflow:
+    required_env:
+      - SILICONFLOW_API_KEY
+    models:
+      qwen-image:
+        enable: true
+        type: image_generation
+        model: "Qwen/Qwen-Image"
+        defaults:
+          quality: "1024x1024"
+          aspect_ratio: "1:1"
+
+  minimax:
+    required_env:
+      - MINIMAX_API_KEY
+    models:
+      minimax-image-01:
+        enable: false
+        type: image_generation
+        model: "image-01"
+        defaults:
+          aspect_ratio: "16:9"
+
+  runninghub:
+    required_env:
+      - RUNNINGHUB_API_KEY
+    models:
+      runninghub-default:
+        enable: true
+        type: image_generation
+        defaults: {}
+
+  comfyui_local:
+    models:
+      comfyui-default:
+        enable: true
+        type: image_generation
+        defaults: {}
+```
+
+> **v0.6.4 注意**: Provider 本身没有 `enable` 属性，继承自子模型。只有子模型 `enable !== false` 且 `type` 匹配任务类型的 Provider 才会被选中。
+
+---
+
+## 4. ComfyUI 特殊处理
+
+ComfyUI **不通过** `api_config.yaml` 指定模型，模型由工作流 JSON 本身定义。
+
+- 使用 `opsv comfy compile <workflow.json>` 独立命令
+- 参数通过 Node Title 匹配注入（如 `input-prompt`, `input-image1`）
+- RunningHub 模式下会自动拦截本地文件路径并上传为 URL
 
 ---
 
@@ -154,50 +172,56 @@ models:
 
 | 能力 | SeaDream 5.0 | Qwen Image | MiniMax Image |
 |------|:---:|:---:|:---:|
-| **文生�?* | �?| �?| �?|
-| **图生�?* | �?| �?| �?|
-| **负面提示�?* | �?| �?| �?|
-| **画幅选项** | 5 �?| 固定 | 多种 |
-| **分辨�?* | 2K | 1024² | 可配�?|
+| **文生图** | ✅ | ✅ | ✅ |
+| **图生图** | ✅ | ✅ | ✅ |
+| **负面提示词** | ✅ | ❌ | ❌ |
+| **画幅选项** | 5 种 | 固定 | 多种 |
+| **分辨率** | 2K | 1024² | 可配置 |
 
 ### 视频模型
 
 | 能力 | Seedance 1.5 Pro | Seedance 2.0 Fast |
 |------|:---:|:---:|
-| **首帧参�?* | �?| �?|
-| **尾帧参�?* | �?| �?|
-| **角色参考图** | �?(�?) | �?(�?0) |
-| **空间音频** | �?| �?|
-| **视频参�?* | �?| �?|
-| **分辨�?* | 480p-1080p | 720p |
+| **首帧参考** | ✅ | ✅ |
+| **尾帧参考** | ✅ | ✅ |
+| **角色参考图** | ✅(9) | ✅(10) |
+| **空间音频** | ❌ | ✅ |
+| **视频参考** | ❌ | ✅ |
+| **分辨率** | 480p-1080p | 720p |
 
 ---
 
 ## 6. 关键参数解读
 
 ### `type` 字段
-标注模型类型�?`"image"` �?`"video"`，`opsv queue compile` 据此路由�?`StandardAPICompiler` �?`ComfyUITaskCompiler`�?
-### `provider` 字段 (v0.6.0 更新)
-直接对应 `opsv queue run <provider>` 的参数名。QueueWatcher 根据此字段实例化对应�?Provider 类�?
-### `global_style_postfix`（全局风格后缀�?
-定义�?`videospec/project.md` 中，编译器在 `opsv generate` 时自动注入每个任务的 Prompt 末尾�?
+标注模型类型：`image_generation` / `video_generation`，`opsv queue compile` 据此路由到 `StandardAPICompiler` 或 `ComfyUITaskCompiler`。
+
+### `provider` 字段 (v0.6.4 更新)
+直接对应 `opsv queue run <provider>` 的参数名。QueueWatcher 根据此字段实例化对应的 Provider 类。
+
+### `global_style_postfix`（全局风格后缀）
+定义在 `videospec/project.md` 中，编译器在 `opsv imagen` / `opsv animate` 时自动注入每个任务的 Prompt 末尾：
+
 ```
 [Shot Prompt] + [Asset Description] + [global_style_postfix]
 ```
 
 ### `required_env` 字段
+声明模型所需的 API Key 环境变量名。CLI 在执行前查表校验，无需硬编码。
 
-声明模型所需�?API Key 环境变量名。CLI 在执行前查表校验，无需硬编码�?
 ---
 
-## 7. 添加新模�?(v0.6.0 流程)
+## 7. 添加新模型 (v0.6.4 流程)
 
-1. �?`api_config.yaml` 中添加新模型配置块（�?`type`、`provider`、`required_env`�?2. �?`secrets.env` 中添加对应的 API Key
-3. �?`src/executor/providers/` 中实现对应的 Provider 类（实现 `processTask(task)` 方法�?4. �?`src/commands/queue.ts` �?`run` 命令中注册新 Provider
+1. 在 `api_config.yaml` 中添加新模型配置块（含 `type`、`provider`、`required_env`）
+2. 在 `secrets.env` 中添加对应的 API Key
+3. 在 `src/executor/providers/` 中实现对应的 Provider 类（实现 `processTask(task)` 方法）
+4. 在 `src/commands/queue.ts` 的 `run` 命令中注册新 Provider
 5. 更新 `docs/cn/07-API-REFERENCE.md` 添加接口文档
 
-> **v0.6.0 注意**: 不再需要在 Dispatcher 中注册！Provider 直接通过 QueueWatcher 被调用�?
+> **v0.6.4 注意**: 不再需要在 Dispatcher 中注册！Provider 直接通过 QueueWatcher 被调用。
+
 ---
 
-> *"配置即命令，参数即纪律�?*
-> *OpsV 0.6.3 | 最后更�? 2026-04-22*
+> *"配置即命令，参数即纪律。"*
+> *OpsV 0.6.4 | 最后更新 2026-04-22*

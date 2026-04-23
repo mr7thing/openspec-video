@@ -1,7 +1,13 @@
 import axios from 'axios';
 import fs from 'fs/promises';
-import path from 'path';
 import { logger } from '../../utils/logger';
+
+/**
+ * ComfyUI Local Provider (v0.6.4 简化版)
+ *
+ * 职责：读取 .json 任务文件（ComfyUI workflow）→ 提交本地 ComfyUI → 轮询历史 → 保存结果标记。
+ * 注意：本地 ComfyUI 的结果通常保存在其自身的 output 目录，此 Provider 主要做提交和状态追踪。
+ */
 
 export class ComfyUILocalProvider {
   private endpoint: string;
@@ -10,68 +16,65 @@ export class ComfyUILocalProvider {
     this.endpoint = endpoint;
   }
 
-  /**
-   * 执行本地 ComfyUI 任务
-   * task 结构: { uuid, payload: { comfyui_payload, shotId, ... }, outputPath }
-   */
-  async processTask(task: any): Promise<boolean> {
-    const { payload, outputPath } = task;
-    const payloadJson = payload.comfyui_payload;
-    if (!payloadJson) throw new Error('Task payload is missing comfyui_payload');
+  async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
+    const { taskJson, outputPath, logPath } = input;
+    const meta = taskJson._opsv;
+    const workflow = { ...taskJson };
+    delete workflow._opsv;
 
-    logger.logExecution(payload.shotId, 'COMFYUI_LOCAL_SUBMIT', { endpoint: this.endpoint, outputPath });
+    const logLines: any[] = [];
+
+    logLines.push({ t: new Date().toISOString(), type: 'request', method: 'POST', url: `${this.endpoint}/prompt`, workflow });
 
     try {
-        // 1. Submit the prompt
-        const submitRes = await axios.post(`${this.endpoint}/prompt`, { prompt: payloadJson }, {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 10000
-        });
+      const submitRes = await axios.post(`${this.endpoint}/prompt`, { prompt: workflow }, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+      });
 
-        const { prompt_id } = submitRes.data;
-        if (!prompt_id) throw new Error("No prompt_id returned from ComfyUI");
+      const { prompt_id } = submitRes.data;
+      if (!prompt_id) throw new Error('No prompt_id returned from ComfyUI');
 
-        // 2. Poll the history endpoint for completion
-        const result = await this.pollForCompletion(prompt_id);
-        
-        // 3. 处理结果保存 (此处简化逻辑，具体取决于 ComfyUI 节点的输出格式)
-        // 本地 Provider 通常由用户自行管理 ComfyUI output 文件夹，或通过 API 获取结果
-        // 这里假设我们需要把结果移动到 task.outputPath
-        await fs.mkdir(path.dirname(outputPath), { recursive: true });
-        
-        // 如果有 output 数据，可以遍历保存。此处打一个成功标记文件作为占位
-        await fs.writeFile(outputPath, JSON.stringify(result, null, 2));
-        return true;
-    } catch (error: any) {
-        logger.error(`ComfyUI Local Error: ${error.message}`);
-        throw error;
+      logLines.push({ t: new Date().toISOString(), type: 'response', status: submitRes.status, body: submitRes.data });
+
+      const result = await this.pollForCompletion(prompt_id, logLines);
+
+      // 本地 ComfyUI 结果通常在其 output 目录，此处保存一个结果引用文件
+      await fs.writeFile(outputPath, JSON.stringify({ prompt_id, result }, null, 2));
+      logLines.push({ t: new Date().toISOString(), type: 'save_complete', path: outputPath, prompt_id });
+
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+    } catch (err: any) {
+      logLines.push({ t: new Date().toISOString(), type: 'error', message: err.message, code: err.code || err.response?.status });
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+      throw err;
     }
   }
 
-  private async pollForCompletion(prompt_id: string): Promise<any> {
+  private async pollForCompletion(prompt_id: string, logLines: any[]): Promise<any> {
     let retries = 0;
-    while (retries < 360) { // 约 18 分钟
-        await new Promise(r => setTimeout(r, 3000));
-        retries++;
+    while (retries < 360) {
+      await new Promise(r => setTimeout(r, 3000));
+      retries++;
 
-        try {
-            const res = await axios.get(`${this.endpoint}/history/${prompt_id}`);
-            if (res.status === 200 && res.data[prompt_id]) {
-                return res.data[prompt_id];
-            }
-            
-            // 检查是否还在队列中
-            const queueRes = await axios.get(`${this.endpoint}/queue`);
-            const queue = queueRes.data;
-            const inQueue = [...(queue.queue_running || []), ...(queue.queue_pending || [])].some(q => q[1] === prompt_id);
-            
-            if (!inQueue && (!res.data || !res.data[prompt_id])) {
-                throw new Error('Prompt disappeared from queue without generating history.');
-            }
-        } catch (err: any) {
-            if (err.message.includes('disappeared')) throw err;
-            logger.warn(`Polling ComfyUI Local failed: ${err.message}`);
+      try {
+        const res = await axios.get(`${this.endpoint}/history/${prompt_id}`);
+        if (res.status === 200 && res.data[prompt_id]) {
+          logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: 'completed' });
+          return res.data[prompt_id];
         }
+
+        const queueRes = await axios.get(`${this.endpoint}/queue`);
+        const queue = queueRes.data;
+        const inQueue = [...(queue.queue_running || []), ...(queue.queue_pending || [])].some((q: any) => q[1] === prompt_id);
+
+        if (!inQueue && (!res.data || !res.data[prompt_id])) {
+          throw new Error('Prompt disappeared from queue without generating history');
+        }
+      } catch (err: any) {
+        if (err.message?.includes('disappeared')) throw err;
+        logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
+      }
     }
     throw new Error(`Polling timeout for ComfyUI prompt_id ${prompt_id}`);
   }

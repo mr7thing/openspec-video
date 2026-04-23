@@ -53,10 +53,12 @@ opsv-queue/                 # 统一队列目录（替代旧 artifacts/、queue/
 │   └── imagen_jobs.json
 ├── firstcircle_1/
 │   ├── volcengine/
-│   │   └── queue_1/
-│   │       ├── queue.json
-│   │       ├── manifest.json
-│   │       └── {taskId}_{seq}.png
+│   │   └── queue_1/         # 每次 compile 必然创建新 batch（queue_N+1）
+│   │       ├── queue.json   # 只读索引（compile 时生成）
+│   │       ├── shot_01.json # 完整 API 请求体（Agent 可直接编辑执行）
+│   │       ├── shot_01_1.png
+│   │       ├── shot_01.log  # JSONL 执行日志
+│   │       └── shot_02.json
 │   └── ...
 └── frames/                  # @FRAME 引用目标目录
 ```

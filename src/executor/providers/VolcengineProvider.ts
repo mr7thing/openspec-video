@@ -1,180 +1,128 @@
 import axios from 'axios';
 import fs from 'fs/promises';
-import path from 'path';
 import { logger } from '../../utils/logger';
-import { ConfigLoader } from '../../utils/configLoader';
+import { downloadFile } from '../../utils/download';
+
+/**
+ * Volcengine Provider (v0.6.4 简化版)
+ *
+ * 职责：读取 .json 任务文件 → 发送请求 → 下载结果 → 写 JSONL log。
+ * 不再读取 api_config，请求体已由 TaskCompiler 完整生成。
+ */
 
 export class VolcengineProvider {
-    private providerName: string;
+  async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
+    const { taskJson, outputPath, logPath } = input;
+    const meta = taskJson._opsv;
+    const requestBody = { ...taskJson };
+    delete requestBody._opsv;
 
-    constructor(providerName: string = 'volcengine') {
-        this.providerName = providerName;
+    const apiKey = this.resolveApiKey();
+    const logLines: any[] = [];
+
+    logLines.push({
+      t: new Date().toISOString(),
+      type: 'request',
+      method: 'POST',
+      url: meta.api_url,
+      body: requestBody
+    });
+
+    try {
+      const response = await axios.post(meta.api_url, requestBody, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: 120000
+      });
+
+      logLines.push({
+        t: new Date().toISOString(),
+        type: 'response',
+        status: response.status,
+        body: response.data
+      });
+
+      if (meta.type === 'image_generation') {
+        await this.handleImageResponse(response.data, outputPath, logLines);
+      } else if (meta.type === 'video_generation') {
+        if (!meta.api_status_url) throw new Error('Video task missing api_status_url in _opsv');
+        await this.handleVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
+      } else {
+        throw new Error(`Unknown task type: ${meta.type}`);
+      }
+
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+    } catch (err: any) {
+      logLines.push({
+        t: new Date().toISOString(),
+        type: 'error',
+        message: err.message,
+        code: err.code || err.response?.status
+      });
+      await fs.appendFile(logPath, logLines.map(l => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+      throw err;
     }
-    
-    /**
-     * 执行火山引擎 (Volcengine) 任务
-     * task 结构: { uuid, payload: { prompt, params, model, type, shotId }, outputPath }
-     */
-    async processTask(task: any): Promise<boolean> {
-        const { payload, outputPath, uuid } = task;
-        if (!payload) throw new Error("Volcengine Provider: Missing payload");
+  }
 
-        const configLoader = ConfigLoader.getInstance();
-        let apiKey: string;
-        try {
-            apiKey = configLoader.getResolvedApiKey(this.providerName);
-        } catch {
-            apiKey = process.env.VOLCENGINE_API_KEY || ''; 
-            if (!apiKey) throw new Error(`Missing API Key for provider ${this.providerName} (VOLCENGINE_API_KEY)`);
-        }
-
-        const modelName = payload.model;
-        const jobType = payload.type || 'image_generation';
-        
-        if (jobType === 'image_generation') {
-            return await this.processImageTask(payload, modelName, apiKey, uuid, outputPath);
-        } else {
-            // 对视频任务，可以从配置中获取特定的 API URL 或使用默认
-            const apiUrl = 'https://ark.cn-beijing.volces.com/api/v3/video/submit';
-            return await this.processVideoTask(payload, modelName, apiKey, uuid, outputPath, apiUrl);
-        }
-    }
-
-    private async processImageTask(payload: any, modelName: string, apiKey: string, uuid: string, outputPath: string): Promise<boolean> {
-        const endpoint = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
-        const params = payload.params || {};
-        
-        logger.logExecution(payload.shotId, 'VOLCENGINE_IMAGE_START', { model: modelName, uuid, outputPath });
-
-        const requestBody = {
-            model: modelName,
-            prompt: payload.prompt || '',
-            negative_prompt: params.negative_prompt || 'blurry, low quality, distorted, deformed, ugly, bad anatomy',
-            response_format: 'url',
-            size: params.image_size || params.size || '1024x1024', 
-            aspect_ratio: params.aspect_ratio || '16:9',
-            steps: params.steps || 30,
-            cfg_scale: params.cfg_scale || 7.5,
-            stream: false,
-            watermark: true
-        };
-        
-        try {
-            const res = await axios.post(endpoint, requestBody, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 300000 
-            });
-
-            const data = res.data;
-            if (data.code !== undefined && data.code !== 0) {
-                 throw new Error(`API Error [${data.code}]: ${data.message}`);
-            }
-
-            // 兼容多种返回格式
-            let imageUrl = '';
-            const dataLayer = data.data?.data || data.data || data;
-            if (Array.isArray(dataLayer)) {
-                imageUrl = dataLayer[0].image_url || dataLayer[0].url;
-            } else {
-                imageUrl = dataLayer.image_url || dataLayer.url;
-            }
-
-            if (!imageUrl) throw new Error(`Invalid response: no image URL found in ${JSON.stringify(data)}`);
-
-            await fs.mkdir(path.dirname(outputPath), { recursive: true });
-            await this.downloadFile(imageUrl, outputPath);
-            return true;
-        } catch (error: any) {
-             const apiError = error.response?.data || error.message;
-             throw new Error(`Volcengine Image API Error: ${JSON.stringify(apiError)}`);
-        }
+  private async handleImageResponse(data: any, outputPath: string, logLines: any[]) {
+    let imageUrl = '';
+    const dataLayer = data.data?.data || data.data || data;
+    if (Array.isArray(dataLayer) && dataLayer.length > 0) {
+      imageUrl = dataLayer[0].image_url || dataLayer[0].url;
+    } else if (dataLayer && typeof dataLayer === 'object') {
+      imageUrl = dataLayer.image_url || dataLayer.url;
     }
 
-    private async processVideoTask(payload: any, modelName: string, apiKey: string, uuid: string, outputPath: string, apiUrl: string): Promise<boolean> {
-        const params = payload.params || {};
-        const requestBody: any = {
-            model: modelName,
-            prompt: payload.prompt || "Cinematic video"
-        };
-        
-        if (payload.reference_images && payload.reference_images.length > 0) {
-            requestBody.image_url = await this.getBase64Image(payload.reference_images[0]);
-        }
+    if (!imageUrl) throw new Error('Image URL not found in response');
 
-        logger.logExecution(payload.shotId, 'VOLCENGINE_VIDEO_SUBMIT', { model: modelName, uuid, outputPath });
+    logLines.push({ t: new Date().toISOString(), type: 'download_start', url: imageUrl });
+    await downloadFile(imageUrl, outputPath);
+    logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+  }
 
-        try {
-            const submitRes = await axios.post(apiUrl, requestBody, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 30000
-            });
+  private async handleVideoResponse(data: any, apiKey: string, apiStatusUrl: string, outputPath: string, logLines: any[]) {
+    const taskId = data.task_id || data.id;
+    if (!taskId) throw new Error(`No task_id in submission response: ${JSON.stringify(data)}`);
 
-            const data = submitRes.data;
-            if (data.code && data.code !== 0) {
-                throw new Error(`Volcengine API Error [${data.code}]: ${data.message}`);
-            }
+    logLines.push({ t: new Date().toISOString(), type: 'video_submitted', taskId });
 
-            const taskId = data.data?.task_id || data.id; 
-            if (!taskId) throw new Error(`No task_id returned: ${JSON.stringify(data)}`);
+    let retries = 0;
+    let pollIntervalMs = 5000;
+    while (retries < 120) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+      retries++;
+      pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
 
-            await this.pollVideoStatus(taskId, apiKey, outputPath);
-            return true;
-        } catch (error: any) {
-            const apiError = error.response?.data || error.message;
-            throw new Error(`Volcengine Video Submit Error: ${JSON.stringify(apiError)}`);
-        }
-    }
-
-    private async pollVideoStatus(taskId: string, apiKey: string, outputPath: string): Promise<void> {
-        const url = 'https://ark.cn-beijing.volces.com/api/v3/video/status';
-        let retries = 0;
-        let pollIntervalMs = 5000;
-        while (retries < 120) {
-            await new Promise(r => setTimeout(r, pollIntervalMs));
-            retries++;
-            pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000); 
-
-            try {
-                const response = await axios.post(url, { task_id: taskId }, {
-                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-                });
-                
-                const data = response.data?.data || response.data;
-                const status = data.status;
-
-                if (status === 'success' || status === 'succeeded' || status === 'completed') {
-                    const videoUrl = data.video_url;
-                    if (!videoUrl) throw new Error(`Status success but no video URL.`);
-                    await fs.mkdir(path.dirname(outputPath), { recursive: true });
-                    await this.downloadFile(videoUrl, outputPath);
-                    return;
-                } else if (status === 'failed' || status === 'error') {
-                    throw new Error(`Video generation failed: ${data.message || data.error_message || 'Unknown error'}`);
-                }
-            } catch (err: any) {
-                if (err.message.includes('failed')) throw err;
-                logger.warn(`Polling attempt ${retries} error: ${err.message}`);
-            }
-        }
-        throw new Error(`Polling timeout for Volcengine task ${taskId}`);
-    }
-
-    private async getBase64Image(filePath: string): Promise<string> {
-        const data = await fs.readFile(filePath);
-        const ext = path.extname(filePath).toLowerCase();
-        const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : (ext === '.webp' ? 'image/webp' : 'image/png');
-        return `data:${mimeType};base64,${data.toString('base64')}`;
-    }
-
-    private async downloadFile(url: string, outputPath: string): Promise<void> {
-        const response = await axios({ method: 'GET', url: url, responseType: 'stream', timeout: 600000 });
-        const writer = require('fs').createWriteStream(outputPath);
-        response.data.pipe(writer);
-        return new Promise((resolve, reject) => {
-            response.data.on('error', reject);
-            writer.on('finish', () => { writer.close(); resolve(); });
-            writer.on('error', reject);
+      try {
+        const statusRes = await axios.get(`${apiStatusUrl}?id=${taskId}`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
         });
-    }
-}
 
+        const statusData = statusRes.data;
+        logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: statusData.status });
+
+        if (statusData.status === 'Success' || statusData.status === 'success' || statusData.status === 'Succeed') {
+          const videoUrl = statusData.video_url || statusData.url || statusData.file_url;
+          if (!videoUrl) throw new Error('Video generation succeeded but no URL found');
+
+          logLines.push({ t: new Date().toISOString(), type: 'download_start', url: videoUrl });
+          await downloadFile(videoUrl, outputPath);
+          logLines.push({ t: new Date().toISOString(), type: 'download_complete', path: outputPath });
+          return;
+        } else if (statusData.status === 'Failed' || statusData.status === 'failed' || statusData.status === 'Fail') {
+          throw new Error(`Video generation failed: ${JSON.stringify(statusData)}`);
+        }
+      } catch (err: any) {
+        if (err.message?.includes('Video generation failed')) throw err;
+        if (err.response && err.response.status >= 400 && err.response.status < 500) throw err;
+        logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
+      }
+    }
+    throw new Error(`Video polling timeout for task ${taskId}`);
+  }
+
+  private resolveApiKey(): string {
+    const key = process.env.VOLCENGINE_API_KEY;
+    if (!key) throw new Error('Missing VOLCENGINE_API_KEY environment variable');
+    return key;
+  }
+}
