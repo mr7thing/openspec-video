@@ -1,7 +1,9 @@
 import axios from 'axios';
 import fs from 'fs/promises';
+import path from 'path';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
+import { inlineLocalFiles } from '../../utils/fileToBase64';
 
 /**
  * Volcengine Provider (v0.6.4 简化版)
@@ -16,6 +18,13 @@ export class VolcengineProvider {
     const meta = taskJson._opsv;
     const requestBody = { ...taskJson };
     delete requestBody._opsv;
+
+    // Seedance 2.0: 将 content 数组中的本地文件路径转为 Base64 Data URI
+    const isContentGeneration = meta.api_url?.includes('content_generation');
+    if (isContentGeneration && Array.isArray(requestBody.content)) {
+      const batchDir = path.dirname(outputPath);
+      await inlineLocalFiles(requestBody.content, batchDir);
+    }
 
     const apiKey = this.resolveApiKey();
     const logLines: any[] = [];
