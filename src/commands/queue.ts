@@ -12,10 +12,10 @@ import fs from 'fs/promises';
 
 function getProviderInstance(providerName: string) {
   switch (providerName) {
-    case 'volcengine': return new VolcengineProvider();
-    case 'siliconflow': return new SiliconFlowProvider();
-    case 'minimax': return new MinimaxImageProvider();
-    case 'runninghub': return new RunningHubProvider();
+    case 'volcengine': return new VolcengineProvider(providerName);
+    case 'siliconflow': return new SiliconFlowProvider(providerName);
+    case 'minimax': return new MinimaxImageProvider(providerName);
+    case 'runninghub': return new RunningHubProvider(providerName);
     case 'comfyui_local': return new ComfyUILocalProvider();
     default: throw new Error(`Unknown provider: ${providerName}`);
   }

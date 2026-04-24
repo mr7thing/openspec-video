@@ -2,23 +2,17 @@ import axios from 'axios';
 import fs from 'fs/promises';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
-
-/**
- * Minimax Provider (v0.6.4 简化版)
- *
- * 职责：读取 .json 任务文件 → 发送请求 → 下载结果 → 写 JSONL log。
- * Minimax 图像返回 base64，视频需要轮询后获取下载 URL。
- */
+import { ConfigLoader } from '../../utils/configLoader';
 
 export class MinimaxImageProvider {
+  constructor(private readonly providerName: string = 'minimax') {}
   async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
     const { taskJson, outputPath, logPath } = input;
     const meta = taskJson._opsv;
     const requestBody = { ...taskJson };
     delete requestBody._opsv;
 
-    const apiKey = this.resolveApiKey();
-    const logLines: any[] = [];
+    const apiKey = await this.resolveApiKey();    const logLines: any[] = [];
 
     logLines.push({ t: new Date().toISOString(), type: 'request', method: 'POST', url: meta.api_url, body: requestBody });
 
@@ -132,9 +126,9 @@ export class MinimaxImageProvider {
     return sensitivePatterns.filter(p => prompt.match(p)).map(p => p.source);
   }
 
-  private resolveApiKey(): string {
-    const key = process.env.MINIMAX_API_KEY;
-    if (!key) throw new Error('Missing MINIMAX_API_KEY environment variable');
-    return key;
+  private async resolveApiKey(): Promise<string> {
+    const configLoader = ConfigLoader.getInstance();
+    await configLoader.loadConfig();
+    return configLoader.getResolvedApiKey(this.providerName);
   }
 }

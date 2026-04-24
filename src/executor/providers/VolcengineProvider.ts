@@ -4,15 +4,10 @@ import path from 'path';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
 import { inlineLocalFiles, inlineLocalFile, isLocalFilePath } from '../../utils/fileToBase64';
-
-/**
- * Volcengine Provider (v0.6.4 简化版)
- *
- * 职责：读取 .json 任务文件 → 发送请求 → 下载结果 → 写 JSONL log。
- * 不再读取 api_config，请求体已由 TaskCompiler 完整生成。
- */
+import { ConfigLoader } from '../../utils/configLoader';
 
 export class VolcengineProvider {
+  constructor(private readonly providerName: string = 'volcengine') {}
   async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
     const { taskJson, outputPath, logPath } = input;
     const meta = taskJson._opsv;
@@ -34,8 +29,7 @@ export class VolcengineProvider {
       requestBody.image_url = await inlineLocalFile(requestBody.image_url, batchDir);
     }
 
-    const apiKey = this.resolveApiKey();
-    const logLines: any[] = [];
+    const apiKey = await this.resolveApiKey();    const logLines: any[] = [];
 
     logLines.push({
       t: new Date().toISOString(),
@@ -225,9 +219,9 @@ export class VolcengineProvider {
     throw new Error(`Video polling timeout for task ${taskId}`);
   }
 
-  private resolveApiKey(): string {
-    const key = process.env.VOLCENGINE_API_KEY;
-    if (!key) throw new Error('Missing VOLCENGINE_API_KEY environment variable');
-    return key;
+  private async resolveApiKey(): Promise<string> {
+    const configLoader = ConfigLoader.getInstance();
+    await configLoader.loadConfig();
+    return configLoader.getResolvedApiKey(this.providerName);
   }
 }

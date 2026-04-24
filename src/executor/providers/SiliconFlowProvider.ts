@@ -3,14 +3,10 @@ import fs from 'fs/promises';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
 import { isLocalFilePath, inlineLocalFile } from '../../utils/fileToBase64';
-
-/**
- * SiliconFlow Provider (v0.6.4 简化版)
- *
- * 职责：读取 .json 任务文件 → 发送请求 → 下载结果 → 写 JSONL log。
- */
+import { ConfigLoader } from '../../utils/configLoader';
 
 export class SiliconFlowProvider {
+  constructor(private readonly providerName: string = 'siliconflow') {}
   async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
     const { taskJson, outputPath, logPath } = input;
     const meta = taskJson._opsv;
@@ -26,8 +22,7 @@ export class SiliconFlowProvider {
       requestBody.edit_image = await inlineLocalFile(requestBody.edit_image, batchDir);
     }
 
-    const apiKey = this.resolveApiKey();
-    const logLines: any[] = [];
+    const apiKey = await this.resolveApiKey();    const logLines: any[] = [];
 
     logLines.push({ t: new Date().toISOString(), type: 'request', method: 'POST', url: meta.api_url, body: requestBody });
 
@@ -107,9 +102,9 @@ export class SiliconFlowProvider {
     throw new Error(`Video polling timeout for request ${requestId}`);
   }
 
-  private resolveApiKey(): string {
-    const key = process.env.SILICONFLOW_API_KEY;
-    if (!key) throw new Error('Missing SILICONFLOW_API_KEY environment variable');
-    return key;
+  private async resolveApiKey(): Promise<string> {
+    const configLoader = ConfigLoader.getInstance();
+    await configLoader.loadConfig();
+    return configLoader.getResolvedApiKey(this.providerName);
   }
 }

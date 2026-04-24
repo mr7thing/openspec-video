@@ -2,23 +2,17 @@ import axios from 'axios';
 import fs from 'fs/promises';
 import { logger } from '../../utils/logger';
 import { downloadFile } from '../../utils/download';
-
-/**
- * RunningHub Provider (v0.6.4 简化版)
- *
- * 职责：读取 .json 任务文件（ComfyUI workflow）→ 提交 RunningHub → 轮询 → 下载结果 → 写 JSONL log。
- * 注意：本地文件上传尚未实现，.json 中的文件路径必须是公网 URL。
- */
+import { ConfigLoader } from '../../utils/configLoader';
 
 export class RunningHubProvider {
+  constructor(private readonly providerName: string = 'runninghub') {}
   async processTask(input: { taskJson: any; outputPath: string; logPath: string }): Promise<void> {
     const { taskJson, outputPath, logPath } = input;
     const meta = taskJson._opsv;
     const workflow = { ...taskJson };
     delete workflow._opsv;
 
-    const apiKey = this.resolveApiKey();
-    const logLines: any[] = [];
+    const apiKey = await this.resolveApiKey();    const logLines: any[] = [];
     const endpointBase = meta.api_url || 'https://www.runninghub.cn/task/openapi';
 
     logLines.push({ t: new Date().toISOString(), type: 'request', method: 'POST', url: `${endpointBase}/create`, workflow });
@@ -95,9 +89,9 @@ export class RunningHubProvider {
     throw new Error(`Polling timeout for RunningHub task ${taskId}`);
   }
 
-  private resolveApiKey(): string {
-    const key = process.env.RUNNINGHUB_API_KEY;
-    if (!key) throw new Error('Missing RUNNINGHUB_API_KEY environment variable');
-    return key;
+  private async resolveApiKey(): Promise<string> {
+    const configLoader = ConfigLoader.getInstance();
+    await configLoader.loadConfig();
+    return configLoader.getResolvedApiKey(this.providerName);
   }
 }
