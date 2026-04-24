@@ -32,17 +32,26 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 ### 状态机
 每个可审阅对象拥有 `status` 字段：
-- `draft` / `drafting` — 起草中（两者等价，`drafting` 为旧版兼容）
-- `approved` — 已通过审查，可作为下游依赖
 
-**一致性铁律**: `status: approved` 的文档**必须**包含至少一张有效的 `## Approved References` 参考图（`![variant](path)` 格式）。`opsv validate` 会自动校验此项。
+| 状态 | 含义 |
+|------|------|
+| `draft` / `drafting` | 起草中（两者等价，`drafting` 为旧版兼容） |
+| `pending_sync` | Approve 回写完成，`prompt_en` 已更新但 `visual_detailed`/`visual_brief`/`refs` 尚未对齐，**阻断下游 Circle** |
+| `approved` | 已完全就绪，可作为下游依赖 |
+
+**状态流转**：`drafting → draft → [渲染] → [approve] → pending_sync → [Agent对齐] → approved`
+
+**一致性铁律**:
+- `status: approved` 的文档**必须**包含至少一张有效的 `## Approved References` 参考图（`![variant](path)` 格式）
+- `pending_sync` 资产虽然已有 Approved References，但被视为"未就绪"，**阻断下游 Circle 执行**
+- `opsv validate` 会自动校验 status 与 Approved References 一致性、pending_sync 字段对齐状态
 
 ### Circle 状态图标（`opsv circle status` 输出）
 
 | 图标 | 状态 | 含义 |
 |------|------|------|
 | ⭕ | 未开始 | 该 Circle 无任何 approved 资产 |
-| ⏳ | 进行中 | 部分资产已批准 |
+| ⏳ | 进行中 | 部分资产已批准，或存在 pending_sync 资产（⚠️ N pending_sync） |
 | ✅ | 已完成 | 全部资产已批准，可晋升下一 Circle |
 
 ### 目录结构
@@ -89,6 +98,8 @@ opsv-queue/                 # 统一队列目录（替代旧 artifacts/、queue/
 | `.json` = 意图层 | **.json = 可直接发送的 API 请求体**，run 时不再读 api_config |
 | Seedance 1.5 旧 API | **新增 Seedance 2.0** Content Generation API（`content[]` 数组格式） |
 | 本地文件仅支持路径引用 | **image/audio 支持 Base64 Data URI** 内联（video 除外） |
+| Approve → `status: approved` | **Approve → `status: pending_sync`**（只覆盖 `prompt_en`，Agent 对齐后方可 `approved`） |
+| 无回写 | **Approve 回写**：覆盖 `prompt_en` + 同步 Design References + review 指向 task JSON |
 
 ## Agent 角色速查
 
@@ -127,6 +138,9 @@ opsv queue run --model <provider.model|alias> --circle <name> [--retry]
 
 # 审阅
 opsv review
+#    → Approve 后: prompt_en已覆盖 + Design References已同步 + status→pending_sync
+#    → Agent 对齐 visual_detailed/visual_brief/refs 后手动改为 approved
+#    → 全部 approved 后执行 opsv circle manifest 固化快照
 ```
 
 ## 导航索引
