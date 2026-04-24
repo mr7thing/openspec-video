@@ -203,15 +203,55 @@ async function validateFile(filePath: string): Promise<ValidationIssue[]> {
         }
     }
 
-    // 规则2: 有 Approved References 的文档，status 应为 approved
-    // （project 类型除外，因为 story.md 等也使用 project type）
-    if (approvedImageCount > 0 && docStatus !== 'approved') {
+    // 规则2: 有 Approved References 的文档，status 应为 approved 或 pending_sync
+    if (approvedImageCount > 0 && docStatus !== 'approved' && docStatus !== 'pending_sync') {
         issues.push({
             file: relativePath,
             field: 'status + ## Approved References',
             message: `文档包含 ${approvedImageCount} 张 Approved References 但 status 为 "${docStatus}"`,
-            suggestion: '将 status 改为 approved，或移除 Approved References 区域中的图片引用'
+            suggestion: '将 status 改为 approved 或 pending_sync，或移除 Approved References 区域中的图片引用'
         });
+    }
+
+    // 规则3: pending_sync 提醒 — 需 Agent 根据 prompt_en 完成 visual_detailed/visual_brief/refs 对齐
+    if (docStatus === 'pending_sync') {
+        const warnings: string[] = [];
+        if (!frontmatter.visual_detailed) warnings.push('visual_detailed 缺失');
+        if (!frontmatter.visual_brief) warnings.push('visual_brief 缺失');
+        if (!frontmatter.refs || frontmatter.refs.length === 0) {
+            if (content.includes('## Design References')) {
+                warnings.push('refs 为空但存在 ## Design References（需同步）');
+            }
+        }
+        if (warnings.length > 0) {
+            issues.push({
+                file: relativePath,
+                field: 'pending_sync',
+                message: `status 为 "pending_sync"，以下字段需根据 prompt_en 对齐: ${warnings.join(', ')}`,
+                suggestion: '根据 prompt_en 翻译更新 visual_detailed，简化为 visual_brief，对齐 refs 与 ## Design References，完成后将 status 改为 approved'
+            });
+        } else {
+            issues.push({
+                file: relativePath,
+                field: 'pending_sync',
+                message: 'status 为 "pending_sync"，所有字段已填充，确认对齐后可将 status 改为 approved',
+                suggestion: '检查 visual_detailed/visual_brief/refs 是否与 prompt_en 一致，确认后改为 approved'
+            });
+        }
+    }
+
+    // 规则4: prompt_en 与 visual_detailed 一致性检查（approved 状态才报 error，pending_sync 已由规则3覆盖）
+    if (docStatus === 'approved' && frontmatter.prompt_en && frontmatter.visual_detailed) {
+        const promptEn = frontmatter.prompt_en as string;
+        const detailed = frontmatter.visual_detailed as string;
+        if (!detailed.includes(promptEn.substring(0, 50)) && detailed.length < promptEn.length * 0.3) {
+            issues.push({
+                file: relativePath,
+                field: 'prompt_en + visual_detailed',
+                message: 'prompt_en 与 visual_detailed 可能不一致（visual_detailed 过短或未反映 prompt_en 内容）',
+                suggestion: '根据 prompt_en 更新 visual_detailed（翻译+补充生成参数）'
+            });
+        }
     }
 
     return issues;

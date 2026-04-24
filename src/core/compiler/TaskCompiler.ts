@@ -157,7 +157,7 @@ export class TaskCompiler {
     requestBody.prompt = job.prompt_en || payload?.prompt || '';
 
     // 参数防御
-    this.applyParameterDefense(provider, modelKey, requestBody);
+    this.applyParameterDefense(provider, modelKey, requestBody, job.type);
 
     const refs = job.reference_images || [];
     const frameRef = (job.payload as any).frame_ref;
@@ -243,12 +243,12 @@ export class TaskCompiler {
       addContent({ type: 'image_url', image_url: { url: imgUrl }, role: 'reference_image' });
     }
 
-    // 3. 首帧/尾帧
+    // 3. 首帧/尾帧 (role 必须为 first_frame/last_frame 以确保帧保真度)
     if (frameRef?.first && !frameRef.first.startsWith('@FRAME:')) {
-      addContent({ type: 'image_url', image_url: { url: frameRef.first }, role: 'reference_image' });
+      addContent({ type: 'image_url', image_url: { url: frameRef.first }, role: 'first_frame' });
     }
     if (frameRef?.last && !frameRef.last.startsWith('@FRAME:')) {
-      addContent({ type: 'image_url', image_url: { url: frameRef.last }, role: 'reference_image' });
+      addContent({ type: 'image_url', image_url: { url: frameRef.last }, role: 'last_frame' });
     }
 
     // 4. 媒体引用 (video/audio)
@@ -279,7 +279,7 @@ export class TaskCompiler {
   /**
    * Provider 参数防御。
    */
-  private applyParameterDefense(provider: string, model: string, params: any) {
+  private applyParameterDefense(provider: string, model: string, params: any, jobType: string) {
     if (provider === 'siliconflow') {
       const recommended = ['1024x1024', '512x1024', '768x1024', '1024x512', '1024x768', '1280x720', '720x1280', '1440x720', '720x1440', '1664x928', '928x1664', '1472x1140', '1140x1472', '1584x1056', '1056x1584', '1328x1328'];
       const currentSize = params.image_size || params.size || params.resolution || '1024x1024';
@@ -293,10 +293,27 @@ export class TaskCompiler {
       delete params.resolution;
     }
 
-    if (provider === 'volcengine') {
-      if (params.size === '2K') params.size = '1920x1080';
-      if (params.size === '2K-Square') params.size = '1440x1440';
-      if (!params.size) params.size = '1280x720';
+    if (provider === 'volcengine' && jobType === 'image_generation') {
+      const resolutionAliases = ['2K', '3K'];
+      if (params.size && resolutionAliases.includes(params.size)) {
+        // 方式1: 分辨率别名("2K"/"3K")由模型根据prompt自动判断像素，原样保留
+      } else if (params.size && /^\d+x\d+$/.test(params.size)) {
+        // 方式2: 指定像素值 — 校验宽高比和总像素
+        const [w, h] = params.size.split('x').map(Number);
+        const ratio = w / h;
+        const totalPixels = w * h;
+        if (ratio < 1 / 16 || ratio > 16) {
+          logger.warn(`[Defense] Volcengine: Size ${params.size} aspect ratio ${ratio.toFixed(2)} out of [1/16, 16]. Fallback to 2048x2048`);
+          params.size = '2048x2048';
+        } else if (totalPixels < 3686400 || totalPixels > 10404496) {
+          logger.warn(`[Defense] Volcengine: Size ${params.size} total pixels ${totalPixels} out of Seedream 5.0 lite range [3686400, 10404496]. Fallback to 2048x2048`);
+          params.size = '2048x2048';
+        }
+      } else if (!params.size) {
+        // API文档方式2默认值
+        params.size = '2048x2048';
+      }
+      // 视频模型不处理size字段（Seedance用ratio，旧版API不支持size）
     }
 
     if (provider === 'minimax') {

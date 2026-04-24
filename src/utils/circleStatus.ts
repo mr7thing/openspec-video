@@ -7,6 +7,7 @@ export interface CircleInfo {
   index: number;
   assets: string[];
   approvedCount: number;
+  pendingSyncCount: number;
   totalCount: number;
   isComplete: boolean;
 }
@@ -32,9 +33,12 @@ export async function getCircleStatus(projectRoot: string): Promise<CircleStatus
   for (let i = 0; i < batches.length; i++) {
     const assets = batches[i];
     let approvedCount = 0;
+    let pendingSyncCount = 0;
     for (const assetId of assets) {
-      if (await approvedRefReader.hasAnyApproved(assetId)) {
+      if (await approvedRefReader.isReadyForDownstream(assetId)) {
         approvedCount++;
+      } else if (await approvedRefReader.hasAnyApproved(assetId)) {
+        pendingSyncCount++;
       }
     }
 
@@ -43,6 +47,7 @@ export async function getCircleStatus(projectRoot: string): Promise<CircleStatus
       index: i,
       assets,
       approvedCount,
+      pendingSyncCount,
       totalCount: assets.length,
       isComplete: approvedCount === assets.length
     });
@@ -69,8 +74,9 @@ export async function printCircleSummary(projectRoot: string): Promise<void> {
   logger.info('\n📊 Circle 状态摘要:');
 
   for (const circle of circles) {
-    const icon = circle.isComplete ? '✅' : (circle.approvedCount > 0 ? '⏳' : '⭕');
-    logger.info(`  ${icon} ${circle.name}: ${circle.totalCount} 个资产 (${circle.approvedCount} 已批准)`);
+    const icon = circle.isComplete ? '✅' : (circle.approvedCount > 0 || circle.pendingSyncCount > 0 ? '⏳' : '⭕');
+    const syncNote = circle.pendingSyncCount > 0 ? ` (⚠️ ${circle.pendingSyncCount} pending_sync)` : '';
+    logger.info(`  ${icon} ${circle.name}: ${circle.totalCount} 个资产 (${circle.approvedCount} 已批准)${syncNote}`);
   }
 
   if (allComplete) {

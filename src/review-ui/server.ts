@@ -339,18 +339,27 @@ export class ReviewServer {
         // 1. 直接使用原产出路径作为 approved 引用（无需复制到单独目录）
         const approvedPath = imagePath;
 
-        // 2. 找到源文档并回写 Approved References
+        // 2. 找到源文档并回写 Approved References + 生成参数
         const docPath = await this.findSourceDoc(jobId);
         if (docPath) {
             await this.approvedRefReader.appendApprovedRef(docPath, variant, approvedPath);
 
-            // 3. 更新 status → approved
+            // 3. 更新 status → pending_sync（由 writebackFromTask 设置）或 approved（无 task JSON 时）
             let content = await fs.readFile(docPath, 'utf-8');
-            content = FrontmatterParser.updateField(content, 'status', 'approved');
 
             // 4. 追加 reviews 记录
             const reviewEntry = `${new Date().toISOString().split('T')[0]}: ${reviewNote || 'approved via review UI'}`;
             content = FrontmatterParser.appendReview(content, reviewEntry);
+
+            // 5. 从 task JSON 回写生成参数到源文档
+            const taskJson = await this.findTaskJson(jobId, imagePath);
+            if (taskJson) {
+                content = this.writebackFromTask(content, taskJson, jobId, imagePath);
+                logger.info(`  🔄 Writeback: ${jobId} (prompt_en已覆盖, Design References已同步, status→pending_sync)`);
+            } else {
+                content = FrontmatterParser.updateField(content, 'status', 'approved');
+                logger.warn(`  ⚠️  Writeback: ${jobId} 未找到 task JSON，直接设为 approved`);
+            }
 
             await fs.writeFile(docPath, content, 'utf-8');
             logger.info(`✅ Approve: ${jobId}:${variant} → ${approvedPath}`);
@@ -436,4 +445,120 @@ export class ReviewServer {
 
         return issues;
     }
+
+    // ================================================================
+    // Task JSON 定位与回写
+    // ================================================================
+
+    private async findTaskJson(jobId: string, imagePath: string): Promise<any | null> {
+        const batchDir = path.dirname(imagePath);
+
+        const defaultPath = path.join(batchDir, `${jobId}.json`);
+        const exists = await fs.access(defaultPath).then(() => true).catch(() => false);
+        if (exists) {
+            try {
+                const raw = await fs.readFile(defaultPath, 'utf-8');
+                return JSON.parse(raw);
+            } catch {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private writebackFromTask(docContent: string, taskData: any, jobId: string, imagePath: string): string {
+        const prompt = taskData.prompt || '';
+        const content: any[] = taskData.content || [];
+        const actualPrompt = this.extractPrompt(prompt, content);
+        if (!actualPrompt) return docContent;
+
+        // 1. prompt_en: 始终覆盖为实际发送的完整提示词
+        docContent = FrontmatterParser.updateField(docContent, 'prompt_en', actualPrompt);
+
+        // 2. 同步 ## Design References 图片链接（从 task JSON 提取参考素材）
+        const taskImageRefs = this.extractImageRefs(taskData.image || [], content);
+        if (taskImageRefs.length > 0) {
+            docContent = this.syncDesignReferences(docContent, taskImageRefs);
+        }
+
+        // 3. 追加 review 条目指向 task JSON（供 Agent 追溯完整生成参数）
+        const taskJsonRelPath = path.relative(this.projectRoot, path.dirname(imagePath)).replace(/\\/g, '/')
+            + `/${jobId}.json`;
+        const model = taskData.model || '';
+        const size = taskData.size || taskData.ratio || '';
+        const reviewNote = `prompt_en 已从 task JSON 同步 | ${model}${size ? ` | ${size}` : ''} | ${taskJsonRelPath}`;
+        docContent = FrontmatterParser.appendReview(docContent, reviewNote);
+
+        // 4. status → pending_sync（需 Agent 根据 prompt_en 完成 visual_detailed/visual_brief/refs 对齐后方可改为 approved）
+        docContent = FrontmatterParser.updateField(docContent, 'status', 'pending_sync');
+
+        return docContent;
+    }
+
+    private syncDesignReferences(docContent: string, imageUrls: string[]): string {
+        const relPaths = imageUrls.map(url => {
+            if (url.startsWith('data:')) return null;
+            if (url.startsWith('http://') || url.startsWith('https://')) return url;
+            return url;
+        }).filter((p): p is string => p !== null);
+
+        const newEntries = relPaths.map(url => `![ref](${url})`).join('\n');
+        const sectionHeader = '## Design References';
+        const sectionRegex = /^(##\s*Design\s+References\s*\n)/im;
+        const match = docContent.match(sectionRegex);
+
+        if (match && match.index !== undefined) {
+            const afterHeader = match.index + match[0].length;
+            const nextSectionRegex = /\n##\s/g;
+            const restOfDoc = docContent.slice(afterHeader);
+            const nextSection = restOfDoc.search(nextSectionRegex);
+            const sectionBody = nextSection >= 0 ? restOfDoc.slice(0, nextSection) : restOfDoc;
+            const afterSection = nextSection >= 0 ? restOfDoc.slice(nextSection) : '';
+            docContent = docContent.slice(0, afterHeader) + '\n' + newEntries + '\n' + sectionBody.trimEnd() + afterSection;
+        } else {
+            const approvedRefRegex = /^(##\s*Approved\s+References)/m;
+            const approvedMatch = docContent.match(approvedRefRegex);
+            if (approvedMatch && approvedMatch.index !== undefined) {
+                docContent = docContent.slice(0, approvedMatch.index)
+                    + `${sectionHeader}\n\n${newEntries}\n\n`
+                    + docContent.slice(approvedMatch.index);
+            } else {
+                docContent += `\n\n${sectionHeader}\n\n${newEntries}\n`;
+            }
+        }
+
+        return docContent;
+    }
+
+    private extractPrompt(prompt: string, content: any[]): string {
+        if (prompt) return prompt;
+        for (const item of content) {
+            if (item.type === 'text' && item.text) return item.text;
+        }
+        return '';
+    }
+
+    private extractImageRefs(imageRefs: any[], content: any[]): string[] {
+        const refs: string[] = [];
+
+        if (Array.isArray(imageRefs)) {
+            for (const ref of imageRefs) {
+                if (typeof ref === 'string') refs.push(ref);
+                else if (ref?.url) refs.push(ref.url);
+            }
+        }
+
+        for (const item of content) {
+            if (item.type === 'image_url' && item.image_url?.url && !item.image_url.url.startsWith('data:')) {
+                refs.push(item.image_url.url);
+            }
+            if (item.type === 'video_url' && item.video_url?.url && !item.video_url.url.startsWith('data:')) {
+                refs.push(item.video_url.url);
+            }
+        }
+
+        return [...new Set(refs)];
+    }
+
 }

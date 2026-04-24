@@ -127,4 +127,91 @@ opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 - `opsv validate` 自动校验此项不一致
 
 ### 敏感词注意 (MiniMax/火山)
-若遇内容审核错误（如 MiniMax 1033），请在 `visual_detailed` 中对敏感词进行脱敏（如使用隐喻或近义词），并重新执行 `opsv imagen` + `opsv queue compile`。
+若遇内容审核错误（如 MiniMax 1033），请在 `visual_detailed `中对敏感词进行脱敏（如使用隐喻或近义词），并重新执行 `opsv imagen` + `opsv queue compile`。也可以`visual_detailed `脱敏后直接修改queue / 下的任务json 重新执行
+
+---
+
+## 🔄 迭代工作指导 (v0.6.4)
+
+### 核心原则：Approve → pending_sync → approved
+
+`opsv review` 的 Approve 操作触发回写，将 `prompt_en` 覆盖为实际生成参数，`status` 设为 `pending_sync`。Agent **必须**根据 `prompt_en` 完成 `visual_detailed`/`visual_brief`/`refs` 对齐后，方可将 `status` 改为 `approved`。
+
+**`pending_sync` 资产阻断下游 Circle**——其他分镜/视频任务无法引用未对齐的资产，确保生成一致性。
+
+### Approve 回写动作
+
+| 动作 | 内容 | 覆盖策略 |
+|------|------|---------|
+| ✅ 覆盖 `prompt_en` | 从 task JSON 的 `prompt` 或 `content[].text` 提取 | **始终覆盖** |
+| ✅ 同步 `## Design References` | 从 task JSON 的 `image`/`content[].image_url` 提取参考图链接 | 替换该区域 |
+| ✅ 添加 review 条目 | 指向 task JSON 路径 + 模型 + 尺寸 | 始终追加 |
+| ✅ `status → pending_sync` | 标记为待同步 | 始终设置 |
+| ✅ 追加 `## Approved References` | `![variant](path)` | 始终追加（已有逻辑不变） |
+
+### Agent 对齐工作（pending_sync → approved）
+
+Agent 看到 `pending_sync` 后**必须执行**：
+
+1. **读取 `prompt_en`** — 确认实际发送给 API 的提示词
+2. **翻译 `prompt_en` → `visual_detailed`** — 将英文提示词翻译为中文描述，可补充生成参数备注
+3. **简化 `visual_detailed` → `visual_brief`** — 提炼核心视觉特征（≤120字）
+4. **对齐 `refs`** — 检查 `refs` 是否与 `## Design References` 中的参考图一致
+5. **`status: approved`** — 所有字段对齐后手动修改
+6. **`opsv validate`** — 确认无问题
+
+### `opsv validate` 检出规则
+
+| 检查项 | 条件 | 级别 |
+|--------|------|------|
+| `pending_sync` 字段缺失 | `visual_detailed`/`visual_brief` 为空，或 `refs` 与 Design References 不一致 | error（提示需对齐） |
+| `pending_sync` 字段已填充 | 所有字段已填充，提醒确认后改为 approved | warning |
+| `prompt_en` 与 `visual_detailed` 不一致 | approved 状态但 visual_detailed 过短或未反映 prompt_en | warning |
+| `status` 与 `Approved References` 矛盾 | 有 approved 图但 status 非 approved/pending_sync | error |
+
+### 完整迭代流程
+
+```
+1. opsv imagen                          # 生成任务列表
+2. opsv queue compile ... --model ...   # 编译
+3. opsv queue run ... --model ...       # 渲染
+4. opsv review                          # 审阅 → Approve 时自动: prompt_en覆盖 + Design References同步 + status→pending_sync
+5. Agent 根据 prompt_en 对齐 visual_detailed/visual_brief/refs，status→approved
+6. opsv validate                        # 验证对齐一致性
+7. opsv circle status                   # 刷新 Circle 状态（pending_sync 不解锁下游）
+```
+
+### 两个 References 区域的职责
+
+| 区域 | 职责 | 来源 |
+|------|------|------|
+| `## Design References` | **输入侧** — 生成此资产时参考了哪些素材（图片/视频 URL） | 从 task JSON 同步 |
+| `## Approved References` | **输出侧** — 此资产的哪些生成结果被接受 | review Approve 时追加 |
+
+### Draft（驳回）后的迭代
+
+1. **定位问题**：查看 `draft_ref` 和 `reviews` 记录了解驳回原因
+2. **修改方案**（二选一）：
+   - **方案A**：修改源 `.md` 的 `visual_detailed` / `prompt_en` → 重新 `opsv imagen` + `compile` + `run`
+   - **方案B**：直接复制并修改 task JSON（快速迭代）
+3. **快速迭代示例**：
+   ```bash
+   # 复制任务
+   cp opsv-queue/firstcircle_1/volcengine/queue_1/shot_01.json \
+      opsv-queue/firstcircle_1/volcengine/queue_1/shot_01_v2.json
+   # 编辑 shot_01_v2.json → 执行 → Approve → 对齐 pending_sync
+   opsv queue run --model seedream --file shot_01_v2.json --circle firstcircle_1
+   opsv review
+   ```
+4. **迭代文件命名规范**：`{jobId}_v{N}.json`，N 从 2 递增
+
+### Circle 跨环迭代
+
+当 ZeroCircle 资产在 FirstCircle 分镜渲染时发现需修改：
+
+1. 回到 ZeroCircle 源 `.md`，修改 `visual_detailed`
+2. 重新 `opsv imagen --circle zerocircle_1 --no-skip-approved`
+3. 编译、渲染、审阅、Agent 对齐、validate
+4. `opsv circle status` 确认 ZeroCircle fully approved
+5. FirstCircle 下次 `opsv imagen` 自动引用新 approved 图
+  

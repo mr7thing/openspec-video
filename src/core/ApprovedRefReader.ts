@@ -54,6 +54,25 @@ export class ApprovedRefReader {
     }
 
     /**
+     * 检查资产是否已完全就绪（有 approved 图 且 status 不是 pending_sync）
+     * pending_sync 表示 prompt_en 已回写但 visual_detailed/visual_brief/refs 尚未对齐，
+     * Agent 完成对齐并将 status 改为 approved 后才算就绪，下游方可引用。
+     */
+    async isReadyForDownstream(assetId: string): Promise<boolean> {
+        const docPath = await this.findDocPath(assetId);
+        if (!docPath) return false;
+        const refs = await this.parseApprovedRefs(docPath);
+        if (refs.size === 0) return false;
+        const { FileUtils } = await import('../utils/fileUtils');
+        const content = await FileUtils.readFile(docPath);
+        const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        if (!fmMatch) return true;
+        const yaml = await import('js-yaml');
+        const fm = yaml.load(fmMatch[1]) as Record<string, any>;
+        return fm.status !== 'pending_sync';
+    }
+
+    /**
      * 向文档的 Approved References 区追加图片
      */
     async appendApprovedRef(docPath: string, variant: string, imagePath: string): Promise<void> {
