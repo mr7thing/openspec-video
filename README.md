@@ -63,6 +63,8 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 ## 🛠️ Key Features / 核心特性
 
 - **Circle Queue**: Dependency-layered batch execution with automatic topological sorting.
+- **pending_sync 状态**: Approve 回写后进入 pending_sync，Agent 对齐字段后方可 approved，阻断下游 Circle。
+- **Approve 回写策略**: 只覆盖 `prompt_en` + 同步 Design References + review 指向 task JSON。
 - **Model Aliasing**: Use `--model volc.sd2` instead of `--model volcengine.seedance-2.0` via `api_config.yaml` aliases.
 - **Seedance 2.0 Ready**: Full support for multimodal content arrays (text + image + video + audio references).
 - **Intent-Execution Decoupling**: `imagen`/`animate` generates intent; `queue compile/run` handles API execution.
@@ -110,6 +112,9 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 - **@FRAME 引用解析**: shotlist.md 中 `first_frame: "@FRAME:shot_01_last"` 或 `@shot_01:last` 自动解析为同目录相对路径 `shot_01_last.png`。
 - **移除 queue.json**: compile 不再生成 `queue.json`，避免 run 时误执行元数据文件。
 - **资产 URL 全记录**: 所有 API 返回的视频/图片 URL 记入 JSONL log（`type: asset_url`），便于审计和二次引用。
+- **`pending_sync` 状态**: 新增 `pending_sync` 枚举值，Approve 回写后 status 自动设为 `pending_sync`（仅覆盖 `prompt_en`），Agent 对齐 `visual_detailed`/`visual_brief`/`refs` 后手动改为 `approved`。`pending_sync` 资产阻断下游 Circle 执行。
+- **Approve 回写策略**: Approve 时 4 个动作：(1) 覆盖 `prompt_en` 为实际 prompt；(2) 从 task JSON 同步 `## Design References`；(3) `reviews[]` 追加指向 task JSON 的条目；(4) `status → pending_sync`。无 task JSON 时 fallback 为 `approved`。
+- **validate 新增规则**: `pending_sync` 字段缺失提醒 + `approved` 时 `prompt_en`↔`visual_detailed` 一致性检查。
 
 ### v0.6.1 — Spooler Queue 物理排队论
 
