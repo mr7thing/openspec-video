@@ -56,7 +56,6 @@ export class VolcengineProvider {
         await this.handleImageResponse(response.data, outputPath, logLines);
       } else if (meta.type === 'video_generation') {
         if (!meta.api_status_url) throw new Error('Video task missing api_status_url in _opsv');
-        const isContentGeneration = meta.api_url?.includes('content_generation');
         if (isContentGeneration) {
           await this.handleContentGenerationVideoResponse(response.data, apiKey, meta.api_status_url, outputPath, logLines);
         } else {

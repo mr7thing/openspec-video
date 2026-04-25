@@ -37,7 +37,7 @@ export class ConfigLoader {
     }
 
     public static getInstance(projectRoot?: string): ConfigLoader {
-        const root = projectRoot || process.cwd();
+        const root = path.normalize(projectRoot || process.cwd()).replace(/\\/g, '/');
         if (!ConfigLoader.instances.has(root)) {
             ConfigLoader.instances.set(root, new ConfigLoader(root));
         }

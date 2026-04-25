@@ -75,14 +75,16 @@ export class SiliconFlowProvider {
       pollIntervalMs = Math.min(pollIntervalMs + 5000, 30000);
 
       try {
-        const statusRes = await axios.post(apiStatusUrl, { requestId }, {
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+        const statusRes = await axios.get(apiStatusUrl, {
+          params: { requestId },
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+          timeout: 30000,
         });
 
         const statusData = statusRes.data;
         logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: statusData.status });
 
-        if (statusData.status === 'Succeed' || statusData.status === 'success') {
+        if (statusData.status === 'Succeed' || statusData.status === 'Success' || statusData.status === 'success') {
           const videoUrl = statusData.results?.videos?.[0]?.url || statusData.video_url;
           if (!videoUrl) throw new Error('Status Succeed but no video URL found');
 

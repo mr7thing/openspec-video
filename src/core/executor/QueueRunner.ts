@@ -138,11 +138,16 @@ export class QueueRunner {
   /**
    * 检查该任务是否已有成功执行结果。
    */
+  private escapeRegExp(str: string): string {
+    return str.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  }
+
   private async hasRunResult(batchDir: string, baseName: string): Promise<boolean> {
     const entries = await fs.readdir(batchDir).catch(() => [] as string[]);
+    const escapedBase = this.escapeRegExp(baseName);
     return entries.some(e => {
       // 匹配 shot_01_1.png, shot_01_2.png 等（baseName 后加 _数字.扩展名）
-      const pattern = new RegExp(`^${baseName}_(\\d+)\\.(png|mp4|jpg|jpeg|webp|gif)$`);
+      const pattern = new RegExp(`^${escapedBase}_(\\d+)\\.(png|mp4|jpg|jpeg|webp|gif)$`);
       return pattern.test(e);
     });
   }
@@ -159,7 +164,7 @@ export class QueueRunner {
 
     const entries = await fs.readdir(batchDir).catch(() => [] as string[]);
     const seqs = entries
-      .map(e => e.match(new RegExp(`^${baseName}_(\\d+)\\.${ext}$`)))
+      .map(e => e.match(new RegExp(`^${this.escapeRegExp(baseName)}_(\\d+)\\.${ext}$`)))
       .filter(Boolean)
       .map(m => parseInt(m![1]));
 

@@ -58,13 +58,13 @@ export class ComfyUILocalProvider {
       retries++;
 
       try {
-        const res = await axios.get(`${this.endpoint}/history/${prompt_id}`);
+        const res = await axios.get(`${this.endpoint}/history/${prompt_id}`, { timeout: 10000 });
         if (res.status === 200 && res.data[prompt_id]) {
           logLines.push({ t: new Date().toISOString(), type: 'poll', attempt: retries, status: 'completed' });
           return res.data[prompt_id];
         }
 
-        const queueRes = await axios.get(`${this.endpoint}/queue`);
+        const queueRes = await axios.get(`${this.endpoint}/queue`, { timeout: 10000 });
         const queue = queueRes.data;
         const inQueue = [...(queue.queue_running || []), ...(queue.queue_pending || [])].some((q: any) => q[1] === prompt_id);
 

@@ -105,8 +105,6 @@ export class ReviewServer {
                 logger.info('🚪 Review 服务已关闭');
                 process.exit(0);
             });
-            // 强制退出兜底
-            setTimeout(() => process.exit(1), 5000);
         } else {
             process.exit(0);
         }
@@ -139,7 +137,7 @@ export class ReviewServer {
         this.scheduleIdleTimer();
 
         // SIGINT 处理（Ctrl+C）
-        process.on('SIGINT', () => {
+        process.once('SIGINT', () => {
             logger.info('\n🔒 收到 Ctrl+C，优雅关闭...');
             this.gracefulShutdown('sigint');
         });
@@ -288,7 +286,6 @@ export class ReviewServer {
         // ---- API: 完成审阅（手动关闭）----
         app.post('/api/complete-review', async (req: any, res: any) => {
             logger.info('🔒 收到完成审阅请求');
-            res.json({ success: true });
             this.gracefulShutdown('manual');
         });
 

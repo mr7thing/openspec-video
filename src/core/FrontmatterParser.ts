@@ -118,10 +118,10 @@ export class FrontmatterParser {
 
     private static split(content: string): { rawYaml: string; body: string } {
         // 匹配 --- 分隔的 frontmatter
-        const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+        const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(\r?\n?)([\s\S]*)$/);
         if (!match) {
             throw new Error('文档缺少 YAML frontmatter（需要 --- 分隔符）');
         }
-        return { rawYaml: match[1], body: match[2] };
+        return { rawYaml: match[1], body: match[3] };
     }
 }

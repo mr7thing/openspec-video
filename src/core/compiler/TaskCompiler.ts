@@ -79,8 +79,13 @@ export class TaskCompiler {
     }
 
     // 读取 jobs
-    const jobsContent = await fs.readFile(jobsPath, 'utf-8');
-    const jobs: Job[] = JSON.parse(jobsContent);
+    let jobs: Job[];
+    try {
+        const jobsContent = await fs.readFile(jobsPath, 'utf-8');
+        jobs = JSON.parse(jobsContent);
+    } catch (e) {
+        throw new Error(`Failed to parse jobs.json: ${(e as Error).message}`);
+    }
 
     // 确定 batch 目录：compile 总是创建新 batch（queue_N+1）
     const providerDir = path.join(this.baseQueueDir, circle, provider);

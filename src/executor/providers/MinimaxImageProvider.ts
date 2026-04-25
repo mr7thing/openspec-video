@@ -99,8 +99,9 @@ export class MinimaxImageProvider {
         if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND') {
           logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
           continue;
+        } else {
+          logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
         }
-        logLines.push({ t: new Date().toISOString(), type: 'poll_error', attempt: retries, message: err.message });
       }
     }
     throw new Error(`Video polling timeout for task ${taskId}`);
