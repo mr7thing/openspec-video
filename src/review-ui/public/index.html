@@ -268,6 +268,7 @@
                 </div>
                 <div style="display: flex; gap: 8px;">
                     <button class="btn btn-secondary" onclick="location.reload()">🔄 刷新</button>
+                    <button class="btn btn-secondary" id="completeBtn" onclick="completeReview()">🔒 完成审阅</button>
                 </div>
             </div>
 
@@ -550,6 +551,14 @@
                 } else {
                     el.textContent = `⚠️ ${json.data.length} 个规范警告`;
                 }
+            }
+        }
+
+        async function completeReview() {
+            if (!confirm('确定完成审阅？将关闭 Review 服务。')) return;
+            const res = await fetch('/api/complete-review', { method: 'POST' });
+            if (res.ok) {
+                alert('🔒 审阅已完成，服务即将关闭');
             }
         }
 

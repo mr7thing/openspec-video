@@ -9,12 +9,29 @@ import { logger } from '../utils/logger';
 // v0.5: 从 CLI 文本升级为可交互的页面服务
 // ============================================================================
 
+function parseDuration(s: string): number {
+    // 支持: 30m, 2h, 3600s, 7200
+    const match = s.match(/^(\d+)([msh])?$/);
+    if (!match) return 2 * 60 * 60 * 1000; // 默认 2h
+    const val = parseInt(match[1]);
+    const unit = match[2] || 'h';
+    switch (unit) {
+        case 'ms': return val;
+        case 's': return val * 1000;
+        case 'm': return val * 60 * 1000;
+        case 'h': return val * 60 * 60 * 1000;
+        default: return 2 * 60 * 60 * 1000;
+    }
+}
+
 export function registerReviewCommand(program: Command) {
     program
         .command('review')
         .description('启动 Review 页面服务，可视化审阅候选图并 Approve')
         .option('-p, --port <port>', '服务端口', process.env.OPSV_REVIEW_PORT || '3456')
         .option('-b, --batch <batch>', '指定批次号: all, 1:4, 或 1,3,5 (默认最新批次)', 'latest')
+        .option('--ttl <duration>', '最大存活时长，默认 2h', '2h')
+        .option('--idle <duration>', '无操作自动关闭，默认 30m', '30m')
         .action(async (options) => {
             const projectRoot = process.cwd();
 
@@ -26,13 +43,17 @@ export function registerReviewCommand(program: Command) {
             }
 
             const port = parseInt(options.port);
-            const server = new ReviewServer(projectRoot, batchDirs);
+            const ttlMs = parseDuration(options.ttl);
+            const idleMs = parseDuration(options.idle);
+            const server = new ReviewServer(projectRoot, batchDirs, { ttlMs, idleMs });
             await server.start(port);
 
+            const ttlStr = options.ttl;
+            const idleStr = options.idle;
             logger.info(`\n🔍 Review 服务已启动`);
             logger.info(`   地址: http://localhost:${port}`);
             logger.info(`   加载批次: ${batchDirs.map(d => path.basename(d)).join(', ')}`);
-            logger.info(`   按 Ctrl+C 关闭\n`);
+            logger.info(`   TTL: ${ttlStr} | Idle: ${idleStr} | 按 Ctrl+C 关闭\n`);
         });
 }
 

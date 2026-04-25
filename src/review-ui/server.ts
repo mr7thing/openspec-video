@@ -13,6 +13,7 @@ import { printCircleSummary } from '../utils/circleStatus';
 //   - 批次内候选图展示 API
 //   - Approve 交互 API（多选 + 默认序号命名）
 //   - 格式检查 API
+//   - 生命周期管理（TTL / Idle / 优雅关闭）
 // ============================================================================
 
 interface Candidate {
@@ -28,34 +29,130 @@ interface CandidateGroup {
     images: Candidate[];
 }
 
+export interface ReviewLifecycle {
+    ttlMs: number;   // 最大存活时长
+    idleMs: number;  // 无操作自动关闭
+}
+
 export class ReviewServer {
     private approvedRefReader: ApprovedRefReader;
+    private lifecycle: ReviewLifecycle;
+    private serverInstance: ReturnType<express.Express['listen']> | null = null;
+    private idleTimer: NodeJS.Timeout | null = null;
+    private ttlTimer: NodeJS.Timeout | null = null;
+    private isShuttingDown = false;
 
     constructor(
         private projectRoot: string,
-        private batchDirs: string[]
+        private batchDirs: string[],
+        lifecycle: ReviewLifecycle = { ttlMs: 2 * 60 * 60 * 1000, idleMs: 30 * 60 * 1000 }
     ) {
         this.approvedRefReader = new ApprovedRefReader(projectRoot);
+        this.lifecycle = lifecycle;
     }
+
+    // ================================================================
+    // 生命周期管理
+    // ================================================================
+
+    private scheduleIdleTimer(): void {
+        if (this.idleTimer) clearTimeout(this.idleTimer);
+        this.idleTimer = setTimeout(() => {
+            logger.info(`⏰ Review 服务 idle 超时（${this.lifecycle.idleMs}ms），自动关闭`);
+            this.gracefulShutdown('idle-timeout');
+        }, this.lifecycle.idleMs);
+    }
+
+    private scheduleTtlTimer(): void {
+        if (this.ttlTimer) clearTimeout(this.ttlTimer);
+        this.ttlTimer = setTimeout(() => {
+            logger.info(`⏰ Review 服务 TTL 到期（${this.lifecycle.ttlMs}ms），强制关闭`);
+            this.gracefulShutdown('ttl-expired');
+        }, this.lifecycle.ttlMs);
+    }
+
+    private resetIdleTimer(): void {
+        if (!this.isShuttingDown) {
+            this.scheduleIdleTimer();
+        }
+    }
+
+    private async gracefulShutdown(reason: string): Promise<void> {
+        if (this.isShuttingDown) return;
+        this.isShuttingDown = true;
+
+        if (this.idleTimer) clearTimeout(this.idleTimer);
+        if (this.ttlTimer) clearTimeout(this.ttlTimer);
+
+        const timestamp = new Date().toISOString();
+
+        // git commit checkpoint
+        try {
+            execFileSync('git', ['add', '.'], { cwd: this.projectRoot, stdio: 'pipe' });
+            execFileSync('git', ['commit', '-m', `[review done] ${timestamp} (${reason})`], {
+                cwd: this.projectRoot,
+                encoding: 'utf-8',
+                stdio: 'pipe'
+            });
+            logger.info(`✅ Git commit: [review done] ${timestamp} (${reason})`);
+        } catch (e) {
+            logger.warn(`Git commit 失败: ${(e as Error).message}`);
+        }
+
+        // 关闭 HTTP 服务
+        if (this.serverInstance) {
+            this.serverInstance.close(() => {
+                logger.info('🚪 Review 服务已关闭');
+                process.exit(0);
+            });
+            // 强制退出兜底
+            setTimeout(() => process.exit(1), 5000);
+        } else {
+            process.exit(0);
+        }
+    }
+
+    // ================================================================
+    // 启动
+    // ================================================================
 
     async start(port: number): Promise<void> {
         const app = express();
         app.use(express.json());
 
+        // ---- 启动时 git commit checkpoint ----
+        try {
+            const timestamp = new Date().toISOString();
+            execFileSync('git', ['add', '.'], { cwd: this.projectRoot, stdio: 'pipe' });
+            execFileSync('git', ['commit', '-m', `[review] ${timestamp} — started`], {
+                cwd: this.projectRoot,
+                encoding: 'utf-8',
+                stdio: 'pipe'
+            });
+            logger.info(`✅ Git checkpoint: [review] ${timestamp}`);
+        } catch (e) {
+            logger.warn(`启动 checkpoint 失败: ${(e as Error).message}`);
+        }
+
+        // 启动 TTL / Idle 计时器
+        this.scheduleTtlTimer();
+        this.scheduleIdleTimer();
+
+        // SIGINT 处理（Ctrl+C）
+        process.on('SIGINT', () => {
+            logger.info('\n🔒 收到 Ctrl+C，优雅关闭...');
+            this.gracefulShutdown('sigint');
+        });
+
         // ---- 静态文件 ----
-        // 图片代理：让前端通过 /opsv-queue/ 路径访问资产
         app.use('/opsv-queue', express.static(
             path.join(this.projectRoot, 'opsv-queue')
         ));
 
         // Review UI 静态页面
-        // 增加动态路径探测，兼容开发模式 (ts-node) 和 发布模式 (dist)
         let publicPath = path.join(__dirname, 'public');
         const publicPathExists = await fs.access(publicPath).then(() => true).catch(() => false);
         if (!publicPathExists) {
-            // 如果是在 dist/review-ui/server.js 运行，public 应该在同级
-            // 如果是在 src/review-ui/server.ts 运行，public 也在同级
-            // 但有些运行环境可能会导致路径偏移，此处做一个向上探测
             publicPath = path.join(__dirname, '../src/review-ui/public');
         }
 
@@ -64,7 +161,6 @@ export class ReviewServer {
             app.use(express.static(publicPath));
         } else {
             logger.error(`❌ Review UI 静态资源目录不存在: ${publicPath}`);
-            // 提供一个基础的响应而不是挂起
             app.get('/', (req, res) => {
                 res.status(500).send('<h1>OpsV Review UI 资源缺失</h1><p>请确保 dist/review-ui/public 目录存在。</p>');
             });
@@ -72,6 +168,7 @@ export class ReviewServer {
 
         // ---- API: 获取批次内所有候选图 ----
         app.get('/api/candidates', async (req: any, res: any) => {
+            this.resetIdleTimer();
             try {
                 const candidates = await this.resolveBatchCandidates();
                 res.json({ success: true, data: candidates });
@@ -82,6 +179,7 @@ export class ReviewServer {
 
         // ---- API: 获取文档内容 ----
         app.get('/api/document/:jobId', async (req: any, res: any) => {
+            this.resetIdleTimer();
             try {
                 const docPath = await this.findSourceDoc(req.params.jobId);
                 if (docPath) {
@@ -100,6 +198,7 @@ export class ReviewServer {
 
         // ---- API: 格式检查 ----
         app.get('/api/format-check', async (req: any, res: any) => {
+            this.resetIdleTimer();
             try {
                 const issues = await this.runFormatCheck();
                 res.json({ success: true, data: issues });
@@ -108,11 +207,11 @@ export class ReviewServer {
             }
         });
 
-        // ---- API: Approve 操作（支持多选） ----
+        // ---- API: Approve 操作（支持多选）----
         app.post('/api/approve', async (req: any, res: any) => {
+            this.resetIdleTimer();
             try {
                 const { selections, reviewNote } = req.body;
-                // selections: [{ jobId, imagePath, variant? }]
                 if (!Array.isArray(selections) || selections.length === 0) {
                     return res.status(400).json({ success: false, error: '未选择任何图片' });
                 }
@@ -128,28 +227,6 @@ export class ReviewServer {
                     results.push(result);
                 }
 
-                // 自动 git commit（使用参数数组防止命令注入）
-                try {
-                    // 白名单校验所有 jobId，只允许字母/数字/下划线/连字符
-                    const SAFE_JOB_ID = /^[a-zA-Z0-9_-]+$/;
-                    const validatedIds = selections.map((s: any) => {
-                        if (typeof s.jobId !== 'string' || !SAFE_JOB_ID.test(s.jobId)) {
-                            throw new Error(`非法 jobId，拒绝提交: ${String(s.jobId).substring(0, 50)}`);
-                        }
-                        return s.jobId;
-                    });
-                    const commitMsg = `approve: ${validatedIds.join(', ')}`;
-                    execFileSync('git', ['add', '.'], { cwd: this.projectRoot, stdio: 'pipe' });
-                    execFileSync('git', ['commit', '-m', commitMsg], {
-                        cwd: this.projectRoot,
-                        encoding: 'utf-8',
-                        stdio: 'pipe'
-                    });
-                    logger.info(`✅ Git commit: ${commitMsg}`);
-                } catch (e) {
-                    logger.warn(`Git commit 失败: ${(e as Error).message}`);
-                }
-
                 // Approve 后打印 Circle 状态摘要
                 try {
                     await printCircleSummary(this.projectRoot);
@@ -163,8 +240,9 @@ export class ReviewServer {
             }
         });
 
-        // ---- API: Draft 操作（打回并记录参考） ----
+        // ---- API: Draft 操作（打回并记录参考）----
         app.post('/api/draft', async (req: any, res: any) => {
+            this.resetIdleTimer();
             try {
                 const { jobId, imagePath, feedback } = req.body;
                 if (!jobId) {
@@ -181,7 +259,7 @@ export class ReviewServer {
                 // 1. 设置 status → draft
                 content = FrontmatterParser.updateField(content, 'status', 'draft');
 
-                // 2. 记录 draft_ref（当前不满意的生成结果，供下轮迭代参考）
+                // 2. 记录 draft_ref
                 if (imagePath) {
                     const relativePath = path.relative(this.projectRoot, imagePath).replace(/\\/g, '/');
                     content = FrontmatterParser.updateField(content, 'draft_ref', relativePath);
@@ -193,19 +271,6 @@ export class ReviewServer {
 
                 await fs.writeFile(docPath, content, 'utf-8');
                 logger.info(`📝 Draft: ${jobId} — ${feedback || '(无具体意见)'}`);
-
-                // 自动 git commit
-                try {
-                    const SAFE_JOB_ID = /^[a-zA-Z0-9_-]+$/;
-                    if (typeof jobId === 'string' && SAFE_JOB_ID.test(jobId)) {
-                        execFileSync('git', ['add', '.'], { cwd: this.projectRoot, stdio: 'pipe' });
-                        execFileSync('git', ['commit', '-m', `draft: ${jobId} — ${(feedback || '').substring(0, 60)}`], {
-                            cwd: this.projectRoot, encoding: 'utf-8', stdio: 'pipe'
-                        });
-                    }
-                } catch (e) {
-                    logger.warn(`Git commit 失败: ${(e as Error).message}`);
-                }
 
                 // Draft 后打印 Circle 状态摘要
                 try {
@@ -220,8 +285,16 @@ export class ReviewServer {
             }
         });
 
-        app.listen(port, () => {
+        // ---- API: 完成审阅（手动关闭）----
+        app.post('/api/complete-review', async (req: any, res: any) => {
+            logger.info('🔒 收到完成审阅请求');
+            res.json({ success: true });
+            this.gracefulShutdown('manual');
+        });
+
+        this.serverInstance = app.listen(port, () => {
             logger.info(`Review 服务启动: http://localhost:${port}`);
+            logger.info(`   TTL: ${this.lifecycle.ttlMs}ms | Idle: ${this.lifecycle.idleMs}ms`);
         });
     }
 
@@ -237,7 +310,6 @@ export class ReviewServer {
             if (!dirExists) continue;
             const batchId = path.basename(dir);
 
-            // 读取批次 jobs json 获取任务元信息
             let jobsJsonFiles: string[] = [];
             try {
                 jobsJsonFiles = (await fs.readdir(dir)).filter(f => f.startsWith('jobs_batch'));
@@ -254,18 +326,14 @@ export class ReviewServer {
                 } catch {}
             }
 
-            // 遍历批次目录下所有子目录（每个子目录对应一个模型）
             const entries = await fs.readdir(dir);
             for (const entry of entries) {
                 const entryPath = path.join(dir, entry);
                 const stat = await fs.stat(entryPath);
 
                 if (stat.isDirectory()) {
-                    // 模型子目录 (Legacy or sub-models)
                     await this.scanModelDir(entryPath, entry, batchId, groups, jobMeta);
                 } else if (stat.isFile() && /\.(png|jpg|webp|mp4|webm)$/i.test(entry)) {
-                    // 资产文件 (v0.6.2 moves assets into Batch root)
-                    // The model name is derived from the parent folder of Batch dir (which is Provider name)
                     const providerName = path.basename(path.dirname(dir));
                     this.addCandidate(groups, entry, entryPath, providerName, batchId, jobMeta);
                 }
@@ -297,7 +365,6 @@ export class ReviewServer {
         batchId: string,
         jobMeta: Record<string, string>
     ): void {
-        // Match: shot_01.png, shot_01_1.mp4, shot_01_draft_1.png etc.
         const match = fileName.match(/^(.+?)(?:_(?:draft_)?\d+)?\.(png|jpg|webp|mp4|webm)$/i);
         if (!match) return;
 
@@ -330,28 +397,21 @@ export class ReviewServer {
         reviewNote: string
     ): Promise<{ jobId: string; approvedPath: string }> {
 
-        // 默认命名: 未输入变体名 → 用 jobId 加序号
         if (!variant) {
             const existingCount = await this.countExistingApproved(jobId);
             variant = existingCount === 0 ? 'default' : `variant_${existingCount + 1}`;
         }
 
-        // 1. 直接使用原产出路径作为 approved 引用（无需复制到单独目录）
         const approvedPath = imagePath;
-
-        // 2. 找到源文档并回写 Approved References + 生成参数
         const docPath = await this.findSourceDoc(jobId);
         if (docPath) {
             await this.approvedRefReader.appendApprovedRef(docPath, variant, approvedPath);
 
-            // 3. 更新 status → pending_sync（由 writebackFromTask 设置）或 approved（无 task JSON 时）
             let content = await fs.readFile(docPath, 'utf-8');
 
-            // 4. 追加 reviews 记录
             const reviewEntry = `${new Date().toISOString().split('T')[0]}: ${reviewNote || 'approved via review UI'}`;
             content = FrontmatterParser.appendReview(content, reviewEntry);
 
-            // 5. 从 task JSON 回写生成参数到源文档
             const taskJson = await this.findTaskJson(jobId, imagePath);
             if (taskJson) {
                 content = this.writebackFromTask(content, taskJson, jobId, imagePath);
@@ -418,7 +478,6 @@ export class ReviewServer {
         const issues: string[] = [];
         const content = await fs.readFile(filePath, 'utf-8');
 
-        // 1. 检查 frontmatter 存在
         if (!content.match(/^---\r?\n/)) {
             issues.push('缺少 YAML frontmatter');
             return issues;
@@ -427,13 +486,9 @@ export class ReviewServer {
         try {
             const { frontmatter } = FrontmatterParser.parseRaw(content);
 
-            // 2. 检查 type 字段
             if (!frontmatter.type) issues.push('缺少 type 字段');
-
-            // 3. 检查 status 字段
             if (!frontmatter.status) issues.push('缺少 status 字段');
 
-            // 4. 检查 Approved References 区域
             if (frontmatter.status === 'approved') {
                 if (!content.includes('## Approved References')) {
                     issues.push('status 为 approved 但缺少 ## Approved References 区域');
@@ -452,7 +507,6 @@ export class ReviewServer {
 
     private async findTaskJson(jobId: string, imagePath: string): Promise<any | null> {
         const batchDir = path.dirname(imagePath);
-
         const defaultPath = path.join(batchDir, `${jobId}.json`);
         const exists = await fs.access(defaultPath).then(() => true).catch(() => false);
         if (exists) {
@@ -463,7 +517,6 @@ export class ReviewServer {
                 return null;
             }
         }
-
         return null;
     }
 
@@ -473,16 +526,13 @@ export class ReviewServer {
         const actualPrompt = this.extractPrompt(prompt, content);
         if (!actualPrompt) return docContent;
 
-        // 1. prompt_en: 始终覆盖为实际发送的完整提示词
         docContent = FrontmatterParser.updateField(docContent, 'prompt_en', actualPrompt);
 
-        // 2. 同步 ## Design References 图片链接（从 task JSON 提取参考素材）
         const taskImageRefs = this.extractImageRefs(taskData.image || [], content);
         if (taskImageRefs.length > 0) {
             docContent = this.syncDesignReferences(docContent, taskImageRefs);
         }
 
-        // 3. 追加 review 条目指向 task JSON（供 Agent 追溯完整生成参数）
         const taskJsonRelPath = path.relative(this.projectRoot, path.dirname(imagePath)).replace(/\\/g, '/')
             + `/${jobId}.json`;
         const model = taskData.model || '';
@@ -490,7 +540,6 @@ export class ReviewServer {
         const reviewNote = `prompt_en 已从 task JSON 同步 | ${model}${size ? ` | ${size}` : ''} | ${taskJsonRelPath}`;
         docContent = FrontmatterParser.appendReview(docContent, reviewNote);
 
-        // 4. status → pending_sync（需 Agent 根据 prompt_en 完成 visual_detailed/visual_brief/refs 对齐后方可改为 approved）
         docContent = FrontmatterParser.updateField(docContent, 'status', 'pending_sync');
 
         return docContent;
@@ -560,5 +609,4 @@ export class ReviewServer {
 
         return [...new Set(refs)];
     }
-
 }
