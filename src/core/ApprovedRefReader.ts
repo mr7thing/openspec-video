@@ -68,7 +68,7 @@ export class ApprovedRefReader {
         const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
         if (!fmMatch) return true;
         const yaml = await import('js-yaml');
-        const fm = yaml.load(fmMatch[1]) as Record<string, any>;
+        const fm = yaml.load(fmMatch[1], { schema: yaml.JSON_SCHEMA }) as Record<string, any>;
         return fm.status !== 'pending_sync';
     }
 
@@ -96,7 +96,7 @@ export class ApprovedRefReader {
             content += `\n\n## Approved References\n\n${newEntry}\n`;
         }
 
-        await FileUtils.writeFile(docPath, content);
+        await FileUtils.atomicWrite(docPath, content);
     }
 
     // ---- 内部方法 ----

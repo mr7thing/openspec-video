@@ -52,6 +52,22 @@ export class FileUtils {
     }
 
     /**
+     * 原子写入：写临时文件再 rename，防止 read-modify-write 竞态
+     */
+    static async atomicWrite(filePath: string, content: string | Buffer): Promise<void> {
+        const tmp = `${filePath}.tmp.${process.pid}`;
+        try {
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
+            await fs.writeFile(tmp, content);
+            await fs.rename(tmp, filePath);
+        } catch (err) {
+            // 清理临时文件
+            try { await fs.unlink(tmp); } catch { /* ignore */ }
+            throw err;
+        }
+    }
+
+    /**
      * 追加内容到文件
      */
     static async appendFile(filePath: string, content: string): Promise<void> {

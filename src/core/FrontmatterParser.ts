@@ -21,7 +21,7 @@ export class FrontmatterParser {
 
         let parsed: any;
         try {
-            parsed = yaml.load(rawYaml);
+            parsed = yaml.load(rawYaml, { schema: yaml.JSON_SCHEMA });
         } catch (e) {
             throw new Error(`YAML 解析失败: ${(e as Error).message}`);
         }
@@ -49,7 +49,7 @@ export class FrontmatterParser {
      */
     static parseRaw(content: string): { frontmatter: Record<string, any>; body: string } {
         const { rawYaml, body } = FrontmatterParser.split(content);
-        const parsed = yaml.load(rawYaml) as Record<string, any>;
+        const parsed = yaml.load(rawYaml, { schema: yaml.JSON_SCHEMA }) as Record<string, any>;
         return { frontmatter: parsed || {}, body };
     }
 
@@ -65,7 +65,7 @@ export class FrontmatterParser {
      */
     static updateField(content: string, field: string, value: any): string {
         const { rawYaml, body } = FrontmatterParser.split(content);
-        const parsed = yaml.load(rawYaml) as Record<string, any>;
+        const parsed = yaml.load(rawYaml, { schema: yaml.JSON_SCHEMA }) as Record<string, any>;
         parsed[field] = value;
         const newYaml = yaml.dump(parsed, { lineWidth: -1, noRefs: true }).trim();
         return `---\n${newYaml}\n---\n${body}`;
@@ -76,7 +76,7 @@ export class FrontmatterParser {
      */
     static appendReview(content: string, reviewEntry: string): string {
         const { rawYaml, body } = FrontmatterParser.split(content);
-        const parsed = yaml.load(rawYaml) as Record<string, any>;
+        const parsed = yaml.load(rawYaml, { schema: yaml.JSON_SCHEMA }) as Record<string, any>;
         if (!parsed.reviews) parsed.reviews = [];
         parsed.reviews.push(reviewEntry);
         const newYaml = yaml.dump(parsed, { lineWidth: -1, noRefs: true }).trim();

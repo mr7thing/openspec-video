@@ -57,7 +57,7 @@ export class ConfigLoader {
 
         try {
             const raw = await fs.readFile(configPath, 'utf8');
-            this.config = yaml.load(raw) as ApiConfig;
+            this.config = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as ApiConfig;
             if (!this.config.providers) {
                 this.config.providers = {};
             }
