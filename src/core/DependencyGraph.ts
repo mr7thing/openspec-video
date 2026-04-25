@@ -25,6 +25,19 @@ export interface DependencyAnalysis {
     cycles: string[];
 }
 
+// 多图管理：图文件结构
+export interface GraphFileStructure {
+    circles: Record<string, string[]>;
+    activeGraph: string;
+}
+
+// ensureCircleDirectories 返回类型
+export interface CircleDirectoryInfo {
+    dir: string;        // 如 "videospec_zerocircle_1"
+    isNew: boolean;     // 是否新建
+    iteration: number;   // 序号
+}
+
 export class DependencyGraph {
     private graph: Map<string, Set<string>> = new Map();
 
@@ -179,6 +192,22 @@ export class DependencyGraph {
     }
 
     /**
+     * 获取当前图中的所有节点 ID
+     */
+    getNodes(): string[] {
+        return [...this.graph.keys()];
+    }
+
+    /**
+     * 获取指定 circle index 的所有资产 ID
+     * @param circleIndex 0-based circle index
+     */
+    getCircleAssets(circleIndex: number): string[] {
+        const { batches } = this.topologicalSort();
+        return batches[circleIndex] || [];
+    }
+
+    /**
      * 输出人类可读的依赖分析
      * 异步方法：内部需要 await 检查 approved 状态
      */
@@ -213,23 +242,247 @@ export class DependencyGraph {
         return lines.join('\n');
     }
 
+    // ========================================================================
+    // 多图管理
+    // ========================================================================
+
+    private static readonly CIRCLE_NAMES = [
+        'zerocircle', 'firstcircle', 'secondcircle',
+        'thirdcircle', 'fourthcircle', 'fifthcircle'
+    ];
+
+    private getCircleWord(circleIndex: number): string {
+        return DependencyGraph.CIRCLE_NAMES[circleIndex] || `circle_${circleIndex}`;
+    }
+
     /**
-     * 持久化到 .opsv/ 目录
+     * 保存图文件到 .opsv/{graphName}_graph.json
      */
-    async save(projectRoot: string): Promise<void> {
+    async saveGraph(projectRoot: string, graphName: string = 'videospec'): Promise<void> {
         const opsvDir = path.join(projectRoot, '.opsv');
         await fs.mkdir(opsvDir, { recursive: true });
 
-        const serialized: Record<string, string[]> = {};
-        for (const [node, deps] of this.graph) {
-            serialized[node] = [...deps];
+        const { batches } = this.topologicalSort();
+
+        // 构建 circles 结构
+        const circles: Record<string, string[]> = {};
+        for (let i = 0; i < batches.length; i++) {
+            circles[String(i)] = batches[i];
         }
 
+        const graphData: GraphFileStructure = {
+            circles,
+            activeGraph: graphName
+        };
+
         await fs.writeFile(
-            path.join(opsvDir, 'dependency-graph.json'),
-            JSON.stringify(serialized, null, 2)
+            path.join(opsvDir, `${graphName}_graph.json`),
+            JSON.stringify(graphData, null, 2)
         );
+
+        // 更新 activeGraph
+        await this.setActiveGraph(projectRoot, graphName);
     }
+
+    /**
+     * 加载图文件 from .opsv/{graphName}_graph.json
+     */
+    static async loadGraph(projectRoot: string, graphName?: string): Promise<DependencyGraph> {
+        const opsvDir = path.join(projectRoot, '.opsv');
+        const name = graphName || await DependencyGraph.getActiveGraph(projectRoot) || 'videospec';
+        const graphPath = path.join(opsvDir, `${name}_graph.json`);
+
+        try {
+            const content = await fs.readFile(graphPath, 'utf-8');
+            const graphData: GraphFileStructure = JSON.parse(content);
+
+            const graph = new DependencyGraph();
+
+            // 从 circles 结构重建图
+            // 相同 circle 内的资产互不依赖
+            // 不同 circle 之间，按 circle 顺序建立依赖
+            for (let i = 0; i < Object.keys(graphData.circles).length; i++) {
+                const circleKey = String(i);
+                const assets = graphData.circles[circleKey];
+                if (!assets) continue;
+
+                for (const assetId of assets) {
+                    // 依赖所有前面 circle 的资产
+                    const deps = new Set<string>();
+                    for (let j = 0; j < i; j++) {
+                        const prevCircleKey = String(j);
+                        const prevAssets = graphData.circles[prevCircleKey];
+                        if (prevAssets) {
+                            for (const prevAsset of prevAssets) {
+                                deps.add(prevAsset);
+                            }
+                        }
+                    }
+                    graph.graph.set(assetId, deps);
+                }
+            }
+
+            return graph;
+        } catch {
+            // 如果文件不存在，返回空图
+            return new DependencyGraph();
+        }
+    }
+
+    /**
+     * 激活指定名称的图
+     * 其他图文件改名为 .back
+     */
+    static async activateGraph(projectRoot: string, graphName: string): Promise<void> {
+        const opsvDir = path.join(projectRoot, '.opsv');
+        await fs.mkdir(opsvDir, { recursive: true });
+
+        // 读取 graphs.json 获取所有图的列表
+        const graphsConfigPath = path.join(opsvDir, 'graphs.json');
+        let graphsConfig: { active: string; graphs: string[] } = { active: graphName, graphs: [graphName] };
+
+        try {
+            const existing = await fs.readFile(graphsConfigPath, 'utf-8');
+            graphsConfig = JSON.parse(existing);
+        } catch { /* ignore */ }
+
+        // 如果新图不在列表中，添加进去
+        if (!graphsConfig.graphs.includes(graphName)) {
+            graphsConfig.graphs.push(graphName);
+        }
+
+        // 将旧图改名为 .back
+        if (graphsConfig.active && graphsConfig.active !== graphName) {
+            const oldGraphPath = path.join(opsvDir, `${graphsConfig.active}_graph.json`);
+            const backupPath = path.join(opsvDir, `${graphsConfig.active}_graph.json.back`);
+            try {
+                await fs.rename(oldGraphPath, backupPath);
+            } catch { /* ignore - file might not exist */ }
+        }
+
+        // 激活新图
+        graphsConfig.active = graphName;
+        await fs.writeFile(graphsConfigPath, JSON.stringify(graphsConfig, null, 2));
+    }
+
+    /**
+     * 获取当前激活的图名称
+     */
+    static async getActiveGraph(projectRoot: string): Promise<string> {
+        const opsvDir = path.join(projectRoot, '.opsv');
+        const graphsConfigPath = path.join(opsvDir, 'graphs.json');
+
+        try {
+            const content = await fs.readFile(graphsConfigPath, 'utf-8');
+            const config = JSON.parse(content);
+            return config.active || 'videospec';
+        } catch {
+            return 'videospec';
+        }
+    }
+
+    /**
+     * 设置当前激活的图
+     */
+    private async setActiveGraph(projectRoot: string, graphName: string): Promise<void> {
+        const opsvDir = path.join(projectRoot, '.opsv');
+        await fs.mkdir(opsvDir, { recursive: true });
+
+        const graphsConfigPath = path.join(opsvDir, 'graphs.json');
+        let graphsConfig: { active: string; graphs: string[] } = { active: graphName, graphs: [graphName] };
+
+        try {
+            const existing = await fs.readFile(graphsConfigPath, 'utf-8');
+            graphsConfig = JSON.parse(existing);
+            if (!graphsConfig.graphs.includes(graphName)) {
+                graphsConfig.graphs.push(graphName);
+            }
+        } catch { /* ignore */ }
+
+        graphsConfig.active = graphName;
+        await fs.writeFile(graphsConfigPath, JSON.stringify(graphsConfig, null, 2), 'utf-8');
+    }
+
+    // ========================================================================
+    // 统一目录创建
+    // ========================================================================
+
+    /**
+     * 确保指定圈层的目录存在
+     * 目录创建触发条件 = 文件列表变化（谁在哪个环），不是内容/状态变化
+     *
+     * @param projectRoot 项目根目录
+     * @param circleIndex 圈层索引 (0-based)
+     * @param graphName 图名称 (默认 videospec)
+     * @returns { dir, isNew, iteration } 目录信息
+     */
+    async ensureCircleDirectories(
+        projectRoot: string,
+        circleIndex: number,
+        graphName: string = 'videospec'
+    ): Promise<CircleDirectoryInfo> {
+        const { batches } = this.topologicalSort();
+        if (circleIndex < 0 || circleIndex >= batches.length) {
+            throw new Error(`Invalid circle index: ${circleIndex}`);
+        }
+
+        const assets = batches[circleIndex];
+        const circleWord = this.getCircleWord(circleIndex);
+
+        // 找到或创建该圈的下一个可用序号
+        let iteration = 1;
+        let isNew = false;
+        const opsvQueueDir = path.join(projectRoot, 'opsv-queue');
+
+        while (true) {
+            const dirPath = path.join(opsvQueueDir, `${graphName}_${circleWord}_${iteration}`);
+            const exists = await fs.access(dirPath).then(() => true).catch(() => false);
+
+            if (!exists) {
+                // 检查文件列表是否变化
+                const prevIteration = iteration - 1;
+                if (prevIteration > 0) {
+                    const prevDir = path.join(opsvQueueDir, `${graphName}_${circleWord}_${prevIteration}`);
+                    const prevExists = await fs.access(prevDir).then(() => true).catch(() => false);
+                    if (prevExists) {
+                        isNew = await this.diffFileList(prevDir, assets);
+                        if (!isNew) {
+                            // 文件列表没变，复用上一轮
+                            return { dir: prevDir, isNew: false, iteration: prevIteration };
+                        }
+                    }
+                }
+
+                // 创建新目录
+                await fs.mkdir(dirPath, { recursive: true });
+                return { dir: dirPath, isNew: true, iteration };
+            }
+            iteration++;
+        }
+    }
+
+    /**
+     * 对比文件列表是否变化
+     */
+    private async diffFileList(circleDir: string, newAssets: string[]): Promise<boolean> {
+        const jobsPath = path.join(circleDir, 'imagen_jobs.json');
+        try {
+            const content = await fs.readFile(jobsPath, 'utf-8');
+            const oldJobs = JSON.parse(content);
+            const oldAssetIds = oldJobs.map((j: any) => j.id);
+
+            if (oldAssetIds.length !== newAssets.length) return true;
+            const sortedOld = [...oldAssetIds].sort();
+            const sortedNew = [...newAssets].sort();
+            return sortedOld.some((id, i) => id !== sortedNew[i]);
+        } catch {
+            return true; // 文件不存在视为变化
+        }
+    }
+
+    // ========================================================================
+    // 工厂方法
+    // ========================================================================
 
     /**
      * 从文档目录扫描并重建依赖图
@@ -238,6 +491,17 @@ export class DependencyGraph {
     static async buildFromProject(projectRoot: string): Promise<DependencyGraph> {
         const graph = new DependencyGraph();
         const documents: ParsedDocument[] = [];
+
+        // 推断 graphName（取 videospec 目录的父目录名或 videospec）
+        let graphName = 'videospec';
+        const videospecPath = path.join(projectRoot, 'videospec');
+        if (await fs.access(videospecPath).then(() => true).catch(() => false)) {
+            graphName = 'videospec';
+        } else {
+            // 尝试从当前目录名推断
+            const cwd = path.basename(projectRoot);
+            if (cwd) graphName = cwd;
+        }
 
         // 支持两种目录结构:
         // 1. {projectRoot}/videospec/elements/  (标准结构)
@@ -269,7 +533,7 @@ export class DependencyGraph {
         }
 
         graph.build(documents);
-        await graph.save(projectRoot);
+        await graph.saveGraph(projectRoot, graphName);
         return graph;
     }
 }

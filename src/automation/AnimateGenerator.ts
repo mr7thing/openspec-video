@@ -30,6 +30,10 @@ export class AnimateGenerator {
         const resolvedCircle = circle === 'auto'
             ? await this.resolveEndCircle()
             : circle;
+
+        // 解析 circleIndex 和 graphName
+        const { circleIndex, graphName } = this.parseCircleSpec(resolvedCircle);
+
         // 不区分大小写查找 shotlist 文件
         const shotsDir = path.join(this.projectRoot, 'videospec/shots');
         let shotlistPath: string | null = null;
@@ -62,9 +66,10 @@ export class AnimateGenerator {
         const ar = globalConfig.aspect_ratio || '16:9';
         const res = globalConfig.resolution || '1920x1080';
 
-        // ---- 输出目录 ----
-        const circleDir = path.join(this.projectRoot, 'opsv-queue', resolvedCircle);
-        await fs.mkdir(circleDir, { recursive: true });
+        // ---- 使用 ensureCircleDirectories 创建输出目录 ----
+        const depGraph = await DependencyGraph.buildFromProject(this.projectRoot);
+        const circleDirInfo = await depGraph.ensureCircleDirectories(this.projectRoot, circleIndex, graphName);
+        const circleDir = circleDirInfo.dir;
 
         const jobs: Job[] = [];
 
@@ -310,19 +315,55 @@ export class AnimateGenerator {
     }
 
     /**
+     * 解析圈层规格字符串
+     * 支持格式: "zerocircle_1" | "videospec_zerocircle_1" | "auto"
+     * 返回 { circleIndex, graphName }
+     */
+    private parseCircleSpec(spec: string): { circleIndex: number; graphName: string } {
+        // auto 的情况由调用方处理
+        if (spec === 'auto') {
+            return { circleIndex: 0, graphName: 'videospec' };
+        }
+
+        const words = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle'];
+        
+        // videospec_zerocircle_1 格式
+        const fullMatch = spec.match(/^(.+?)_(zerocircle|firstcircle|secondcircle|thirdcircle|fourthcircle|fifthcircle)_(\d+)$/);
+        if (fullMatch) {
+            return {
+                graphName: fullMatch[1],
+                circleIndex: words.indexOf(fullMatch[2]),
+            };
+        }
+
+        // zerocircle_1 格式 (默认 videospec)
+        const simpleMatch = spec.match(/^(zerocircle|firstcircle|secondcircle|thirdcircle|fourthcircle|fifthcircle)_(\d+)$/);
+        if (simpleMatch) {
+            return {
+                graphName: 'videospec',
+                circleIndex: words.indexOf(simpleMatch[1]),
+            };
+        }
+
+        // 回退
+        return { circleIndex: 0, graphName: 'videospec' };
+    }
+
+    /**
      * 自动推断依赖图的末端 Circle
      * 视频生成位于拓扑排序的最后一个 batch
      */
     private async resolveEndCircle(): Promise<string> {
         try {
             const graph = await DependencyGraph.buildFromProject(this.projectRoot);
+            const graphName = await DependencyGraph.getActiveGraph(this.projectRoot);
             const { batches } = graph.topologicalSort();
             if (batches.length === 0) {
                 return 'zerocircle_1';
             }
             const lastIdx = batches.length - 1;
             const circleWord = this.getCircleWord(lastIdx);
-            return `${circleWord}_1`;
+            return `${graphName}_${circleWord}_1`;
         } catch (e) {
             logger.warn(`⚠️ 依赖图分析失败，回退到 zerocircle_1: ${(e as Error).message}`);
             return 'zerocircle_1';

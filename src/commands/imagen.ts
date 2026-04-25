@@ -64,9 +64,9 @@ export function registerImagenCommand(program: Command, VERSION: string) {
                 });
 
                 logger.info('\n📂 图像任务列表已生成。');
-                logger.info(`   输出: opsv-queue/${circle}/imagen_jobs.json`);
+                logger.info(`   输出: opsv-queue/<circle>/imagen_jobs.json`);
                 logger.info('   下一步：执行编译入队');
-                logger.info(`   $ opsv queue compile opsv-queue/${circle}/imagen_jobs.json --model <alias>`);
+                logger.info(`   $ opsv queue compile <path-to-jobs-json> --model <alias>`);
             } catch (err) {
                 logger.error(`编译失败: ${(err as Error).message}`);
                 process.exit(1);

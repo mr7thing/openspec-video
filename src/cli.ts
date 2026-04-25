@@ -14,6 +14,7 @@ import { registerCircleCommand } from './commands/circle';
 import { registerComfyCommand } from './commands/comfy';
 import { registerQueueCommands } from './commands/queue';
 import { registerValidateCommand } from './commands/validate';
+import { registerScriptCommand } from './commands/script';
 
 const projectRoot = process.cwd();
 const envSubDir = path.join(projectRoot, '.env');
@@ -51,6 +52,7 @@ registerAddonsCommands(program);
 registerQueueCommands(program);
 registerCircleCommand(program, VERSION);
 registerValidateCommand(program, VERSION);
+registerScriptCommand(program, VERSION);
 
 program.parse(process.argv);
 

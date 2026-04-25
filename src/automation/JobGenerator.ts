@@ -57,6 +57,7 @@ export class JobGenerator {
             skipDependsLayer?: boolean;
             circleIndex?: number; // 指定运行哪个环 (N-Circle)
             iterationIndex?: number; // 指定本次运行的序号 (_N)
+            graphName?: string; // 图名称 (默认 videospec)
         } = {}
     ): Promise<Job[]> {
         // ---- 初始化 ----
@@ -70,6 +71,9 @@ export class JobGenerator {
         // ---- 构建依赖图 ----
         const depGraph = await DependencyGraph.buildFromProject(this.projectRoot);
         logger.info(await depGraph.prettyPrint(this.approvedRefReader));
+
+        // 获取 graphName (如果没有传入，从 active graph 获取)
+        const graphName = options.graphName || await DependencyGraph.getActiveGraph(this.projectRoot);
 
         // ---- 扫描目标目录 ----
         if (!targets || targets.length === 0) {
@@ -153,15 +157,15 @@ export class JobGenerator {
         }
 
         // ---- 保存任务列表到 opsv-queue ----
-        const circleWord = this.getCircleWord(targetLayerIdx);
-        const iterationIndex = options.iterationIndex || await this._nextCircleIteration(targetLayerIdx);
-        const circleDir = path.join(this.projectRoot, 'opsv-queue', `${circleWord}_${iterationIndex}`);
-        await fs.mkdir(circleDir, { recursive: true });
+        // 使用 ensureCircleDirectories 确保圈层目录存在（仅文件列表变化时新建）
+        const circleDirInfo = await depGraph.ensureCircleDirectories(this.projectRoot, targetLayerIdx, graphName);
+        const circleDir = circleDirInfo.dir;
         
         const jobsPath = path.join(circleDir, 'imagen_jobs.json');
         await fs.writeFile(jobsPath, JSON.stringify(targetLayerJobs, null, 2), 'utf-8');
         
-        logger.info(`\n✅ ${circleWord}_${iterationIndex} 任务列表生成完毕: ${targetLayerJobs.length} 个任务 → ${jobsPath}`);
+        const circleWord = this.getCircleWord(targetLayerIdx);
+        logger.info(`\n✅ ${path.basename(circleDir)} 任务列表生成完毕: ${targetLayerJobs.length} 个任务 → ${jobsPath}`);
         
         return targetLayerJobs;
     }

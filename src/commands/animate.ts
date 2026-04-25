@@ -43,8 +43,8 @@ export function registerAnimateCommand(program: Command, VERSION: string) {
 
                 if (jobs.length > 0) {
                     logger.info(`✅ ${jobs.length} video job(s) compiled.`);
-                    logger.info(`   输出: opsv-queue/${circle}/video_jobs.json`);
-                    logger.info('   Next step: opsv queue compile opsv-queue/<cycle>/video_jobs.json --model <alias>');
+                    logger.info(`   输出: opsv-queue/<circle>/video_jobs.json`);
+                    logger.info('   Next step: opsv queue compile <path-to-video-jobs-json> --model <alias>');
                 } else {
                     logger.info('ℹ️ No pending video jobs found.');
                 }
