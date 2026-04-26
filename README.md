@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.6.4 (Circle Queue Era)
+# OpenSpec-Video (OpsV) 0.7.0 (Circle Queue Era)
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
@@ -14,9 +14,9 @@
 
 ## 💡 What is OpsV? / 什么是 OpsV?
 
-OpsV is a professional, **Spec-First** video production pipeline. v0.6.4 introduces the **Circle Queue** architecture with explicit provider/model aliasing and Seedance 2.0 multimodal API support.
+OpsV is a professional, **Spec-First** video production pipeline. v0.7.0 introduces the **Circle Queue** architecture with explicit provider/model aliasing and Seedance 2.0 multimodal API support.
 
-OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。v0.6.4 引入 **Circle Queue (环状队列)** 架构，支持 `--model` 别名系统，并完整适配火山引擎 Seedance 2.0 Content Generation API 的多模态输入能力。
+OpsV 是一套专业的、**规范驱动 (Spec-First)** 的视频制作管线。v0.7.0 引入 **Circle Queue (环状队列)** 架构，支持 `--model` 别名系统，并完整适配火山引擎 Seedance 2.0 Content Generation API 的多模态输入能力。
 
 ---
 
@@ -46,11 +46,11 @@ opsv queue run --model volc.seedance2
 
 ---
 
-## 🏗️ Core Architecture: Circle Queue (v0.6.4)
+## 🏗️ Core Architecture: Circle Queue (v0.7.0)
 
-In v0.6.4, tasks are organized into **Circles** (dependency layers) and compiled into provider-specific batches under `opsv-queue/<circle>/<provider>/queue_{N}/`:
+In v0.7.0, tasks are organized into **Circles** (dependency layers) and compiled into provider-specific batches under `opsv-queue/<circle>/<provider>/queue_{N}/`:
 
-在 v0.6.4 中，任务按 **Circle（依赖层次环）** 组织，编译后落在 `opsv-queue/<circle>/<provider>/queue_{N}/` 下：
+在 v0.7.0 中，任务按 **Circle（依赖层次环）** 组织，编译后落在 `opsv-queue/<circle>/<provider>/queue_{N}/` 下：
 
 1. **compile**: Reads `jobs.json` and generates atomic `{taskId}.json` payloads.
 2. **run**: Scans `.json` task files, skips already completed results, executes sequentially.
@@ -87,34 +87,24 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 
 ---
 
-> *OpsV 0.6.4 | 2026-04-23*
+> *OpsV 0.7.0 | 2026-04-26*
 
 ---
 
 ## 🆕 Release Notes / 更新说明
 
-### v0.6.4 — Circle Queue & Seedance 2.0
+### v0.7.0 — Circle 多图管理 & Shot 文件系统
 
-- **Circle Queue 架构**: 任务按依赖层次分 Circle 存储，`opsv-queue/<circle>/<provider>/queue_{N}/`。
-- **`opsv circle` 命令**: 正式注册 `opsv circle status`（状态探针）和 `opsv circle manifest`（快照固化）。
-- **Circle 自动推断**: `imagen` / `animate` 未指定 `--circle` 时自动推断当前开放的 Circle（未全部 approved 的最上游 Circle）。
-- **上游 Circle 检查**: `imagen` / `animate` 执行前自动检测上游 Circle 是否全部 approved，未 approved 时阻止执行（可 `--skip-circle-check` 强制跳过）。
-- **`--skip-approved` 默认开启**: `imagen` 默认跳过已有 approved 参考图的资产，避免重复生成。需重新生成时用 `--no-skip-approved`。
-- **Approved References ↔ status 一致性校验**: `opsv validate` 自动检查 `status: approved` 的文档是否包含有效的 `## Approved References`。
-- **`--model` 选项**: 替换旧的 `--provider.model` 伪选项语法，支持 `provider.model` 和别名两种格式。
-- **别名系统**: `api_config.yaml` 每个模型支持 `aliases: []`，如 `seedance2` → `volcengine.seedance-2.0`。
-- **模型名含点号支持**: 完整支持 `wan2.2-i2v`、`qwen-image-edit-2509` 等带点号的模型名。
-- **Seedance 2.0 适配**: 完整支持 Content Generation API 的 `content[]` 多模态数组（text/image/video/audio）。
-- **SiliconFlow 增强**: 自动本地文件转 Base64 Data URI 上传；支持多种响应格式解析（`data.url` / `data.images[0].url` / `data.data[0].url`）。
-- **Edit 模型字段保留**: `qwen-image-edit-2509` 等编辑模型的 `edit_image` / `mask_image` 字段在编译时正确保留。
-- **本地文件 Base64 直传**: compile 保留相对路径，run 时 Provider 自动将本地图片/audio 转为 `data:image/png;base64,...` 发送给 API（视频不支持 Base64，仍为 URL）。
-- **API 返回尾帧**: Seedance 2.0 创建任务时传 `return_last_frame: true`，轮询成功后自动下载视频 + 首帧(cover) + 尾帧到 batch 目录，替代 ffmpeg 提取。
-- **@FRAME 引用解析**: shotlist.md 中 `first_frame: "@FRAME:shot_01_last"` 或 `@shot_01:last` 自动解析为同目录相对路径 `shot_01_last.png`。
-- **移除 queue.json**: compile 不再生成 `queue.json`，避免 run 时误执行元数据文件。
-- **资产 URL 全记录**: 所有 API 返回的视频/图片 URL 记入 JSONL log（`type: asset_url`），便于审计和二次引用。
-- **`pending_sync` 状态**: 新增 `pending_sync` 枚举值，Approve 回写后 status 自动设为 `pending_sync`（仅覆盖 `prompt_en`），Agent 对齐 `visual_detailed`/`visual_brief`/`refs` 后手动改为 `approved`。`pending_sync` 资产阻断下游 Circle 执行。
-- **Approve 回写策略**: Approve 时 4 个动作：(1) 覆盖 `prompt_en` 为实际 prompt；(2) 从 task JSON 同步 `## Design References`；(3) `reviews[]` 追加指向 task JSON 的条目；(4) `status → pending_sync`。无 task JSON 时 fallback 为 `approved`。
-- **validate 新增规则**: `pending_sync` 字段缺失提醒 + `approved` 时 `prompt_en`↔`visual_detailed` 一致性检查。
+- **多图管理**: `DependencyGraph` 支持 `saveGraph`/`loadGraph`/`activateGraph`/`getActiveGraph`，可管理多个项目图（如 `episode_2_graph.json`）
+- **`opsv circle create`**: 新增 `--dir <path>` 和 `--skip-middle-circle`，支持多剧集和简化圈层模式
+- **`opsv circle` 合并**: status + manifest 合并，manifest 写入 `.opsv/videospec_manifest.json`
+- **统一目录创建**: `ensureCircleDirectories()` — 文件列表变化才新建目录，imagen/animate/comfy 共享同一逻辑
+- **圈层隔离检查**: imagen/animate 指定圈层时检查前置圈层 approved 状态 + 文件归属，不匹配则报错
+- **目录路径重命名**: `zerocircle_1` → `videospec_zerocircle_1`，`.opsv/dependency-graph.json` → `.opsv/videospec_graph.json`，`opsv-queue/circle_manifest.json` → `.opsv/videospec_manifest.json`
+- **Shot 文件**: `shot_*.md` 作为独立数据源，`opsv script` 聚合生成 Script.md（来源标注）
+- **Shotlist.md 末环**: Shotlist.md 不进依赖图，独立处理
+- **Comfy 类型**: `opsv comfy compile` 输出任务描述 JSON（inputs/outputs），Agent 从技能目录加载 workflow 后注入变量
+- **`--skip-middle-circle`**: 所有非 shotlist 资产归入 zerocircle，shotlist 单独进 endcircle，中间层消失
 
 ### v0.6.1 — Spooler Queue 物理排队论
 
