@@ -153,7 +153,7 @@ export class DependencyGraph {
         const blocked: T[] = [];
         const reasons = new Map<string, string>();
 
-        // 1. 收集所有已就绪（有 approved 图且非 pending_sync）的资产 ID
+        // 1. 收集所有已就绪（有 approved 图且非 syncing）的资产 ID
         for (const id of this.graph.keys()) {
             const isReady = await approvedRefReader.isReadyForDownstream(id);
             if (isReady) {

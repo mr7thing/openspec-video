@@ -134,7 +134,7 @@ videospec/shots/
 ```yaml
 ---
 id: shot_01
-status: pending
+status: draft
 first_frame: "@shot_01:first"
 last_frame: "@shot_01:last"
 duration: "5s"
@@ -158,7 +158,7 @@ refs:
 - frontmatter 不重复 `id` 字段
 - `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法
 - `refs` 参与拓扑排序
-- `status`：`pending` / `approved` / `pending_sync` / `drafting`
+- `status`：`draft` / `approved` / `syncing` / `drafting`
 
 ### 3.4 Shotlist.md 规则（末环）
 

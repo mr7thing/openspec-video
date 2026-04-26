@@ -412,7 +412,7 @@ export class ReviewServer {
             const taskJson = await this.findTaskJson(jobId, imagePath);
             if (taskJson) {
                 content = this.writebackFromTask(content, taskJson, jobId, imagePath);
-                logger.info(`  🔄 Writeback: ${jobId} (prompt_en已覆盖, Design References已同步, status→pending_sync)`);
+                logger.info(`  🔄 Writeback: ${jobId} (prompt_en已覆盖, Design References已同步, status→syncing)`);
             } else {
                 content = FrontmatterParser.updateField(content, 'status', 'approved');
                 logger.warn(`  ⚠️  Writeback: ${jobId} 未找到 task JSON，直接设为 approved`);
@@ -537,7 +537,7 @@ export class ReviewServer {
         const reviewNote = `prompt_en 已从 task JSON 同步 | ${model}${size ? ` | ${size}` : ''} | ${taskJsonRelPath}`;
         docContent = FrontmatterParser.appendReview(docContent, reviewNote);
 
-        docContent = FrontmatterParser.updateField(docContent, 'status', 'pending_sync');
+        docContent = FrontmatterParser.updateField(docContent, 'status', 'syncing');
 
         return docContent;
     }

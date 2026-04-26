@@ -220,18 +220,18 @@ async function validateFile(filePath: string): Promise<ValidationIssue[]> {
         }
     }
 
-    // 规则2: 有 Approved References 的文档，status 应为 approved 或 pending_sync
-    if (approvedImageCount > 0 && docStatus !== 'approved' && docStatus !== 'pending_sync') {
+    // 规则2: 有 Approved References 的文档，status 应为 approved 或 syncing
+    if (approvedImageCount > 0 && docStatus !== 'approved' && docStatus !== 'syncing') {
         issues.push({
             file: relativePath,
             field: 'status + ## Approved References',
             message: `文档包含 ${approvedImageCount} 张 Approved References 但 status 为 "${docStatus}"`,
-            suggestion: '将 status 改为 approved 或 pending_sync，或移除 Approved References 区域中的图片引用'
+            suggestion: '将 status 改为 approved 或 syncing，或移除 Approved References 区域中的图片引用'
         });
     }
 
-    // 规则3: pending_sync 提醒 — 需 Agent 根据 prompt_en 完成 visual_detailed/visual_brief/refs 对齐
-    if (docStatus === 'pending_sync') {
+    // 规则3: syncing 提醒 — 需 Agent 根据 prompt_en 完成 visual_detailed/visual_brief/refs 对齐
+    if (docStatus === 'syncing') {
         const warnings: string[] = [];
         if (!frontmatter.visual_detailed) warnings.push('visual_detailed 缺失');
         if (!frontmatter.visual_brief) warnings.push('visual_brief 缺失');
@@ -243,21 +243,21 @@ async function validateFile(filePath: string): Promise<ValidationIssue[]> {
         if (warnings.length > 0) {
             issues.push({
                 file: relativePath,
-                field: 'pending_sync',
-                message: `status 为 "pending_sync"，以下字段需根据 prompt_en 对齐: ${warnings.join(', ')}`,
+                field: 'syncing',
+                message: `status 为 "syncing"，以下字段需根据 prompt_en 对齐: ${warnings.join(', ')}`,
                 suggestion: '根据 prompt_en 翻译更新 visual_detailed，简化为 visual_brief，对齐 refs 与 ## Design References，完成后将 status 改为 approved'
             });
         } else {
             issues.push({
                 file: relativePath,
-                field: 'pending_sync',
-                message: 'status 为 "pending_sync"，所有字段已填充，确认对齐后可将 status 改为 approved',
+                field: 'syncing',
+                message: 'status 为 "syncing"，所有字段已填充，确认对齐后可将 status 改为 approved',
                 suggestion: '检查 visual_detailed/visual_brief/refs 是否与 prompt_en 一致，确认后改为 approved'
             });
         }
     }
 
-    // 规则4: prompt_en 与 visual_detailed 一致性检查（approved 状态才报 error，pending_sync 已由规则3覆盖）
+    // 规则4: prompt_en 与 visual_detailed 一致性检查（approved 状态才报 error，syncing 已由规则3覆盖）
     if (docStatus === 'approved' && frontmatter.prompt_en && frontmatter.visual_detailed) {
         const promptEn = frontmatter.prompt_en as string;
         const detailed = frontmatter.visual_detailed as string;

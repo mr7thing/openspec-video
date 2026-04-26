@@ -75,7 +75,7 @@ export async function printCircleSummary(projectRoot: string): Promise<void> {
 
   for (const circle of circles) {
     const icon = circle.isComplete ? '✅' : (circle.approvedCount > 0 || circle.pendingSyncCount > 0 ? '⏳' : '⭕');
-    const syncNote = circle.pendingSyncCount > 0 ? ` (⚠️ ${circle.pendingSyncCount} pending_sync)` : '';
+    const syncNote = circle.pendingSyncCount > 0 ? ` (⚠️ ${circle.pendingSyncCount} syncing)` : '';
     logger.info(`  ${icon} ${circle.name}: ${circle.totalCount} 个资产 (${circle.approvedCount} 已批准)${syncNote}`);
   }
 

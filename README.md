@@ -63,7 +63,7 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 ## 🛠️ Key Features / 核心特性
 
 - **Circle Queue**: Dependency-layered batch execution with automatic topological sorting.
-- **pending_sync 状态**: Approve 回写后进入 pending_sync，Agent 对齐字段后方可 approved，阻断下游 Circle。
+- **syncing 状态**: Approve 回写后进入 syncing，Agent 对齐字段后方可 approved，阻断下游 Circle。
 - **Approve 回写策略**: 只覆盖 `prompt_en` + 同步 Design References + review 指向 task JSON。
 - **Model Aliasing**: Use `--model volc.sd2` instead of `--model volcengine.seedance-2.0` via `api_config.yaml` aliases.
 - **Seedance 2.0 Ready**: Full support for multimodal content arrays (text + image + video + audio references).

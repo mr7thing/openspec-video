@@ -133,11 +133,11 @@ opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 
 ## 🔄 迭代工作指导 (v0.6.4)
 
-### 核心原则：Approve → pending_sync → approved
+### 核心原则：Approve → syncing → approved
 
-`opsv review` 的 Approve 操作触发回写，将 `prompt_en` 覆盖为实际生成参数，`status` 设为 `pending_sync`。Agent **必须**根据 `prompt_en` 完成 `visual_detailed`/`visual_brief`/`refs` 对齐后，方可将 `status` 改为 `approved`。
+`opsv review` 的 Approve 操作触发回写，将 `prompt_en` 覆盖为实际生成参数，`status` 设为 `syncing`。Agent **必须**根据 `prompt_en` 完成 `visual_detailed`/`visual_brief`/`refs` 对齐后，方可将 `status` 改为 `approved`。
 
-**`pending_sync` 资产阻断下游 Circle**——其他分镜/视频任务无法引用未对齐的资产，确保生成一致性。
+**`syncing` 资产阻断下游 Circle**——其他分镜/视频任务无法引用未对齐的资产，确保生成一致性。
 
 ### Approve 回写动作
 
@@ -146,12 +146,12 @@ opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 | ✅ 覆盖 `prompt_en` | 从 task JSON 的 `prompt` 或 `content[].text` 提取 | **始终覆盖** |
 | ✅ 同步 `## Design References` | 从 task JSON 的 `image`/`content[].image_url` 提取参考图链接 | 替换该区域 |
 | ✅ 添加 review 条目 | 指向 task JSON 路径 + 模型 + 尺寸 | 始终追加 |
-| ✅ `status → pending_sync` | 标记为待同步 | 始终设置 |
+| ✅ `status → syncing` | 标记为待同步 | 始终设置 |
 | ✅ 追加 `## Approved References` | `![variant](path)` | 始终追加（已有逻辑不变） |
 
-### Agent 对齐工作（pending_sync → approved）
+### Agent 对齐工作（syncing → approved）
 
-Agent 看到 `pending_sync` 后**必须执行**：
+Agent 看到 `syncing` 后**必须执行**：
 
 1. **读取 `prompt_en`** — 确认实际发送给 API 的提示词
 2. **翻译 `prompt_en` → `visual_detailed`** — 将英文提示词翻译为中文描述，可补充生成参数备注
@@ -164,10 +164,10 @@ Agent 看到 `pending_sync` 后**必须执行**：
 
 | 检查项 | 条件 | 级别 |
 |--------|------|------|
-| `pending_sync` 字段缺失 | `visual_detailed`/`visual_brief` 为空，或 `refs` 与 Design References 不一致 | error（提示需对齐） |
-| `pending_sync` 字段已填充 | 所有字段已填充，提醒确认后改为 approved | warning |
+| `syncing` 字段缺失 | `visual_detailed`/`visual_brief` 为空，或 `refs` 与 Design References 不一致 | error（提示需对齐） |
+| `syncing` 字段已填充 | 所有字段已填充，提醒确认后改为 approved | warning |
 | `prompt_en` 与 `visual_detailed` 不一致 | approved 状态但 visual_detailed 过短或未反映 prompt_en | warning |
-| `status` 与 `Approved References` 矛盾 | 有 approved 图但 status 非 approved/pending_sync | error |
+| `status` 与 `Approved References` 矛盾 | 有 approved 图但 status 非 approved/syncing | error |
 
 ### 完整迭代流程
 
@@ -175,10 +175,10 @@ Agent 看到 `pending_sync` 后**必须执行**：
 1. opsv imagen                          # 生成任务列表
 2. opsv queue compile ... --model ...   # 编译
 3. opsv queue run ... --model ...       # 渲染
-4. opsv review                          # 审阅 → Approve 时自动: prompt_en覆盖 + Design References同步 + status→pending_sync
+4. opsv review                          # 审阅 → Approve 时自动: prompt_en覆盖 + Design References同步 + status→syncing
 5. Agent 根据 prompt_en 对齐 visual_detailed/visual_brief/refs，status→approved
 6. opsv validate                        # 验证对齐一致性
-7. opsv circle status                   # 刷新 Circle 状态（pending_sync 不解锁下游）
+7. opsv circle status                   # 刷新 Circle 状态（syncing 不解锁下游）
 ```
 
 ### 两个 References 区域的职责
@@ -199,7 +199,7 @@ Agent 看到 `pending_sync` 后**必须执行**：
    # 复制任务
    cp opsv-queue/firstcircle_1/volcengine/queue_1/shot_01.json \
       opsv-queue/firstcircle_1/volcengine/queue_1/shot_01_v2.json
-   # 编辑 shot_01_v2.json → 执行 → Approve → 对齐 pending_sync
+   # 编辑 shot_01_v2.json → 执行 → Approve → 对齐 syncing
    opsv queue run --model seedream --file shot_01_v2.json --circle firstcircle_1
    opsv review
    ```
