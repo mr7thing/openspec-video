@@ -56,6 +56,7 @@ export class JobGenerator {
             skipApproved?: boolean; 
             skipDependsLayer?: boolean;
             circleIndex?: number; // 指定运行哪个环 (N-Circle)
+            circleName?: string; // 指定环名称 (如 "zerocircle", "firstcircle")
             iterationIndex?: number; // 指定本次运行的序号 (_N)
             graphName?: string; // 图名称 (默认 videospec)
         } = {}
@@ -74,6 +75,69 @@ export class JobGenerator {
 
         // 获取 graphName (如果没有传入，从 active graph 获取)
         const graphName = options.graphName || await DependencyGraph.getActiveGraph(this.projectRoot);
+
+        // ---- 解析 circleIndex 和 circleName ----
+        // circleName 可以是 "zerocircle", "firstcircle", "ZeroCircle", "FirstCircle" 等
+        // 如果同时传入了 circleIndex 和 circleName，以 circleName 为准进行验证
+        const { batches } = depGraph.topologicalSort();
+        
+        // 确定目标环索引
+        let targetCircleIdx = options.circleIndex;
+        if (targetCircleIdx === undefined && options.circleName) {
+            // 从 circleName 反推索引
+            const lowerName = options.circleName.toLowerCase();
+            const CIRCLE_NAME_MAP: Record<string, number> = {
+                'zerocircle': 0, 'zero_circle': 0,
+                'firstcircle': 1, 'first_circle': 1,
+                'secondcircle': 2, 'second_circle': 2,
+                'thirdcircle': 3, 'third_circle': 3,
+                'fourthcircle': 4, 'fourth_circle': 4,
+                'fifthcircle': 5, 'fifth_circle': 5,
+            };
+            // 去掉可能的 _N 后缀 (如 "firstcircle_1" -> "firstcircle")
+            const baseName = lowerName.replace(/_\d+$/, '');
+            targetCircleIdx = CIRCLE_NAME_MAP[baseName];
+        }
+        
+        // ---- 圈层隔离检查: 验证 explicitFilePaths 属于目标环 ----
+        if (targetCircleIdx !== undefined && options.circleName) {
+            // 构建 asset -> circleIndex 的映射
+            const assetToCircle = new Map<string, number>();
+            for (let i = 0; i < batches.length; i++) {
+                for (const assetId of batches[i]) {
+                    assetToCircle.set(assetId, i);
+                }
+            }
+            
+            // 获取目标环的名称用于错误消息
+            const targetCircleWord = options.circleName.replace(/_\d+$/, '').toLowerCase();
+            
+            // 检查 explicitFilePaths 中的每个资产是否属于目标环
+            for (const target of targets) {
+                const targetPath = path.resolve(this.projectRoot, target);
+                if (!await fs.access(targetPath).then(() => true).catch(() => false)) continue;
+                
+                const stats = await fs.stat(targetPath);
+                if (stats.isFile() && targetPath.endsWith('.md')) {
+                    const assetId = path.basename(targetPath, '.md').replace(/^@/, '');
+                    const assetCircleIdx = assetToCircle.get(assetId);
+                    if (assetCircleIdx !== undefined && assetCircleIdx !== targetCircleIdx) {
+                        const assetCircleWord = this.getCircleWord(assetCircleIdx);
+                        throw new Error(`${assetId} 属于 ${assetCircleWord}，请先执行 opsv imagen ${assetCircleWord}`);
+                    }
+                } else if (stats.isDirectory()) {
+                    const files = (await fs.readdir(targetPath)).filter(f => f.endsWith('.md'));
+                    for (const file of files) {
+                        const assetId = file.replace(/^@/, '').replace(/\.md$/, '');
+                        const assetCircleIdx = assetToCircle.get(assetId);
+                        if (assetCircleIdx !== undefined && assetCircleIdx !== targetCircleIdx) {
+                            const assetCircleWord = this.getCircleWord(assetCircleIdx);
+                            throw new Error(`${assetId} 属于 ${assetCircleWord}，请先执行 opsv imagen ${assetCircleWord}`);
+                        }
+                    }
+                }
+            }
+        }
 
         // ---- 扫描目标目录 ----
         if (!targets || targets.length === 0) {

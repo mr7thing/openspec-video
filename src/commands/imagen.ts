@@ -61,6 +61,7 @@ export function registerImagenCommand(program: Command, VERSION: string) {
                     shots: options.shots,
                     skipApproved: options.skipApproved,
                     skipDependsLayer: options.skipDependLayer,
+                    circleName: circle, // 传入 circleName 用于圈层隔离检查
                 });
 
                 logger.info('\n📂 图像任务列表已生成。');

@@ -257,8 +257,9 @@ export class DependencyGraph {
 
     /**
      * 保存图文件到 .opsv/{graphName}_graph.json
+     * @param skipMiddleCircle 简化模式：所有非 shotlist → zerocircle，shotlist → endcircle
      */
-    async saveGraph(projectRoot: string, graphName: string = 'videospec'): Promise<void> {
+    async saveGraph(projectRoot: string, graphName: string = 'videospec', skipMiddleCircle: boolean = false): Promise<void> {
         const opsvDir = path.join(projectRoot, '.opsv');
         await fs.mkdir(opsvDir, { recursive: true });
 
@@ -266,8 +267,29 @@ export class DependencyGraph {
 
         // 构建 circles 结构
         const circles: Record<string, string[]> = {};
-        for (let i = 0; i < batches.length; i++) {
-            circles[String(i)] = batches[i];
+
+        if (skipMiddleCircle) {
+            // 简化模式：所有非 shotlist → circles["0"], shotlist → circles["endcircle"]
+            const shotlistAssets: string[] = [];
+            const nonShotlistAssets: string[] = [];
+
+            for (const batch of batches) {
+                for (const assetId of batch) {
+                    if (assetId.toLowerCase() === 'shotlist') {
+                        shotlistAssets.push(assetId);
+                    } else {
+                        nonShotlistAssets.push(assetId);
+                    }
+                }
+            }
+
+            circles["0"] = nonShotlistAssets;
+            circles["endcircle"] = shotlistAssets;
+        } else {
+            // 默认模式：按拓扑排序的批次
+            for (let i = 0; i < batches.length; i++) {
+                circles[String(i)] = batches[i];
+            }
         }
 
         const graphData: GraphFileStructure = {
@@ -487,8 +509,9 @@ export class DependencyGraph {
     /**
      * 从文档目录扫描并重建依赖图
      * 确保每次 generate 前都是最新版本
+     * @param skipMiddleCircle 简化模式：所有非 shotlist → zerocircle，shotlist → endcircle
      */
-    static async buildFromProject(projectRoot: string): Promise<DependencyGraph> {
+    static async buildFromProject(projectRoot: string, skipMiddleCircle: boolean = false): Promise<DependencyGraph> {
         const graph = new DependencyGraph();
         const documents: ParsedDocument[] = [];
 
@@ -533,7 +556,7 @@ export class DependencyGraph {
         }
 
         graph.build(documents);
-        await graph.saveGraph(projectRoot, graphName);
+        await graph.saveGraph(projectRoot, graphName, skipMiddleCircle);
         return graph;
     }
 }

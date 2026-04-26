@@ -161,7 +161,7 @@ export function registerCircleCommand(program: Command, VERSION: string) {
 
             try {
                 // 构建依赖图
-                const graph = await DependencyGraph.buildFromProject(projectRoot);
+                const graph = await DependencyGraph.buildFromProject(projectRoot, skipMiddleCircle);
                 const { batches, cycles } = graph.topologicalSort();
 
                 if (batches.length === 0) {
