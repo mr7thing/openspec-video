@@ -17,17 +17,11 @@ import { registerValidateCommand } from './commands/validate';
 import { registerScriptCommand } from './commands/script';
 
 const projectRoot = process.cwd();
-const envSubDir = path.join(projectRoot, '.env');
-const secretsEnvPath = path.join(envSubDir, 'secrets.env');
 const rootEnvPath = path.join(projectRoot, '.env');
 
-// --- 核心：必须先加载环境变量 ---
-if (fs.existsSync(secretsEnvPath)) {
-    dotenv.config({ path: secretsEnvPath });
-} else if (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory()) {
+// --- 核心：必须先加载环境变量 (.env 是单文件) ---
+if (fs.existsSync(rootEnvPath) && !fs.lstatSync(rootEnvPath).isDirectory()) {
     dotenv.config({ path: rootEnvPath });
-} else {
-    dotenv.config();
 }
 
 // 获取版本号（从 package.json 动态读取）

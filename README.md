@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) 0.7.0 (Circle Queue Era)
+# OpenSpec-Video (OpsV) 0.7.1 (Circle Queue Era)
 
 [English](./docs/en/01-OVERVIEW.md) | [中文说明](./docs/cn/01-OVERVIEW.md)
 
@@ -92,6 +92,11 @@ Each batch contains only task JSONs and a `compile.log` — no `queue.json` mani
 ---
 
 ## 🆕 Release Notes / 更新说明
+
+### v0.7.1 — 目录结构规范化
+
+- **`.env` 改为单文件**: API 密钥文件从目录 (`.env/secrets.env`) 改为根目录单文件 `.env`，dotenv 可直接加载
+- **`api_config.yaml` 移入 `.opsv/`**: 从 `.env/api_config.yaml` 移至 `.opsv/api_config.yaml`，与 graph/manifest 集中管理
 
 ### v0.7.0 — Circle 多图管理 & Shot 文件系统
 

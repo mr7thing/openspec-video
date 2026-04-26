@@ -5,18 +5,13 @@ import path from 'path';
 import os from 'os';
 import dotenv from 'dotenv';
 
-// 尝试加载环境变量（从当前目录的 .env 或 .env/secrets.env，因为它是后台启动的，需要在相对位置寻找）
+// 尝试加载环境变量（后台启动时在相对位置寻找 .env 文件）
 const projectRoot = process.cwd();
-const envSubDir = path.join(projectRoot, '.env');
-const secretsEnvPath = path.join(envSubDir, 'secrets.env');
 const rootEnvPath = path.join(projectRoot, '.env');
 
-if (fsSync.existsSync(secretsEnvPath)) {
-    dotenv.config({ path: secretsEnvPath });
-} else if (fsSync.existsSync(rootEnvPath) && !fsSync.lstatSync(rootEnvPath).isDirectory()) {
+// --- 加载环境变量 (.env 是单文件) ---
+if (fsSync.existsSync(rootEnvPath) && !fsSync.lstatSync(rootEnvPath).isDirectory()) {
     dotenv.config({ path: rootEnvPath });
-} else {
-    dotenv.config();
 }
 
 const PORT = parseInt(process.env.OPSV_DAEMON_PORT || '3061', 10);

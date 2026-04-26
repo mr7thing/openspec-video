@@ -107,7 +107,7 @@ export class ConfigLoader {
 
         const allEnvs = required.join(' or ');
         throw ErrorFactory.compilationFailed(
-            `Missing API Key for provider '${providerName}'. Please set ${allEnvs} in .env/secrets.env`
+            `Missing API Key for provider '${providerName}'. Please set ${allEnvs} in .env`
         );
     }
 }

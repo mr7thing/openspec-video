@@ -34,7 +34,7 @@
 
 ---
 
-## 📋 OpsV v0.6.4 实际工作流
+## 📋 OpsV v0.7.0 实际工作流
 
 ### 核心生产管线
 
@@ -131,7 +131,7 @@ opsv queue run --model siliconflow.qwen-image --retry --circle zerocircle_1
 
 ---
 
-## 🔄 迭代工作指导 (v0.6.4)
+## 🔄 迭代工作指导 (v0.7.0)
 
 ### 核心原则：Approve → syncing → approved
 

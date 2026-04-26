@@ -73,7 +73,7 @@ export function registerInitCommand(program: Command, VERSION: string) {
 
                 const templateEnvExists = await fs.access(path.join(TEMPLATE_DIR, '.env')).then(() => true).catch(() => false);
                 if (templateEnvExists) {
-                    await fs.cp(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'), { recursive: true, force: true });
+                    await fs.copyFile(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
                 }
 
                 // 2. Selective copy based on tools (Legacy & Metadata)
