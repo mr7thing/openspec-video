@@ -7,9 +7,7 @@ visual_detailed: >
   视觉详细特征描述。
 prompt_en: >
   Core Prompt.
-refs:                               # 引用必须带 @ 前缀
-  - "@elder_brother"                # 引用文档
-  - "@classroom:morning"            # 引用文档中的特定变体图片
+refs: []                             # 按需添加依赖资产
 reviews: []
 ---
 

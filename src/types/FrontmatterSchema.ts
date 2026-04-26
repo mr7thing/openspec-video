@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ============================================================================
-// OpenSpec-Video v0.5 Frontmatter Schema
+// OpenSpec-Video v0.7.0 Frontmatter Schema
 // 四层规范体系 — 第二层：文档标头
 // ============================================================================
 
@@ -51,12 +51,19 @@ export const ShotDesignFrontmatterSchema = BaseFrontmatterSchema.extend({
 });
 export type ShotDesignFrontmatter = z.infer<typeof ShotDesignFrontmatterSchema>;
 
-// ---- 分镜生产文档额外字段 (Shotlist.md) ----
+// ---- 分镜生产文档额外字段 (Shotlist.md / shot_*.md) ----
 export const ShotProductionFrontmatterSchema = BaseFrontmatterSchema.extend({
     title: z.string().optional(),
+    // shot_*.md 文件专用字段
+    id: z.string().optional(),          // 由文件名推导，shot_01.md → id: shot_01
+    first_frame: z.string().optional(), // 起始帧引用
+    last_frame: z.string().optional(),  // 终止帧引用
+    duration: z.string().optional(),     // 时长，如 "5s"
+    // Shotlist.md 兼容字段
     frame_ref: z.object({
         first: z.string().nullable().optional(),
         last: z.string().nullable().optional(),
     }).optional(),
+    video_path: z.string().nullable().optional(),
 });
 export type ShotProductionFrontmatter = z.infer<typeof ShotProductionFrontmatterSchema>;

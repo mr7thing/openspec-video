@@ -240,10 +240,11 @@ opsv animate [--cycle auto]
 - 产出：`opsv-queue/<endcircle>/video_jobs.json`。
 - 后续：`opsv queue compile --model <provider.model|alias>` + `opsv queue run --model <provider.model|alias>` 执行渲染。
 
-**v0.6.4 CLI 语法变更**：
-- 旧语法 `--volcengine.seedance-2.0` 已废弃
-- 新语法：`--model volcengine.seedance-2.0` 或别名 `--model volc.sd2`
-- 别名在 `.env/api_config.yaml` 的 `aliases` 字段中定义
+**历史变更 (v0.6.4 — CLI 语法)**：
+> 以下为 v0.6.4 的变更记录，当前版本 v0.7.0 仍适用此规则，仅作历史参考。
+> - 旧语法 `--volcengine.seedance-2.0` 已废弃
+> - 新语法：`--model volcengine.seedance-2.0` 或别名 `--model volc.sd2`
+> - 别名在 `.env/api_config.yaml` 的 `aliases` 字段中定义
 
 ---
 

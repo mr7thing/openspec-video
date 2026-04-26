@@ -1,6 +1,6 @@
 ---
 name: opsv
-description: OpenSpec-Video (OpsV) v0.7.0 核心框架规范。涵盖从创意脑暴到视频渲染的完整管线，包括 Circle 架构、资产定义、Shot 文件系统、多图管理、任务编排与审查协议。
+description: OpsV v0.7.0 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
 # OpsV 框架规范 (v0.7.0)
@@ -97,8 +97,8 @@ opsv-queue/                         # 渲染产物目录
 
 ```yaml
 ---
-id: shot_01                    # ID 来自文件名，不在 frontmatter 重复
-status: pending
+# id 由文件名推导（shot_01.md → id: shot_01），frontmatter 无需声明
+status: draft
 first_frame: "@shot_01:first"
 last_frame: "@shot_01:last"
 duration: "5s"

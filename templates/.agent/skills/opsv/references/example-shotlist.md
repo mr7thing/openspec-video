@@ -7,7 +7,7 @@
 
 ```yaml
 id: shot_01
-status: pending  # pending | rejected | completed
+status: draft  # pending | rejected | completed
 first_frame: "../../opsv-queue/firstcircle_1/volcengine/queue_1/shot_01_1.png"
 last_frame: null
 video_path: null
@@ -30,7 +30,7 @@ video_path: null
 
 ```yaml
 id: shot_02
-status: pending
+status: draft
 first_frame: "@FRAME:shot_01_last"
 last_frame: null
 video_path: null

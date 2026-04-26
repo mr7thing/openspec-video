@@ -163,6 +163,23 @@ async function validateFile(filePath: string): Promise<ValidationIssue[]> {
             return issues; // 无法继续验证
     }
 
+    // Shot 文件 id ↔ filename 一致性校验
+    if (docType === 'shot-production') {
+        const idFromFrontmatter = frontmatter.id;
+        if (idFromFrontmatter) {
+            // 从文件名前缀提取 id（如 shot_01.md → shot_01）
+            const fileName = path.basename(filePath, '.md');
+            if (idFromFrontmatter !== fileName) {
+                issues.push({
+                    file: relativePath,
+                    field: 'id',
+                    message: `frontmatter 中 id "${idFromFrontmatter}" 与文件名 "${fileName}" 不一致`,
+                    suggestion: 'shot 文件的 id 应由文件名推导，frontmatter 中无需声明 id'
+                });
+            }
+        }
+    }
+
     // Zod 验证
     const result = schema.safeParse(frontmatter);
 

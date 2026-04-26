@@ -24,10 +24,13 @@
 ### opsv imagen
 编译 Markdown 文档为图像生成任务，保存为 `opsv-queue/videospec_<circle>_1/imagen_jobs.json`。
 
-**v0.7.0 演进**:
-- **圈层参数**：指定 `zerocircle` / `firstcircle` 等，只处理属于该圈层的资产
-- **圈层隔离**：前置圈层未 approved → 报错；指定文件不属于目标圈层 → 报错
-- **`--skip-approved` 默认开启**：已有 approved 参考图的资产自动跳过，避免重复生成。需强制生成时用 `--no-skip-approved`
+**圈层参数**：指定 `zerocircle` / `firstcircle` 等，只处理属于该圈层的资产
+
+**圈层隔离**：前置圈层未 approved → 报错；指定文件不属于目标圈层 → 报错
+
+**`--skip-approved` 默认开启**：已有 approved 参考图的资产自动跳过，避免重复生成。需强制生成时用 `--no-skip-approved`
+
+**`--skip-depend-layer`**：跳过依赖层级检查，产生扁平任务列表（不推断 circle 分层，所有目标打包进同一批）
 
 ### opsv animate
 编译 Shotlist.md 为视频任务，保存为 `opsv-queue/<circle>/video_jobs.json`。
