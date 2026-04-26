@@ -23,7 +23,7 @@ video_path: null
 
 **[Review 审查区]**
 > 这里供机器回填视频草案，供导演审查推翻。
-<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/endcircle_1/volcengine/queue_1/shot_01_1.mp4) -->
+<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec_endcircle_1/volcengine/queue_1/shot_01_1.mp4) -->
 
 
 ## Shot 02 (4s)

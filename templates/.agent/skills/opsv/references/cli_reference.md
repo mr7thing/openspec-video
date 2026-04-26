@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.6.4 (Circle Architecture)
+> 当前版本：v0.7.0 (Circle Architecture)
 
 ## 命令总览
 
@@ -22,14 +22,12 @@
 ## 核心命令详解
 
 ### opsv imagen
-编译 Markdown 文档为图像生成任务，保存为 `opsv-queue/<circle>/imagen_jobs.json`。
+编译 Markdown 文档为图像生成任务，保存为 `opsv-queue/videospec_<circle>_1/imagen_jobs.json`。
 
-**v0.6.4 演进**:
-- **Circle 自动推断**：未指定 `--circle` 时自动推断当前开放的 Circle。
-- **上游 Circle 检查**：执行前检测上游 Circle 是否全部 approved，未 approved 时阻止执行（可 `--skip-circle-check` 跳过）。
-- **`--skip-approved` 默认开启**：已有 approved 参考图的资产自动跳过，避免重复生成。需强制生成时用 `--no-skip-approved`。
-- **生成 vs 编译分离**：`imagen` 只生成 `imagen_jobs.json`，不直接生成 API 请求体；后续需 `queue compile` 显式编译。
-- **YAML 强约束**: 强制读取 `visual_detailed` 和 `visual_brief` 字段。
+**v0.7.0 演进**:
+- **圈层参数**：指定 `zerocircle` / `firstcircle` 等，只处理属于该圈层的资产
+- **圈层隔离**：前置圈层未 approved → 报错；指定文件不属于目标圈层 → 报错
+- **`--skip-approved` 默认开启**：已有 approved 参考图的资产自动跳过，避免重复生成。需强制生成时用 `--no-skip-approved`
 
 ### opsv animate
 编译 Shotlist.md 为视频任务，保存为 `opsv-queue/<circle>/video_jobs.json`。
@@ -40,14 +38,15 @@
 - EndCircle 必须是 `shotlist.md`。
 
 ### opsv comfy compile
-ComfyUI 工作流直接编译为可执行 `.json`，不走 `queue compile`。
+ComfyUI 工作流编译为任务描述 JSON（inputs/outputs），Agent 从技能目录加载 workflow 后注入变量。
 
 ```bash
-opsv comfy compile workflow.json --provider comfyui_local --shot-id shot_01 --circle zerocircle_1
+opsv comfy compile flux_schnell --skill comfy-flux-schnell
 ```
 
-- 产出原始 ComfyUI workflow `.json`，可直接在 ComfyUI WebUI 中导入测试。
-- 参数通过 Node Title 匹配注入（`--param key=value`）。
+- 产出任务描述 JSON，包含 inputs/outputs 声明
+- Agent 从 `.agent/skills/` 找到对应 workflow，复制到队列目录，注入变量
+- ComfyUI Local 和 RunningHub 都是 `type: comfy`，只是 provider 不同
 
 ### opsv queue compile
 将任务 JSON 编译为 Provider 特定的可直接执行的 `.json` 文件。
@@ -101,18 +100,18 @@ opsv queue run --model volcengine.seadream-5.0-lite --file shot_01_v2.json
 Circle（环）依赖层次的状态管理与拓扑刷新。**每次文档变更后必须重新执行**，不可依赖缓存结果。
 
 ```bash
-opsv circle status          # 实时扫描文档，重新计算拓扑排序与批准状态
-opsv circle manifest        # 将当前拓扑快照写入 opsv-queue/circle_manifest.json
-opsv circle --skip          # 只生成零环和终环（终环=shotlist.md）
+opsv circle create --dir videospec           # 新建并激活依赖图
+opsv circle create --dir episode_2            # 多剧集
+opsv circle create --dir videospec --skip-middle-circle  # 简化模式（所有非 shotlist 归 zerocircle）
+opsv circle status                            # 实时扫描，自动写入 .opsv/videospec_manifest.json
 ```
-
-**v0.6.4 修复**: `opsv circle` 命令现已正确注册，可直接使用。
 
 **设计哲学**：Circle 不是静态配置，而是文档依赖关系的**动态投影**。`opsv circle status` 每次运行都会：
 1. 重新扫描 `videospec/` 下所有 `.md` 文件
 2. 从 frontmatter 的 `refs` 字段重建依赖图
 3. 拓扑排序得到 Circle 分层（ZeroCircle → FirstCircle → ...）
 4. 读取每个文档的 `## Approved References` 区域统计批准状态
+5. 自动写入 `.opsv/videospec_manifest.json`
 
 **触发时机**（文档变更后必须刷新）：
 
@@ -144,9 +143,8 @@ opsv circle --skip          # 只生成零环和终环（终环=shotlist.md）
 opsv validate
 opsv circle status
 
-# 2. 确认全部 approved 后，固化并晋升
-opsv circle manifest        # 生成 circle_manifest.json
-opsv animate                # 基于 approved 资产生成下一 Circle 任务
+# 2. 确认全部 approved 后，直接生成下游任务
+opsv animate                # manifest 由 circle status 自动写入，无需单独命令
 ```
 
 ### opsv review
@@ -173,7 +171,7 @@ opsv animate                # 基于 approved 资产生成下一 Circle 任务
 2. **创意阶段**: 在 `elements/`, `scenes/`, `shots/` 下编写 Markdown，聚焦 `## Vision`。
 3. **`opsv validate`**: 校验文档与引用死链。
 4. **`opsv deps`**: 确认依赖关系与 Circle 执行顺序。
-5. **`opsv imagen`**: 生成图像任务列表（`opsv-queue/zerocircle_1/imagen_jobs.json`）。
+5. **`opsv imagen`**: 生成图像任务列表（`opsv-queue/videospec_zerocircle_1/imagen_jobs.json`）。
 6. **`opsv queue compile --<provider.model>`**: 编译为可执行 `.json`。
 7. **`opsv queue run --<provider.model>`**: 执行渲染。
 8. **`opsv review`**: 通过 Web 界面进行审美决策。

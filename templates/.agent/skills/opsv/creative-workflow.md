@@ -2,7 +2,7 @@
 
 从模糊灵感到可编译视频工程的完整创作管线。分为 5 个阶段，每个阶段有明确的输入、输出与文档规范。
 
-> 当前版本：v0.6.4 (Circle Architecture)
+> 当前版本：v0.7.0 (Circle Architecture)
 
 ---
 
@@ -161,10 +161,35 @@ opsv deps                  # 查看拓扑排序与依赖阻塞情况
 - **链接大纲**：在 YAML `refs` 中引用故事大纲的具体段落（如 `refs: ["story.md#Act 1"]`）。
 - **同步工作流**：撰写剧本前，必须先吸收 `refs` 所指的大纲意图，确保叙事逻辑不发生偏离。
 
-### 分镜设计准则
+### 剧本设计准则
 - **时长管理**：单镜头 3~5s，上限 15s。
 - **资产穿透**：必须且只能使用 `@id` 引用全局资产。
 - **镜头语言**：必须包含具体的景别、光影、运动描述。
+
+### Shot 文件（v0.7.0 新增）
+每个分镜是独立的 `shot_*.md` 文件，不再写在 Script.md 里：
+
+```yaml
+---
+id: shot_01
+status: pending
+first_frame: "@shot_01:first"
+last_frame: "@shot_01:last"
+duration: "5s"
+refs:
+  - "@role_hero"
+  - "@scene_forest"
+---
+
+## Shot 01 - 开场森林
+
+角色走进阴暗的森林，镜头缓慢推进...
+```
+
+- `id` 来自文件名，frontmatter 不重复
+- `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法，指向自身资源
+- `refs` 参与拓扑排序，决定 Circle 分层
+- `Script.md` 由 `opsv script` 从 shot_*.md 聚合生成（来源标注）
 
 ### 状态机管理
 - **初始状态**：新剧本默认为 `status: draft`。
@@ -231,5 +256,5 @@ opsv animate [--cycle auto]
 | 资产 | 花名册 | `elements/*.md` + `scenes/*.md` | 架构完成 |
 | 剧本 | 定稿资产 | `shots/Script.md` | ZeroCircle 资产 approved |
 | 动画 | 定稿剧本 | `shots/Shotlist.md` | 剧本 approved |
-| 图像渲染 | 资产文档 | `opsv-queue/zerocircle_1/*.png` | `opsv imagen` + `queue compile/run` |
-| 视频渲染 | Shotlist.md | `opsv-queue/endcircle_1/*.mp4` | `opsv animate` + `queue compile/run` |
+| 图像渲染 | 资产文档 | `opsv-queue/videospec_zerocircle_1/*.png` | `opsv imagen` + `queue compile/run` |
+| 视频渲染 | Shotlist.md | `opsv-queue/videospec_endcircle_1/*.mp4` | `opsv animate` + `queue compile/run` |

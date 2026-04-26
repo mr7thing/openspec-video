@@ -190,11 +190,11 @@ sequential_image_generation: "auto"
 
 ```bash
 # 文生图
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json \
+opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json \
   --model volcengine.seadream-5.0-lite --circle zerocircle_1
 
 # 使用别名
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json \
+opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json \
   --model seedream --circle zerocircle_1
 ```
 

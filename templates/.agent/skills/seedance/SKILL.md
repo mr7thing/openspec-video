@@ -259,11 +259,11 @@ description: Seedance 2.0 视频生成专家。精通火山方舟 Seedance 2.0/2
 
 ```bash
 # Seedance 2.0
-opsv queue compile opsv-queue/endcircle_1/video_jobs.json \
+opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json \
   --model seedance2 --circle endcircle_1
 
 # Seedance 2.0 fast
-opsv queue compile opsv-queue/endcircle_1/video_jobs.json \
+opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json \
   --model seedance2f --circle endcircle_1
 ```
 

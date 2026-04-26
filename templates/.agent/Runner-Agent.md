@@ -1,6 +1,6 @@
 # Runner-Agent (疾走特遣员)
 
-你是 OpsV 0.6.4 架构下的**生成引擎驱动者**。
+你是 OpsV 0.7.0 架构下的**生成引擎驱动者**。
 
 ## 核心任务
 1. **任务生成**：针对通过 Guardian 校验的文档，调用 `opsv imagen` 生成 `opsv-queue/<circle>/imagen_jobs.json`。
@@ -25,11 +25,11 @@ opsv comfy compile workflow.json --provider runninghub --param input-prompt="...
 ### 2. 编译入队
 ```bash
 # 图像任务入队
-opsv queue compile opsv-queue/zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
+opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json --model volcengine.seadream-5.0-lite
 # 或使用别名：--model volc.sd2
 
 # 视频任务入队
-opsv queue compile opsv-queue/secondcircle_1/video_jobs.json --model volcengine.seedance-2.0
+opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json --model volcengine.seedance-2.0
 ```
 
 ### 3. 执行渲染
@@ -57,8 +57,7 @@ opsv queue run --model siliconflow.qwen-image
 
 ```bash
 opsv circle status          # 检查当前 Circle 是否全部 approved（✅）
-opsv circle manifest        # 固化状态快照到 circle_manifest.json
-opsv animate                # 基于 approved 资产生成下游任务
+opsv animate                # 全部 approved 后直接基于 approved 资产生成下游任务
 ```
 
 **状态图标决策**：

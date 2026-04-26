@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpenSpec-Video (OpsV) v0.6.4 核心框架规范。涵盖从创意脑暴到视频渲染的完整管线，包括 Circle 架构、资产定义、分镜设计、任务编排与审查协议。
+description: OpenSpec-Video (OpsV) v0.7.0 核心框架规范。涵盖从创意脑暴到视频渲染的完整管线，包括 Circle 架构、资产定义、Shot 文件系统、多图管理、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.6.4)
+# OpsV 框架规范 (v0.7.0)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -14,10 +14,10 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 | Circle | 职责 | 产出 |
 |--------|------|------|
-| **ZeroCircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/zerocircle_1/imagen_jobs.json` |
-| **FirstCircle** | 基于 approved 资产的分镜图像 | `opsv-queue/firstcircle_1/imagen_jobs.json` |
+| **ZeroCircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec_zerocircle_1/imagen_jobs.json` |
+| **FirstCircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec_firstcircle_1/imagen_jobs.json` |
 | **...** | 中间层级（按需扩展） | ... |
-| **EndCircle** | 末端动态视频（自动推断） | `opsv-queue/<endcircle>/video_jobs.json` |
+| **EndCircle** | 末端动态视频（自动推断） | `opsv-queue/<graphName>_endcircle_1/video_jobs.json` |
 
 **铁律**：
 - 严禁在 ZeroCircle 未完成 Review/Approve 时强行下发 FirstCircle
@@ -54,52 +54,69 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 | ⏳ | 进行中 | 部分资产已批准，或存在 pending_sync 资产（⚠️ N pending_sync） |
 | ✅ | 已完成 | 全部资产已批准，可晋升下一 Circle |
 
-### 目录结构
+## 资产目录结构
+
 ```
-videospec/
-├── project.md              # 全局配置 + 资产花名册
-├── stories/
-│   └── story.md            # 故事大纲（## Act N 结构）
-├── elements/
-│   ├── @role_hero.md       # 角色定义
-│   └── @prop_gun.md        # 道具定义
-├── scenes/
-│   └── @scene_bar.md       # 场景定义
+videospec/                         # 创意资产根目录
+├── project.md                     # 全局配置 + 资产花名册
+├── stories/story.md              # 故事大纲
+├── elements/@role_hero.md        # 角色定义（@id 全局引用）
+├── scenes/@scene_bar.md          # 场景定义
 └── shots/
-    ├── Script.md           # 分镜设计
-    └── Shotlist.md         # 视频工程图纸（显式账本）
+    ├── shot_01.md                # 分镜数据源（v0.7.0）
+    ├── shot_02.md
+    ├── Script.md                 # 聚合展示（由 opsv script 生成）
+    └── Shotlist.md               # 视频工程图纸（末环，独立不进依赖图）
 
-opsv-queue/                 # 统一队列目录（替代旧 artifacts/、queue/）
-├── circle_manifest.json    # 拓扑快照（由 opsv circle manifest 生成）
-├── zerocircle_1/
-│   └── imagen_jobs.json
-├── firstcircle_1/
-│   ├── volcengine/
-│   │   └── queue_1/         # 每次 compile 必然创建新 batch（queue_N+1）
-│   │       ├── shot_01.json # 完整 API 请求体（Agent 可直接编辑执行）
-│   │       ├── shot_01_1.png
-│   │       ├── shot_01.log  # JSONL 执行日志
-│   │       └── shot_02.json
-│   └── ...
-└── frames/                  # @FRAME 引用的尾帧落盘目录
+.opsv/                              # OpsV 内部状态
+├── api_config.yaml
+├── videospec_graph.json           # 依赖图（由 opsv circle create 生成）
+└── videospec_manifest.json       # 状态快照（由 opsv circle status 自动写入）
+
+opsv-queue/                         # 渲染产物目录
+├── videospec_zerocircle_1/        # 目录名格式：{graphName}_{circleName}_N
+│   ├── imagen_jobs.json
+│   └── volcengine-seadream5/queue_1/
+│       ├── shot_01.json
+│       └── shot_01_1.png
+└── videospec_endcircle_1/
+    ├── video_jobs.json
+    └── volcengine-seedance2/queue_1/
 ```
 
-## v0.6.4 重大变更
+### 命名规则
 
-| 旧版本 (v0.5.x) | v0.6.4 |
-|-----------------|--------|
-| `artifacts/` 目录 | **全部迁移到** `opsv-queue/` |
-| `imagen` 直接入队 | `imagen` 只生成 `imagen_jobs.json`，由 `queue compile` 编译为 `.json` |
-| `--provider.model` 伪 flag | **`--model <provider.model|alias>`**（如 `--model volc.sd2`） |
-| `@FRAME` 解析到 `opsv-queue/frames/` | `@FRAME` 编译为**相对路径** `shot_XX_last.png` |
-| `queue.json` manifest | **compile 不再生成**；run 直接扫描 `.json` 文件 |
-| `opsv generate` | 拆分为 `opsv imagen / animate / comfy` |
-| 资产覆盖式命名 | **本地递增序号** `{jobId}_{runSeq}.{ext}` |
-| `.json` = 意图层 | **.json = 可直接发送的 API 请求体**，run 时不再读 api_config |
-| Seedance 1.5 旧 API | **新增 Seedance 2.0** Content Generation API（`content[]` 数组格式） |
-| 本地文件仅支持路径引用 | **image/audio 支持 Base64 Data URI** 内联（video 除外） |
-| Approve → `status: approved` | **Approve → `status: pending_sync`**（只覆盖 `prompt_en`，Agent 对齐后方可 `approved`） |
-| 无回写 | **Approve 回写**：覆盖 `prompt_en` + 同步 Design References + review 指向 task JSON |
+- **Circle 目录**：统一格式 `{graphName}_{circleName}_N`，如 `videospec_zerocircle_1`、`videospec_firstcircle_1`、`videospec_endcircle_1`
+- **多剧集**：每个剧集独立建图，如 `episode_2_zerocircle_1`
+- **Graph 名**：由 `opsv circle create --dir <path>` 的路径名决定
+- **Shot 文件**：`shot_*.md` 的 ID 绑定到文件名，修改文件名 = 删除重建
+
+### Shot 文件系统
+
+每个分镜是独立的 `shot_*.md` 文件：
+
+```yaml
+---
+id: shot_01                    # ID 来自文件名，不在 frontmatter 重复
+status: pending
+first_frame: "@shot_01:first"
+last_frame: "@shot_01:last"
+duration: "5s"
+refs:
+  - "@role_hero"
+  - "@scene_forest"
+---
+
+## Shot 01 - 开场森林
+
+角色走进阴暗的森林，镜头缓慢推进...
+```
+
+- `id` 绑定文件名，改名 = 删除重建
+- `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法
+- `refs` 参与拓扑排序，决定 Circle 分层
+- `Script.md` 由 `opsv script` 从 shot_*.md 聚合生成（带来源标注）
+- `Shotlist.md` 是末环，独立处理，不进依赖图
 
 ## Agent 角色速查
 
@@ -115,9 +132,13 @@ opsv-queue/                 # 统一队列目录（替代旧 artifacts/、queue/
 # 文档校验（任何修改后必做）
 opsv validate
 
-# Circle 状态刷新（文档/Review 变更后必做）
+# 新建并激活依赖图
+opsv circle create --dir videospec
+opsv circle create --dir episode_2         # 多剧集
+opsv circle create --dir videospec --skip-middle-circle  # 简化模式
+
+# 依赖图状态（status 合并 manifest，自动写入 .opsv/videospec_manifest.json）
 opsv circle status
-opsv circle manifest        # 全部 approved 后固化快照
 
 # 依赖分析
 opsv deps
@@ -138,9 +159,11 @@ opsv queue run --model <provider.model|alias> --circle <name> [--retry]
 
 # 审阅
 opsv review
+#    → 启动时自动 git commit checkpoint: "[review] {ts} — started"
+#    → 关闭时自动 git commit: "[review done] {ts} ({reason})"
 #    → Approve 后: prompt_en已覆盖 + Design References已同步 + status→pending_sync
 #    → Agent 对齐 visual_detailed/visual_brief/refs 后手动改为 approved
-#    → 全部 approved 后执行 opsv circle manifest 固化快照
+#    → 全部 approved 后 opsv circle status 自动更新 manifest
 ```
 
 ## 导航索引
