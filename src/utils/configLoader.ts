@@ -10,7 +10,7 @@ import { ErrorFactory } from '../errors/OpsVError';
 
 export interface ModelConfig {
   provider: string;
-  type?: 'image' | 'video' | 'audio';
+  type?: 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
   enable?: boolean;
   model?: string;
   api_url?: string;

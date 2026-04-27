@@ -49,7 +49,7 @@ export class ComfyUILocalProvider {
               const img = images[0];
               const imageUrl = `${apiUrl}/view?filename=${img.filename}&subfolder=${img.subfolder || ''}&type=${img.type || 'output'}`;
 
-              const ext = task._opsv.type === 'video_generation' ? 'mp4' : 'png';
+              const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
               const outputPath = path.join(outputDir, `${shotId}_1.${ext}`);
               await downloadFile(imageUrl, outputPath);
 

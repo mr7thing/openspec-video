@@ -2,7 +2,7 @@
 
 从模糊灵感到可编译视频工程的完整创作管线。分为 5 个阶段，每个阶段有明确的输入、输出与文档规范。
 
-> 当前版本：v0.7.0 (Circle Architecture)
+> 当前版本：v0.8 (Layer-Based Execution)
 
 ---
 
@@ -66,8 +66,8 @@ status: draft
 - `aspect_ratio`: 默认 `"16:9"`。
 - `vision`: 一两句话说明总调性。
 - `global_style_postfix`: 全局绘画提示词后缀。
-- `status`: 文档本身的审查状态（`draft` / `drafting` | `approved`）。两者等价，`drafting` 为旧版兼容。
-- **严禁**在 project.md 中配置 `engine` 等执行流参数，模型选择由 Runner-Agent 在 `opsv queue compile` 时通过 `--model` 指定。
+- `status`: 文档本身的审查状态（`drafting` | `syncing` | `approved`）。
+- **严禁**在 project.md 中配置 `engine` 等执行流参数，模型选择由 Runner-Agent 在 `opsv imagen --model` / `opsv animate --model` 时指定。
 
 ### 1.2 故事大纲 (`stories/story.md`)
 ```yaml
@@ -100,8 +100,8 @@ review: []
 **角色/道具模板** (`elements/@id.md`)：
 ```yaml
 ---
-type: "character"
-status: "draft"
+type: "imagen"
+status: "drafting"
 visual_brief: >
   视觉描述简述。
 visual_detailed: >
@@ -124,12 +124,13 @@ reviews: []
 <!-- 审批回写区域 —— 由 opsv review 自动写入，Agent 勿手动修改 -->
 ```
 
-**场景模板** (`scenes/@id.md`)：与角色模板语法互通，`type: "scene"`。
+**场景模板** (`scenes/@id.md`)：与角色模板语法互通，`type: "imagen"`。
 
 **硬性约束**：
 - 文件名必须精确匹配花名册里的标签（如 `@boss` → `elements/@boss.md`）。
 - 顶部必须由符合规范的 YAML 字典组成。
-- `status: approved` 代表实体已定档可用；刚起草则为 `draft` / `drafting`。
+- `type` 值使用新规范：`imagen`、`video`、`audio`、`comfy`、`webapp`（不再使用 `image`/`character`/`scene`）。
+- `status: approved` 代表实体已定档可用；刚起草则为 `drafting`。
 - 必须设立 `## Design References`（输入参考图）和 `## Approved References`（定档后视觉形象，由 `opsv review` 自动回写）。
 - `refs` 字段定义了依赖关系，**直接影响 Circle 分层**。例如：若 `@younger_brother` 的 `refs` 包含 `@elder_brother`，则前者必须等待后者 approved 后才能生成。
 - **一致性约束**: `status: approved` 的文档必须在 `## Approved References` 区域包含至少一张 `![variant](path)` 格式的参考图。`opsv validate` 会自动校验。
@@ -140,8 +141,7 @@ reviews: []
 
 ```bash
 opsv validate              # 校验 YAML frontmatter 与引用死链
-opsv circle status         # 查看资产自动分层的 Circle 归属
-opsv deps                  # 查看拓扑排序与依赖阻塞情况
+opsv circle refresh        # 查看资产自动分层的 Circle 归属 + 依赖状态
 ```
 
 ---
@@ -166,13 +166,12 @@ opsv deps                  # 查看拓扑排序与依赖阻塞情况
 - **资产穿透**：必须且只能使用 `@id` 引用全局资产。
 - **镜头语言**：必须包含具体的景别、光影、运动描述。
 
-### Shot 文件（v0.7.0 新增）
+### Shot 文件（v0.8）
 每个分镜是独立的 `shot_*.md` 文件，不再写在 Script.md 里：
 
 ```yaml
 ---
-id: shot_01
-status: pending
+status: draft
 first_frame: "@shot_01:first"
 last_frame: "@shot_01:last"
 duration: "5s"
@@ -186,13 +185,13 @@ refs:
 角色走进阴暗的森林，镜头缓慢推进...
 ```
 
-- `id` 来自文件名，frontmatter 不重复
+- `id` 来自文件名，frontmatter 不重复声明
 - `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法，指向自身资源
 - `refs` 参与拓扑排序，决定 Circle 分层
 - `Script.md` 由 `opsv script` 从 shot_*.md 聚合生成（来源标注）
 
 ### 状态机管理
-- **初始状态**：新剧本默认为 `status: draft`。
+- **初始状态**：新剧本默认为 `status: drafting`。
 - **打回流转**：若审查未通过，记录不满意的视频/图路径到 `draft_ref`，导演意见记入 `review`。
 - **变现迭代**：下一轮生成时，引导模型参考 `draft_ref` 进行针对性修正。
 
@@ -217,7 +216,7 @@ refs:
 - **YAML 追踪块**：
   ```yaml
   id: shot_NN
-  status: pending
+  status: draft
   first_frame: "指向定稿的参考图，若是继承则用 @FRAME:shot_XX_last"
   ```
 - **多模态扩展库**：环境音效、参考视频建议放置在 `> [!note] 附加资源` 区域。
@@ -225,26 +224,24 @@ refs:
 **关键帧塌缩 (@FRAME)**：
 如果是连贯分镜，首帧应指向上镜的尾帧。写法：`first_frame: "@FRAME:shot_01_last"`。
 
-**@FRAME 路径解析（v0.6.4）**：
+**@FRAME 路径解析**：
 - `@FRAME:shot_XX_last` 在 `opsv animate` 编译时解析为**相对路径** `shot_XX_last.png`
 - 非 `@FRAME` 路径仍按传统方式解析（相对于 `videospec/shots/`）
-- 该 PNG 文件由上游视频的 Provider（如 Volcengine Seedance 2.0 的 `return_last_frame`）或 QueueRunner 的 ffmpeg 提取到 batch 目录
+- 该 PNG 文件由上游视频的 Provider（如 Volcengine Seedance 2.0 的 `return_last_frame`）或 `opsv run` 的 ffmpeg 提取到 Provider 目录
 - **编译时不检查** `@FRAME` 路径的存在性（因为上游视频可能尚未生成）
 
 ### 视频任务生成
 Shotlist.md 定稿后，由 Runner-Agent 调用：
 ```bash
-opsv animate [--cycle auto]
+opsv animate --model volcengine.seedance-2.0
 ```
-- 默认 `--cycle auto`，自动推断依赖图末端 Circle（EndCircle）。
-- 产出：`opsv-queue/<endcircle>/video_jobs.json`。
-- 后续：`opsv queue compile --model <provider.model|alias>` + `opsv queue run --model <provider.model|alias>` 执行渲染。
+- 自动推断依赖图末端 Circle（EndCircle）。
+- 直接产出可执行 `.json` 到 `opsv-queue/videospec/endcircle/volcengine.seedance/`，无 `video_jobs.json` 中间层。
+- 后续：`opsv run <paths...>` 执行渲染。
 
-**历史变更 (v0.6.4 — CLI 语法)**：
-> 以下为 v0.6.4 的变更记录，当前版本 v0.7.0 仍适用此规则，仅作历史参考。
-> - 旧语法 `--volcengine.seedance-2.0` 已废弃
-> - 新语法：`--model volcengine.seedance-2.0` 或别名 `--model volc.sd2`
-> - 别名在 `.opsv/api_config.yaml` 的 `aliases` 字段中定义
+**别名支持**：
+- `--model volcengine.seedance-2.0` 或别名 `--model volc.sd2`
+- 别名在 `.opsv/api_config.yaml` 的 `aliases` 字段中定义
 
 ---
 
@@ -257,5 +254,5 @@ opsv animate [--cycle auto]
 | 资产 | 花名册 | `elements/*.md` + `scenes/*.md` | 架构完成 |
 | 剧本 | 定稿资产 | `shots/Script.md` | ZeroCircle 资产 approved |
 | 动画 | 定稿剧本 | `shots/Shotlist.md` | 剧本 approved |
-| 图像渲染 | 资产文档 | `opsv-queue/videospec_zerocircle_1/*.png` | `opsv imagen` + `queue compile/run` |
-| 视频渲染 | Shotlist.md | `opsv-queue/videospec_endcircle_1/*.mp4` | `opsv animate` + `queue compile/run` |
+| 图像渲染 | 资产文档 | `opsv-queue/videospec/zerocircle/volcengine.seadream/*.png` | `opsv imagen --model` |
+| 视频渲染 | Shotlist.md | `opsv-queue/videospec/endcircle/volcengine.seedance/*.mp4` | `opsv animate --model` + `opsv run` |

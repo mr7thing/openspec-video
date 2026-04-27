@@ -42,7 +42,7 @@ export function registerInitCommand(program: Command, version: string): void {
         // Write project.md
         const projectMd = `---
 type: project
-status: draft
+status: drafting
 vision: "${projectName} — a cinematic narrative project"
 aspect_ratio: "16:9"
 resolution: "1920x1080"
@@ -60,7 +60,7 @@ Describe your project vision here.
 models:
   volcengine.seadream:
     provider: volcengine
-    type: image
+    type: imagen
     model: seadream
     api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
     required_env:
@@ -81,7 +81,7 @@ models:
 
   siliconflow.qwenimg:
     provider: siliconflow
-    type: image
+    type: imagen
     model: Qwen/Qwen2.5-VL-72B-Instruct
     api_url: https://api.siliconflow.cn/v1/images/generations
     required_env:
@@ -99,7 +99,7 @@ models:
 
   minimax.minimax-image:
     provider: minimax
-    type: image
+    type: imagen
     model: minimax-image-01
     api_url: https://api.minimax.chat/v1/image_generation
     required_env:
@@ -107,7 +107,7 @@ models:
 
   comfyui.sdxl:
     provider: comfyui
-    type: image
+    type: comfy
     model: sdxl
     api_url: http://127.0.0.1:8188
 `;

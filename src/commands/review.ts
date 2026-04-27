@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import express from 'express';
+import { FrontmatterParser } from '../core/FrontmatterParser';
 import { logger } from '../utils/logger';
 
 export function registerReviewCommand(program: Command): void {
@@ -85,38 +86,68 @@ export function registerReviewCommand(program: Command): void {
         });
 
         // Approve endpoint
+        // CLI only performs deterministic, conflict-free actions:
+        // 1. Append a review record to source .md frontmatter
+        // 2. Set status to 'syncing' (agent will change to 'approved' after alignment)
+        // 3. Never modify prompt_en or other fields
         app.post('/api/approve/:circle/:assetId', express.json(), async (req, res) => {
           const { circle, assetId } = req.params;
-          const { variant, imagePath } = req.body || {};
+          const { outputFile, taskJsonPath } = req.body || {};
 
           try {
-            // Update _assets.json status
+            const now = new Date().toISOString();
+            const reviewEntry = `${now} approved output: ${outputFile || assetId}`;
+
+            // Find source .md file and append review record
+            const elementsDir = path.join(process.cwd(), 'videospec', 'elements');
+            const scenesDir = path.join(process.cwd(), 'videospec', 'scenes');
+            let sourceDocPath: string | null = null;
+
+            for (const dir of [elementsDir, scenesDir]) {
+              if (!fs.existsSync(dir)) continue;
+              for (const prefix of ['@', '']) {
+                const p = path.join(dir, `${prefix}${assetId}.md`);
+                if (fs.existsSync(p)) {
+                  sourceDocPath = p;
+                  break;
+                }
+              }
+              if (sourceDocPath) break;
+            }
+
+            if (sourceDocPath) {
+              const content = fs.readFileSync(sourceDocPath, 'utf-8');
+              const updated = FrontmatterParser.appendReview(content, reviewEntry);
+
+              // Set status to syncing (not approved — agent must align first)
+              const finalContent = FrontmatterParser.updateField(updated, 'status', 'syncing');
+              fs.writeFileSync(sourceDocPath, finalContent);
+            }
+
+            // Update _assets.json status → syncing
             const assetsJsonPath = path.join(queueRoot, circle, '_assets.json');
             if (fs.existsSync(assetsJsonPath)) {
               const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
               const asset = (data.assets || []).find((a: any) => a.id === assetId);
               if (asset) {
-                asset.status = 'approved';
+                asset.status = 'syncing';
                 fs.writeFileSync(assetsJsonPath, JSON.stringify(data, null, 2));
               }
             }
 
-            // Update _manifest.json
+            // Update _manifest.json status → syncing
             const manifestPath = path.join(queueRoot, '_manifest.json');
             if (fs.existsSync(manifestPath)) {
               const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
               for (const c of manifest.circles || []) {
                 if (c.circle === circle && c.status && c.status[assetId]) {
-                  c.status[assetId] = 'approved';
+                  c.status[assetId] = 'syncing';
                 }
               }
               fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
             }
 
-            // Update frontmatter in source doc
-            // TODO: Write approved status back to source .md file
-
-            res.json({ success: true });
+            res.json({ success: true, status: 'syncing', note: 'Agent must align fields before setting approved' });
           } catch (err: any) {
             res.status(500).json({ error: err.message });
           }

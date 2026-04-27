@@ -62,7 +62,7 @@ export class RunningHubProvider {
           const outputUrl = statusRes.data?.data?.output?.[0]?.url || statusRes.data?.data?.url;
           if (!outputUrl) throw new Error('Completed but no output URL found');
 
-          const ext = task._opsv.type === 'video_generation' ? 'mp4' : 'png';
+          const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
           const outputPath = path.join(outputDir, `${shotId}_1.${ext}`);
           await downloadFile(outputUrl, outputPath);
 

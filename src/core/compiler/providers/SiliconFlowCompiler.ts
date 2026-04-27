@@ -12,7 +12,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
 
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const isImage = modelConfig.type === 'image';
+    const isImage = modelConfig.type === 'imagen';
 
     if (isImage) {
       return this.compileImageTask(ctx);
@@ -41,7 +41,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       _opsv: {
         provider: 'siliconflow',
         modelKey: modelConfig.model || 'qwenimg',
-        type: 'image_generation',
+        type: 'imagen',
         shotId: job.id,
         api_url: apiUrl,
         references: ctx.referenceImages,
@@ -73,7 +73,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       _opsv: {
         provider: 'siliconflow',
         modelKey: modelConfig.model || 'wan',
-        type: 'video_generation',
+        type: 'video',
         shotId: job.id,
         api_url: apiUrl,
         api_status_url: statusUrl,

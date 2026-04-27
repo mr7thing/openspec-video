@@ -34,7 +34,7 @@ if (fs.existsSync(opsvEnvPath)) {
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../package.json');
-const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.0' };
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.1' };
 const VERSION = pkg.version;
 
 const program = new Command();

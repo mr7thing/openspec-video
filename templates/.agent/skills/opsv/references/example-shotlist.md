@@ -1,14 +1,14 @@
 # Shotlist
 
-> OpsV 视频工程图纸（V4 规范：显式账本模式）
+> OpsV 视频工程图纸（v0.8 规范：显式账本模式）
 > 该文档为视频指令的 Single Source of Truth。不仅限于机位，所有发送给模型的描述必须显式落笔。
 
 ## Shot 01 (5s)
 
 ```yaml
 id: shot_01
-status: draft  # pending | rejected | completed
-first_frame: "../../opsv-queue/firstcircle_1/volcengine/queue_1/shot_01_1.png"
+status: draft
+first_frame: "../../opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01.png"
 last_frame: null
 video_path: null
 ```
@@ -23,7 +23,7 @@ video_path: null
 
 **[Review 审查区]**
 > 这里供机器回填视频草案，供导演审查推翻。
-<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec_endcircle_1/volcengine/queue_1/shot_01_1.mp4) -->
+<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec/endcircle/volcengine.seedance/shot_01.mp4) -->
 
 
 ## Shot 02 (4s)

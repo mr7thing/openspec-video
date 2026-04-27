@@ -11,7 +11,7 @@ export class MinimaxCompiler implements ProviderCompiler {
 
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const isImage = modelConfig.type === 'image';
+    const isImage = modelConfig.type === 'imagen';
 
     if (isImage) {
       return this.compileImageTask(ctx);
@@ -39,7 +39,7 @@ export class MinimaxCompiler implements ProviderCompiler {
       _opsv: {
         provider: 'minimax',
         modelKey: modelConfig.model || 'minimax-image-01',
-        type: 'image_generation',
+        type: 'imagen',
         shotId: job.id,
         api_url: apiUrl,
         references: ctx.referenceImages,
@@ -67,7 +67,7 @@ export class MinimaxCompiler implements ProviderCompiler {
       _opsv: {
         provider: 'minimax',
         modelKey: modelConfig.model || 'video-01',
-        type: 'video_generation',
+        type: 'video',
         shotId: job.id,
         api_url: apiUrl,
         api_status_url: statusUrl,

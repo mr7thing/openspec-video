@@ -190,12 +190,7 @@ sequential_image_generation: "auto"
 
 ```bash
 # 文生图
-opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json \
-  --model volcengine.seadream-5.0-lite --circle zerocircle_1
-
-# 使用别名
-opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json \
-  --model seedream --circle zerocircle_1
+opsv imagen --model volcengine.seadream --circle zerocircle
 ```
 
 ### 常见场景的 global_settings 配置
@@ -237,7 +232,7 @@ opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json \
   "_opsv": {
     "provider": "volcengine",
     "modelKey": "seadream-5.0-lite",
-    "type": "image_generation",
+    "type": "imagen",
     "shotId": "shot_01",
     "api_url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
     "compiledAt": "2026-04-24T12:00:00.000Z"
@@ -265,7 +260,7 @@ opsv queue compile opsv-queue/videospec_zerocircle_1/imagen_jobs.json \
   "_opsv": {
     "provider": "volcengine",
     "modelKey": "seadream-5.0-lite",
-    "type": "image_generation",
+    "type": "imagen",
     "shotId": "shot_05",
     "api_url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
     "compiledAt": "2026-04-24T12:00:00.000Z",

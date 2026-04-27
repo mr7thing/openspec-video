@@ -10,7 +10,7 @@ export const AssetTypeEnum = z.enum([
 ]);
 export type AssetType = z.infer<typeof AssetTypeEnum>;
 
-export const StatusEnum = z.enum(['drafting', 'draft', 'syncing', 'approved']);
+export const StatusEnum = z.enum(['drafting', 'syncing', 'approved']);
 export type Status = z.infer<typeof StatusEnum>;
 
 export const BaseFrontmatterSchema = z.object({

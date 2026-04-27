@@ -108,7 +108,7 @@ function buildComfyJob(asset: Asset, paramOverrides: Record<string, any>): Job {
 
   return {
     id: asset.id,
-    type: frontmatter.type === 'shot-production' ? 'video_generation' : 'image_generation',
+    type: frontmatter.type === 'shot-production' ? 'video' : 'imagen',
     prompt_en: prompt,
     payload: {
       prompt,

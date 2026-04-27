@@ -48,7 +48,7 @@ export class ComfyUICompiler implements ProviderCompiler {
       _opsv: {
         provider: 'comfyui',
         modelKey: templateName.replace(/\.json$/, ''),
-        type: modelConfig.type === 'video' ? 'video_generation' : 'image_generation',
+        type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,
         api_url: modelConfig.api_url || 'http://127.0.0.1:8188',
         references: ctx.referenceImages,

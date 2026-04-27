@@ -199,7 +199,7 @@ export class DependencyGraph {
 
   writeManifest(queueRoot: string, circles: CircleDefinition[]): void {
     const manifest: Manifest = {
-      version: '0.8.0',
+      version: '0.8.1',
       generatedAt: new Date().toISOString(),
       circles: circles.map((c) => ({
         circle: c.name,
@@ -224,7 +224,7 @@ export class DependencyGraph {
 
   private getAssetStatus(id: string): string {
     const deps = this.graph.get(id);
-    if (!deps || deps.size === 0) return 'draft';
+    if (!deps || deps.size === 0) return 'drafting';
     return 'drafting';
   }
 

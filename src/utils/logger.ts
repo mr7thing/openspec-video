@@ -112,7 +112,7 @@ export function initializeLogger(options: Partial<LoggerOptions> = {}): winston.
   const merged = { ...defaultOptions, ...options };
   loggerInstance = winston.createLogger({
     level: merged.level,
-    defaultMeta: { service: 'opsv', version: '0.8.0' },
+    defaultMeta: { service: 'opsv', version: '0.8.1' },
     transports: createTransports(merged),
     exitOnError: false,
   });

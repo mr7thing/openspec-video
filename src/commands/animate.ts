@@ -131,7 +131,7 @@ async function buildVideoJob(
 
   return {
     id: asset.id,
-    type: 'video_generation',
+    type: 'video',
     prompt_en: prompt,
     payload: {
       prompt,

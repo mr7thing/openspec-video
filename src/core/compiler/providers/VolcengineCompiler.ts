@@ -12,7 +12,7 @@ export class VolcengineCompiler implements ProviderCompiler {
 
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig, apiKey } = ctx;
-    const isImage = modelConfig.type === 'image';
+    const isImage = modelConfig.type === 'imagen';
     const apiUrl = modelConfig.api_url || 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
 
     if (isImage) {
@@ -42,7 +42,7 @@ export class VolcengineCompiler implements ProviderCompiler {
       _opsv: {
         provider: 'volcengine',
         modelKey: modelConfig.model || 'seadream',
-        type: 'image_generation',
+        type: 'imagen',
         shotId: job.id,
         api_url: apiUrl,
         references: ctx.referenceImages,
@@ -87,7 +87,7 @@ export class VolcengineCompiler implements ProviderCompiler {
       _opsv: {
         provider: 'volcengine',
         modelKey: modelConfig.model || 'seedance-2',
-        type: 'video_generation',
+        type: 'video',
         shotId: job.id,
         api_url: apiUrl,
         api_status_url: statusUrl,

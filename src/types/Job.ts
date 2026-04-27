@@ -4,7 +4,7 @@ import { z } from 'zod';
 // OpsV v0.8 Job Type
 // ============================================================================
 
-export type JobType = 'image_generation' | 'video_generation' | 'audio_generation';
+export type JobType = 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
 
 export interface FrameRef {
   first: string | null;

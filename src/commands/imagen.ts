@@ -121,7 +121,7 @@ async function buildImageJob(asset: Asset, refResolver: RefResolver, projectRoot
 
   return {
     id: asset.id,
-    type: 'image_generation',
+    type: 'imagen',
     prompt_en: prompt,
     payload: {
       prompt,

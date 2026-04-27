@@ -259,12 +259,10 @@ description: Seedance 2.0 视频生成专家。精通火山方舟 Seedance 2.0/2
 
 ```bash
 # Seedance 2.0
-opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json \
-  --model seedance2 --circle endcircle_1
+opsv animate --model volcengine.seedance2 --circle endcircle
 
 # Seedance 2.0 fast
-opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json \
-  --model seedance2f --circle endcircle_1
+opsv animate --model volcengine.seedance2-fast --circle endcircle
 ```
 
 ### 常见场景的 global_settings / payload 配置
@@ -303,7 +301,7 @@ opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json \
   "_opsv": {
     "provider": "volcengine",
     "modelKey": "seedance-2.0",
-    "type": "video_generation",
+    "type": "video",
     "shotId": "shot_01",
     "api_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
     "api_status_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
@@ -332,7 +330,7 @@ opsv queue compile opsv-queue/videospec_endcircle_1/video_jobs.json \
   "_opsv": {
     "provider": "volcengine",
     "modelKey": "seedance-2.0",
-    "type": "video_generation",
+    "type": "video",
     "shotId": "shot_02",
     "api_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
     "api_status_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",

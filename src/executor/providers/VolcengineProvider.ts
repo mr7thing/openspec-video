@@ -27,7 +27,7 @@ export class VolcengineProvider {
       apiKey = process.env.VOLCENGINE_API_KEY || process.env.ARK_API_KEY || '';
     }
 
-    const isImage = task._opsv.type === 'image_generation';
+    const isImage = task._opsv.type === 'imagen';
 
     try {
       if (isImage) {

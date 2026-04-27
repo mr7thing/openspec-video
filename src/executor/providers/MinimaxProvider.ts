@@ -24,7 +24,7 @@ export class MinimaxProvider {
       apiKey = process.env.MINIMAX_API_KEY || '';
     }
 
-    const isImage = task._opsv.type === 'image_generation';
+    const isImage = task._opsv.type === 'imagen';
 
     try {
       if (isImage) {
