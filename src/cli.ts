@@ -33,7 +33,7 @@ const program = new Command();
 program
     .name('opsv')
     .version(VERSION)
-    .description('OpenSpec-Video Automation CLI (v0.6.4)');
+    .description(`OpenSpec-Video Automation CLI (v${VERSION})`);
 
 // 注册所有拆分的子命令
 registerDaemonCommands(program, VERSION);

@@ -14,6 +14,9 @@ if (fsSync.existsSync(rootEnvPath) && !fsSync.lstatSync(rootEnvPath).isDirectory
     dotenv.config({ path: rootEnvPath });
 }
 
+// --- 读取版本号 ---
+const DAEMON_VERSION = JSON.parse(fsSync.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8')).version;
+
 const PORT = parseInt(process.env.OPSV_DAEMON_PORT || '3061', 10);
 const PID_FILE = path.join(os.homedir(), '.opsv', 'daemon.pid');
 
@@ -90,7 +93,7 @@ wss.on('connection', (ws) => {
     });
 
     // Send initial status
-    ws.send(JSON.stringify({ type: 'WELCOME', payload: { status: 'connected', version: '0.6.4' } }));
+    ws.send(JSON.stringify({ type: 'WELCOME', payload: { status: 'connected', version: DAEMON_VERSION } }));
 });
 
 // Broadcast jobs to all connected clients

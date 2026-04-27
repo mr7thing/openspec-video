@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { logger } from '../../utils/logger';
 
 /**
- * ComfyUI Local Provider (v0.6.4 简化版)
+ * ComfyUI Local Provider (v0.7.x 简化版)
  *
  * 职责：读取 .json 任务文件（ComfyUI workflow）→ 提交本地 ComfyUI → 轮询历史 → 保存结果标记。
  * 注意：本地 ComfyUI 的结果通常保存在其自身的 output 目录，此 Provider 主要做提交和状态追踪。

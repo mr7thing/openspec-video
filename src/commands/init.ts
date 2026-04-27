@@ -71,9 +71,19 @@ export function registerInitCommand(program: Command, VERSION: string) {
                 // 1. Core Projection (All core genes from .agent are projected here)
                 await projectAgentTemplates(targetDir, tools, TEMPLATE_DIR);
 
+                // 1.5 Create .opsv directory first
+                await fs.mkdir(path.join(targetDir, '.opsv'), { recursive: true });
+
                 const templateEnvExists = await fs.access(path.join(TEMPLATE_DIR, '.env')).then(() => true).catch(() => false);
                 if (templateEnvExists) {
                     await fs.copyFile(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
+                }
+
+                // Copy .opsv/api_config.yaml
+                const apiConfigSrc = path.join(TEMPLATE_DIR, '.opsv', 'api_config.yaml');
+                const apiConfigExists = await fs.access(apiConfigSrc).then(() => true).catch(() => false);
+                if (apiConfigExists) {
+                    await fs.copyFile(apiConfigSrc, path.join(targetDir, '.opsv', 'api_config.yaml'));
                 }
 
                 // 2. Selective copy based on tools (Legacy & Metadata)

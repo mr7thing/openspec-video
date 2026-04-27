@@ -46,7 +46,7 @@ export class ConfigLoader {
 
     public async loadConfig(projectRoot?: string): Promise<ApiConfig> {
         const root = projectRoot || this.projectRoot;
-        const configPath = path.join(root, '.env', 'api_config.yaml');
+        const configPath = path.join(root, '.opsv', 'api_config.yaml');
         
         const configExists = await fs.access(configPath).then(() => true).catch(() => false);
         if (!configExists) {
