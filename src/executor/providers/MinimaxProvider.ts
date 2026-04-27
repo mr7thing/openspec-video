@@ -1,10 +1,8 @@
 // ============================================================================
-// OpsV v0.8 SiliconFlow Executor Provider
-// Handles: wan (video), qwenimg (image)
+// OpsV v0.8 Minimax Executor Provider
 // ============================================================================
 
 import axios from 'axios';
-import fs from 'fs';
 import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
@@ -12,8 +10,8 @@ import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
 
-export class SiliconFlowProvider {
-  name = 'siliconflow';
+export class MinimaxProvider {
+  name = 'minimax';
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
     const configLoader = ConfigLoader.getInstance();
@@ -21,9 +19,9 @@ export class SiliconFlowProvider {
 
     let apiKey: string;
     try {
-      apiKey = configLoader.getResolvedApiKey(`siliconflow.${task._opsv.modelKey}`);
+      apiKey = configLoader.getResolvedApiKey(`minimax.${task._opsv.modelKey}`);
     } catch {
-      apiKey = process.env.SILICONFLOW_API_KEY || '';
+      apiKey = process.env.MINIMAX_API_KEY || '';
     }
 
     const isImage = task._opsv.type === 'image_generation';
@@ -37,7 +35,7 @@ export class SiliconFlowProvider {
       return {
         taskPath,
         shotId: task._opsv.shotId,
-        provider: 'siliconflow',
+        provider: 'minimax',
         success: false,
         error: err.message,
       };
@@ -61,8 +59,8 @@ export class SiliconFlowProvider {
     });
 
     const imageUrl =
-      response.data?.images?.[0]?.url ||
-      response.data?.data?.[0]?.url ||
+      response.data?.data?.image_url ||
+      response.data?.data?.url ||
       response.data?.url;
 
     if (!imageUrl) {
@@ -72,7 +70,7 @@ export class SiliconFlowProvider {
     const outputPath = path.join(outputDir, `${shotId}_1.png`);
     await downloadFile(imageUrl, outputPath);
 
-    return { taskPath, shotId, provider: 'siliconflow', success: true, outputPath };
+    return { taskPath, shotId, provider: 'minimax', success: true, outputPath };
   }
 
   private async executeVideo(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
@@ -92,45 +90,38 @@ export class SiliconFlowProvider {
       timeout: 120000,
     });
 
-    const requestId = submitRes.data?.requestId || submitRes.data?.data?.requestId;
-    if (!requestId) {
-      throw new Error(`No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
+    const taskId = submitRes.data?.task_id || submitRes.data?.data?.task_id;
+    if (!taskId) {
+      throw new Error(`No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
     }
 
-    logger.info(`[SiliconFlow] Submitted ${shotId}, requestId=${requestId}`);
+    logger.info(`[Minimax] Submitted ${shotId}, taskId=${taskId}`);
 
     const maxRetries = 150;
     for (let i = 0; i < maxRetries; i++) {
       await new Promise((r) => setTimeout(r, 10000));
 
-      const statusRes = await axios.post(
-        statusUrl!,
-        { requestId },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const statusRes = await axios.get(`${statusUrl}?task_id=${taskId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
 
       const status = statusRes.data?.status || statusRes.data?.data?.status;
 
-      if (status === 'Succeed' || status === 'succeeded') {
-        const videoUrl = statusRes.data?.results?.videos?.[0]?.url || statusRes.data?.data?.video_url;
+      if (status === 'Success' || status === 'succeeded') {
+        const videoUrl = statusRes.data?.data?.video_url || statusRes.data?.file_url;
         if (!videoUrl) throw new Error('Completed but no video_url found');
 
         const outputPath = path.join(outputDir, `${shotId}_1.mp4`);
         await downloadFile(videoUrl, outputPath);
 
-        return { taskPath, shotId, provider: 'siliconflow', success: true, outputPath };
+        return { taskPath, shotId, provider: 'minimax', success: true, outputPath };
       }
 
-      if (status === 'Failed' || status === 'failed') {
+      if (status === 'Fail' || status === 'failed') {
         throw new Error(`Video generation failed: ${JSON.stringify(statusRes.data)}`);
       }
     }
 
-    throw new Error(`Polling timeout for ${requestId}`);
+    throw new Error(`Polling timeout for ${taskId}`);
   }
 }

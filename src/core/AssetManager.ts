@@ -1,151 +1,113 @@
+// ============================================================================
+// OpsV v0.8 Asset Manager
+// Reads assets from videospec/ and _assets.json per circle
+// ============================================================================
+
 import path from 'path';
-import { FileUtils } from '../utils/fileUtils';
+import fs from 'fs';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader, ApprovedRef } from './ApprovedRefReader';
-import { BaseFrontmatter } from '../types/FrontmatterSchema';
 import { logger } from '../utils/logger';
 
-// ============================================================================
-// v0.5 资产管理器
-// 核心变更: 去掉 has_image / visual_traits / brief_description
-// 用 status + ApprovedRefReader 替代
-// 文件操作已全部异步化
-// ============================================================================
-
 export interface Asset {
-    id: string;
-    type: string;
-    status: string;
-    reference?: string;
-    refs: string[];
-    description: string;
-    approvedRefs: ApprovedRef[];
-    designRefs: string[];
-    filePath: string;
+  id: string;
+  type: string;
+  status: string;
+  refs: string[];
+  description: string;
+  approvedRefs: ApprovedRef[];
+  filePath: string;
+}
+
+export interface CircleAssets {
+  circleName: string;
+  assets: Asset[];
 }
 
 export class AssetManager {
-    private elementsRoot: string;
-    private scenesRoot: string;
-    private assets: Map<string, Asset> = new Map();
-    private approvedRefReader: ApprovedRefReader;
+  private projectRoot: string;
+  private videospecRoot: string;
+  private assets: Map<string, Asset> = new Map();
+  private approvedRefReader: ApprovedRefReader;
 
-    constructor(projectRoot: string) {
-        const root = path.resolve(projectRoot);
-        this.elementsRoot = path.join(root, 'videospec', 'elements');
-        this.scenesRoot = path.join(root, 'videospec', 'scenes');
-        this.approvedRefReader = new ApprovedRefReader(root);
-    }
+  constructor(projectRoot: string) {
+    this.projectRoot = path.resolve(projectRoot);
+    this.videospecRoot = path.join(this.projectRoot, 'videospec');
+    this.approvedRefReader = new ApprovedRefReader(this.projectRoot);
+  }
 
-    async loadAssets(): Promise<void> {
-        await this.loadDirectory(this.elementsRoot);
-        await this.loadDirectory(this.scenesRoot);
-    }
+  async loadFromVideospec(): Promise<void> {
+    this.assets.clear();
+    const dirs = ['elements', 'scenes'];
 
-    private async loadDirectory(dirPath: string): Promise<void> {
-        const dirExists = await FileUtils.exists(dirPath);
-        if (!dirExists) return;
+    for (const dir of dirs) {
+      const dirPath = path.join(this.videospecRoot, dir);
+      if (!fs.existsSync(dirPath)) continue;
 
-        // v0.5: 仅支持 .md 文件
-        const entries = await FileUtils.readDir(dirPath);
-        const files = entries.filter(e => !e.isDirectory && e.name.endsWith('.md'));
+      const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
 
-        for (const fileEntry of files) {
-            const filePath = fileEntry.path;
-            try {
-                const content = await FileUtils.readFile(filePath);
-                const { frontmatter, body } = FrontmatterParser.parseRaw(content);
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        try {
+          const content = fs.readFileSync(filePath, 'utf-8');
+          const { frontmatter, body } = FrontmatterParser.parseRaw(content);
+          const id = file.replace(/^@/, '').replace(/\.md$/, '');
+          const description =
+            frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+          const approvedRefs = await this.approvedRefReader.getAll(filePath);
 
-                const id = fileEntry.name.replace(/^@/, '').replace(/\.md$/, '');
+          const asset: Asset = {
+            id,
+            type: frontmatter.type || 'other',
+            status: frontmatter.status || 'drafting',
+            refs: frontmatter.refs || [],
+            description,
+            approvedRefs,
+            filePath,
+          };
 
-                // v0.5.7: 视觉简述优先
-                const description = (frontmatter as any).visual_brief || FrontmatterParser.extractFirstParagraph(body);
-
-                // Approved Refs 从 Markdown 正文的 ## Approved References 区读取
-                const approvedRefs = await this.approvedRefReader.getAll(filePath);
-
-                // Design Refs 从 Markdown 正文的 ## Design References 区读取
-                const designRefs = this.extractDesignRefs(body, filePath);
-
-                const asset: Asset = {
-                    id,
-                    type: frontmatter.type || 'other',
-                    status: frontmatter.status || 'drafting',
-                    reference: frontmatter.reference,
-                    refs: frontmatter.refs || [],
-                    description,
-                    approvedRefs,
-                    designRefs,
-                    filePath,
-                };
-
-                this.assets.set(id, asset);
-                logger.info(`资产加载: ${id} (${asset.type}, ${asset.status}) ` +
-                    `approved: ${approvedRefs.length}张`);
-
-            } catch (err) {
-                logger.warn(`资产解析失败 ${fileEntry.name}: ${(err as Error).message}`);
-            }
+          this.assets.set(id, asset);
+          logger.info(`Asset loaded: ${id} (${asset.type}, ${asset.status})`);
+        } catch (err) {
+          logger.warn(`Asset parse failed ${file}: ${(err as Error).message}`);
         }
+      }
+    }
+  }
+
+  async loadCircleAssets(circleDir: string): Promise<CircleAssets> {
+    const assetsJsonPath = path.join(circleDir, '_assets.json');
+    const circleName = path.basename(circleDir);
+
+    if (fs.existsSync(assetsJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
+      return { circleName, assets: data.assets || [] };
     }
 
-    // ---- 访问方法 ----
+    return { circleName, assets: [] };
+  }
 
-    getAsset(id: string): Asset | undefined {
-        return this.assets.get(id);
-    }
+  getAsset(id: string): Asset | undefined {
+    return this.assets.get(id);
+  }
 
-    getElement(id: string): Asset | undefined {
-        const asset = this.assets.get(id);
-        return asset && ['character', 'prop', 'costume'].includes(asset.type)
-            ? asset : undefined;
-    }
+  getAllAssets(): Asset[] {
+    return Array.from(this.assets.values());
+  }
 
-    getScene(id: string): Asset | undefined {
-        const asset = this.assets.get(id);
-        return asset?.type === 'scene' ? asset : undefined;
-    }
+  getAllElements(): Asset[] {
+    return this.getAllAssets().filter((a) =>
+      ['character', 'prop', 'costume'].includes(a.type)
+    );
+  }
 
-    getAllAssets(): Asset[] {
-        return Array.from(this.assets.values());
-    }
+  getAllScenes(): Asset[] {
+    return this.getAllAssets().filter((a) => a.type === 'scene');
+  }
 
-    getAllElements(): Asset[] {
-        return this.getAllAssets().filter(a =>
-            ['character', 'prop', 'costume'].includes(a.type)
-        );
-    }
-
-    getAllScenes(): Asset[] {
-        return this.getAllAssets().filter(a => a.type === 'scene');
-    }
-
-    /**
-     * 获取资产的第一个 approved 图的绝对路径
-     * 替代旧的 has_image + image_path 模式
-     */
-    getApprovedImagePath(id: string): string | null {
-        const asset = this.assets.get(id);
-        if (!asset || asset.approvedRefs.length === 0) return null;
-        return asset.approvedRefs[0].filePath;
-    }
-
-
-    private extractDesignRefs(body: string, docPath: string): string[] {
-        const sectionMatch = body.match(
-            /##\s*Design\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i
-        );
-        if (!sectionMatch) return [];
-
-        const refs: string[] = [];
-        const imgRegex = /!\[.*?\]\(([^)]+)\)/g;
-        let match;
-        while ((match = imgRegex.exec(sectionMatch[1])) !== null) {
-            const absPath = path.isAbsolute(match[1])
-                ? match[1]
-                : path.resolve(path.dirname(docPath), match[1]);
-            refs.push(absPath);
-        }
-        return refs;
-    }
+  getApprovedImagePath(id: string): string | null {
+    const asset = this.assets.get(id);
+    if (!asset || asset.approvedRefs.length === 0) return null;
+    return asset.approvedRefs[0].filePath;
+  }
 }

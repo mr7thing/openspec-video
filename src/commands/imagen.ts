@@ -1,76 +1,135 @@
+// ============================================================================
+// OpsV v0.8 — opsv imagen
+// ============================================================================
+
 import { Command } from 'commander';
-import fs from 'fs-extra';
 import path from 'path';
-import { JobGenerator } from '../automation/JobGenerator';
+import fs from 'fs';
+import chalk from 'chalk';
+import { TaskBuilder } from '../core/compiler/TaskBuilder';
+import { AssetManager, Asset } from '../core/AssetManager';
+import { FrontmatterParser } from '../core/FrontmatterParser';
+import { RefResolver } from '../core/RefResolver';
+import { ApprovedRefReader } from '../core/ApprovedRefReader';
+import { Job, JobType } from '../types/Job';
+import { FileUtils } from '../utils/FileUtils';
 import { logger } from '../utils/logger';
-import { inferDefaultCircle, checkUpstreamApproved } from '../utils/circleStatus';
 
-// ============================================================================
-// opsv imagen — 图像编译管线入口
-// v0.6: 媒介属性隔离 (生成 job.type === 'image_generation')
-// ============================================================================
+export function registerImagenCommand(program: Command): void {
+  program
+    .command('imagen')
+    .description('Compile image generation tasks for a specific model')
+    .requiredOption('--model <model>', 'Provider model key (e.g. volcengine.seadream)')
+    .option('--dir <path>', 'Project videospec directory', 'videospec')
+    .option('--circle <name>', 'Target circle (default: auto-detect from _assets.json)')
+    .option('--dry-run', 'Show compiled tasks without writing files')
+    .action(async (options: any) => {
+      try {
+        const projectRoot = process.cwd();
+        const modelKey = options.model;
+        const { provider } = TaskBuilder.parseModelKey(modelKey);
 
-export function registerImagenCommand(program: Command, VERSION: string) {
-    program
-        .command('imagen [targets...]')
-        .description('编译 Markdown 文档为图像生成意图任务 (jobs.json)')
-        .option('-p, --preview', '预览模式（仅生成第一个分镜）', false)
-        .option('--shots <list>', '指定分镜 ID（逗号分隔: 1,5,12）', (val) => val.split(','))
-        .option('--skip-approved', '跳过已 Approve 的文档，不纳入生成队列（默认开启）', true)
-        .option('--skip-depend-layer', '跳过依赖层次，生成扁平的大任务列表', false)
-        .option('--circle <name>', '指定生成环 (Circle)。默认自动推断为当前开放的 Circle')
-        .option('--skip-circle-check', '跳过上游 Circle approved 状态检查', false)
-        .action(async (targets, options) => {
-            try {
-                const projectRoot = process.cwd();
+        const assetManager = new AssetManager(projectRoot);
+        await assetManager.loadFromVideospec();
 
-                // 自动推断 Circle
-                let circle = options.circle;
-                if (!circle) {
-                    circle = await inferDefaultCircle(projectRoot);
-                    if (!circle) {
-                        logger.error('❌ 所有 Circle 已完成，没有开放的 Circle 需要生成');
-                        logger.error('   如需重新生成，请显式指定 --circle');
-                        process.exit(1);
-                    }
-                    logger.info(`🔮 自动推断 Circle: ${circle}`);
-                }
+        const approvedRefReader = new ApprovedRefReader(projectRoot);
+        const refResolver = new RefResolver(projectRoot, approvedRefReader);
 
-                // 检查上游 Circle 状态
-                if (!options.skipCircleCheck) {
-                    const upstream = await checkUpstreamApproved(projectRoot, circle);
-                    if (!upstream.ok) {
-                        logger.error(`❌ ${upstream.message}`);
-                        logger.error('   请先执行 opsv review 完成上游 approve');
-                        logger.error('   或加 --skip-circle-check 强制跳过（不推荐）');
-                        process.exit(1);
-                    }
-                }
+        const circleName = await resolveCircle(projectRoot, options.circle);
+        const circleDir = path.join(projectRoot, 'opsv-queue', 'videospec', circleName);
 
-                logger.info(`\n🔧 OpsV Imagen v${VERSION}`);
-                logger.info(`   Circle: ${circle}`);
-                logger.info(`   目标: ${targets && targets.length > 0 ? targets.join(', ') : '全部规范目录'}`);
-                if (options.preview) logger.info('   👀 预览模式');
-                if (options.shots) logger.info(`   🎯 指定分镜: ${options.shots.join(', ')}`);
-                if (options.skipApproved) logger.info('   ✅ 已启用: 跳过 Approved 文档');
-                if (options.skipDependLayer) logger.info('   🔗 跳过依赖层次（扁平模式）');
+        const circleAssets = await assetManager.loadCircleAssets(circleDir);
+        const targetIds = circleAssets.assets
+          .filter((a: any) => a.status !== 'approved')
+          .map((a: any) => a.id);
 
-                const generator = new JobGenerator(projectRoot);
-                const jobs = await generator.generateJobs(targets, {
-                    preview: options.preview,
-                    shots: options.shots,
-                    skipApproved: options.skipApproved,
-                    skipDependsLayer: options.skipDependLayer,
-                    circleName: circle, // 传入 circleName 用于圈层隔离检查
-                });
+        const allAssets = assetManager.getAllElements();
+        const targetAssets = allAssets.filter((a) => targetIds.includes(a.id));
 
-                logger.info('\n📂 图像任务列表已生成。');
-                logger.info(`   输出: opsv-queue/<circle>/imagen_jobs.json`);
-                logger.info('   下一步：执行编译入队');
-                logger.info(`   $ opsv queue compile <path-to-jobs-json> --model <alias>`);
-            } catch (err) {
-                logger.error(`编译失败: ${(err as Error).message}`);
-                process.exit(1);
-            }
-        });
+        if (targetAssets.length === 0) {
+          console.log(chalk.yellow('No pending image assets found in this circle.'));
+          return;
+        }
+
+        console.log(chalk.cyan(`Compiling ${targetAssets.length} image tasks for ${modelKey}...`));
+
+        const jobs: Job[] = [];
+        for (const asset of targetAssets) {
+          const job = await buildImageJob(asset, refResolver, projectRoot);
+          jobs.push(job);
+        }
+
+        const outputDir = path.join(circleDir, modelKey);
+        const builder = new TaskBuilder(projectRoot);
+
+        const results = builder.compileToDir(jobs, modelKey, outputDir, options.dryRun);
+
+        if (options.dryRun) {
+          console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));
+          for (const task of results) {
+            console.log(`  ${task._opsv.shotId}: ${JSON.stringify(task, null, 2).slice(0, 100)}...`);
+          }
+        } else {
+          console.log(chalk.green(`\n${results.length} tasks compiled to ${outputDir}`));
+        }
+      } catch (err: any) {
+        logger.error(err.message);
+        process.exit(1);
+      }
+    });
+}
+
+async function resolveCircle(projectRoot: string, circleName?: string): Promise<string> {
+  if (circleName) return circleName;
+
+  const manifestPath = path.join(projectRoot, 'opsv-queue', 'videospec', '_manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    const circles = manifest.circles || [];
+
+    for (const circle of circles) {
+      const hasPending = Object.values(circle.status || {}).some((s) => s !== 'approved');
+      if (hasPending) return circle.circle;
+    }
+
+    if (circles.length > 0) return circles[0].circle;
+  }
+
+  return 'zerocircle';
+}
+
+async function buildImageJob(asset: Asset, refResolver: RefResolver, projectRoot: string): Promise<Job> {
+  const content = fs.readFileSync(asset.filePath, 'utf-8');
+  const { frontmatter, body } = FrontmatterParser.parseRaw(content);
+
+  const prompt = frontmatter.prompt_en || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+
+  let referenceImages: string[] = [];
+  if (frontmatter.refs && frontmatter.refs.length > 0) {
+    const refs = await refResolver.parseAll(body);
+    referenceImages = refs
+      .filter((r) => r.resolvedImagePath)
+      .map((r) => r.resolvedImagePath!);
+  }
+
+  if (asset.approvedRefs.length > 0) {
+    referenceImages = [
+      ...referenceImages,
+      ...asset.approvedRefs.map((r) => r.filePath),
+    ];
+  }
+
+  return {
+    id: asset.id,
+    type: 'image_generation',
+    prompt_en: prompt,
+    payload: {
+      prompt,
+      global_settings: {
+        aspect_ratio: '1:1',
+        quality: 'standard',
+      },
+    },
+    reference_images: referenceImages.length > 0 ? referenceImages : undefined,
+  };
 }

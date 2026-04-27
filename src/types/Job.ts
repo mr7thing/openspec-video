@@ -1,0 +1,57 @@
+import { z } from 'zod';
+
+// ============================================================================
+// OpsV v0.8 Job Type
+// ============================================================================
+
+export type JobType = 'image_generation' | 'video_generation' | 'audio_generation';
+
+export interface FrameRef {
+  first: string | null;
+  last: string | null;
+}
+
+export interface GlobalSettings {
+  aspect_ratio: string;
+  quality: string;
+}
+
+export interface PromptPayload {
+  prompt?: string;
+  global_settings: GlobalSettings;
+  camera?: { type: string; motion: string };
+  duration?: string;
+  frame_ref?: FrameRef;
+  extra?: { media_refs: string[] };
+}
+
+export interface Job {
+  id: string;
+  type: JobType;
+  prompt_en?: string;
+  payload: PromptPayload;
+  reference_images?: string[];
+  output_path?: string;
+  seed?: number;
+  _meta?: JobMeta;
+}
+
+export interface JobMeta {
+  circle: string;
+  source: string;
+  batch?: number;
+}
+
+export interface TaskJson {
+  [key: string]: any;
+  _opsv: {
+    provider: string;
+    modelKey: string;
+    type: JobType;
+    shotId: string;
+    api_url: string;
+    api_status_url?: string;
+    references?: string[];
+    compiledAt: string;
+  };
+}

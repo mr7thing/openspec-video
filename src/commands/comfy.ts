@@ -1,138 +1,125 @@
+// ============================================================================
+// OpsV v0.8 — opsv comfy
+// ============================================================================
+
 import { Command } from 'commander';
-import fs from 'fs/promises';
 import path from 'path';
+import fs from 'fs';
+import chalk from 'chalk';
+import { TaskBuilder } from '../core/compiler/TaskBuilder';
+import { AssetManager, Asset } from '../core/AssetManager';
+import { FrontmatterParser } from '../core/FrontmatterParser';
+import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
 
-
-// ============================================================================
-// opsv comfy — ComfyUI 工作流直接入队
-// 生成的 .json 就是原始 ComfyUI workflow，可直接在 ComfyUI WebUI 中导入
-// ============================================================================
-
-export function registerComfyCommand(program: Command, VERSION: string) {
-  const comfyCmd = program
+export function registerComfyCommand(program: Command): void {
+  program
     .command('comfy')
-    .description('Compile ComfyUI workflow JSON into queue tasks');
+    .description('Compile ComfyUI workflow tasks for a specific model')
+    .requiredOption('--model <model>', 'ComfyUI model key (e.g. comfy.sdxl)')
+    .option('--dir <path>', 'Project videospec directory', 'videospec')
+    .option('--circle <name>', 'Target circle (default: auto-detect)')
+    .option('--param <json>', 'Override workflow parameters as JSON')
+    .option('--dry-run', 'Show compiled tasks without writing files')
+    .action(async (options: any) => {
+      try {
+        const projectRoot = process.cwd();
+        const modelKey = options.model;
 
-  comfyCmd
-    .command('compile <workflowJson>')
-    .description('将 ComfyUI 工作流 JSON 编译为可直接执行的队列任务')
-    .option('--provider <name>', '目标 Provider (comfyui_local | runninghub)', 'comfyui_local')
-    .option('--shot-id <id>', '关联的 Shot/任务 ID', 'comfy_task')
-    .option('--circle <name>', '目标 Circle', 'zerocircle_1')
-    .option('--param <kv>', '注入工作流参数 (格式: key=value)', collectParams, {})
-    .action(async (workflowJson: string, options) => {
-      const projectRoot = process.cwd();
-      const absWorkflowPath = path.resolve(projectRoot, workflowJson);
+        const assetManager = new AssetManager(projectRoot);
+        await assetManager.loadFromVideospec();
 
-      const exists = await fs.access(absWorkflowPath).then(() => true).catch(() => false);
-      if (!exists) {
-        logger.error(`❌ 工作流文件不存在: ${absWorkflowPath}`);
-        process.exit(1);
-      }
+        const circleName = resolveCircle(projectRoot, options.circle);
+        const circleDir = path.join(projectRoot, 'opsv-queue', 'videospec', circleName);
 
-      const provider = options.provider.toLowerCase();
-      if (provider !== 'comfyui_local' && provider !== 'runninghub') {
-        logger.error(`❌ 不支持的 Provider: ${provider}。仅支持 comfyui_local 或 runninghub`);
-        process.exit(1);
-      }
+        const circleAssets = await assetManager.loadCircleAssets(circleDir);
+        const targetIds = circleAssets.assets
+          .filter((a: any) => a.status !== 'approved')
+          .map((a: any) => a.id);
 
-      // 读取并解析 workflow
-      let workflow = JSON.parse(await fs.readFile(absWorkflowPath, 'utf-8'));
+        const allAssets = assetManager.getAllAssets();
+        const targetAssets = allAssets.filter((a) => targetIds.includes(a.id));
 
-      // 注入参数（Node Title 匹配）
-      if (Object.keys(options.param).length > 0) {
-        injectParameters(workflow, options.param);
-      }
-
-      // 构建任务 JSON（原始 workflow + _opsv 元数据）
-      const taskJson = {
-        ...workflow,
-        _opsv: {
-          provider,
-          type: 'image_generation',  // ComfyUI 默认可处理图像
-          shotId: options.shotId,
-          api_url: provider === 'runninghub'
-            ? 'https://www.runninghub.cn/task/openapi'
-            : 'http://127.0.0.1:8188',
-          compiledAt: new Date().toISOString(),
-          workflowSource: path.basename(absWorkflowPath)
+        if (targetAssets.length === 0) {
+          console.log(chalk.yellow('No pending assets found in this circle.'));
+          return;
         }
-      };
 
-      // 确定 batch 目录：compile 总是创建新 batch（queue_N+1）
-      const queueDir = path.join(projectRoot, 'opsv-queue');
-      const providerDir = path.join(queueDir, options.circle, provider);
-      await fs.mkdir(providerDir, { recursive: true });
+        console.log(chalk.cyan(`Compiling ${targetAssets.length} comfy tasks for ${modelKey}...`));
 
-      const latestBatch = await getLatestBatchNum(providerDir);
-      const batchNum = latestBatch + 1;
-      const batchDir = path.join(providerDir, `queue_${batchNum}`);
-      await fs.mkdir(batchDir, { recursive: true });
+        let paramOverrides: Record<string, any> = {};
+        if (options.param) {
+          try {
+            paramOverrides = JSON.parse(options.param);
+          } catch {
+            console.error(chalk.red('--param must be valid JSON'));
+            process.exit(1);
+          }
+        }
 
-      const jsonFile = `${options.shotId}.json`;
-      const jsonPath = path.join(batchDir, jsonFile);
-      await fs.writeFile(jsonPath, JSON.stringify(taskJson, null, 2), 'utf-8');
+        const jobs: Job[] = [];
+        for (const asset of targetAssets) {
+          const job = buildComfyJob(asset, paramOverrides);
+          jobs.push(job);
+        }
 
-      // compile.log
-      const compileLog = {
-        t: new Date().toISOString(),
-        type: 'compile',
-        provider,
-        circle: options.circle,
-        batch: `queue_${batchNum}`,
-        workflow: path.basename(absWorkflowPath),
-        shotId: options.shotId
-      };
-      await fs.appendFile(path.join(batchDir, 'compile.log'), JSON.stringify(compileLog) + '\n', 'utf-8');
+        const outputDir = path.join(circleDir, modelKey);
+        const builder = new TaskBuilder(projectRoot);
 
-      logger.info(`\n🎨 OpsV Comfy v${VERSION}`);
-      logger.info(`   工作流: ${workflowJson}`);
-      logger.info(`   Provider: ${provider}`);
-      logger.info(`   Shot ID: ${options.shotId}`);
-      logger.info(`   输出: ${jsonPath}`);
-      logger.info(`\n✅ ComfyUI 任务已就绪，执行: opsv queue run --${provider}.default --file ${jsonFile} --circle ${options.circle}`);
+        const results = builder.compileToDir(jobs, modelKey, outputDir, options.dryRun);
+
+        if (options.dryRun) {
+          console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));
+          for (const task of results) {
+            console.log(`  ${task._opsv.shotId}`);
+          }
+        } else {
+          console.log(chalk.green(`\n${results.length} tasks compiled to ${outputDir}`));
+        }
+      } catch (err: any) {
+        logger.error(err.message);
+        process.exit(1);
+      }
     });
 }
 
-function collectParams(value: string, previous: Record<string, string | number>): Record<string, string | number> {
-  const sepIdx = value.indexOf('=');
-  if (sepIdx === -1) {
-    logger.warn(`⚠️ 忽略无效参数格式: ${value} (应为 key=value)`);
-    return previous;
-  }
-  const key = value.slice(0, sepIdx);
-  let val: string | number = value.slice(sepIdx + 1);
-  if (/^\d+$/.test(val)) val = parseInt(val, 10);
-  else if (/^\d+\.\d+$/.test(val)) val = parseFloat(val);
-  previous[key] = val;
-  return previous;
-}
+function resolveCircle(projectRoot: string, circleName?: string): string {
+  if (circleName) return circleName;
 
-/**
- * 搜索 ComfyUI nodes，如果 _meta.title 匹配参数 key，注入 value。
- */
-function injectParameters(workflow: any, params: Record<string, any>) {
-  for (const nodeId in workflow) {
-    const node = workflow[nodeId];
-    if (!node) continue;
-    const title = node._meta?.title || node.title || '';
-    if (title in params) {
-      const injectValue = params[title];
-      if (node.inputs) {
-        if ('text' in node.inputs) node.inputs.text = injectValue;
-        else if ('text_1' in node.inputs) node.inputs.text_1 = injectValue;
-        else if ('image' in node.inputs) node.inputs.image = injectValue;
-        else if ('video' in node.inputs) node.inputs.video = injectValue;
-      }
+  const manifestPath = path.join(projectRoot, 'opsv-queue', 'videospec', '_manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    const circles = manifest.circles || [];
+    for (const circle of circles) {
+      const hasPending = Object.values(circle.status || {}).some((s) => s !== 'approved');
+      if (hasPending) return circle.circle;
     }
+    if (circles.length > 0) return circles[0].circle;
   }
+
+  return 'zerocircle';
 }
 
-async function getLatestBatchNum(providerDir: string): Promise<number> {
-  const entries = await fs.readdir(providerDir).catch(() => [] as string[]);
-  const batchFolders = entries.filter(e => /^queue_\d+$/.test(e));
-  if (batchFolders.length === 0) return 0;
-  const nums = batchFolders.map(f => parseInt(f.replace('queue_', ''), 10)).filter(n => !isNaN(n));
-  return Math.max(...nums);
+function buildComfyJob(asset: Asset, paramOverrides: Record<string, any>): Job {
+  const content = fs.readFileSync(asset.filePath, 'utf-8');
+  const { frontmatter, body } = FrontmatterParser.parseRaw(content);
+
+  const prompt = frontmatter.prompt_en || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+
+  return {
+    id: asset.id,
+    type: frontmatter.type === 'shot-production' ? 'video_generation' : 'image_generation',
+    prompt_en: prompt,
+    payload: {
+      prompt,
+      global_settings: {
+        aspect_ratio: '1:1',
+        quality: 'standard',
+      },
+      extra: {
+        media_refs: [],
+        ...paramOverrides,
+      },
+    },
+  };
 }

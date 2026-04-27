@@ -13,7 +13,7 @@ dist/
 .opencode/
 .opsv/
 .opsv-queue/
-
+!templates/
 
 # Test Projects & Demos
 project-demo/

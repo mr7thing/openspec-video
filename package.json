@@ -1,7 +1,7 @@
 {
   "name": "videospec",
-  "version": "0.7.2",
-  "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework to transform narrative specs into production-ready creative intents.",
+  "version": "0.8.0",
+  "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework: structured narrative specs → production-ready media via multi-provider pipeline.",
   "main": "dist/index.js",
   "bin": {
     "opsv": "dist/cli.js"
@@ -15,11 +15,8 @@
     "build": "tsc && node scripts/copy-ui-assets.js",
     "prepublishOnly": "npm run build",
     "start": "ts-node src/index.ts",
-    "daemon": "ts-node src/server/daemon.ts",
-    "daemon:restart": "npx kill-port 3061 && npm run daemon",
     "test": "jest --passWithNoTests",
-    "lint": "eslint src/**/*.ts",
-    "release": "npm version patch && git push --follow-tags"
+    "lint": "eslint src/**/*.ts"
   },
   "files": [
     "dist",
@@ -39,14 +36,12 @@
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "adm-zip": "^0.5.17",
     "axios": "^1.13.6",
     "chalk": "^4.1.2",
     "commander": "^13.1.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "fs-extra": "^11.3.3",
-    "inquirer": "^8.2.7",
     "js-yaml": "^4.1.1",
     "remark-frontmatter": "^5.0.0",
     "remark-parse": "^11.0.0",
@@ -56,15 +51,10 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.8",
-    "@types/chalk": "^0.4.31",
     "@types/express": "^5.0.6",
     "@types/fs-extra": "^11.0.4",
-    "@types/inquirer": "^8.2.12",
-    "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.19.32",
-    "@types/winston": "^2.4.4",
     "@types/ws": "^8.18.1",
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",

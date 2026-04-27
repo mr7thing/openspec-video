@@ -1,113 +1,102 @@
-import fs from 'fs/promises';
+// ============================================================================
+// OpsV v0.8 Config Loader
+// ============================================================================
+
+import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { logger } from './logger';
 import { ErrorFactory } from '../errors/OpsVError';
 
 export interface ModelConfig {
-    enable?: boolean;
-    type?: 'image_generation' | 'video_generation';
-    input?: string[];
-    output?: string;
-    model?: string;
-    api_url?: string;
-    api_status_url?: string;
-    defaults?: any;
-    max_reference_images?: number;
-    quality_map?: Record<string, any>;
-}
-
-export interface ProviderConfig {
-    required_env?: string[];
-    models?: Record<string, ModelConfig>;
+  provider: string;
+  type?: 'image' | 'video' | 'audio';
+  enable?: boolean;
+  model?: string;
+  api_url?: string;
+  api_status_url?: string;
+  required_env?: string[];
+  fallback_env?: string[];
+  features?: string[];
+  defaults?: Record<string, any>;
+  max_size?: { width: number; height: number };
+  max_batch?: number;
+  quality_map?: Record<string, any>;
+  supports_first_image?: boolean;
+  supports_middle_image?: boolean;
+  supports_last_image?: boolean;
+  supports_reference_images?: boolean;
+  max_reference_images?: number;
+  supports_audio?: boolean;
+  supports_video_ref?: boolean;
 }
 
 export interface ApiConfig {
-    providers: Record<string, ProviderConfig>;
+  models: Record<string, ModelConfig>;
 }
 
 export class ConfigLoader {
-    private static instances = new Map<string, ConfigLoader>();
-    private config: ApiConfig;
-    private projectRoot: string;
+  private static instance: ConfigLoader;
+  private config: ApiConfig;
 
-    private constructor(projectRoot: string) {
-        this.projectRoot = projectRoot;
-        this.config = { providers: {} };
+  private constructor() {
+    this.config = { models: {} };
+  }
+
+  static getInstance(): ConfigLoader {
+    if (!ConfigLoader.instance) {
+      ConfigLoader.instance = new ConfigLoader();
+    }
+    return ConfigLoader.instance;
+  }
+
+  loadConfig(projectRoot: string): ApiConfig {
+    const configPath = path.join(projectRoot, '.opsv', 'api_config.yaml');
+
+    if (!fs.existsSync(configPath)) {
+      logger.warn(`API config not found at ${configPath}, using empty config`);
+      this.config = { models: {} };
+      return this.config;
     }
 
-    public static getInstance(projectRoot?: string): ConfigLoader {
-        const root = path.normalize(projectRoot || process.cwd()).replace(/\\/g, '/');
-        if (!ConfigLoader.instances.has(root)) {
-            ConfigLoader.instances.set(root, new ConfigLoader(root));
-        }
-        return ConfigLoader.instances.get(root)!;
+    try {
+      const raw = fs.readFileSync(configPath, 'utf8');
+      this.config = yaml.load(raw) as ApiConfig;
+      return this.config;
+    } catch (e: any) {
+      logger.error(`Failed to load api_config.yaml`, { error: e.message });
+      this.config = { models: {} };
+      return this.config;
+    }
+  }
+
+  getModelConfig(modelName: string): ModelConfig | undefined {
+    return this.config.models?.[modelName];
+  }
+
+  getResolvedApiKey(targetModel: string): string {
+    const modelConfig = this.getModelConfig(targetModel);
+    if (!modelConfig) {
+      throw ErrorFactory.compilationFailed(`Model configuration for '${targetModel}' not found.`);
     }
 
-    public async loadConfig(projectRoot?: string): Promise<ApiConfig> {
-        const root = projectRoot || this.projectRoot;
-        const configPath = path.join(root, '.opsv', 'api_config.yaml');
-        
-        const configExists = await fs.access(configPath).then(() => true).catch(() => false);
-        if (!configExists) {
-            logger.warn(`API config not found at ${configPath}, using empty config`);
-            this.config = { providers: {} };
-            return this.config;
-        }
+    const required = modelConfig.required_env || [];
+    const fallback = modelConfig.fallback_env || [];
 
-        try {
-            const raw = await fs.readFile(configPath, 'utf8');
-            this.config = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as ApiConfig;
-            if (!this.config.providers) {
-                this.config.providers = {};
-            }
-            return this.config;
-        } catch (e: any) {
-            logger.error(`Failed to load api_config.yaml`, { error: e.message });
-            this.config = { providers: {} };
-            return this.config;
-        }
+    for (const envVar of required) {
+      if (process.env[envVar]) return process.env[envVar]!;
     }
 
-    public getProviderConfig(providerName: string): ProviderConfig | undefined {
-        return this.config.providers?.[providerName];
+    for (const envVar of fallback) {
+      if (process.env[envVar]) {
+        logger.debug(`Using fallback API key from ${envVar} for model ${targetModel}`);
+        return process.env[envVar]!;
+      }
     }
 
-    public getModelConfig(providerName: string, modelKey: string): ModelConfig | undefined {
-        return this.config.providers?.[providerName]?.models?.[modelKey];
-    }
-
-    public findModelsByCapability(providerName: string, type: 'image_generation' | 'video_generation'): { key: string, config: ModelConfig }[] {
-        const provider = this.getProviderConfig(providerName);
-        if (!provider || !provider.models) return [];
-        
-        const results: { key: string, config: ModelConfig }[] = [];
-        for (const [key, config] of Object.entries(provider.models)) {
-            if (config.enable !== false && config.type === type) {
-                results.push({ key, config });
-            }
-        }
-        return results;
-    }
-
-    public getResolvedApiKey(providerName: string): string {
-        const providerConfig = this.getProviderConfig(providerName);
-        if (!providerConfig) {
-            throw ErrorFactory.compilationFailed(`Provider configuration for '${providerName}' not found.`);
-        }
-
-        const required = providerConfig.required_env || [];
-
-        // Check required envs
-        for (const envVar of required) {
-            if (process.env[envVar]) {
-                return process.env[envVar] as string;
-            }
-        }
-
-        const allEnvs = required.join(' or ');
-        throw ErrorFactory.compilationFailed(
-            `Missing API Key for provider '${providerName}'. Please set ${allEnvs} in .env`
-        );
-    }
+    const allEnvs = [...required, ...fallback].join(' or ');
+    throw ErrorFactory.compilationFailed(
+      `Missing API Key for model '${targetModel}'. Please set ${allEnvs} in .env`
+    );
+  }
 }

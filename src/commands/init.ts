@@ -1,164 +1,152 @@
+// ============================================================================
+// OpsV v0.8 — opsv init
+// ============================================================================
+
 import { Command } from 'commander';
-import fs from 'fs/promises';
 import path from 'path';
-import inquirer from 'inquirer';
-import { projectAgentTemplates } from '../utils/projector';
+import fs from 'fs';
+import chalk from 'chalk';
+import { logger } from '../utils/logger';
 
-const TEMPLATE_DIR = path.join(__dirname, '../../templates');
+export function registerInitCommand(program: Command, version: string): void {
+  program
+    .command('init [name]')
+    .description('Scaffold a new OpsV project')
+    .option('--dir <path>', 'Target directory')
+    .action(async (name?: string, options?: any) => {
+      try {
+        const projectName = name || 'my-project';
+        const targetDir = options?.dir
+          ? path.resolve(options.dir, projectName)
+          : path.join(process.cwd(), projectName);
 
-export function registerInitCommand(program: Command, VERSION: string) {
-    program
-        .command('init [projectName]')
-        .description('Initialize a new OpenSpec-Video project')
-        .option('-g, --gemini', 'Initialize with Gemini support (GEMINI.md)')
-        .option('-c, --claude', 'Initialize with Claude Code support (CLAUDE_INSTRUCTIONS.md)')
-        .option('-x, --codex', 'Initialize with Codex/Cursor support (.cursorrules)')
-        .option('-o, --opencode', 'Initialize with OpenCode support (AGENTS.md + .opencode)')
-        .option('-t, --trae', 'Initialize with Trae support (AGENTS.md + .trae)')
-        .action(async (projectName, options) => {
-            let targetDir = process.cwd();
-            if (projectName && projectName !== '.') {
-                targetDir = path.resolve(process.cwd(), projectName);
-            }
+        if (fs.existsSync(targetDir)) {
+          console.error(chalk.red(`Directory already exists: ${targetDir}`));
+          process.exit(1);
+        }
 
-            if (projectName && projectName !== '.') {
-                const targetExists = await fs.access(targetDir).then(() => true).catch(() => false);
-                if (targetExists) {
-                    console.error(`Error: Directory ${projectName} already exists.`);
-                    return;
-                }
-            }
+        console.log(chalk.cyan(`Creating OpsV project: ${projectName}`));
 
-            const templateDirExists = await fs.access(TEMPLATE_DIR).then(() => true).catch(() => false);
-            if (!templateDirExists) {
-                console.error(`CRITICAL ERROR: Template directory not found at ${TEMPLATE_DIR}`);
-                return;
-            }
+        // Create directory structure
+        const dirs = [
+          path.join(targetDir, 'videospec', 'elements'),
+          path.join(targetDir, 'videospec', 'scenes'),
+          path.join(targetDir, 'opsv-queue', 'videospec'),
+          path.join(targetDir, '.opsv'),
+        ];
 
-            let tools: string[] = [];
+        for (const dir of dirs) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
 
-            // 1. Check for CLI flags for automated/non-interactive use
-            if (options.gemini) tools.push('gemini');
-            if (options.claude) tools.push('claude');
-            if (options.codex) tools.push('codex');
-            if (options.opencode) tools.push('opencode');
-            if (options.trae) tools.push('trae');
+        // Write project.md
+        const projectMd = `---
+type: project
+status: draft
+vision: "${projectName} — a cinematic narrative project"
+aspect_ratio: "16:9"
+resolution: "1920x1080"
+---
 
-            // 2. If no flags provided, fall back to interactive prompt
-            if (tools.length === 0) {
-                const response = await inquirer.prompt([
-                    {
-                        type: 'checkbox',
-                        name: 'tools',
-                        message: 'Select the AI assistants you want to support:',
-                        choices: [
-                            { name: 'Claude Code (CLAUDE_INSTRUCTIONS.md)', value: 'claude', checked: true },
-                            { name: 'Codex / Cursor (.cursorrules)', value: 'codex', checked: true },
-                            { name: 'Trae (AGENTS.md + .trae)', value: 'trae' },
-                            { name: 'OpenCode (AGENTS.md + .opencode)', value: 'opencode' },
-                            { name: 'Gemini (Deprecated - GEMINI.md)', value: 'gemini' }
-                        ]
-                    }
-                ]);
-                tools = response.tools;
-            }
+# ${projectName}
 
-            console.log(`Initializing project in ${targetDir}...`);
+Describe your project vision here.
+`;
 
-            try {
-                await fs.mkdir(targetDir, { recursive: true });
+        fs.writeFileSync(path.join(targetDir, 'videospec', 'elements', 'project.md'), projectMd);
 
-                // 1. Core Projection (All core genes from .agent are projected here)
-                await projectAgentTemplates(targetDir, tools, TEMPLATE_DIR);
+        // Write .opsv/api_config.yaml
+        const apiConfig = `# OpsV v0.8 API Configuration
+models:
+  volcengine.seadream:
+    provider: volcengine
+    type: image
+    model: seadream
+    api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    required_env:
+      - ARK_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
 
-                // 1.5 Create .opsv directory first
-                await fs.mkdir(path.join(targetDir, '.opsv'), { recursive: true });
+  volcengine.seedance2:
+    provider: volcengine
+    type: video
+    model: seedance-2
+    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/status
+    required_env:
+      - ARK_API_KEY
+    supports_first_image: true
+    supports_last_image: true
 
-                const templateEnvExists = await fs.access(path.join(TEMPLATE_DIR, '.env')).then(() => true).catch(() => false);
-                if (templateEnvExists) {
-                    await fs.copyFile(path.join(TEMPLATE_DIR, '.env'), path.join(targetDir, '.env'));
-                }
+  siliconflow.qwenimg:
+    provider: siliconflow
+    type: image
+    model: Qwen/Qwen2.5-VL-72B-Instruct
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    required_env:
+      - SILICONFLOW_API_KEY
 
-                // Copy .opsv/api_config.yaml
-                const apiConfigSrc = path.join(TEMPLATE_DIR, '.opsv', 'api_config.yaml');
-                const apiConfigExists = await fs.access(apiConfigSrc).then(() => true).catch(() => false);
-                if (apiConfigExists) {
-                    await fs.copyFile(apiConfigSrc, path.join(targetDir, '.opsv', 'api_config.yaml'));
-                }
+  siliconflow.wan:
+    provider: siliconflow
+    type: video
+    model: wan
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_first_image: true
 
-                // 2. Selective copy based on tools (Legacy & Metadata)
-                if (tools.includes('gemini')) {
-                    const geminiExists = await fs.access(path.join(TEMPLATE_DIR, 'GEMINI.md')).then(() => true).catch(() => false);
-                    if (geminiExists) {
-                        await fs.copyFile(path.join(TEMPLATE_DIR, 'GEMINI.md'), path.join(targetDir, 'GEMINI.md'));
-                    }
-                }
+  minimax.minimax-image:
+    provider: minimax
+    type: image
+    model: minimax-image-01
+    api_url: https://api.minimax.chat/v1/image_generation
+    required_env:
+      - MINIMAX_API_KEY
 
-                if (tools.includes('opencode') || tools.includes('trae')) {
-                    const agentsExists = await fs.access(path.join(TEMPLATE_DIR, 'AGENTS.md')).then(() => true).catch(() => false);
-                    if (agentsExists) {
-                        await fs.copyFile(path.join(TEMPLATE_DIR, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
-                    }
-                }
+  comfyui.sdxl:
+    provider: comfyui
+    type: image
+    model: sdxl
+    api_url: http://127.0.0.1:8188
+`;
 
-                if (tools.includes('opencode')) {
-                    // Still ensuring the physical directory exists for OpenCode specific reasons
-                    await fs.mkdir(path.join(targetDir, '.opencode'), { recursive: true });
-                }
+        fs.writeFileSync(path.join(targetDir, '.opsv', 'api_config.yaml'), apiConfig);
 
-                // 3. Create normative videospec structure
-                const specDir = path.join(targetDir, 'videospec');
-                await fs.mkdir(specDir, { recursive: true });
-                await fs.mkdir(path.join(specDir, 'stories'), { recursive: true });
-                await fs.mkdir(path.join(specDir, 'elements'), { recursive: true });
-                await fs.mkdir(path.join(specDir, 'scenes'), { recursive: true });
-                await fs.mkdir(path.join(specDir, 'shots'), { recursive: true });
+        // Write .env template
+        const envTemplate = `# OpsV v0.8 Environment Variables
+# Add your API keys here
 
-                // 4. Create operational directories
-                await fs.mkdir(path.join(targetDir, 'opsv-queue'), { recursive: true });
-                await fs.mkdir(path.join(targetDir, '.opsv'), { recursive: true });
+# ARK_API_KEY=
+# SILICONFLOW_API_KEY=
+# MINIMAX_API_KEY=
+# RUNNINGHUB_API_KEY=
+`;
 
-                // 5. Create .gitignore and initialize Git
-                const defaultGitignore = `# System Files
-.DS_Store
-Thumbs.db
+        fs.writeFileSync(path.join(targetDir, '.opsv', '.env'), envTemplate);
 
-# Dependencies & Build
-node_modules/
+        // Write .gitignore
+        const gitignore = `node_modules/
 dist/
-
-# Runtime Data & Artifacts
+logs/
+.env
+*.tmp
 opsv-queue/
 .opsv/
-
-# OpenCode & Trae 
-.opencode/
-.trae/
 `;
-                const gitignoreDest = path.join(targetDir, '.gitignore');
-                await fs.writeFile(gitignoreDest, defaultGitignore);
 
-                const { execSync } = require('child_process');
-                try {
-                    // Check if git is installed
-                    execSync('git --version', { stdio: 'ignore' });
-                    
-                    const gitExists = await fs.access(path.join(targetDir, '.git')).then(() => true).catch(() => false);
-                    if (!gitExists) {
-                        execSync('git init', { cwd: targetDir, stdio: 'ignore' });
-                        execSync('git add .', { cwd: targetDir, stdio: 'ignore' });
-                        execSync('git commit -m "chore: initial project structure by OpsV"', { cwd: targetDir, stdio: 'ignore' });
-                        console.log('✅ Git repository initialized with .gitignore');
-                    }
-                } catch (e) {
-                    console.warn('⚠️ Git not found or failed to initialize. Please install git for asset tracking.');
-                }
+        fs.writeFileSync(path.join(targetDir, '.gitignore'), gitignore);
 
-                console.log('\n🚀 Project structure created successfully.');
-                console.log(`   Tools configured: ${tools.join(', ')}`);
-                console.log(`   Location: ${targetDir}\n`);
-            } catch (err) {
-                console.error('Failed to initialize project:', err);
-            }
-        });
+        console.log(chalk.green(`\nProject created at ${targetDir}`));
+        console.log(chalk.cyan('\nNext steps:'));
+        console.log(`  cd ${projectName}`);
+        console.log('  opsv circle create');
+        console.log('  opsv imagen --model volcengine.seadream');
+        console.log('  opsv run opsv-queue/videospec/zerocircle/');
+      } catch (err: any) {
+        logger.error(err.message);
+        process.exit(1);
+      }
+    });
 }
