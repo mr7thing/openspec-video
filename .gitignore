@@ -1,4 +1,4 @@
-# System Files
+# System
 .DS_Store
 Thumbs.db
 
@@ -7,62 +7,21 @@ node_modules/
 dist/
 *.tgz
 
-# Runtime Data & Artifacts (per-project, not part of tool source)
-.agent/*
-!.agent/skills/
-.opencode/
+# Runtime & Artifacts
 .opsv/
-.opsv-queue/
-!templates/
+opsv-queue/
+logs/
 
-# Test Projects & Demos
-project-demo/
-Project-*/
-mv-*/
-test-env/
-tests/
-openspec/
-
-# References & Stale Docs
-.ref/
-forUncle7/
-MANUAL_STRUCTURE*.md
-forMr7th.md
-FOR_Uncle7.md
-IMPLEMENTATION-*.md
-IMPROVEMENT_*.md
-MANUAL.md
-PACKAGING-REPORT.md
-ROADMAP-*.md
-TECHNICAL_ANALYSIS.md
-
-# Debug & Logs
-debug_gen.ts
-regex_test.ts
-test_new_cli.js
-src/test_gen.ts
-*.log
-npm-debug.log*
-npm-publish-*.log
-
-# Tests
+# Test & Debug
 test/
 test-*/
-test-image.json
-jest.config.js
-error_msg.txt
-jest**
-out**
-error*
+*.log
+npm-debug.log*
 
+# IDE
+.vscode/
+.idea/
 
-.antigravity/documents/*
-docs/0.5/*
-addons/*
-CLAUDE.md
-.claude/*
-docs/OPSV_v0.6.0_FIX_VERIFICATION.md
-docs/OPSV_v0.6.0_TEST_FEEDBACK.md
-docs/OPSV_v0.6.1_CODE_REVIEW_COMPLETION.md
-docs/new.md
-docs/circle.md
+# Secrets
+.env
+*.env.local
