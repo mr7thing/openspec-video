@@ -190,7 +190,7 @@ sequential_image_generation: "auto"
 
 ```bash
 # 文生图
-opsv imagen --model volcengine.seadream --circle zerocircle
+opsv imagen --model volcengine.seadream --circle circle1
 ```
 
 ### 常见场景的 global_settings 配置

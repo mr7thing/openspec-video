@@ -1,4 +1,4 @@
-# OpsV v0.8 Specification
+# OpsV v0.8.2 Specification
 
 ## Overview
 
@@ -19,13 +19,13 @@ opsv
 ├── init [name]                   # Project scaffold
 ├── validate [-d]                 # Document validation
 ├── circle
-│   ├── create [--dir] [--skip-middle-circle]
+│   ├── create [--dir] [--name] [--skip-middle-circle]
 │   └── refresh [--dir]
 ├── imagen --model <m>            # Compile image tasks
 ├── animate --model <m>           # Compile video tasks
 ├── comfy --model <m> [--param]   # Compile ComfyUI tasks
 ├── audio --model <m>             # [planned]
-├── app --model <m>               # Browser automation
+├── webapp --model <m>            # Browser automation
 ├── run <path...> [--retry]       # Execute tasks
 ├── review [--port] [--latest|--all] [--ttl]
 └── script [-d] [-o] [--dry-run]
@@ -46,20 +46,18 @@ project/
     api_config.yaml                <- Provider/model configuration
     .env                           <- API keys
   opsv-queue/
-    videospec/                     <- Build output
-      _manifest.json               <- Global status snapshot
-      zerocircle/
-        _assets.json               <- Circle asset list + status
-        volcengine.seadream/       <- provider.model
-          @hero.json               <- Compiled task
-          @hero_1.png              <- Output
-      firstcircle/
-        _assets.json
-        volcengine.seedance2/
-          shot_01.json
-          shot_01_1.mp4
-          shot_01_first.png
-          shot_01_last.png
+    videospec.circle1/             <- Build output (basename.circleN)
+      _manifest.json               <- Circle manifest: status + assets list
+      volcengine.seadream/         <- provider.model
+        @hero.json                 <- Compiled task
+        @hero_1.png                <- Output
+    role.circle2/                  <- Next circle batch
+      _manifest.json
+      volcengine.seedance2/
+        shot_01.json
+        shot_01_1.mp4
+        shot_01_first.png
+        shot_01_last.png
 ```
 
 ## Status State Machine
@@ -124,7 +122,7 @@ Circles represent dependency layers determined by topological sort:
 2. **FirstCircle / Circle1**: Assets depending on ZeroCircle outputs
 3. **EndCircle**: Final outputs (video shots depending on approved images)
 
-`opsv circle create` builds the graph and creates directory structure.
+`opsv circle create` builds the graph and creates a new circle directory (`basename.circleN`). The `--name` parameter sets the basename; `--dir` scopes creation to a specific directory. Each `circle create` increments the circle batch number (`.circle1`, `.circle2`, etc.).
 `opsv circle refresh` rebuilds the graph and diffs against existing state.
 
 ## Task JSON & Output Naming Convention
@@ -151,12 +149,12 @@ Rules:
 
 ## Compilation Flow
 
-1. Produce command (imagen/animate/comfy) reads `_assets.json`
+1. Produce command (imagen/animate/comfy) reads `_manifest.json`
 2. Filters out `approved` assets
 3. Resolves `@ref` references -> approved image paths
 4. Builds `Job` objects from frontmatter
 5. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
-6. Writes `TaskJson` to `circle/provider.model/shotId.json`
+6. Writes `TaskJson` to `basename.circleN/provider.model/shotId.json`
 
 ## Execution Flow
 
@@ -194,3 +192,10 @@ Rules:
 - Review approve sets `approved` for original task outputs, `syncing` for modified task outputs
 - No iteration numbers in directory names (A1 incremental update)
 - Output naming convention: `id_1.ext` (original), `id_N_1.ext` (modified, N≥2)
+
+## Breaking Changes from v0.8.1
+
+- Circle directories renamed: `zerocircle/`, `firstcircle/`, `endcircle/` → `basename.circleN/` (e.g., `videospec.circle1/`, `role.circle2/`). Each `opsv circle create` produces a new `.circleN` batch.
+- `_assets.json` eliminated; its contents merged into `_manifest.json` with an `assets` field. `_manifest.json` now lives inside each `.circleN/` directory, not at the `opsv-queue/videospec/` level.
+- `opsv circle create` gains `--name` parameter to set the circle directory basename.
+- `--dir` on `circle create` now scopes creation to a specific directory rather than the whole videospec.

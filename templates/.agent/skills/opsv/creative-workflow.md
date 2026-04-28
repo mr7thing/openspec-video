@@ -236,7 +236,7 @@ Shotlist.md 定稿后，由 Runner-Agent 调用：
 opsv animate --model volcengine.seedance-2.0
 ```
 - 自动推断依赖图末端 Circle（EndCircle）。
-- 直接产出可执行 `.json` 到 `opsv-queue/videospec/endcircle/volcengine.seedance/`，无 `video_jobs.json` 中间层。
+- 直接产出可执行 `.json` 到 `opsv-queue/videospec.circleN/volcengine.seedance/`，无 `video_jobs.json` 中间层。
 - 后续：`opsv run <paths...>` 执行渲染。
 
 **别名支持**：
@@ -254,5 +254,5 @@ opsv animate --model volcengine.seedance-2.0
 | 资产 | 花名册 | `elements/*.md` + `scenes/*.md` | 架构完成 |
 | 剧本 | 定稿资产 | `shots/Script.md` | ZeroCircle 资产 approved |
 | 动画 | 定稿剧本 | `shots/Shotlist.md` | 剧本 approved |
-| 图像渲染 | 资产文档 | `opsv-queue/videospec/zerocircle/volcengine.seadream/*.png` | `opsv imagen --model` |
-| 视频渲染 | Shotlist.md | `opsv-queue/videospec/endcircle/volcengine.seedance/*.mp4` | `opsv animate --model` + `opsv run` |
+| 图像渲染 | 资产文档 | `opsv-queue/videospec.circle1/volcengine.seadream/*.png` | `opsv imagen --model` |
+| 视频渲染 | Shotlist.md | `opsv-queue/videospec.circleN/volcengine.seedance/*.mp4` | `opsv animate --model` + `opsv run` |

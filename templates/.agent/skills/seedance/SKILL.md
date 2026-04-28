@@ -259,10 +259,10 @@ description: Seedance 2.0 视频生成专家。精通火山方舟 Seedance 2.0/2
 
 ```bash
 # Seedance 2.0
-opsv animate --model volcengine.seedance2 --circle endcircle
+opsv animate --model volcengine.seedance2 --circle circle2
 
 # Seedance 2.0 fast
-opsv animate --model volcengine.seedance2-fast --circle endcircle
+opsv animate --model volcengine.seedance2-fast --circle circle2
 ```
 
 ### 常见场景的 global_settings / payload 配置

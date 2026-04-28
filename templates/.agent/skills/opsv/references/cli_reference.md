@@ -26,14 +26,14 @@
 ### opsv imagen
 编译 Markdown 文档为图像生成任务，带 `--model` 参数时**直接编译**产出可执行 `.json`，不再生成 `imagen_jobs.json` 中间层。
 
-**产出目录**：`opsv-queue/videospec/<circle>/volcengine.seadream/shot_01.json` 等
+**产出目录**：`opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json` 等
 
 ```bash
 # 基本用法（必须指定 --model）
 opsv imagen --model volcengine.seadream-5.0-lite
 
 # 指定圈层
-opsv imagen --model volcengine.seadream-5.0-lite --circle firstcircle
+opsv imagen --model volcengine.seadream-5.0-lite --circle circle2
 
 # 使用别名
 opsv imagen --model volc.sd5lite
@@ -57,14 +57,14 @@ opsv imagen --model volcengine.seadream-5.0-lite --skip-circle-check
 ### opsv animate
 编译 Shotlist.md 为视频任务，带 `--model` 参数时**直接编译**产出可执行 `.json`，不再生成 `video_jobs.json` 中间层。
 
-**产出目录**：`opsv-queue/videospec/endcircle/volcengine.seedance/shot_01.json` 等
+**产出目录**：`opsv-queue/videospec.circleN/volcengine.seedance/shot_01.json` 等
 
 ```bash
 # 基本用法（必须指定 --model）
 opsv animate --model volcengine.seedance-2.0
 
 # 指定圈层
-opsv animate --model volcengine.seedance-2.0 --circle endcircle
+opsv animate --model volcengine.seedance-2.0 --circle circle2
 
 # 使用别名
 opsv animate --model volc.sd2
@@ -100,7 +100,7 @@ opsv audio --model <provider.model>
 
 ```bash
 opsv webapp --model webapp.gemini
-opsv webapp --model webapp.jimeng --circle zerocircle
+opsv webapp --model webapp.jimeng --circle circle1
 opsv webapp --model webapp.wan --dry-run
 ```
 
@@ -112,17 +112,17 @@ opsv webapp --model webapp.wan --dry-run
 
 ```bash
 # 执行单个任务
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json
 
 # 执行整个 Provider 目录下所有任务
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/
+opsv run opsv-queue/videospec.circle1/volcengine.seadream/
 
 # 执行多个路径
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01.json \
-       opsv-queue/videospec/zerocircle/volcengine.seadream/shot_02.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json \
+       opsv-queue/videospec.circle1/volcengine.seadream/shot_02.json
 
 # 重试失败任务
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/ --retry
+opsv run opsv-queue/videospec.circle1/volcengine.seadream/ --retry
 ```
 
 **行为**：
@@ -136,10 +136,10 @@ opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/ --retry
 **Agent 直接操作**：
 ```bash
 # 复制并修改任务（序号递增）
-cp opsv-queue/videospec/zerocircle/volcengine.seadream/@hero.json \
-   opsv-queue/videospec/zerocircle/volcengine.seadream/@hero_2.json
+cp opsv-queue/videospec.circle1/volcengine.seadream/@hero.json \
+   opsv-queue/videospec.circle1/volcengine.seadream/@hero_2.json
 # 编辑 @hero_2.json 的 prompt 字段
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/@hero_2.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream/@hero_2.json
 # → 生成 @hero_2_1.png（id_N_1.ext 模式，Review 后为 syncing 状态）
 ```
 
@@ -150,17 +150,18 @@ Circle（环）依赖层次的状态管理与拓扑刷新。**每次文档变更
 ```bash
 opsv circle create --dir videospec           # 新建并激活依赖图
 opsv circle create --dir episode_2            # 多剧集
-opsv circle create --dir videospec --skip-middle-circle  # 简化模式（所有非 shotlist 归 zerocircle）
+opsv circle create --dir videospec --name custom  # 覆盖 basename
+opsv circle create --dir videospec --skip-middle-circle  # 简化模式（所有非 shotlist 归 circle1）
 
-opsv circle refresh                           # 实时扫描 + 依赖分析，自动写入 opsv-queue/videospec/_manifest.json
+opsv circle refresh                           # 实时扫描 + 依赖分析，自动写入各 .circleN/_manifest.json
 ```
 
 **设计哲学**：Circle 不是静态配置，而是文档依赖关系的**动态投影**。`opsv circle refresh` 每次运行都会：
-1. 重新扫描 `videospec/` 下所有 `.md` 文件
+1. 重新扫描 `--dir` 指定目录下所有 `.md` 文件
 2. 从 frontmatter 的 `refs` 字段重建依赖图
 3. 拓扑排序得到 Circle 分层（ZeroCircle → FirstCircle → ...）
 4. 读取每个文档的 `## Approved References` 区域统计批准状态
-5. 自动写入 `opsv-queue/videospec/_manifest.json`
+5. 自动写入各 `opsv-queue/{basename}.circleN/_manifest.json`
 
 **触发时机**（文档变更后必须刷新）：
 
@@ -212,21 +213,19 @@ opsv animate --model volcengine.seedance-2.0
 ## 目录结构参考 (v0.8)
 
 ```
-opsv-queue/                         # 渲染产物目录
-└── videospec/                     # 按 graphName 组织
-    ├── _manifest.json              # 状态快照（opsv circle refresh 写入）
-    ├── zerocircle/                # Circle 目录，无迭代后缀
-    │   ├── _assets.json           # 该 Circle 资产清单
-    │   └── volcengine.seadream/   # Provider.Model 扁平目录
-    │       ├── @hero.json         # 初始编译的任务
-    │       ├── @hero_1.png        # 初始编译的产出
-    │       ├── @hero_2.json       # 修改后的任务（序号递增）
-    │       └── @hero_2_1.png      # 修改任务的产出（id_N_1.ext 模式）
-    └── endcircle/
-        ├── _assets.json
-        └── volcengine.seedance/
-            ├── shot_01.json
-            └── shot_01_1.mp4
+opsv-queue/                                    # 渲染产物目录
+├── videospec.circle1/                        # Circle 目录（basename.circleN 格式）
+│   ├── _manifest.json                        # 该 Circle 资产清单 + 状态快照（含 assets 字段）
+│   └── volcengine.seadream/                  # Provider.Model 扁平目录
+│       ├── @hero.json                        # 初始编译的任务
+│       ├── @hero_1.png                       # 初始编译的产出
+│       ├── @hero_2.json                      # 修改后的任务（序号递增）
+│       └── @hero_2_1.png                     # 修改任务的产出（id_N_1.ext 模式）
+└── videospec.circle2/                        # 后续 Circle（批次号递增）
+    ├── _manifest.json
+    └── volcengine.seedance/
+        ├── shot_01.json
+        └── shot_01_1.mp4
 ```
 
 ---

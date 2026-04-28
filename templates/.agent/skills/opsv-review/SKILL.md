@@ -34,7 +34,7 @@ Review approve uses `parseOutputFilename()` to detect whether the approved outpu
 2. **Set status** based on filename pattern:
    - Original → `approved`
    - Modified → `syncing`
-3. **Update** `_assets.json` and `_manifest.json` status
+3. **Update** `_manifest.json` status (including `assets` field, replacing `_assets.json`)
 
 ### What CLI Never Does
 - Never modifies `prompt_en`, `visual_detailed`, `visual_brief`, `refs`, or any content field
@@ -47,7 +47,7 @@ When an asset is in `syncing` state, the agent must:
 3. Align `visual_detailed`, `visual_brief`, `prompt_en`, `refs` in the source `.md` with the modified task JSON
 4. Write approved output to `## Approved References`
 5. Set `status: approved`
-6. Run `opsv circle refresh` to update manifests
+6. Run `opsv circle refresh` to update `_manifest.json` in the `.circleN/` directory
 
 ## Key Files
 - `src/commands/review.ts` — Express server with API routes

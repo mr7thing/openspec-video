@@ -7,7 +7,7 @@
 # 使用示例:
 #   opsv imagen --model volcengine.seadream
 #   opsv animate --model volcengine.seedance2
-#   opsv run opsv-queue/videospec/zerocircle/
+#   opsv run opsv-queue/videospec.circle1/
 
 models:
   # ==========================================

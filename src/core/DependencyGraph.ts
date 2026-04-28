@@ -1,6 +1,6 @@
 // ============================================================================
-// OpsV v0.8 Dependency Graph
-// Circle-centric: builds layers → circle directories + _assets.json + _manifest.json
+// OpsV v0.8.2 Dependency Graph
+// Circle-centric: builds layers → {basename}.circle{N}/ flat dirs + _manifest.json
 // ============================================================================
 
 import fs from 'fs';
@@ -39,15 +39,23 @@ export interface ManifestEntry {
 
 export interface Manifest {
   version: string;
+  target: string;
   generatedAt: string;
   circles: ManifestEntry[];
+  assets: Record<string, { status: string; layer: number }>;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export class DependencyGraph {
   private graph: Map<string, Set<string>> = new Map();
+  private statusMap: Map<string, string> = new Map();
 
   build(documents: ParsedDocument[]): void {
     this.graph.clear();
+    this.statusMap.clear();
 
     for (const doc of documents) {
       const deps = new Set<string>();
@@ -64,6 +72,9 @@ export class DependencyGraph {
       }
 
       this.graph.set(doc.id, deps);
+      if (doc.frontmatter.status) {
+        this.statusMap.set(doc.id, doc.frontmatter.status);
+      }
     }
   }
 
@@ -169,78 +180,143 @@ export class DependencyGraph {
     return deps ? [...deps] : [];
   }
 
-  writeCircleAssets(queueRoot: string, circles: CircleDefinition[]): void {
-    const videospecDir = path.join(queueRoot, 'videospec');
-    if (!fs.existsSync(videospecDir)) {
-      fs.mkdirSync(videospecDir, { recursive: true });
-    }
+  // --- v0.8.2: flat .circleN directory + merged _manifest.json ---
 
-    for (const circle of circles) {
-      const circleDir = path.join(videospecDir, circle.name);
-      if (!fs.existsSync(circleDir)) {
-        fs.mkdirSync(circleDir, { recursive: true });
-      }
-
-      const assetsJson = {
-        circle: circle.name,
-        layer: circle.layer,
-        assets: circle.assetIds.map((id) => ({
-          id,
-          status: this.getAssetStatus(id),
-        })),
-      };
-
-      fs.writeFileSync(
-        path.join(circleDir, '_assets.json'),
-        JSON.stringify(assetsJson, null, 2)
-      );
-    }
+  static resolveTargetBasename(dirPath: string): string {
+    return path.basename(path.resolve(dirPath));
   }
 
-  writeManifest(queueRoot: string, circles: CircleDefinition[]): void {
-    const manifest: Manifest = {
-      version: '0.8.1',
-      generatedAt: new Date().toISOString(),
-      circles: circles.map((c) => ({
-        circle: c.name,
-        layer: c.layer,
-        assetIds: c.assetIds,
-        status: Object.fromEntries(
-          c.assetIds.map((id) => [id, this.getAssetStatus(id)])
-        ),
-      })),
-    };
+  static detectCircleN(queueRoot: string, basename: string): number {
+    if (!fs.existsSync(queueRoot)) return 1;
+    const entries = fs.readdirSync(queueRoot);
+    const pattern = new RegExp(`^${escapeRegex(basename)}\\.circle(\\d+)$`);
+    let maxN = 0;
+    for (const e of entries) {
+      const m = e.match(pattern);
+      if (m) maxN = Math.max(maxN, parseInt(m[1]));
+    }
+    return maxN + 1;
+  }
 
-    const videospecDir = path.join(queueRoot, 'videospec');
-    if (!fs.existsSync(videospecDir)) {
-      fs.mkdirSync(videospecDir, { recursive: true });
+  static findLatestCircleN(queueRoot: string, basename: string): number {
+    if (!fs.existsSync(queueRoot)) return 0;
+    const entries = fs.readdirSync(queueRoot);
+    const pattern = new RegExp(`^${escapeRegex(basename)}\\.circle(\\d+)$`);
+    let maxN = 0;
+    for (const e of entries) {
+      const m = e.match(pattern);
+      if (m) maxN = Math.max(maxN, parseInt(m[1]));
+    }
+    return maxN;
+  }
+
+  static checkNameConflict(queueRoot: string, basename: string, dirPath: string): string | null {
+    if (!fs.existsSync(queueRoot)) return null;
+    const entries = fs.readdirSync(queueRoot);
+    const pattern = new RegExp(`^${escapeRegex(basename)}\\.circle(\\d+)$`);
+
+    const resolvedDir = path.resolve(dirPath);
+
+    for (const e of entries) {
+      const m = e.match(pattern);
+      if (!m) continue;
+
+      const manifestPath = path.join(queueRoot, e, '_manifest.json');
+      if (!fs.existsSync(manifestPath)) continue;
+
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        if (manifest.target && path.resolve(manifest.target) !== resolvedDir) {
+          return `Target name "${basename}" already used by a different directory (${manifest.target}). Use --name to specify a different name.`;
+        }
+      } catch {
+        // Skip unreadable manifests
+      }
     }
 
+    return null;
+  }
+
+  writeCircleDir(
+    queueRoot: string,
+    basename: string,
+    circleN: number,
+    circles: CircleDefinition[],
+    targetDir: string
+  ): string {
+    const circleDirName = `${basename}.circle${circleN}`;
+    const circleDir = path.join(queueRoot, circleDirName);
+
+    if (!fs.existsSync(circleDir)) {
+      fs.mkdirSync(circleDir, { recursive: true });
+    }
+
+    const assets: Record<string, { status: string; layer: number }> = {};
+    const circlesData: ManifestEntry[] = [];
+
+    for (const circle of circles) {
+      const status: Record<string, string> = {};
+      for (const id of circle.assetIds) {
+        const s = this.statusMap.get(id) || 'drafting';
+        status[id] = s;
+        assets[id] = { status: s, layer: circle.layer };
+      }
+
+      circlesData.push({
+        circle: circle.name,
+        layer: circle.layer,
+        assetIds: circle.assetIds,
+        status,
+      });
+    }
+
+    const manifest: Manifest = {
+      version: '0.8.2',
+      target: targetDir,
+      generatedAt: new Date().toISOString(),
+      circles: circlesData,
+      assets,
+    };
+
     fs.writeFileSync(
-      path.join(videospecDir, '_manifest.json'),
+      path.join(circleDir, '_manifest.json'),
       JSON.stringify(manifest, null, 2)
     );
+
+    return circleDir;
+  }
+
+  // Deprecated: kept for transition, no longer used by commands
+  writeCircleAssets(_queueRoot: string, _circles: CircleDefinition[]): void {
+    throw new Error('writeCircleAssets is deprecated in v0.8.2. Use writeCircleDir() instead.');
+  }
+
+  // Deprecated: kept for transition, no longer used by commands
+  writeManifest(_queueRoot: string, _circles: CircleDefinition[]): void {
+    throw new Error('writeManifest is deprecated in v0.8.2. Use writeCircleDir() instead.');
   }
 
   private getAssetStatus(id: string): string {
-    const deps = this.graph.get(id);
-    if (!deps || deps.size === 0) return 'drafting';
-    return 'drafting';
+    return this.statusMap.get(id) || 'drafting';
   }
 
-  static buildFromProject(projectRoot: string): DependencyGraph {
+  static buildFromDir(projectRoot: string, targetDir: string): DependencyGraph {
     const graph = new DependencyGraph();
     const documents: ParsedDocument[] = [];
-    const dirs = ['elements', 'scenes'];
 
-    for (const dir of dirs) {
-      const standardPath = path.join(projectRoot, 'videospec', dir);
-      const dirPath = fs.existsSync(standardPath) ? standardPath : null;
-      if (!dirPath || !fs.existsSync(dirPath)) continue;
+    const resolvedTarget = path.resolve(projectRoot, targetDir);
 
-      const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
+    if (!fs.existsSync(resolvedTarget)) {
+      logger.warn(`Target directory not found: ${resolvedTarget}`);
+      graph.build(documents);
+      return graph;
+    }
+
+    // Scan target directory for .md files
+    if (fs.statSync(resolvedTarget).isDirectory()) {
+      const files = fs.readdirSync(resolvedTarget).filter((f) => f.endsWith('.md'));
       for (const file of files) {
-        const filePath = path.join(dirPath, file);
+        const filePath = path.join(resolvedTarget, file);
         try {
           const content = fs.readFileSync(filePath, 'utf-8');
           const { frontmatter } = FrontmatterParser.parseRaw(content);
@@ -252,7 +328,56 @@ export class DependencyGraph {
       }
     }
 
+    // Resolve upstream dependencies: scan elements/ and scenes/ for referenced assets
+    const upstreamDirs = ['elements', 'scenes'];
+    const targetAssetIds = new Set(documents.map((d) => d.id));
+    const targetRefs = new Set<string>();
+
+    for (const doc of documents) {
+      if (doc.frontmatter.refs) {
+        for (const ref of doc.frontmatter.refs) {
+          let cleanId = ref.startsWith('@') ? ref.slice(1) : ref;
+          const colonIdx = cleanId.indexOf(':');
+          if (colonIdx > 0) cleanId = cleanId.slice(0, colonIdx);
+          if (!targetAssetIds.has(cleanId)) {
+            targetRefs.add(cleanId);
+          }
+        }
+      }
+    }
+
+    // Pull in upstream assets that are not yet approved
+    if (targetRefs.size > 0) {
+      for (const dir of upstreamDirs) {
+        const dirPath = path.join(projectRoot, 'videospec', dir);
+        if (!fs.existsSync(dirPath)) continue;
+
+        const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
+        for (const file of files) {
+          const id = file.replace(/^@/, '').replace(/\.md$/, '');
+          if (!targetRefs.has(id) || targetAssetIds.has(id)) continue;
+
+          const filePath = path.join(dirPath, file);
+          try {
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const { frontmatter } = FrontmatterParser.parseRaw(content);
+            // Only pull upstream if not approved
+            if (frontmatter.status !== 'approved') {
+              documents.push({ id, filePath, frontmatter });
+              targetAssetIds.add(id);
+            }
+          } catch (e) {
+            logger.warn(`Dependency graph skipped upstream ${file}: ${(e as Error).message}`);
+          }
+        }
+      }
+    }
+
     graph.build(documents);
     return graph;
+  }
+
+  static buildFromProject(projectRoot: string): DependencyGraph {
+    return DependencyGraph.buildFromDir(projectRoot, 'videospec');
   }
 }

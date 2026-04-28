@@ -1,20 +1,20 @@
 # opsv-produce Skill
 
 ## Overview
-Compile generation tasks for specific models. Each produce command reads `_assets.json`, skips approved assets, and writes provider-specific `.json` files to `circle/provider.model/` directories.
+Compile generation tasks for specific models. Each produce command reads `_manifest.json` (including `assets` field), skips approved assets, and writes provider-specific `.json` files to `{basename}.circle{N}/provider.model/` directories.
 
 ## Commands
 
 ### imagen — Image generation
 ```bash
 opsv imagen --model volcengine.seadream
-opsv imagen --model siliconflow.qwenimg --circle zerocircle --dry-run
+opsv imagen --model siliconflow.qwenimg --circle circle1 --dry-run
 ```
 
 ### animate — Video generation
 ```bash
 opsv animate --model volcengine.seedance2
-opsv animate --model siliconflow.wan --circle firstcircle
+opsv animate --model siliconflow.wan --circle circle2
 ```
 
 ### comfy — ComfyUI workflow
@@ -34,12 +34,12 @@ opsv webapp --model webapp.gemini
 ```
 
 ## Compilation Flow
-1. Read `_assets.json` from target circle
+1. Read `_manifest.json` from target circle (including `assets` field)
 2. Filter out `approved` assets
 3. Load asset frontmatter and resolve `@ref` references
 4. Build `Job` objects with prompt, references, frame_ref
 5. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
-6. Write to `opsv-queue/videospec/<circle>/<provider.model>/<id>.json`
+6. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
 
 ## Task JSON & Output Naming Convention
 

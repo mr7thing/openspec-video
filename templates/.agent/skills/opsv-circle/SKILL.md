@@ -1,33 +1,32 @@
 # opsv-circle Skill
 
 ## Overview
-Manage circle lifecycle: create dependency graph, generate circle directories with `_assets.json`, and maintain `_manifest.json`.
+Manage circle lifecycle: create dependency graph, generate circle directories with `_manifest.json` (including `assets` field), and maintain per-circle manifests.
 
 ## Commands
 
 ### Create Circles
 ```bash
 opsv circle create --dir videospec
+opsv circle create --dir videospec --name custom    # override basename
 opsv circle create --dir videospec --skip-middle-circle
 ```
 
-Scans `videospec/elements/` and `videospec/scenes/`, builds a dependency graph from `refs` fields, topologically sorts assets into layers, and creates:
-- `opsv-queue/videospec/<circle>/` directories
-- `opsv-queue/videospec/<circle>/_assets.json` per circle
-- `opsv-queue/videospec/_manifest.json` global status snapshot
+Scans the specified `--dir` directory (e.g. `videospec/elements/` and `videospec/scenes/`), builds a dependency graph from `refs` fields, topologically sorts assets into layers, and creates:
+- `opsv-queue/{basename}.circle{N}/` directories (batch number increments each create)
+- `opsv-queue/{basename}.circle{N}/_manifest.json` per circle (includes `assets` field, replaces `_assets.json`)
 
-Circle naming:
-- Layer 1 → `zerocircle` (no dependencies)
-- Layer 2 → `firstcircle` (or `circle1` if 3+ layers)
-- Last layer → `endcircle` (if 3+ layers)
-- Middle layers → `circle2`, `circle3`, etc.
+Circle directory naming:
+- Each `opsv circle create` increments the batch number: `.circle1/`, `.circle2/`, `.circle3/`
+- Layer semantics (ZeroCircle, FirstCircle, EndCircle) are stored in `_manifest.json`, not in directory names
+- `--name` overrides the basename (default: derived from `--dir` path)
 
 ### Refresh Circles
 ```bash
 opsv circle refresh --dir videospec
 ```
 
-Rebuilds the graph, diffs against existing `_assets.json`, and updates both per-circle and global manifests. Reports new/removed assets.
+Rebuilds the graph, diffs against existing `_manifest.json` `assets` field, and updates per-circle manifests. Reports new/removed assets.
 
 ## Key Files
 - `src/commands/circle.ts` — Command handler

@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 — opsv init
+// OpsV v0.8.2 — opsv init
 // ============================================================================
 
 import { Command } from 'commander';
@@ -31,7 +31,7 @@ export function registerInitCommand(program: Command, version: string): void {
         const dirs = [
           path.join(targetDir, 'videospec', 'elements'),
           path.join(targetDir, 'videospec', 'scenes'),
-          path.join(targetDir, 'opsv-queue', 'videospec'),
+          path.join(targetDir, 'opsv-queue'),
           path.join(targetDir, '.opsv'),
         ];
 
@@ -41,7 +41,7 @@ export function registerInitCommand(program: Command, version: string): void {
 
         // Write project.md
         const projectMd = `---
-type: project
+category: project
 status: drafting
 vision: "${projectName} — a cinematic narrative project"
 aspect_ratio: "16:9"
@@ -141,9 +141,9 @@ opsv-queue/
         console.log(chalk.green(`\nProject created at ${targetDir}`));
         console.log(chalk.cyan('\nNext steps:'));
         console.log(`  cd ${projectName}`);
-        console.log('  opsv circle create');
+        console.log('  opsv circle create --dir videospec');
         console.log('  opsv imagen --model volcengine.seadream');
-        console.log('  opsv run opsv-queue/videospec/zerocircle/');
+        console.log('  opsv run opsv-queue/videospec.circle1/volcengine.seadream/');
       } catch (err: any) {
         logger.error(err.message);
         process.exit(1);

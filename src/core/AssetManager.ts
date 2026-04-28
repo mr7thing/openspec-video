@@ -1,6 +1,6 @@
 // ============================================================================
-// OpsV v0.8 Asset Manager
-// Reads assets from videospec/ and _assets.json per circle
+// OpsV v0.8.2 Asset Manager
+// Reads assets from videospec/ and _manifest.json per .circleN/
 // ============================================================================
 
 import path from 'path';
@@ -19,9 +19,14 @@ export interface Asset {
   filePath: string;
 }
 
+export interface CircleAssetEntry {
+  id: string;
+  status: string;
+}
+
 export interface CircleAssets {
   circleName: string;
-  assets: Asset[];
+  assets: CircleAssetEntry[];
 }
 
 export class AssetManager {
@@ -76,12 +81,27 @@ export class AssetManager {
   }
 
   async loadCircleAssets(circleDir: string): Promise<CircleAssets> {
-    const assetsJsonPath = path.join(circleDir, '_assets.json');
+    const manifestPath = path.join(circleDir, '_manifest.json');
     const circleName = path.basename(circleDir);
 
-    if (fs.existsSync(assetsJsonPath)) {
-      const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
-      return { circleName, assets: data.assets || [] };
+    if (fs.existsSync(manifestPath)) {
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      // v0.8.2: assets from merged manifest
+      if (data.assets) {
+        const assets = Object.entries(data.assets).map(([id, info]: [string, any]) => ({
+          id,
+          status: info.status || 'drafting',
+        }));
+        return { circleName, assets };
+      }
+      // Fallback: circles[].status (old format)
+      const assets: Array<{ id: string; status: string }> = [];
+      for (const circle of data.circles || []) {
+        for (const [id, status] of Object.entries(circle.status || {})) {
+          assets.push({ id, status: status as string });
+        }
+      }
+      return { circleName, assets };
     }
 
     return { circleName, assets: [] };

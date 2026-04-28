@@ -39,7 +39,7 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 **Why**: In v0.5–v0.6, `opsv imagen` mixed five responsibilities: document parsing, dependency scheduling, prompt assembly, task construction, and persistence. Changing one aspect broke others. The coupling made it impossible to compile without executing, or to re-execute without recompiling.
 
-**How it applies**: `opsv imagen --model volcengine.seadream` compiles task `.json` files to disk. `opsv run opsv-queue/videospec/zerocircle/` executes them. You can inspect, modify, or delete compiled tasks before execution. You can re-run without recompiling.
+**How it applies**: `opsv imagen --model volcengine.seadream` compiles task `.json` files to disk. `opsv run opsv-queue/videospec.circle1/` executes them. You can inspect, modify, or delete compiled tasks before execution. You can re-run without recompiling.
 
 ---
 
@@ -55,11 +55,11 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 ## 5. Circle-Centric Directory Structure (No Iteration Numbers)
 
-**Principle**: Directories are named by circle (`zerocircle`, `firstcircle`, `endcircle`) without iteration suffixes. Provider directories are flat `provider.model/` without `queue_1/` subdirectories.
+**Principle**: Directories are named by circle batch (`basename.circleN`) without iteration suffixes. Provider directories are flat `provider.model/` without `queue_1/` subdirectories.
 
 **Why**: In v0.6–v0.7, directory names included iteration numbers (`zerocircle_1`, `queue_1/`). When a user re-ran a task, a new iteration number was created (`zerocircle_2`), breaking all downstream path references. The A1 incremental update strategy (update in place, don't create new iteration directories) eliminates this problem.
 
-**How it applies**: `opsv circle refresh` updates `_assets.json` in place. Produce commands overwrite existing `.json` files rather than creating `@hero_v2.json`. The directory structure is stable across iterations.
+**How it applies**: `opsv circle refresh` updates `_manifest.json` in place. Produce commands overwrite existing `.json` files rather than creating `@hero_v2.json`. The directory structure is stable across iterations.
 
 ---
 
@@ -103,13 +103,13 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 ---
 
-## 10. _assets.json as the Circle's Authoritative Manifest
+## 10. _manifest.json as the Circle's Authoritative Manifest
 
-**Principle**: Each circle directory contains `_assets.json` — the single source of truth for which assets belong to that circle and their current status.
+**Principle**: Each circle directory (`.circleN/`) contains `_manifest.json` — the single source of truth for which assets belong to that circle and their current status. The `assets` field within `_manifest.json` replaces the former `_assets.json`.
 
-**Why**: In v0.7, circle membership was inferred from the dependency graph at runtime, while status was tracked separately in `.opsv/`. This created synchronization issues: the graph might say an asset belongs to `zerocircle`, but the status file thought it was in `firstcircle`. Co-locating membership and status in `_assets.json` within the circle directory makes them impossible to desynchronize.
+**Why**: In v0.7, circle membership was inferred from the dependency graph at runtime, while status was tracked separately in `.opsv/`. This created synchronization issues: the graph might say an asset belongs to one circle, but the status file thought it was in another. Co-locating membership and status in `_manifest.json` within the circle directory makes them impossible to desynchronize. Merging the former `_assets.json` into `_manifest.json`'s `assets` field eliminates the redundant file and the risk of the two files diverging.
 
-**How it applies**: `opsv circle create` writes `_assets.json`. `opsv circle refresh` updates it. `opsv review` approves update it. Produce commands read it to determine which assets to compile. No other source of circle membership or status exists.
+**How it applies**: `opsv circle create` writes `_manifest.json`. `opsv circle refresh` updates it. `opsv review` approves update it. Produce commands read it to determine which assets to compile. No other source of circle membership or status exists.
 
 ---
 

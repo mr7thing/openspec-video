@@ -28,10 +28,11 @@
 <resource_navigation>
 1. **本能寻检**：优先查阅 `.agent/skills/` 确定已有技能。
 2. **命名规范**：
-   - `opsv-queue/{videospec}/zerocircle/{provider.model}/` — 基础资产层
-   - `opsv-queue/{videospec}/firstcircle/{provider.model}/` — 分镜图片层
-   - `opsv-queue/{videospec}/{circle}/{provider.model}/` — 通用层级
-   - Circle 命名：`zerocircle`, `firstcircle`, `secondcircle` ... `endcircle`（无迭代号后缀）
+   - `opsv-queue/{basename}.circle1/{provider.model}/` — 基础资产层
+   - `opsv-queue/{basename}.circle2/{provider.model}/` — 分镜图片层
+   - `opsv-queue/{basename}.circle{N}/{provider.model}/` — 通用层级
+   - Circle 目录命名：`{basename}.circle1`, `{basename}.circle2` ... `{basename}.circleN`（批次号递增）
+   - Layer 语义（ZeroCircle, FirstCircle, EndCircle）存储在 `_manifest.json` 中，不再作为目录名
    - 任务文件：`@hero.json`, `shot_01.json`；生成物：`@hero_1.png`, `shot_01_1.mp4`
 </resource_navigation>
 
@@ -48,16 +49,16 @@ opsv init my-project
 # 2. 验证规范
 opsv validate
 
-# 3. 构建 Circle 依赖图 + 目录结构 + _assets.json + _manifest.json
+# 3. 构建 Circle 依赖图 + 目录结构 + _manifest.json（含 assets 字段）
 opsv circle create
-# 可选：--dir 指定目录，--skip-middle-circle 跳过中间环
+# 可选：--dir 指定目录，--name 覆盖 basename，--skip-middle-circle 跳过中间环
 
 # 4. 生成图像任务（直接编译为可执行 .json，无 jobs.json 中间产物）
 opsv imagen --model volcengine.seadream
 # 可选：--circle 指定环，--dry-run 预览不落盘
 
 # 5. 执行编译后的任务
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/@hero.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream/@hero.json
 # 可选：--retry 重试失败，--dry-run 预览
 
 # 6. 审阅（Approve 后方可进入下一 Circle）
@@ -69,7 +70,7 @@ opsv animate --model volcengine.seedance2
 # 可选：--circle 指定环，--dry-run 预览
 
 # 8. 执行视频任务
-opsv run opsv-queue/videospec/endcircle/volcengine.seedance2/shot_01.json
+opsv run opsv-queue/videospec.circle2/volcengine.seedance2/shot_01.json
 ```
 
 ### ComfyUI 工作流
@@ -79,7 +80,7 @@ opsv run opsv-queue/videospec/endcircle/volcengine.seedance2/shot_01.json
 opsv comfy --model comfy.sdxl --param --dry-run
 
 # 执行
-opsv run opsv-queue/videospec/firstcircle/comfy.sdxl/shot_02.json
+opsv run opsv-queue/videospec.circle2/comfy.sdxl/shot_02.json
 ```
 
 ### 浏览器自动化
@@ -95,8 +96,8 @@ opsv app --model browser.chrome
 |------|------|----------|
 | `opsv init` | 项目脚手架 | `[name]` |
 | `opsv validate` | 验证 frontmatter、引用死链、Approved References 与 status 一致性 | `-d` 详细输出 |
-| `opsv circle create` | 构建依赖图，创建 Circle 目录 + `_assets.json` + `_manifest.json` | `--dir`, `--skip-middle-circle` |
-| `opsv circle refresh` | 重建依赖图，diff 更新 `_assets.json` 和 `_manifest.json` | `--dir` |
+| `opsv circle create` | 构建依赖图，创建 Circle 目录 + `_manifest.json`（含 assets 字段） | `--dir`, `--name`, `--skip-middle-circle` |
+| `opsv circle refresh` | 重建依赖图，diff 更新各 `.circleN/_manifest.json` | `--dir` |
 | `opsv imagen` | 编译图像任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
 | `opsv animate` | 编译视频任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
 | `opsv comfy` | 编译 ComfyUI 任务为可执行 `.json` | `--model <m>`, `--param`, `--dry-run` |
@@ -115,7 +116,7 @@ opsv app --model browser.chrome
 | `opsv deps` | 依赖分析内置于 `opsv circle create` / `opsv circle refresh` |
 | `opsv daemon serve/start/stop/status` | daemon 隐式管理，无需手动操作 |
 | `opsv circle status` | 状态信息由 `opsv circle refresh` 的 diff 输出提供 |
-| `opsv circle manifest` | `_manifest.json` 由 `opsv circle create` / `opsv circle refresh` 自动维护 |
+| `opsv circle manifest` | `_manifest.json` 由 `opsv circle create` / `opsv circle refresh` 自动维护（位于 `.circleN/` 目录内） |
 
 ### Circle 资产层级定义
 
@@ -128,18 +129,16 @@ opsv app --model browser.chrome
 
 ```
 opsv-queue/
-  videospec/
+  videospec.circle1/
+    _manifest.json              # 含 assets 字段（替代 _assets.json）
+    volcengine.seadream/
+      @hero.json
+      @hero_1.png
+  videospec.circle2/
     _manifest.json
-    zerocircle/
-      _assets.json
-      volcengine.seadream/
-        @hero.json
-        @hero_1.png
-    firstcircle/
-      _assets.json
-      volcengine.seedance2/
-        shot_01.json
-        shot_01_1.mp4
+    volcengine.seedance2/
+      shot_01.json
+      shot_01_1.mp4
 ```
 
 ### 任务类型值
@@ -172,7 +171,7 @@ drafting → draft → syncing → approved
 | 修改 `.md` 文件的 `refs` 字段 | 依赖关系改变，资产可能重新分层 | 检查 Circle 归属是否漂移 |
 | Review Approve | 批准状态解锁下游 Circle | 全部 approved 则允许晋升下一 Circle |
 | Review Draft | 批准状态回退 | 阻断下游 Circle，直到重新 approved |
-| 迭代重生成 | 旧结果失效，迭代计数增加 | 确认新迭代已纳入 `_assets.json` |
+| 迭代重生成 | 旧结果失效，迭代计数增加 | 确认新迭代已纳入 `_manifest.json` |
 | 手动编辑 `## Approved References` | 引用路径可能变化 | 验证状态统计准确性 |
 | 新增/删除 `.md` 文件 | 资产总数变化 | 重建完整依赖图 |
 
@@ -253,10 +252,10 @@ Agent 看到 `syncing` 后**必须执行**：
 3. **快速迭代示例**：
    ```bash
    # 复制任务
-   cp opsv-queue/videospec/firstcircle/volcengine.seadream/shot_01.json \
-      opsv-queue/videospec/firstcircle/volcengine.seadream/shot_01_v2.json
+   cp opsv-queue/videospec.circle2/volcengine.seadream/shot_01.json \
+      opsv-queue/videospec.circle2/volcengine.seadream/shot_01_v2.json
    # 编辑 shot_01_v2.json → 执行 → Approve → 对齐 syncing
-   opsv run opsv-queue/videospec/firstcircle/volcengine.seadream/shot_01_v2.json
+   opsv run opsv-queue/videospec.circle2/volcengine.seadream/shot_01_v2.json
    opsv review
    ```
 4. **迭代文件命名规范**：`{jobId}_v{N}.json`，N 从 2 递增

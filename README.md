@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.1
+# OpenSpec-Video (OpsV) v0.8.2
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -27,7 +27,7 @@ opsv circle create
 opsv imagen --model volcengine.seadream
 
 # 3. Execute compiled tasks
-opsv run opsv-queue/videospec/zerocircle/
+opsv run opsv-queue/videospec.circle1/
 
 # 4. Review and approve
 opsv review
@@ -36,7 +36,7 @@ opsv review
 opsv animate --model volcengine.seedance2
 
 # 6. Execute video tasks
-opsv run opsv-queue/videospec/endcircle/
+opsv run opsv-queue/videospec.circle2/
 ```
 
 ---
@@ -48,7 +48,7 @@ opsv
 ├── init [name]                   # Project scaffold
 ├── validate [-d]                 # Document validation
 ├── circle
-│   ├── create [--dir] [--skip-middle-circle]
+│   ├── create [--dir] [--name] [--skip-middle-circle]
 │   └── refresh [--dir]           # Replaces old status + deps
 ├── imagen --model <m>            # Compile image tasks directly
 ├── animate --model <m>           # Compile video tasks directly
@@ -69,15 +69,14 @@ opsv
 Tasks are organized into **Circles** (dependency layers via topological sort):
 
 ```
-opsv-queue/videospec/
-  _manifest.json               # Global status snapshot
-  zerocircle/                  # No dependencies (characters, props, scenes)
-    _assets.json
-    volcengine.seadream/       # provider.model flat (no iteration numbers)
+opsv-queue/
+  videospec.circle1/            # Build output (basename.circleN)
+    _manifest.json              # Circle manifest: status + assets list
+    volcengine.seadream/        # provider.model flat (no iteration numbers)
       @hero.json
       @hero_1.png
-  firstcircle/                 # Depends on zerocircle
-    _assets.json
+  role.circle2/                 # Depends on circle1
+    _manifest.json
     volcengine.seedance2/
       shot_01.json
       shot_01_1.mp4
@@ -136,4 +135,4 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale b
 
 MIT
 
-> *OpsV v0.8.1 | 2026-04-28*
+> *OpsV v0.8.2 | 2026-04-28*

@@ -1,5 +1,6 @@
 // ============================================================================
-// OpsV v0.8 — opsv review
+// OpsV v0.8.2 — opsv review
+// Scans *.circleN/ directories, reads/writes _manifest.json assets
 // ============================================================================
 
 import { Command } from 'commander';
@@ -22,7 +23,7 @@ export function registerReviewCommand(program: Command): void {
     .action(async (options: any) => {
       try {
         const projectRoot = process.cwd();
-        const queueRoot = path.join(projectRoot, 'opsv-queue', 'videospec');
+        const queueRoot = path.join(projectRoot, 'opsv-queue');
 
         if (!fs.existsSync(queueRoot)) {
           console.error(chalk.red(`Queue directory not found: ${queueRoot}`));
@@ -35,25 +36,26 @@ export function registerReviewCommand(program: Command): void {
 
         const app = express();
 
-        // API: List circles with assets
+        // API: List circle directories
         app.get('/api/circles', (_req, res) => {
           const circles = scanCircles(queueRoot, options);
           res.json(circles);
         });
 
-        // API: Get assets for a circle
+        // API: Get assets for a circle directory
         app.get('/api/circles/:name/assets', (req, res) => {
           const circleDir = path.join(queueRoot, req.params.name);
-          const assetsJsonPath = path.join(circleDir, '_assets.json');
+          const manifestPath = path.join(circleDir, '_manifest.json');
 
-          if (!fs.existsSync(assetsJsonPath)) {
+          if (!fs.existsSync(manifestPath)) {
             return res.json({ assets: [] });
           }
 
-          const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+          const assetsMap: Record<string, any> = manifest.assets || {};
 
           // Enrich with output files
-          const enriched = (data.assets || []).map((asset: any) => {
+          const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
             const outputs: string[] = [];
             const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_'));
 
@@ -63,14 +65,14 @@ export function registerReviewCommand(program: Command): void {
 
               const files = fs.readdirSync(providerPath);
               const matches = files.filter(
-                (f) => f.startsWith(asset.id) && !f.endsWith('.json')
+                (f) => f.startsWith(id) && !f.endsWith('.json')
               );
               for (const f of matches) {
                 outputs.push(path.join(providerDir, f));
               }
             }
 
-            return { ...asset, outputs };
+            return { id, status: info.status, layer: info.layer, outputs };
           });
 
           res.json({ circle: req.params.name, assets: enriched });
@@ -87,11 +89,6 @@ export function registerReviewCommand(program: Command): void {
         });
 
         // Approve endpoint
-        // CLI only performs deterministic, conflict-free actions:
-        // 1. Append a review record to source .md frontmatter
-        // 2. If output matches original task (id_N.ext) → status = 'approved' directly
-        //    If output matches modified task (id_N_N.ext) → status = 'syncing' + record task JSON path
-        // 3. Never modify prompt_en or other content fields
         app.post('/api/approve/:circle/:assetId', express.json(), async (req, res) => {
           const { circle, assetId } = req.params;
           const { outputFile, taskJsonPath } = req.body || {};
@@ -100,8 +97,6 @@ export function registerReviewCommand(program: Command): void {
             const now = new Date().toISOString();
 
             // Determine approval status from output filename convention
-            // id_N.ext → original task → approved
-            // id_N_N.ext → modified task → syncing (agent must align)
             const parsed = outputFile ? parseOutputFilename(outputFile) : { isModified: false };
             const newStatus = parsed.isModified ? 'syncing' : 'approved';
 
@@ -134,23 +129,17 @@ export function registerReviewCommand(program: Command): void {
               fs.writeFileSync(sourceDocPath, finalContent);
             }
 
-            // Update _assets.json status
-            const assetsJsonPath = path.join(queueRoot, circle, '_assets.json');
-            if (fs.existsSync(assetsJsonPath)) {
-              const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
-              const asset = (data.assets || []).find((a: any) => a.id === assetId);
-              if (asset) {
-                asset.status = newStatus;
-                fs.writeFileSync(assetsJsonPath, JSON.stringify(data, null, 2));
-              }
-            }
-
-            // Update _manifest.json status
-            const manifestPath = path.join(queueRoot, '_manifest.json');
+            // Update _manifest.json assets field
+            const circleDir = path.join(queueRoot, circle);
+            const manifestPath = path.join(circleDir, '_manifest.json');
             if (fs.existsSync(manifestPath)) {
               const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+              if (manifest.assets && manifest.assets[assetId]) {
+                manifest.assets[assetId].status = newStatus;
+              }
+              // Also update circles[].status for backward compatibility
               for (const c of manifest.circles || []) {
-                if (c.circle === circle && c.status && c.status[assetId]) {
+                if (c.status && c.status[assetId]) {
                   c.status[assetId] = newStatus;
                 }
               }
@@ -222,17 +211,21 @@ function scanCircles(queueRoot: string, options: any): any[] {
 
   const entries = fs.readdirSync(queueRoot).filter((d) => {
     const fullPath = path.join(queueRoot, d);
-    return fs.statSync(fullPath).isDirectory() && !d.startsWith('_');
+    return fs.statSync(fullPath).isDirectory() && d.includes('.circle');
   });
 
   for (const name of entries) {
-    const assetsJsonPath = path.join(queueRoot, name, '_assets.json');
-    if (fs.existsSync(assetsJsonPath)) {
-      const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
+    const manifestPath = path.join(queueRoot, name, '_manifest.json');
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      const assets = manifest.assets || {};
+      const assetCount = Object.keys(assets).length;
+      const layers = new Set(Object.values(assets).map((a: any) => a.layer));
       circles.push({
         name,
-        layer: data.layer,
-        assetCount: (data.assets || []).length,
+        target: manifest.target || '',
+        assetCount,
+        layers: layers.size,
       });
     }
   }
