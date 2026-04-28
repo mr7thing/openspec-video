@@ -30,6 +30,21 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 - 如 `@role_hero`, `@scene_bar`, `@prop_gun`
 - 引用带变体：`@classroom:morning`
 
+### 双通道参考图体系 (v0.8.3)
+
+OpsV 区分两种参考图来源，分别对应文档的两个不同区域：
+
+| 区域 | 方向 | 用途 | 读取方式 |
+|------|------|------|----------|
+| `## Design References` | **输入侧** | 本文档的设计参考图，编译时作为 `reference_images` 传入生成 API | `DesignRefReader` 读取自身文档的 `## Design References` |
+| `## Approved References` | **输出侧** | 审阅通过后的定档图像，供**其他文档**通过 `@assetId:variant` 引用时读取 | `ApprovedRefReader` 读取被引用文档的 `## Approved References` |
+
+**外部引用**（`@assetId:variant` in body + `refs:` in frontmatter）→ 读取**被引用文档**的 `## Approved References`
+**内部引用**（`## Design References` section in own document）→ 读取**自身文档**的 `## Design References` 作为 `reference_images`
+
+- `Asset.approvedRefs`：存储从被引用文档 `## Approved References` 解析出的图像路径
+- `Asset.designRefs`：存储从自身文档 `## Design References` 解析出的图像路径（v0.8.3 新增）
+
 ### 状态机
 每个可审阅对象拥有 `status` 字段：
 

@@ -90,6 +90,12 @@ Review approve 根据**生成物文件名**自动判断状态：
 
 v0.8 中 `opsv imagen` 和 `opsv animate` 带上 `--model` 参数后**直接编译**，产出可执行的 `.json` 文件，不再有 `jobs.json` 中间层。
 
+**编译时参考图解析**（v0.8.3）：
+- **外部引用**（`@assetId:variant`）→ `ApprovedRefReader` 读取被引用文档的 `## Approved References`，解析为 `Asset.approvedRefs`
+- **内部引用**（本文档自带的参考图）→ `DesignRefReader` 读取自身文档的 `## Design References`，解析为 `Asset.designRefs`
+- 第一个参考图块读取 `approvedRefs`（来自外部引用的 approved 图像）
+- 第二个参考图块读取 `designRefs`（来自自身 `## Design References` 的设计参考图）
+
 ```bash
 # 图像任务（自动推断当前开放的 Circle，默认跳过已 approved 资产）
 opsv imagen --model volcengine.seadream-5.0-lite
@@ -170,6 +176,8 @@ opsv imagen --model volcengine.seadream-5.0-lite --no-skip-approved
 - **CLI 非冲突原则**：Review approve 仅追加 review 记录 + 设置状态，绝不修改内容字段。
 - 只有 `approved` 的资产才能作为下一 Circle 的参考底图。`syncing` 资产阻断下游。
 - Review 后刷新 circle：`opsv circle refresh`；全部 approve → 可晋升下一环。
+- **`## Approved References`**（输出侧）：审阅通过后自动追加，供其他文档通过 `@assetId:variant` 引用
+- **`## Design References`**（输入侧）：文档自带的设计参考图，编译时作为 `reference_images` 传入生成 API
 
 ### 步骤 5：下一 Circle
 基于 approved 资产，继续 FirstCircle → ... → EndCircle。

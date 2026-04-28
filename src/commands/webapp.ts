@@ -114,10 +114,10 @@ async function buildWebappJob(asset: any, refResolver: RefResolver, projectRoot:
       .map((r) => r.resolvedImagePath!);
   }
 
-  if (asset.approvedRefs && asset.approvedRefs.length > 0) {
+  if (asset.designRefs && asset.designRefs.length > 0) {
     referenceImages = [
       ...referenceImages,
-      ...asset.approvedRefs.map((r: any) => r.filePath),
+      ...asset.designRefs.map((r: any) => r.filePath),
     ];
   }
 

@@ -1,4 +1,4 @@
-# OpsV v0.8.2 Specification
+# OpsV v0.8.3 Specification
 
 ## Overview
 
@@ -147,12 +147,28 @@ Rules:
 (@asset_id:variant) description text  <- parenthesized form
 ```
 
+- External references (`@assetId:variant` in body + `refs:` in frontmatter) → reads `## Approved References` from the **referenced document** via `ApprovedRefReader`
+- Internal references (`## Design References` section in own document) → reads images from own document's `## Design References` section via `DesignRefReader`
+
+### Design References vs Approved References
+
+| Section | Direction | Purpose | Reader |
+|---------|-----------|---------|--------|
+| `## Design References` | **Input-side** | Design reference images bundled with the document; used as `reference_images` during compilation | `DesignRefReader` → `Asset.designRefs` |
+| `## Approved References` | **Output-side** | Images placed here after review approve; used when OTHER documents reference this one via `@assetId:variant` | `ApprovedRefReader` → `Asset.approvedRefs` |
+
+### @FRAME Resolution
+
+`@FRAME:shot_XX_last` resolution searches `.circleN/<provider.model>/` directories (v0.8.3) instead of hardcoded `opsv-queue/videospec/`.
+
 ## Compilation Flow
 
 1. Produce command (imagen/animate/comfy) reads `_manifest.json`
 2. Filters out `approved` assets
-3. Resolves `@ref` references -> approved image paths
-4. Builds `Job` objects from frontmatter
+3. Resolves `@ref` references via two readers (v0.8.3):
+   - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs` (first reference block)
+   - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs` (second reference block)
+4. Builds `Job` objects from frontmatter (with `approvedRefs` + `designRefs`)
 5. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
 6. Writes `TaskJson` to `basename.circleN/provider.model/shotId.json`
 
@@ -199,3 +215,12 @@ Rules:
 - `_assets.json` eliminated; its contents merged into `_manifest.json` with an `assets` field. `_manifest.json` now lives inside each `.circleN/` directory, not at the `opsv-queue/videospec/` level.
 - `opsv circle create` gains `--name` parameter to set the circle directory basename.
 - `--dir` on `circle create` now scopes creation to a specific directory rather than the whole videospec.
+
+## Breaking Changes from v0.8.2
+
+- Two reference types now properly distinguished: external references (`@assetId:variant` + `refs:`) read `## Approved References` from the referenced document; internal references read `## Design References` from the own document
+- New `DesignRefReader` class reads `## Design References` section (parallel to `ApprovedRefReader` which reads `## Approved References`)
+- `Asset.designRefs` field added alongside `Asset.approvedRefs`
+- Produce commands: second reference block now reads `designRefs` (from `## Design References`) instead of `approvedRefs` (from `## Approved References`)
+- `@FRAME:` resolution updated: now searches `.circleN/<provider.model>/` directories instead of hardcoded `opsv-queue/videospec/`
+- Section distinction clarified: `## Approved References` = output-side (images placed after review, referenced by other docs); `## Design References` = input-side (design reference images, used as `reference_images` during compilation)

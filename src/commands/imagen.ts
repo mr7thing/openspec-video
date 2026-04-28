@@ -114,10 +114,10 @@ async function buildImageJob(asset: Asset, refResolver: RefResolver, projectRoot
       .map((r) => r.resolvedImagePath!);
   }
 
-  if (asset.approvedRefs.length > 0) {
+  if (asset.designRefs.length > 0) {
     referenceImages = [
       ...referenceImages,
-      ...asset.approvedRefs.map((r) => r.filePath),
+      ...asset.designRefs.map((r) => r.filePath),
     ];
   }
 

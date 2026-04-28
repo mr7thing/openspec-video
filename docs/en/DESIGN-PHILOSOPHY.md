@@ -31,6 +31,10 @@ OpsV is not just a CLI tool — it is a **coordination protocol** between humans
 
 All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is the agent's responsibility after seeing `syncing`. The CLI never touches these fields.
 
+**Reference architecture** (v0.8.3): Two distinct reference types prevent confusion between input and output image flows:
+- `## Design References` (input-side): design reference images bundled with the document, read by `DesignRefReader` as `Asset.designRefs`, used as `reference_images` during compilation
+- `## Approved References` (output-side): images placed after review approve, read by `ApprovedRefReader` as `Asset.approvedRefs`, used when OTHER documents reference this one via `@assetId:variant`
+
 ---
 
 ## 3. Intent-Execution Decoupling
@@ -89,7 +93,7 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 **Why**: In v0.5–v0.6, an approved image might have been generated with a different prompt than what's in the frontmatter. When a downstream video task referenced this asset via `@hero`, it used the frontmatter's `visual_brief` — which might not match the actual generated image. The `syncing` gate forces alignment before propagation.
 
-**How it applies**: `opsv circle refresh` reports `syncing` assets as blocked. Produce commands skip `syncing` assets. The agent must verify that `visual_detailed`, `visual_brief`, `prompt_en`, and `refs` all reflect the actual generation result before setting `status: approved`.
+**How it applies**: `opsv circle refresh` reports `syncing` assets as blocked. Produce commands skip `syncing` assets. The agent must verify that `visual_detailed`, `visual_brief`, `prompt_en`, and `refs` all reflect the actual generation result before setting `status: approved`. Produce commands read references from two sources: `approvedRefs` (from `## Approved References` of referenced documents) and `designRefs` (from `## Design References` of the own document).
 
 ---
 

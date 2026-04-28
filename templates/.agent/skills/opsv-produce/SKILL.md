@@ -37,9 +37,14 @@ opsv webapp --model webapp.gemini
 1. Read `_manifest.json` from target circle (including `assets` field)
 2. Filter out `approved` assets
 3. Load asset frontmatter and resolve `@ref` references
-4. Build `Job` objects with prompt, references, frame_ref
-5. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
-6. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
+4. Read reference images via two readers (v0.8.3):
+   - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs` (first reference block)
+   - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs` (second reference block)
+5. Build `Job` objects with prompt, references (`approvedRefs` + `designRefs`), frame_ref
+6. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
+7. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
+
+**`@FRAME:` resolution** (v0.8.3): searches `.circleN/<provider.model>/` directories instead of hardcoded `opsv-queue/videospec/`
 
 ## Task JSON & Output Naming Convention
 

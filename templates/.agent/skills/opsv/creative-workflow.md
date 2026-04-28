@@ -118,10 +118,13 @@ reviews: []
 <!-- 导演原意 -->
 
 ## Design References
-<!-- 外部参考与附件 -->
+<!-- 输入侧：本文档的设计参考图，编译时作为 reference_images 传入生成 API -->
+<!-- DesignRefReader 读取此区域，解析为 Asset.designRefs -->
 
 ## Approved References
-<!-- 审批回写区域 —— 由 opsv review 自动写入，Agent 勿手动修改 -->
+<!-- 输出侧：审批通过后的定档图像，供其他文档通过 @assetId:variant 引用 -->
+<!-- 由 opsv review 自动写入，Agent 勿手动修改 -->
+<!-- ApprovedRefReader 读取此区域，解析为 Asset.approvedRefs -->
 ```
 
 **场景模板** (`scenes/@id.md`)：与角色模板语法互通，`category: "scene"`。
@@ -132,6 +135,8 @@ reviews: []
 - `category` 值为文档管理分类：`character`、`prop`、`costume`、`scene`、`shot-design`、`shot-production`、`project`。与生成类型无关 — 同一文档可用于 `imagen`、`video` 等任何生成命令，具体由 `--model` 参数决定。
 - `status: approved` 代表实体已定档可用；刚起草则为 `drafting`。
 - 必须设立 `## Design References`（输入参考图）和 `## Approved References`（定档后视觉形象，由 `opsv review` 自动回写）。
+- **`## Design References`**（输入侧）：本文档自带的设计参考图，编译时由 `DesignRefReader` 读取，解析为 `Asset.designRefs`，作为 `reference_images` 传入生成 API。
+- **`## Approved References`**（输出侧）：审阅通过后的定档图像，供**其他文档**通过 `@assetId:variant` 引用时由 `ApprovedRefReader` 读取，解析为 `Asset.approvedRefs`。
 - `refs` 字段定义了依赖关系，**直接影响 Circle 分层**。例如：若 `@younger_brother` 的 `refs` 包含 `@elder_brother`，则前者必须等待后者 approved 后才能生成。
 - **一致性约束**: `status: approved` 的文档必须在 `## Approved References` 区域包含至少一张 `![variant](path)` 格式的参考图。`opsv validate` 会自动校验。
 
@@ -224,8 +229,9 @@ refs:
 **关键帧塌缩 (@FRAME)**：
 如果是连贯分镜，首帧应指向上镜的尾帧。写法：`first_frame: "@FRAME:shot_01_last"`。
 
-**@FRAME 路径解析**：
-- `@FRAME:shot_XX_last` 在 `opsv animate` 编译时解析为**相对路径** `shot_XX_last.png`
+**@FRAME 路径解析**（v0.8.3 更新）：
+- `@FRAME:shot_XX_last` 在 `opsv animate` 编译时，搜索 `.circleN/provider.model/` 目录下匹配的文件，解析为相对路径
+- 搜索范围：所有 `.circleN/<provider.model>/` 目录（而非硬编码的 `opsv-queue/videospec/`）
 - 非 `@FRAME` 路径仍按传统方式解析（相对于 `videospec/shots/`）
 - 该 PNG 文件由上游视频的 Provider（如 Volcengine Seedance 2.0 的 `return_last_frame`）或 `opsv run` 的 ffmpeg 提取到 Provider 目录
 - **编译时不检查** `@FRAME` 路径的存在性（因为上游视频可能尚未生成）

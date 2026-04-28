@@ -133,6 +133,13 @@ async function buildVideoJob(
       .map((r) => r.resolvedImagePath!);
   }
 
+  if (asset.designRefs.length > 0) {
+    referenceImages = [
+      ...referenceImages,
+      ...asset.designRefs.map((r) => r.filePath),
+    ];
+  }
+
   return {
     id: asset.id,
     type: 'video',

@@ -182,6 +182,21 @@ drafting → draft → syncing → approved
 - 包含 Approved References 的文档状态必须为 `approved`
 - `opsv validate` 自动校验此项不一致
 
+### 双通道参考图体系 (v0.8.3)
+
+文档包含两个参考图区域，职责不同：
+
+| 区域 | 方向 | 用途 | 读取方式 |
+|------|------|------|----------|
+| `## Design References` | **输入侧** | 本文档的设计参考图，编译时作为 `reference_images` 传入生成 API | `DesignRefReader` 读取自身文档 → `Asset.designRefs` |
+| `## Approved References` | **输出侧** | 审阅通过后的定档图像，供其他文档通过 `@assetId:variant` 引用 | `ApprovedRefReader` 读取被引用文档 → `Asset.approvedRefs` |
+
+**编译时参考图解析**：
+- 第一个参考图块 = `approvedRefs`（来自外部引用文档的 `## Approved References`）
+- 第二个参考图块 = `designRefs`（来自自身文档的 `## Design References`）
+
+**`@FRAME:` resolution** (v0.8.3): now searches `.circleN/<provider.model>/` directories instead of hardcoded `opsv-queue/videospec/`
+
 ### 敏感词注意 (MiniMax/火山)
 若遇内容审核错误（如 MiniMax 1033），请在 `visual_detailed` 中对敏感词进行脱敏（如使用隐喻或近义词），并重新执行 `opsv imagen`。也可以 `visual_detailed` 脱敏后直接修改 Circle 目录下的任务 `.json` 重新 `opsv run`。
 

@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.2 Asset Manager
+// OpsV v0.8.3 Asset Manager
 // Reads assets from videospec/ and _manifest.json per .circleN/
 // ============================================================================
 
@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader, ApprovedRef } from './ApprovedRefReader';
+import { DesignRefReader, DesignRef } from './DesignRefReader';
 import { logger } from '../utils/logger';
 
 export interface Asset {
@@ -16,6 +17,7 @@ export interface Asset {
   refs: string[];
   description: string;
   approvedRefs: ApprovedRef[];
+  designRefs: DesignRef[];
   filePath: string;
 }
 
@@ -34,11 +36,13 @@ export class AssetManager {
   private videospecRoot: string;
   private assets: Map<string, Asset> = new Map();
   private approvedRefReader: ApprovedRefReader;
+  private designRefReader: DesignRefReader;
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
     this.videospecRoot = path.join(this.projectRoot, 'videospec');
     this.approvedRefReader = new ApprovedRefReader(this.projectRoot);
+    this.designRefReader = new DesignRefReader(this.projectRoot);
   }
 
   async loadFromVideospec(): Promise<void> {
@@ -60,6 +64,7 @@ export class AssetManager {
           const description =
             frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
           const approvedRefs = await this.approvedRefReader.getAll(filePath);
+          const designRefs = await this.designRefReader.getAll(filePath);
 
           const asset: Asset = {
             id,
@@ -68,6 +73,7 @@ export class AssetManager {
             refs: frontmatter.refs || [],
             description,
             approvedRefs,
+            designRefs,
             filePath,
           };
 

@@ -98,19 +98,38 @@ export class RefResolver {
     const shotId = framePart.slice(0, lastUnderscoreIdx);
     const frameType = framePart.slice(lastUnderscoreIdx + 1);
 
-    const framePath = path.join(
-      this.projectRoot,
-      'opsv-queue',
-      'videospec',
-      `${shotId}_${frameType}.png`
-    );
+    // Search .circleN/ directories for the frame file
+    const queueRoot = path.join(this.projectRoot, 'opsv-queue');
+    let framePath: string | undefined;
+
+    if (fs.existsSync(queueRoot)) {
+      const circleDirs = fs.readdirSync(queueRoot).filter((d) => d.includes('.circle'));
+      for (const circleDir of circleDirs) {
+        const circlePath = path.join(queueRoot, circleDir);
+        if (!fs.statSync(circlePath).isDirectory()) continue;
+
+        // Scan provider.model/ subdirectories for matching frame file
+        const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_'));
+        for (const providerDir of providerDirs) {
+          const providerPath = path.join(circlePath, providerDir);
+          if (!fs.statSync(providerPath).isDirectory()) continue;
+
+          const candidate = path.join(providerPath, `${shotId}_${frameType}.png`);
+          if (fs.existsSync(candidate)) {
+            framePath = candidate;
+            break;
+          }
+        }
+        if (framePath) break;
+      }
+    }
 
     return {
       type: 'frame',
       assetId: framePart,
       label,
       targetDoc: '',
-      resolvedImagePath: fs.existsSync(framePath) ? framePath : undefined,
+      resolvedImagePath: framePath,
     };
   }
 
