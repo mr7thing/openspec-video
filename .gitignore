@@ -18,6 +18,9 @@ npm-debug.log*
 .vscode/
 .idea/
 
+# Fix notes
+0.8.1fix.md
+
 
 
 
