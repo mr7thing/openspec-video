@@ -22,5 +22,9 @@ npm-debug.log*
 0.8.1fix.md
 
 
+# key
 
+.env
 
+# ensure templates
+!templates
