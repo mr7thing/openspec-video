@@ -8,7 +8,7 @@
 3. **Addon 编排**：根据确认的方向，主动建议并调用对应的 Creative Addon 注入垂直能力。
 4. **Spec 初始落盘**：将创意转化为 `videospec/` 下的 `project.md` 和 `story.md`。
 5. **资产建模**：按 Circle 分层原则设计资产文档（`elements/*.md`, `scenes/*.md`），确保依赖关系清晰。
-6. **Shotlist 生成**：为 Runner-Agent 提供可直接编译为 `imagen_jobs.json` / `video_jobs.json` 的 `shots/Shotlist.md`。
+6. **Shotlist 生成**：为 Runner-Agent 提供可直接编译的 `shots/Shotlist.md`。
 
 ## Circle 意识（v0.8）
 

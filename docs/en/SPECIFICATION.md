@@ -65,20 +65,25 @@ project/
 ## Status State Machine
 
 ```
-drafting -> draft -> syncing -> approved
+drafting -> syncing -> approved
 ```
 
-- `drafting`: Asset specification in progress
-- `draft`: Specification complete, ready for generation
-- `syncing`: Output generated, under review (blocks downstream)
+- `drafting`: Asset specification in progress (default, no review history)
+- `syncing`: Modified task approved, source document needs field alignment (blocks downstream)
 - `approved`: Output accepted, downstream dependencies unblocked
+
+Review approve sets status based on output filename pattern:
+- `id_1.ext` (original task) → directly `approved`
+- `id_N_N.ext` (modified task) → `syncing` + review record includes `modified_task` path; agent aligns fields then sets `approved`
+
+CLI never modifies `prompt_en` or other content fields during review — only appends review records and sets status.
 
 ## Frontmatter Schema
 
-### Base (all asset types)
+### Base (all asset categories)
 ```yaml
-type: character | prop | costume | scene | shot-design | shot-production | project
-status: drafting | draft | syncing | approved
+category: character | prop | costume | scene | shot-design | shot-production | project
+status: drafting | syncing | approved
 visual_brief: "Brief description for prompt generation"
 visual_detailed: "Detailed description for video prompt"
 prompt_en: "English prompt for AI generation"
@@ -86,9 +91,11 @@ refs: ["@hero:portrait", "@villain"]
 reviews: ["2026-01-15 Approved by director"]
 ```
 
+`category` is a document management classification — it does NOT determine generation type. Any document can be used with any `--model` (imagen/video/comfy/etc.). Generation type comes from `api_config.yaml` via the `--model` parameter.
+
 ### Project
 ```yaml
-type: project
+category: project
 aspect_ratio: "16:9"
 resolution: "1920x1080"
 global_style_postfix: "cinematic, film grain"
@@ -97,7 +104,7 @@ vision: "A dark thriller about..."
 
 ### Shot Production
 ```yaml
-type: shot-production
+category: shot-production
 title: "Hero enters forest"
 id: "shot_01"
 first_frame: "@hero_standing.png"
@@ -119,6 +126,19 @@ Circles represent dependency layers determined by topological sort:
 
 `opsv circle create` builds the graph and creates directory structure.
 `opsv circle refresh` rebuilds the graph and diffs against existing state.
+
+## Task JSON & Output Naming Convention
+
+| Scenario | Task JSON | Output | Review Result |
+|----------|-----------|--------|---------------|
+| Initial compile | `@hero.json` | `@hero_1.png` | Original → directly `approved` |
+| Modified re-compile | `@hero_2.json` | `@hero_2_1.png` | Modified → `syncing`, agent must align |
+
+Rules:
+- Initial: `id.json` → output `id_1.ext`
+- Modified tasks increment sequence: `id_2.json`, `id_3.json`...
+- Modified task outputs: `id_N_1.ext` (extra `_1` level, N≥2)
+- Agent iteration: `cp @hero.json @hero_2.json` → edit → `opsv run @hero_2.json` → output `@hero_2_1.png`
 
 ## @ Reference Syntax
 
@@ -163,8 +183,14 @@ Circles represent dependency layers determined by topological sort:
 
 - `opsv queue compile` removed; compilation is inline via `--model`
 - `opsv deps` removed; replaced by `opsv circle refresh`
-- `opsv daemon serve/start/stop/status` removed; daemon lifecycle implicit in `opsv app`
+- `opsv daemon` removed; Chrome extension now exposes HTTP API, CLI uses standard submit-poll via `opsv webapp`
 - `jobs.json` intermediate layer eliminated
-- `--model` is mandatory for imagen/animate/comfy/app
+- `--model` is mandatory for imagen/animate/comfy/webapp
 - `pending_sync` status removed; use `syncing`
+- `draft` status removed; only `drafting`, `syncing`, `approved`
+- `type` frontmatter field renamed to `category` (document management classification, NOT generation type)
+- Generation type is determined solely by `--model` (from `api_config.yaml`), not by document category
+- Review approve no longer modifies `prompt_en` or content fields — CLI only appends review records + sets status
+- Review approve sets `approved` for original task outputs, `syncing` for modified task outputs
 - No iteration numbers in directory names (A1 incremental update)
+- Output naming convention: `id_1.ext` (original), `id_N_1.ext` (modified, N≥2)

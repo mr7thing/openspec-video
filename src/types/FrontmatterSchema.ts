@@ -4,17 +4,19 @@ import { z } from 'zod';
 // OpsV v0.8 Frontmatter Schema
 // ============================================================================
 
-export const AssetTypeEnum = z.enum([
+// Document category — organizational classification, NOT generation type.
+// Generation type (imagen/video/audio/comfy/webapp) comes from api_config.yaml via --model.
+export const AssetCategoryEnum = z.enum([
   'character', 'prop', 'costume', 'scene',
   'shot-design', 'shot-production', 'project'
 ]);
-export type AssetType = z.infer<typeof AssetTypeEnum>;
+export type AssetCategory = z.infer<typeof AssetCategoryEnum>;
 
 export const StatusEnum = z.enum(['drafting', 'syncing', 'approved']);
 export type Status = z.infer<typeof StatusEnum>;
 
 export const BaseFrontmatterSchema = z.object({
-  type: AssetTypeEnum,
+  category: AssetCategoryEnum,
   status: StatusEnum,
   visual_brief: z.string().optional(),
   visual_detailed: z.string().optional(),

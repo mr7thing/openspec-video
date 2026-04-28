@@ -30,7 +30,7 @@ opsv audio --model test  # Not yet implemented
 
 ### app — Browser automation
 ```bash
-opsv app --model gemini.flash
+opsv webapp --model webapp.gemini
 ```
 
 ## Compilation Flow
@@ -39,7 +39,20 @@ opsv app --model gemini.flash
 3. Load asset frontmatter and resolve `@ref` references
 4. Build `Job` objects with prompt, references, frame_ref
 5. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
-6. Write to `opsv-queue/videospec/<circle>/<provider.model>/<shotId>.json`
+6. Write to `opsv-queue/videospec/<circle>/<provider.model>/<id>.json`
+
+## Task JSON & Output Naming Convention
+
+| Scenario | Task JSON | Output | Review Result |
+|----------|-----------|--------|---------------|
+| Initial compile | `@hero.json` | `@hero_1.png` | Original → directly `approved` |
+| Modified re-compile | `@hero_2.json` | `@hero_2_1.png` | Modified → `syncing`, Agent must align |
+
+**Rules**:
+- Initial: `id.json` → output `id_1.ext`
+- Modified tasks increment sequence: `id_2.json`, `id_3.json`...
+- Modified task outputs: `id_N_1.ext` (extra `_1` level)
+- Agent iteration: `cp @hero.json @hero_2.json` → edit → `opsv run @hero_2.json` → output `@hero_2_1.png`
 
 ## Key Files
 - `src/commands/imagen.ts`, `animate.ts`, `comfy.ts`, `audio.ts`, `app.ts`

@@ -44,10 +44,10 @@ export function registerScriptCommand(program: Command): void {
               const content = fs.readFileSync(filePath, 'utf-8');
               const { frontmatter } = FrontmatterParser.parseRaw(content);
 
-              if (frontmatter.type === 'shot-design' || frontmatter.type === 'shot-production') {
+              if (frontmatter.category === 'shot-design' || frontmatter.category === 'shot-production') {
                 shots.push({
                   id: file.replace(/^@/, '').replace(/\.md$/, ''),
-                  type: frontmatter.type,
+                  category: frontmatter.category,
                   title: frontmatter.title,
                   status: frontmatter.status,
                   duration: frontmatter.duration,

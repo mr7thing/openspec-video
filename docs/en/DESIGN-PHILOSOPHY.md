@@ -35,7 +35,7 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 ## 3. Intent-Execution Decoupling
 
-**Principle**: Produce commands (`imagen`, `animate`, `comfy`, `app`) only compile. Execution is a separate step via `opsv run`.
+**Principle**: Produce commands (`imagen`, `animate`, `comfy`, `webapp`) only compile. Execution is a separate step via `opsv run`.
 
 **Why**: In v0.5–v0.6, `opsv imagen` mixed five responsibilities: document parsing, dependency scheduling, prompt assembly, task construction, and persistence. Changing one aspect broke others. The coupling made it impossible to compile without executing, or to re-execute without recompiling.
 
@@ -110,3 +110,16 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 **Why**: In v0.7, circle membership was inferred from the dependency graph at runtime, while status was tracked separately in `.opsv/`. This created synchronization issues: the graph might say an asset belongs to `zerocircle`, but the status file thought it was in `firstcircle`. Co-locating membership and status in `_assets.json` within the circle directory makes them impossible to desynchronize.
 
 **How it applies**: `opsv circle create` writes `_assets.json`. `opsv circle refresh` updates it. `opsv review` approves update it. Produce commands read it to determine which assets to compile. No other source of circle membership or status exists.
+
+---
+
+## 11. Filename-Encoded Provenance: Task Identity Carries Modification History
+
+**Principle**: Task and output filenames encode whether a task has been modified, enabling deterministic review logic without any external state.
+
+**Why**: In v0.7, when a user modified a compiled task JSON and re-ran it, the review system had no way to know whether the approved output matched the original frontmatter or the modified task. The CLI would either blindly overwrite `prompt_en` (causing conflicts with agent edits) or skip alignment entirely (leaving stale descriptions). Encoding modification history in the filename makes the distinction trivial: `id_1.ext` = original, `id_2_1.ext` = modified.
+
+**How it applies**:
+- Initial compilation: `@hero.json` → output `@hero_1.png`
+- Modified re-compile: `@hero_2.json` → output `@hero_2_1.png`
+- Review approve: if output matches `id_N.ext` pattern (original) → set `approved` directly. If output matches `id_N_N.ext` pattern (modified) → set `syncing` and record the modified task JSON path so the agent can align frontmatter fields with the modified task.

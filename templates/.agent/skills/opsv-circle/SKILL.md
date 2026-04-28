@@ -33,3 +33,4 @@ Rebuilds the graph, diffs against existing `_assets.json`, and updates both per-
 - `src/commands/circle.ts` — Command handler
 - `src/core/DependencyGraph.ts` — Graph engine, topological sort, circle naming, manifest writing
 - `src/core/AssetManager.ts` — Asset loading from videospec/
+- `src/executor/naming.ts` — Task/output naming convention helpers (`parseOutputFilename`, `isModifiedTask`)

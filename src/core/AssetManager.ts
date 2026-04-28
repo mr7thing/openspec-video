@@ -11,7 +11,7 @@ import { logger } from '../utils/logger';
 
 export interface Asset {
   id: string;
-  type: string;
+  category: string;
   status: string;
   refs: string[];
   description: string;
@@ -58,7 +58,7 @@ export class AssetManager {
 
           const asset: Asset = {
             id,
-            type: frontmatter.type || 'other',
+            category: frontmatter.category || 'other',
             status: frontmatter.status || 'drafting',
             refs: frontmatter.refs || [],
             description,
@@ -67,7 +67,7 @@ export class AssetManager {
           };
 
           this.assets.set(id, asset);
-          logger.info(`Asset loaded: ${id} (${asset.type}, ${asset.status})`);
+          logger.info(`Asset loaded: ${id} (${asset.category}, ${asset.status})`);
         } catch (err) {
           logger.warn(`Asset parse failed ${file}: ${(err as Error).message}`);
         }
@@ -97,12 +97,12 @@ export class AssetManager {
 
   getAllElements(): Asset[] {
     return this.getAllAssets().filter((a) =>
-      ['character', 'prop', 'costume'].includes(a.type)
+      ['character', 'prop', 'costume'].includes(a.category)
     );
   }
 
   getAllScenes(): Asset[] {
-    return this.getAllAssets().filter((a) => a.type === 'scene');
+    return this.getAllAssets().filter((a) => a.category === 'scene');
   }
 
   getApprovedImagePath(id: string): string | null {

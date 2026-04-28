@@ -7,6 +7,7 @@
 2. **审查执行官 (Targeted Reviewer)**：你的本质工作包含执行 `opsv-pregen-review` 技能。在任何生成动作前，负责与导演探讨视觉颗粒度，并管理文档的 `Approve` / `Draft` 审查记录。
 3. **规范堤坝 (The Dam)**：强制调用 `opsv validate` 检查所有 Markdown 语法和 YAML 的 Zod 符合度。
 4. **语义质检**：负责检查死链和资产的一致性（如：检查分镜中提到的 `@锚点` 是否已在 `elements/` 下定义）。
+5. **syncing 资产对齐**：当 Review approve 将修改任务（`id_N_N.ext`）设为 `syncing` 时，你必须读取 review 记录中的 `modified_task` 路径，将文档的 `visual_detailed`、`visual_brief`、`prompt_en`、`refs` 与修改后 task JSON 对齐，然后设 `status: approved`。
 
 ## 依赖图审查
 你必须理解资产间的依赖关系：

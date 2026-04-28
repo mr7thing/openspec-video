@@ -3,12 +3,19 @@
 // ============================================================================
 
 import axios from 'axios';
-import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
+import { outputFilePath } from '../naming';
 import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
+import {
+  appendLog,
+  getResumeTaskId,
+  getPollIntervalMs,
+  getElapsedMs,
+  sleep,
+} from '../polling';
 
 export class RunningHubProvider {
   name = 'runninghub';
@@ -27,30 +34,43 @@ export class RunningHubProvider {
     try {
       const submitUrl = task._opsv.api_url;
       const statusUrl = task._opsv.api_status_url || submitUrl.replace('/post', '/status');
-      const outputDir = path.dirname(taskPath);
       const shotId = task._opsv.shotId;
 
-      const payload = { ...task };
-      delete (payload as any)._opsv;
+      let taskId = getResumeTaskId(taskPath);
 
-      const submitRes = await axios.post(submitUrl, payload, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 120000,
-      });
-
-      const taskId = submitRes.data?.data?.taskId || submitRes.data?.taskId;
       if (!taskId) {
-        throw new Error(`No taskId in submit response: ${JSON.stringify(submitRes.data)}`);
+        const payload = { ...task };
+        delete (payload as any)._opsv;
+
+        const submitRes = await axios.post(submitUrl, payload, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 120000,
+        });
+
+        taskId = submitRes.data?.data?.taskId || submitRes.data?.taskId;
+        if (!taskId) {
+          throw new Error(`No taskId in submit response: ${JSON.stringify(submitRes.data)}`);
+        }
+
+        appendLog(taskPath, { event: 'submitted', task_id: taskId });
+        logger.info(`[RunningHub] Submitted ${shotId}, taskId=${taskId}`);
+      } else {
+        logger.info(`[RunningHub] Resuming ${shotId}, taskId=${taskId}`);
       }
 
-      logger.info(`[RunningHub] Submitted ${shotId}, taskId=${taskId}`);
+      // Gradient polling
+      const maxDuration = 4 * 60 * 60 * 1000;
+      while (true) {
+        const elapsed = getElapsedMs(taskPath);
+        if (elapsed > maxDuration) {
+          throw new Error(`Polling timeout for ${taskId} (4h exceeded)`);
+        }
 
-      const maxRetries = 150;
-      for (let i = 0; i < maxRetries; i++) {
-        await new Promise((r) => setTimeout(r, 10000));
+        const interval = getPollIntervalMs(elapsed);
+        await sleep(interval);
 
         const statusRes = await axios.get(`${statusUrl}?taskId=${taskId}`, {
           headers: { Authorization: `Bearer ${apiKey}` },
@@ -63,18 +83,21 @@ export class RunningHubProvider {
           if (!outputUrl) throw new Error('Completed but no output URL found');
 
           const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-          const outputPath = path.join(outputDir, `${shotId}_1.${ext}`);
+          const outputPath = outputFilePath(taskPath, 1, ext);
           await downloadFile(outputUrl, outputPath);
 
+          appendLog(taskPath, { event: 'succeeded', task_id: taskId });
           return { taskPath, shotId, provider: 'runninghub', success: true, outputPath };
         }
 
         if (status === 'FAIL' || status === 'failed') {
-          throw new Error(`Task failed: ${JSON.stringify(statusRes.data)}`);
+          const reason = JSON.stringify(statusRes.data);
+          appendLog(taskPath, { event: 'failed', task_id: taskId, error: reason });
+          throw new Error(`Task failed: ${reason}`);
         }
-      }
 
-      throw new Error(`Polling timeout for ${taskId}`);
+        appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: taskId });
+      }
     } catch (err: any) {
       return {
         taskPath,

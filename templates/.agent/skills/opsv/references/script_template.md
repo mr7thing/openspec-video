@@ -1,13 +1,13 @@
 ---
-type: shot-design
+category: shot-design
 episode: 1
 visual_detailed: >
   写意水墨风格，强调黑白灰的层次感与虚实结合。
   画面中应有大量的留白，模拟宣纸的质感。
-status: draft
+status: drafting
 refs:
   - "story.md#Act 1"
-review: []
+reviews: []
 ---
 
 # Video Script - Episode 1

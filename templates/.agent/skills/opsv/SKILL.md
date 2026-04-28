@@ -35,15 +35,24 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 | 状态 | 含义 |
 |------|------|
-| `draft` | 起草中 |
-| `syncing` | Approve 回写完成，`prompt_en` 已更新但 `visual_detailed`/`visual_brief`/`refs` 尚未对齐，**阻断下游 Circle** |
+| `drafting` | 起草中（默认，无任何审阅动作记录） |
+| `syncing` | 修改过的任务经 approve 后，生成物与源文档描述字段尚未对齐，**阻断下游 Circle** |
 | `approved` | 已完全就绪，可作为下游依赖 |
 
-**状态流转**：`draft → [渲染] → [approve] → syncing → [Agent对齐] → approved`
+**状态流转**：
+- 原始任务（`id.json` → 生成物 `id_1.ext`）approve → **直接 `approved`**
+- 修改任务（`id_2.json` → 生成物 `id_2_1.ext`）approve → **`syncing`** → Agent 对齐后 → `approved`
+
+**CLI 非冲突原则**：Review approve 仅做两件事：
+1. 追加 review 记录（时间戳 + approve 意见 + 如有修改则记录 task JSON 路径）
+2. 根据生成物文件名模式设置状态（`approved` 或 `syncing`）
+
+**绝不修改 `prompt_en`、`visual_detailed`、`visual_brief` 等内容字段**，所有字段对齐由 Agent 完成。
 
 **一致性铁律**:
 - `status: approved` 的文档**必须**包含至少一张有效的 `## Approved References` 参考图（`![variant](path)` 格式）
-- `syncing` 资产虽然已有 Approved References，但被视为"未就绪"，**阻断下游 Circle 执行**
+- `syncing` 资产虽已有 Approved References，但被视为"未就绪"，**阻断下游 Circle 执行**
+- Agent 检查 `syncing` 资产的 review 记录中的 `modified_task` 路径，对齐文档描述字段与修改后 task JSON
 - `opsv validate` 会自动校验 status 与 Approved References 一致性、syncing 字段对齐状态
 
 ### Circle 状态图标（`opsv circle refresh` 输出）
@@ -78,8 +87,10 @@ opsv-queue/                         # 渲染产物目录
     ├── zerocircle/                # Circle 目录，无迭代后缀
     │   ├── _assets.json           # 该 Circle 资产清单
     │   └── volcengine.seadream/   # Provider.Model 扁平目录
-    │       ├── shot_01.json
-    │       └── shot_01.png
+    │       ├── @hero.json         # 初始编译的任务
+    │       ├── @hero_1.png        # 初始编译的产出
+    │       ├── @hero_2.json       # 修改后的任务（序号递增）
+    │       └── @hero_2_1.png      # 修改任务的产出（多一层_N）
     └── endcircle/
         ├── _assets.json
         └── volcengine.seedance/
@@ -93,6 +104,22 @@ opsv-queue/                         # 渲染产物目录
 - **Provider 目录**：扁平 `provider.model/` 格式，直接位于 Circle 目录下，无 queue_N 子目录
 - **Shot 文件**：`shot_*.md` 的 ID 绑定到文件名，修改文件名 = 删除重建
 
+### 任务 JSON 与生成物命名约定
+
+| 场景 | 任务 JSON | 生成物 | Review 结果 |
+|------|-----------|--------|-------------|
+| 初始编译 | `@hero.json` | `@hero_1.png` | 原始任务 → 直接 `approved` |
+| 修改后重编译 | `@hero_2.json` | `@hero_2_1.png` | 修改任务 → `syncing`，Agent 需对齐 |
+| 再次修改 | `@hero_3.json` | `@hero_3_1.png` | 修改任务 → `syncing`，Agent 需对齐 |
+
+**规则**：
+- 初始编译：`id.json` → 生成物 `id_1.ext`
+- 修改任务递增序号：`id_2.json`、`id_3.json`...
+- 修改任务生成物：`id_N_1.ext`（多一个 `_1` 层级）
+- Review 通过生成物文件名判断来源：
+  - `id_N.ext` 模式 → 原始任务 → 直接 `approved`
+  - `id_N_N.ext` 模式 → 修改任务 → `syncing` + review 记录中追加 `modified_task` 路径
+
 ### Shot 文件系统
 
 每个分镜是独立的 `shot_*.md` 文件：
@@ -100,7 +127,7 @@ opsv-queue/                         # 渲染产物目录
 ```yaml
 ---
 # id 由文件名推导（shot_01.md → id: shot_01），frontmatter 无需声明
-status: draft
+status: drafting
 first_frame: "@shot_01:first"
 last_frame: "@shot_01:last"
 duration: "5s"
@@ -154,7 +181,7 @@ opsv animate --model volcengine.seedance-2.0
 opsv comfy --model runninghub.flux-schnell
 
 # WebApp 生成（新增）
-opsv app --model <provider.model>
+opsv webapp --model <provider.model>
 
 # 音频生成（规划中）
 opsv audio --model <provider.model>
@@ -168,8 +195,11 @@ opsv run <path1> <path2> ...                                      # 多路径
 opsv review
 #    → 启动时自动 git commit checkpoint: "[review] {ts} — started"
 #    → 关闭时自动 git commit: "[review done] {ts} ({reason})"
-#    → Approve 后: prompt_en已覆盖 + Design References已同步 + status→syncing
-#    → Agent 对齐 visual_detailed/visual_brief/refs 后手动改为 approved
+#    → Approve 后（根据生成物文件名自动判断）：
+#      - 原始任务生成物 (id_1.ext) → 直接 approved
+#      - 修改任务生成物 (id_2_1.ext) → syncing + 记录 modified_task 路径
+#    → CLI 绝不修改 prompt_en 等内容字段
+#    → syncing 状态的资产：Agent 需对齐 visual_detailed/visual_brief/refs 后改为 approved
 #    → 全部 approved 后 opsv circle refresh 自动更新 _manifest.json
 
 # 聚合展示

@@ -3,12 +3,19 @@
 // ============================================================================
 
 import axios from 'axios';
-import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
+import { outputFilePath } from '../naming';
 import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
+import {
+  appendLog,
+  getResumeTaskId,
+  getPollIntervalMs,
+  getElapsedMs,
+  sleep,
+} from '../polling';
 
 export class MinimaxProvider {
   name = 'minimax';
@@ -44,7 +51,6 @@ export class MinimaxProvider {
 
   private async executeImage(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
     const apiUrl = task._opsv.api_url;
-    const outputDir = path.dirname(taskPath);
     const shotId = task._opsv.shotId;
 
     const payload = { ...task };
@@ -67,7 +73,7 @@ export class MinimaxProvider {
       throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
-    const outputPath = path.join(outputDir, `${shotId}_1.png`);
+    const outputPath = outputFilePath(taskPath, 1, 'png');
     await downloadFile(imageUrl, outputPath);
 
     return { taskPath, shotId, provider: 'minimax', success: true, outputPath };
@@ -76,30 +82,43 @@ export class MinimaxProvider {
   private async executeVideo(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
     const submitUrl = task._opsv.api_url;
     const statusUrl = task._opsv.api_status_url;
-    const outputDir = path.dirname(taskPath);
     const shotId = task._opsv.shotId;
 
-    const payload = { ...task };
-    delete (payload as any)._opsv;
+    let taskId = getResumeTaskId(taskPath);
 
-    const submitRes = await axios.post(submitUrl, payload, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 120000,
-    });
-
-    const taskId = submitRes.data?.task_id || submitRes.data?.data?.task_id;
     if (!taskId) {
-      throw new Error(`No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
+      const payload = { ...task };
+      delete (payload as any)._opsv;
+
+      const submitRes = await axios.post(submitUrl, payload, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 120000,
+      });
+
+      taskId = submitRes.data?.task_id || submitRes.data?.data?.task_id;
+      if (!taskId) {
+        throw new Error(`No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
+      }
+
+      appendLog(taskPath, { event: 'submitted', task_id: taskId });
+      logger.info(`[Minimax] Submitted ${shotId}, taskId=${taskId}`);
+    } else {
+      logger.info(`[Minimax] Resuming ${shotId}, taskId=${taskId}`);
     }
 
-    logger.info(`[Minimax] Submitted ${shotId}, taskId=${taskId}`);
+    // Gradient polling
+    const maxDuration = 4 * 60 * 60 * 1000;
+    while (true) {
+      const elapsed = getElapsedMs(taskPath);
+      if (elapsed > maxDuration) {
+        throw new Error(`Polling timeout for ${taskId} (4h exceeded)`);
+      }
 
-    const maxRetries = 150;
-    for (let i = 0; i < maxRetries; i++) {
-      await new Promise((r) => setTimeout(r, 10000));
+      const interval = getPollIntervalMs(elapsed);
+      await sleep(interval);
 
       const statusRes = await axios.get(`${statusUrl}?task_id=${taskId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -111,17 +130,20 @@ export class MinimaxProvider {
         const videoUrl = statusRes.data?.data?.video_url || statusRes.data?.file_url;
         if (!videoUrl) throw new Error('Completed but no video_url found');
 
-        const outputPath = path.join(outputDir, `${shotId}_1.mp4`);
+        const outputPath = outputFilePath(taskPath, 1, 'mp4');
         await downloadFile(videoUrl, outputPath);
 
+        appendLog(taskPath, { event: 'succeeded', task_id: taskId });
         return { taskPath, shotId, provider: 'minimax', success: true, outputPath };
       }
 
       if (status === 'Fail' || status === 'failed') {
-        throw new Error(`Video generation failed: ${JSON.stringify(statusRes.data)}`);
+        const reason = JSON.stringify(statusRes.data);
+        appendLog(taskPath, { event: 'failed', task_id: taskId, error: reason });
+        throw new Error(`Video generation failed: ${reason}`);
       }
-    }
 
-    throw new Error(`Polling timeout for ${taskId}`);
+      appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: taskId });
+    }
   }
 }

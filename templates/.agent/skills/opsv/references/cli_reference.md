@@ -14,7 +14,7 @@
 | `opsv animate --model` | 编译 Shotlist 为视频任务，直接产出可执行 `.json` | 视频管线 |
 | `opsv comfy --model` | ComfyUI 工作流编译与执行 | 自定义管线 |
 | `opsv audio --model` | 音频生成（规划中） | 音频管线 |
-| `opsv app --model` | WebApp 生成 | 应用管线 |
+| `opsv webapp --model` | WebApp 浏览器自动化 | 应用管线 |
 | `opsv run <paths...>` | 按路径引用执行渲染任务 | 执行 |
 | `opsv review` | 启动 Web Review UI 页面服务 | 审阅 |
 | `opsv script` | 从 shot_*.md 聚合生成 Script.md | 展示 |
@@ -95,12 +95,17 @@ opsv comfy --model runninghub.flux-schnell
 opsv audio --model <provider.model>
 ```
 
-### opsv app
-WebApp 生成。
+### opsv webapp
+浏览器自动化（Chrome 扩展 HTTP API）。
 
 ```bash
-opsv app --model <provider.model>
+opsv webapp --model webapp.gemini
+opsv webapp --model webapp.jimeng --circle zerocircle
+opsv webapp --model webapp.wan --dry-run
 ```
+
+**前提**：Chrome 扩展及其 Native Messaging Host 已启动，暴露 `http://127.0.0.1:9700`。
+**编译后**：`opsv run <compiled-dir>` 执行。
 
 ### opsv run
 按路径引用执行渲染任务，取代原 `opsv queue run`。
@@ -130,12 +135,12 @@ opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/ --retry
 
 **Agent 直接操作**：
 ```bash
-# 复制并修改任务
-cp opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01.json \
-   opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01_v2.json
-# 编辑 shot_01_v2.json 的 prompt 字段
-opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01_v2.json
-# → 生成 shot_01_v2.png
+# 复制并修改任务（序号递增）
+cp opsv-queue/videospec/zerocircle/volcengine.seadream/@hero.json \
+   opsv-queue/videospec/zerocircle/volcengine.seadream/@hero_2.json
+# 编辑 @hero_2.json 的 prompt 字段
+opsv run opsv-queue/videospec/zerocircle/volcengine.seadream/@hero_2.json
+# → 生成 @hero_2_1.png（id_N_1.ext 模式，Review 后为 syncing 状态）
 ```
 
 ### opsv circle
@@ -195,7 +200,11 @@ opsv animate --model volcengine.seedance-2.0
 
 **功能**:
 - **视觉反馈**: 实时对比多模型生成结果。
-- **Approve 闭环**: Approve 后直接引用原队列路径（`opsv-queue/...`）。
+- **Approve 条件判断**（根据生成物文件名自动决定）：
+  - `id_1.ext`（如 `@hero_1.png`）→ 原始任务 → 直接 `approved`
+  - `id_2_1.ext`（如 `@hero_2_1.png`）→ 修改任务 → `syncing` + review 记录追加 `modified_task` 路径
+- **CLI 非冲突原则**：Review approve 绝不修改 `prompt_en` 等内容字段，仅追加 review 记录 + 设置状态。
+- `syncing` 资产需 Agent 检查 review 记录中的 `modified_task`，对齐文档描述字段后改为 `approved`。
 - Review 后刷新 circle：`opsv circle refresh`；有变化 → 继续当前 Circle；全部 approve → 可晋升下一环。
 
 ---
@@ -209,13 +218,15 @@ opsv-queue/                         # 渲染产物目录
     ├── zerocircle/                # Circle 目录，无迭代后缀
     │   ├── _assets.json           # 该 Circle 资产清单
     │   └── volcengine.seadream/   # Provider.Model 扁平目录
-    │       ├── shot_01.json       # 可执行 API 请求体
-    │       └── shot_01.png        # 产出文件
+    │       ├── @hero.json         # 初始编译的任务
+    │       ├── @hero_1.png        # 初始编译的产出
+    │       ├── @hero_2.json       # 修改后的任务（序号递增）
+    │       └── @hero_2_1.png      # 修改任务的产出（id_N_1.ext 模式）
     └── endcircle/
         ├── _assets.json
         └── volcengine.seedance/
             ├── shot_01.json
-            └── shot_01.mp4
+            └── shot_01_1.mp4
 ```
 
 ---

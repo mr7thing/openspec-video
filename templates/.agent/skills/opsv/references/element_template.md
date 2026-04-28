@@ -1,5 +1,5 @@
 ---
-type: "imagen"
+category: "character"
 status: "drafting"
 visual_brief: >
   视觉描述简述。

@@ -1,5 +1,6 @@
 // ============================================================================
-// OpsV v0.8 — opsv animate
+// OpsV v0.8 — opsv webapp
+// Browser automation via Chrome extension HTTP API
 // ============================================================================
 
 import { Command } from 'commander';
@@ -7,18 +8,18 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { TaskBuilder } from '../core/compiler/TaskBuilder';
-import { AssetManager, Asset } from '../core/AssetManager';
+import { AssetManager } from '../core/AssetManager';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { RefResolver } from '../core/RefResolver';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
-import { Job, FrameRef } from '../types/Job';
+import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
 
-export function registerAnimateCommand(program: Command): void {
+export function registerWebappCommand(program: Command): void {
   program
-    .command('animate')
-    .description('Compile video generation tasks for a specific model')
-    .requiredOption('--model <model>', 'Provider model key (e.g. volcengine.seedance2)')
+    .command('webapp')
+    .description('Compile browser automation tasks for a specific webapp model')
+    .requiredOption('--model <model>', 'Webapp model key (e.g. webapp.gemini)')
     .option('--dir <path>', 'Project videospec directory', 'videospec')
     .option('--circle <name>', 'Target circle (default: auto-detect)')
     .option('--dry-run', 'Show compiled tasks without writing files')
@@ -33,7 +34,7 @@ export function registerAnimateCommand(program: Command): void {
         const approvedRefReader = new ApprovedRefReader(projectRoot);
         const refResolver = new RefResolver(projectRoot, approvedRefReader);
 
-        const circleName = resolveCircle(projectRoot, options.circle);
+        const circleName = await resolveCircle(projectRoot, options.circle);
         const circleDir = path.join(projectRoot, 'opsv-queue', 'videospec', circleName);
 
         const circleAssets = await assetManager.loadCircleAssets(circleDir);
@@ -42,20 +43,18 @@ export function registerAnimateCommand(program: Command): void {
           .map((a: any) => a.id);
 
         const allAssets = assetManager.getAllAssets();
-        const shotAssets = allAssets.filter(
-          (a) => targetIds.includes(a.id) && (a.category === 'shot-production' || a.category === 'shot-design')
-        );
+        const targetAssets = allAssets.filter((a) => targetIds.includes(a.id));
 
-        if (shotAssets.length === 0) {
-          console.log(chalk.yellow('No pending shot assets found in this circle.'));
+        if (targetAssets.length === 0) {
+          console.log(chalk.yellow('No pending assets found in this circle.'));
           return;
         }
 
-        console.log(chalk.cyan(`Compiling ${shotAssets.length} video tasks for ${modelKey}...`));
+        console.log(chalk.cyan(`Compiling ${targetAssets.length} webapp tasks for ${modelKey}...`));
 
         const jobs: Job[] = [];
-        for (const asset of shotAssets) {
-          const job = await buildVideoJob(asset, refResolver, projectRoot, circleDir, modelKey);
+        for (const asset of targetAssets) {
+          const job = await buildWebappJob(asset, refResolver, projectRoot);
           jobs.push(job);
         }
 
@@ -71,6 +70,7 @@ export function registerAnimateCommand(program: Command): void {
           }
         } else {
           console.log(chalk.green(`\n${results.length} tasks compiled to ${outputDir}`));
+          console.log(chalk.gray(`Run: opsv run ${outputDir}`));
         }
       } catch (err: any) {
         logger.error(err.message);
@@ -79,7 +79,7 @@ export function registerAnimateCommand(program: Command): void {
     });
 }
 
-function resolveCircle(projectRoot: string, circleName?: string): string {
+async function resolveCircle(projectRoot: string, circleName?: string): Promise<string> {
   if (circleName) return circleName;
 
   const manifestPath = path.join(projectRoot, 'opsv-queue', 'videospec', '_manifest.json');
@@ -90,36 +90,17 @@ function resolveCircle(projectRoot: string, circleName?: string): string {
       const hasPending = Object.values(circle.status || {}).some((s) => s !== 'approved');
       if (hasPending) return circle.circle;
     }
-    if (circles.length > 0) return circles[circles.length - 1].circle;
+    if (circles.length > 0) return circles[0].circle;
   }
 
   return 'zerocircle';
 }
 
-async function buildVideoJob(
-  asset: Asset,
-  refResolver: RefResolver,
-  projectRoot: string,
-  circleDir: string,
-  modelKey: string
-): Promise<Job> {
+async function buildWebappJob(asset: any, refResolver: RefResolver, projectRoot: string): Promise<Job> {
   const content = fs.readFileSync(asset.filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt_en || frontmatter.visual_detailed || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
-
-  let frameRef: FrameRef | undefined;
-  if (frontmatter.frame_ref) {
-    frameRef = {
-      first: frontmatter.frame_ref.first || null,
-      last: frontmatter.frame_ref.last || null,
-    };
-  } else if (frontmatter.first_frame || frontmatter.last_frame) {
-    frameRef = {
-      first: frontmatter.first_frame || null,
-      last: frontmatter.last_frame || null,
-    };
-  }
+  const prompt = frontmatter.prompt_en || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
 
   let referenceImages: string[] = [];
   if (frontmatter.refs && frontmatter.refs.length > 0) {
@@ -129,17 +110,31 @@ async function buildVideoJob(
       .map((r) => r.resolvedImagePath!);
   }
 
+  if (asset.approvedRefs && asset.approvedRefs.length > 0) {
+    referenceImages = [
+      ...referenceImages,
+      ...asset.approvedRefs.map((r: any) => r.filePath),
+    ];
+  }
+
+  let frameRef;
+  if (frontmatter.frame_ref) {
+    frameRef = {
+      first: frontmatter.frame_ref.first || null,
+      last: frontmatter.frame_ref.last || null,
+    };
+  }
+
   return {
     id: asset.id,
-    type: 'video',
+    type: 'webapp',
     prompt_en: prompt,
     payload: {
       prompt,
       global_settings: {
-        aspect_ratio: '16:9',
+        aspect_ratio: frontmatter.aspect_ratio || '1:1',
         quality: 'standard',
       },
-      duration: frontmatter.duration,
       frame_ref: frameRef,
     },
     reference_images: referenceImages.length > 0 ? referenceImages : undefined,

@@ -13,7 +13,7 @@ export interface ParsedDocument {
   id: string;
   filePath: string;
   frontmatter: {
-    type?: string;
+    category?: string;
     refs?: string[];
     status?: string;
   };

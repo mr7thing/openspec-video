@@ -3,8 +3,8 @@
 // ============================================================================
 
 // Types
-export { AssetTypeEnum, StatusEnum, BaseFrontmatterSchema, ProjectFrontmatterSchema, ShotDesignFrontmatterSchema, ShotProductionFrontmatterSchema } from './types/FrontmatterSchema';
-export type { AssetType, Status, BaseFrontmatter, ProjectFrontmatter, ShotDesignFrontmatter, ShotProductionFrontmatter } from './types/FrontmatterSchema';
+export { AssetCategoryEnum, StatusEnum, BaseFrontmatterSchema, ProjectFrontmatterSchema, ShotDesignFrontmatterSchema, ShotProductionFrontmatterSchema } from './types/FrontmatterSchema';
+export type { AssetCategory, Status, BaseFrontmatter, ProjectFrontmatter, ShotDesignFrontmatter, ShotProductionFrontmatter } from './types/FrontmatterSchema';
 export type { JobType, FrameRef, GlobalSettings, PromptPayload, Job, JobMeta, TaskJson } from './types/Job';
 
 // Errors

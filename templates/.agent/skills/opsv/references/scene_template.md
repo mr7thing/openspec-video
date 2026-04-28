@@ -1,5 +1,5 @@
 ---
-type: "scene"
+category: "scene"
 status: "drafting"
 visual_brief: >
   薄雾笼罩下的欧洲中世纪风格农场

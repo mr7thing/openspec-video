@@ -7,8 +7,8 @@
 
 ```yaml
 id: shot_01
-status: draft
-first_frame: "../../opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01.png"
+status: drafting
+first_frame: "../../opsv-queue/videospec/zerocircle/volcengine.seadream/shot_01_1.png"
 last_frame: null
 video_path: null
 ```
@@ -23,14 +23,14 @@ video_path: null
 
 **[Review 审查区]**
 > 这里供机器回填视频草案，供导演审查推翻。
-<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec/endcircle/volcengine.seedance/shot_01.mp4) -->
+<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec/endcircle/volcengine.seedance/shot_01_1.mp4) -->
 
 
 ## Shot 02 (4s)
 
 ```yaml
 id: shot_02
-status: draft
+status: drafting
 first_frame: "@FRAME:shot_01_last"
 last_frame: null
 video_path: null

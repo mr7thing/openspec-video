@@ -14,6 +14,7 @@ import { SiliconFlowCompiler } from './providers/SiliconFlowCompiler';
 import { MinimaxCompiler } from './providers/MinimaxCompiler';
 import { RunningHubCompiler } from './providers/RunningHubCompiler';
 import { ComfyUICompiler } from './providers/ComfyUICompiler';
+import { WebappCompiler } from './providers/WebappCompiler';
 import { logger } from '../../utils/logger';
 
 const COMPILERS: Record<string, ProviderCompiler> = {
@@ -22,6 +23,7 @@ const COMPILERS: Record<string, ProviderCompiler> = {
   minimax: new MinimaxCompiler(),
   runninghub: new RunningHubCompiler(),
   comfyui: new ComfyUICompiler(),
+  webapp: new WebappCompiler(),
 };
 
 function getCompiler(provider: string): ProviderCompiler {

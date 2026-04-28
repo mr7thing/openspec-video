@@ -1,0 +1,207 @@
+# OpsV v0.8 多模态资产生态系统配置文件
+# 类型值对齐 Produce 命令: imagen / video / audio / comfy / webapp
+#
+# 修改 api_url 可切换私有化部署或区域节点
+# 修改 defaults 可调整生成参数而无需重新编译代码
+#
+# 使用示例:
+#   opsv imagen --model volcengine.seadream
+#   opsv animate --model volcengine.seedance2
+#   opsv run opsv-queue/videospec/zerocircle/
+
+models:
+  # ==========================================
+  # 火山引擎 (Volcengine Ark)
+  # ==========================================
+  volcengine.seadream:
+    provider: volcengine
+    type: imagen
+    model: doubao-seedream-5-0-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    required_env:
+      - ARK_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      size: "2048x2048"
+      steps: 30
+      cfg_scale: 7.5
+      negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
+      output_format: "png"
+      response_format: "url"
+      watermark: false
+
+  volcengine.seedance2:
+    provider: volcengine
+    type: video
+    model: doubao-seedance-2-0-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    required_env:
+      - ARK_API_KEY
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 9
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+
+  volcengine.seedance2-fast:
+    provider: volcengine
+    type: video
+    model: doubao-seedance-2-0-fast-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    required_env:
+      - ARK_API_KEY
+    supports_first_image: true
+    supports_reference_images: true
+    max_reference_images: 9
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+
+  # ==========================================
+  # 硅基流动 (SiliconFlow)
+  # ==========================================
+  siliconflow.qwenimg:
+    provider: siliconflow
+    type: imagen
+    model: Qwen/Qwen-Image
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      image_size: "1664x928"
+      cfg_scale: 4.0
+      steps: 50
+      seed: 42
+
+  siliconflow.wan-t2v:
+    provider: siliconflow
+    type: video
+    model: Wan-AI/Wan2.2-T2V-A14B
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    required_env:
+      - SILICONFLOW_API_KEY
+    defaults:
+      image_size: "1280x720"
+      seed: 42
+
+  siliconflow.wan-i2v:
+    provider: siliconflow
+    type: video
+    model: Wan-AI/Wan2.2-I2V-A14B
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_first_image: true
+    defaults:
+      image_size: "1280x720"
+      seed: 42
+
+  # ==========================================
+  # MiniMax 稀宇科技
+  # ==========================================
+  minimax.image-01:
+    provider: minimax
+    type: imagen
+    model: image-01
+    api_url: https://api.minimaxi.com/v1/image_generation
+    required_env:
+      - MINIMAX_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      aspect_ratio: "16:9"
+
+  minimax.video-01:
+    provider: minimax
+    type: video
+    model: MiniMax-Hailuo-2.3
+    api_url: https://api.minimaxi.com/v1/video_generation
+    api_status_url: https://api.minimaxi.com/v1/query/video_generation
+    required_env:
+      - MINIMAX_API_KEY
+    supports_first_image: true
+    max_reference_images: 1
+    defaults:
+      resolution: "1080P"
+      duration: 5
+
+  # ==========================================
+  # ComfyUI Local
+  # ==========================================
+  comfyui.sdxl:
+    provider: comfyuilocal
+    type: comfy
+    model: any
+    api_url: http://127.0.0.1:8188/prompt
+    defaults:
+      templateDir: ""
+
+  # ==========================================
+  # RunningHub (ComfyUI Cloud)
+  # ==========================================
+  runninghub.default:
+    provider: runninghub
+    type: comfy
+    model: any
+    api_url: https://www.runninghub.cn/task/openapi/comfyui/post
+    api_status_url: https://www.runninghub.cn/task/openapi/comfyui/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+
+  # ==========================================
+  # Web App 浏览器自动化
+  # ==========================================
+  webapp.gemini:
+    provider: webapp
+    type: webapp
+    api_url: http://127.0.0.1:9700/generate
+    api_status_url: http://127.0.0.1:9700/status
+    supports_reference_images: true
+    supports_first_image: true
+    max_reference_images: 1
+    defaults:
+      target_url: "https://gemini.google.com"
+      typing_speed: "human"
+      watermark_removal: true
+      upload_method: "drag-drop"
+
+  webapp.wan:
+    provider: webapp
+    type: webapp
+    api_url: http://127.0.0.1:9700/generate
+    api_status_url: http://127.0.0.1:9700/status
+    supports_reference_images: true
+    supports_first_image: true
+    max_reference_images: 1
+    defaults:
+      target_url: "https://wan.example.com"
+      typing_speed: "fast"
+      watermark_removal: false
+      upload_method: "file-input"
+
+  webapp.jimeng:
+    provider: webapp
+    type: webapp
+    api_url: http://127.0.0.1:9700/generate
+    api_status_url: http://127.0.0.1:9700/status
+    supports_reference_images: true
+    supports_first_image: true
+    max_reference_images: 9
+    defaults:
+      target_url: "https://jimeng.jianying.com"
+      typing_speed: "human"
+      watermark_removal: true
+      upload_method: "paste"

@@ -1,5 +1,5 @@
 ---
-type: "prop"
+category: "prop"
 status: "drafting"
 visual_brief: >
   赤焰断剑：带有岩浆裂纹的黑色铁剑。

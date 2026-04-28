@@ -1,7 +1,7 @@
 ---
-type: story-outline
+category: story-outline
 status: approved
-review: []
+reviews: []
 ---
 
 # Story Outline

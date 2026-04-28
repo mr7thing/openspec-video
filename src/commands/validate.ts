@@ -13,7 +13,7 @@ import {
   ProjectFrontmatterSchema,
   ShotDesignFrontmatterSchema,
   ShotProductionFrontmatterSchema,
-  AssetTypeEnum,
+  AssetCategoryEnum,
   StatusEnum,
 } from '../types/FrontmatterSchema';
 import { logger } from '../utils/logger';
@@ -52,8 +52,8 @@ export function registerValidateCommand(program: Command, version: string): void
               const content = fs.readFileSync(filePath, 'utf-8');
               const { frontmatter } = FrontmatterParser.parseRaw(content);
 
-              // Determine schema based on type
-              const schema = getSchemaForType(frontmatter.type);
+              // Determine schema based on category
+              const schema = getSchemaForCategory(frontmatter.category);
               FrontmatterParser.parse(content, schema);
               validFiles++;
             } catch (err: any) {
@@ -80,8 +80,8 @@ export function registerValidateCommand(program: Command, version: string): void
     });
 }
 
-function getSchemaForType(type?: string): z.ZodType {
-  switch (type) {
+function getSchemaForCategory(category?: string): z.ZodType {
+  switch (category) {
     case 'project':
       return ProjectFrontmatterSchema;
     case 'shot-design':

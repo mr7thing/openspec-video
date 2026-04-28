@@ -8,6 +8,7 @@ import fs from 'fs';
 import chalk from 'chalk';
 import express from 'express';
 import { FrontmatterParser } from '../core/FrontmatterParser';
+import { parseOutputFilename } from '../executor/naming';
 import { logger } from '../utils/logger';
 
 export function registerReviewCommand(program: Command): void {
@@ -88,15 +89,26 @@ export function registerReviewCommand(program: Command): void {
         // Approve endpoint
         // CLI only performs deterministic, conflict-free actions:
         // 1. Append a review record to source .md frontmatter
-        // 2. Set status to 'syncing' (agent will change to 'approved' after alignment)
-        // 3. Never modify prompt_en or other fields
+        // 2. If output matches original task (id_N.ext) → status = 'approved' directly
+        //    If output matches modified task (id_N_N.ext) → status = 'syncing' + record task JSON path
+        // 3. Never modify prompt_en or other content fields
         app.post('/api/approve/:circle/:assetId', express.json(), async (req, res) => {
           const { circle, assetId } = req.params;
           const { outputFile, taskJsonPath } = req.body || {};
 
           try {
             const now = new Date().toISOString();
-            const reviewEntry = `${now} approved output: ${outputFile || assetId}`;
+
+            // Determine approval status from output filename convention
+            // id_N.ext → original task → approved
+            // id_N_N.ext → modified task → syncing (agent must align)
+            const parsed = outputFile ? parseOutputFilename(outputFile) : { isModified: false };
+            const newStatus = parsed.isModified ? 'syncing' : 'approved';
+
+            let reviewEntry = `${now} approved output: ${outputFile || assetId}`;
+            if (parsed.isModified && taskJsonPath) {
+              reviewEntry += ` | modified_task: ${taskJsonPath}`;
+            }
 
             // Find source .md file and append review record
             const elementsDir = path.join(process.cwd(), 'videospec', 'elements');
@@ -118,36 +130,38 @@ export function registerReviewCommand(program: Command): void {
             if (sourceDocPath) {
               const content = fs.readFileSync(sourceDocPath, 'utf-8');
               const updated = FrontmatterParser.appendReview(content, reviewEntry);
-
-              // Set status to syncing (not approved — agent must align first)
-              const finalContent = FrontmatterParser.updateField(updated, 'status', 'syncing');
+              const finalContent = FrontmatterParser.updateField(updated, 'status', newStatus);
               fs.writeFileSync(sourceDocPath, finalContent);
             }
 
-            // Update _assets.json status → syncing
+            // Update _assets.json status
             const assetsJsonPath = path.join(queueRoot, circle, '_assets.json');
             if (fs.existsSync(assetsJsonPath)) {
               const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf-8'));
               const asset = (data.assets || []).find((a: any) => a.id === assetId);
               if (asset) {
-                asset.status = 'syncing';
+                asset.status = newStatus;
                 fs.writeFileSync(assetsJsonPath, JSON.stringify(data, null, 2));
               }
             }
 
-            // Update _manifest.json status → syncing
+            // Update _manifest.json status
             const manifestPath = path.join(queueRoot, '_manifest.json');
             if (fs.existsSync(manifestPath)) {
               const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
               for (const c of manifest.circles || []) {
                 if (c.circle === circle && c.status && c.status[assetId]) {
-                  c.status[assetId] = 'syncing';
+                  c.status[assetId] = newStatus;
                 }
               }
               fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
             }
 
-            res.json({ success: true, status: 'syncing', note: 'Agent must align fields before setting approved' });
+            const note = parsed.isModified
+              ? 'Modified task — agent must align fields before setting approved'
+              : 'Original task — directly approved';
+
+            res.json({ success: true, status: newStatus, note });
           } catch (err: any) {
             res.status(500).json({ error: err.message });
           }

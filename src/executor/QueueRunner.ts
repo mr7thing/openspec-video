@@ -13,7 +13,8 @@ import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
 import { MinimaxProvider } from './providers/MinimaxProvider';
 import { RunningHubProvider } from './providers/RunningHubProvider';
 import { ComfyUILocalProvider } from './providers/ComfyUILocalProvider';
-import { BrowserProvider } from './providers/BrowserProvider';
+import { WebappProvider } from './providers/WebappProvider';
+import { isTaskCompleted, getResumeTaskId } from './polling';
 
 export interface ProviderResult {
   taskPath: string;
@@ -38,7 +39,7 @@ export class QueueRunner {
     this.providers.set('minimax', new MinimaxProvider());
     this.providers.set('runninghub', new RunningHubProvider());
     this.providers.set('comfyui', new ComfyUILocalProvider());
-    this.providers.set('browser', new BrowserProvider());
+    this.providers.set('webapp', new WebappProvider());
   }
 
   async runPaths(paths: string[], options: { retry?: boolean; dryRun?: boolean } = {}): Promise<ProviderResult[]> {
@@ -144,6 +145,9 @@ export class QueueRunner {
 
   private collectFromDir(dir: string, results: Array<{ task: TaskJson; path: string }>): void {
     const entries = fs.readdirSync(dir);
+    const outputFiles = new Set(
+      entries.filter((e) => !e.endsWith('.json') && !e.endsWith('.log') && !e.startsWith('_'))
+    );
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry);
@@ -155,6 +159,12 @@ export class QueueRunner {
         try {
           const task = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
           if (task._opsv) {
+            // Skip if output already exists
+            const base = entry.replace(/\.json$/, '');
+            const hasOutput = Array.from(outputFiles).some((f) => f.startsWith(base + '_'));
+            if (hasOutput && !getResumeTaskId(fullPath)) {
+              continue;
+            }
             results.push({ task, path: fullPath });
           }
         } catch {

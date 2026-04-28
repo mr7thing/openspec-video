@@ -342,9 +342,9 @@ opsv animate --model volcengine.seedance2-fast --circle endcircle
 
 ### 产物获取
 
-OpsV 自动从成功响应中提取：
-1. 视频 → `{shotId}_1.mp4`
-2. 封面/首帧 → `{shotId}_first.png`
-3. 尾帧 → `{shotId}_last.png`（因 `return_last_frame: true`）
+OpsV 自动从成功响应中提取（遵循命名约定 `id_N_1.ext`）：
+1. 视频 → `shot_01_1.mp4`（原始任务）或 `shot_01_2_1.mp4`（修改任务）
+2. 封面/首帧 → `shot_01_first.png`
+3. 尾帧 → `shot_01_last.png`（因 `return_last_frame: true`）
 
 尾帧可用于下游 shot 的 `@FRAME:shot_XX_last` 首帧引用。

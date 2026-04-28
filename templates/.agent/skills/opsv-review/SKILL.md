@@ -17,13 +17,39 @@ opsv review --all
 - `POST /api/approve/:circle/:assetId` — Approve an asset (updates status)
 
 ## Approval Flow
-1. User reviews output in browser
-2. Clicks approve → `POST /api/approve/:circle/:assetId`
-3. Server updates `_assets.json` status → `approved`
-4. Server updates `_manifest.json` status → `approved`
-5. Next `opsv circle refresh` will reflect the approved state
-6. Downstream circles can now proceed
+
+### Conditional Status by Output Filename Pattern
+
+Review approve uses `parseOutputFilename()` to detect whether the approved output came from an original or modified task:
+
+| Output Filename | Pattern | Task Type | Result |
+|-----------------|---------|-----------|--------|
+| `@hero_1.png` | `id_N.ext` | Original task (`@hero.json`) | `status: approved` |
+| `@hero_2_1.png` | `id_N_N.ext` | Modified task (`@hero_2.json`) | `status: syncing` |
+
+### What CLI Does (Deterministic, Conflict-Free Only)
+1. **Append review record** to source `.md` frontmatter:
+   - Timestamp + approve opinion
+   - If modified task: append `modified_task: <task JSON path>` in review entry
+2. **Set status** based on filename pattern:
+   - Original → `approved`
+   - Modified → `syncing`
+3. **Update** `_assets.json` and `_manifest.json` status
+
+### What CLI Never Does
+- Never modifies `prompt_en`, `visual_detailed`, `visual_brief`, `refs`, or any content field
+- Never writes to `## Approved References` (that's the agent's job after syncing)
+
+### Agent Responsibility for `syncing` Assets
+When an asset is in `syncing` state, the agent must:
+1. Read the review record to find the `modified_task` path
+2. Load the modified task JSON
+3. Align `visual_detailed`, `visual_brief`, `prompt_en`, `refs` in the source `.md` with the modified task JSON
+4. Write approved output to `## Approved References`
+5. Set `status: approved`
+6. Run `opsv circle refresh` to update manifests
 
 ## Key Files
 - `src/commands/review.ts` — Express server with API routes
+- `src/executor/naming.ts` — `parseOutputFilename()` for filename-based status decision
 - `src/review-ui/public/` — Static UI files
