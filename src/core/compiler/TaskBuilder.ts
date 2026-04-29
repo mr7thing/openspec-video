@@ -46,7 +46,9 @@ export class TaskBuilder {
     jobs: Job[],
     modelKey: string,
     outputDir: string,
-    dryRun = false
+    dryRun = false,
+    workflowPath?: string,
+    workflowDir?: string
   ): TaskJson[] {
     const modelConfig = this.configLoader.getModelConfig(modelKey);
     if (!modelConfig) {
@@ -64,6 +66,9 @@ export class TaskBuilder {
         modelConfig,
         apiKey,
         outputDir,
+        workflowPath,
+        workflowDir,
+        refCount: job.reference_images?.length || 0,
       };
 
       const taskJson = compiler.compile(ctx);

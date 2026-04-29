@@ -11,6 +11,9 @@ export interface CompileContext {
   apiKey: string;
   outputDir: string;
   referenceImages?: string[];
+  workflowPath?: string;
+  workflowDir?: string;
+  refCount?: number;
 }
 
 export interface ProviderCompiler {

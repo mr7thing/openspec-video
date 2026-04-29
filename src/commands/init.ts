@@ -15,17 +15,29 @@ export function registerInitCommand(program: Command, version: string): void {
     .option('--dir <path>', 'Target directory')
     .action(async (name?: string, options?: any) => {
       try {
-        const projectName = name || 'my-project';
-        const targetDir = options?.dir
-          ? path.resolve(options.dir, projectName)
-          : path.join(process.cwd(), projectName);
+        // No name → init in current directory; with name → create subdirectory
+        const projectName = name || path.basename(process.cwd());
+        const targetDir = name
+          ? (options?.dir
+            ? path.resolve(options.dir, name)
+            : path.join(process.cwd(), name))
+          : (options?.dir
+            ? path.resolve(options.dir)
+            : process.cwd());
 
-        if (fs.existsSync(targetDir)) {
+        if (name && fs.existsSync(targetDir)) {
           console.error(chalk.red(`Directory already exists: ${targetDir}`));
           process.exit(1);
         }
 
-        console.log(chalk.cyan(`Creating OpsV project: ${projectName}`));
+        // Guard: prevent overwriting existing project
+        const existingMarker = path.join(targetDir, '.opsv', 'api_config.yaml');
+        if (fs.existsSync(existingMarker)) {
+          console.error(chalk.red(`OpsV project already exists in ${targetDir}`));
+          process.exit(1);
+        }
+
+        console.log(chalk.cyan(`Initializing OpsV project: ${projectName}`));
 
         // Create directory structure
         const dirs = [
@@ -138,9 +150,11 @@ opsv-queue/
 
         fs.writeFileSync(path.join(targetDir, '.gitignore'), gitignore);
 
-        console.log(chalk.green(`\nProject created at ${targetDir}`));
+        console.log(chalk.green(`\nProject initialized at ${targetDir}`));
         console.log(chalk.cyan('\nNext steps:'));
-        console.log(`  cd ${projectName}`);
+        if (name) {
+          console.log(`  cd ${name}`);
+        }
         console.log('  opsv circle create --dir videospec');
         console.log('  opsv imagen --model volcengine.seadream');
         console.log('  opsv run opsv-queue/videospec.circle1/volcengine.seadream/');

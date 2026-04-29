@@ -52,6 +52,7 @@ export interface TaskJson {
     api_url: string;
     api_status_url?: string;
     references?: string[];
+    workflowFile?: string;
     compiledAt: string;
   };
 }
