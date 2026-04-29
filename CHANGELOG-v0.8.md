@@ -1,6 +1,6 @@
 # OpsV v0.8.x 会话变更记录
 
-> 记录范围：v0.8.1 → v0.8.3，涵盖 2026-04-28 全部会话
+> 记录范围：v0.8.1 → v0.8.5，涵盖 2026-04-28 ~ 2026-04-29 全部会话
 
 ---
 
@@ -169,6 +169,7 @@
 | v0.8.2 | 2026-04-28 22:38 | Circle 扁平化 (.circleN)、合并 _manifest.json、--dir 精确扫描 |
 | v0.8.3 | 2026-04-28 23:35 | 双通道参考图（Design + Approved）、DesignRefReader、@FRAME 路径修复 |
 | v0.8.4 | 2026-04-29 10:00 | ComfyUI --workflow/--workflow-dir、ref(N) 自动匹配、_opsv_workflow 验证 |
+| v0.8.5 | 2026-04-29 11:30 | init 模板复制化、.env 根目录化、cli.ts 优先级修正 |
 
 ---
 
@@ -203,3 +204,26 @@
 
 29. **编译错误容忍**
     - 单个资产编译失败不中断整体批次，错误汇总报告后跳过
+
+---
+
+## v0.8.5 — 2026-04-29 11:30
+
+### 变更要点
+
+30. **`opsv init` 模板复制化**
+    - `api_config.yaml`：从 `templates/.opsv/api_config.yaml` 复制（完整多模型配置 + defaults），不再硬编码精简版
+    - `.env`：从 `templates/.env` 复制到项目根目录
+    - `.agent/`：从 `templates/.agent/` 递归复制（skills、agent configs）
+    - 模板文件缺失时警告跳过而非崩溃
+
+31. **`.env` 根目录化**
+    - `templates/.env`：放在模板根目录位置（对应项目根目录）
+    - `init.ts`：复制到 `{project}/.env`（项目根目录）
+    - `cli.ts`：优先读根目录 `.env`，fallback 读 `.opsv/.env`（向后兼容）
+    - `.gitignore`：忽略根目录 `.env`
+
+32. **`opsv init` 不带参数在当前目录初始化**
+    - `opsv init`：在当前目录直接初始化（不创建子目录）
+    - `opsv init my-project`：创建子目录（不变）
+    - 防重复保护：检测 `.opsv/api_config.yaml` 已存在时报错

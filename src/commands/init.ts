@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.2 — opsv init
+// OpsV v0.8.4 — opsv init
 // ============================================================================
 
 import { Command } from 'commander';
@@ -7,6 +7,10 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
+
+// Resolve templates directory relative to the compiled dist/ directory
+const PKG_ROOT = path.resolve(__dirname, '..');
+const TEMPLATES_DIR = path.join(PKG_ROOT, '..', 'templates');
 
 export function registerInitCommand(program: Command, version: string): void {
   program
@@ -67,76 +71,22 @@ Describe your project vision here.
 
         fs.writeFileSync(path.join(targetDir, 'videospec', 'elements', 'project.md'), projectMd);
 
-        // Write .opsv/api_config.yaml
-        const apiConfig = `# OpsV v0.8 API Configuration
-models:
-  volcengine.seadream:
-    provider: volcengine
-    type: imagen
-    model: seadream
-    api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
-    required_env:
-      - ARK_API_KEY
-    supports_reference_images: true
-    max_reference_images: 1
+        // Copy template files from templates/ directory
+        copyTemplateFile(
+          path.join(TEMPLATES_DIR, '.opsv', 'api_config.yaml'),
+          path.join(targetDir, '.opsv', 'api_config.yaml')
+        );
 
-  volcengine.seedance2:
-    provider: volcengine
-    type: video
-    model: seedance-2
-    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations
-    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/status
-    required_env:
-      - ARK_API_KEY
-    supports_first_image: true
-    supports_last_image: true
+        copyTemplateFile(
+          path.join(TEMPLATES_DIR, '.env'),
+          path.join(targetDir, '.env')
+        );
 
-  siliconflow.qwenimg:
-    provider: siliconflow
-    type: imagen
-    model: Qwen/Qwen2.5-VL-72B-Instruct
-    api_url: https://api.siliconflow.cn/v1/images/generations
-    required_env:
-      - SILICONFLOW_API_KEY
-
-  siliconflow.wan:
-    provider: siliconflow
-    type: video
-    model: wan
-    api_url: https://api.siliconflow.cn/v1/video/submit
-    api_status_url: https://api.siliconflow.cn/v1/video/status
-    required_env:
-      - SILICONFLOW_API_KEY
-    supports_first_image: true
-
-  minimax.minimax-image:
-    provider: minimax
-    type: imagen
-    model: minimax-image-01
-    api_url: https://api.minimax.chat/v1/image_generation
-    required_env:
-      - MINIMAX_API_KEY
-
-  comfyui.sdxl:
-    provider: comfyui
-    type: comfy
-    model: sdxl
-    api_url: http://127.0.0.1:8188
-`;
-
-        fs.writeFileSync(path.join(targetDir, '.opsv', 'api_config.yaml'), apiConfig);
-
-        // Write .env template
-        const envTemplate = `# OpsV v0.8 Environment Variables
-# Add your API keys here
-
-# ARK_API_KEY=
-# SILICONFLOW_API_KEY=
-# MINIMAX_API_KEY=
-# RUNNINGHUB_API_KEY=
-`;
-
-        fs.writeFileSync(path.join(targetDir, '.opsv', '.env'), envTemplate);
+        // Copy .agent/ directory (skills, agent configs)
+        const agentSrc = path.join(TEMPLATES_DIR, '.agent');
+        if (fs.existsSync(agentSrc)) {
+          copyDirRecursive(agentSrc, path.join(targetDir, '.agent'));
+        }
 
         // Write .gitignore
         const gitignore = `node_modules/
@@ -145,7 +95,6 @@ logs/
 .env
 *.tmp
 opsv-queue/
-.opsv/
 `;
 
         fs.writeFileSync(path.join(targetDir, '.gitignore'), gitignore);
@@ -155,6 +104,7 @@ opsv-queue/
         if (name) {
           console.log(`  cd ${name}`);
         }
+        console.log('  Edit .env to add your API keys');
         console.log('  opsv circle create --dir videospec');
         console.log('  opsv imagen --model volcengine.seadream');
         console.log('  opsv run opsv-queue/videospec.circle1/volcengine.seadream/');
@@ -163,4 +113,30 @@ opsv-queue/
         process.exit(1);
       }
     });
+}
+
+function copyTemplateFile(src: string, dest: string): void {
+  if (!fs.existsSync(src)) {
+    console.warn(chalk.yellow(`Template file not found: ${src} (skipping)`));
+    return;
+  }
+  fs.copyFileSync(src, dest);
+}
+
+function copyDirRecursive(src: string, dest: string): void {
+  if (!fs.existsSync(src)) return;
+
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }

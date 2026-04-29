@@ -44,7 +44,8 @@
 
 ```bash
 # 1. 初始化项目（首次）
-opsv init my-project
+opsv init              # 在当前目录初始化
+opsv init my-project   # 创建子目录初始化
 
 # 2. 验证规范
 opsv validate
@@ -77,7 +78,9 @@ opsv run opsv-queue/videospec.circle2/volcengine.seedance2/shot_01.json
 
 ```bash
 # 编译 ComfyUI 任务
-opsv comfy --model comfy.sdxl --param --dry-run
+opsv comfy --model comfyui.sdxl --dry-run
+opsv comfy --model comfyui.sdxl --workflow ref2          # 指定 workflow
+opsv comfy --model comfyui.sdxl --workflow-dir workflows/sdxl/  # 指定 workflow 目录
 
 # 执行
 opsv run opsv-queue/videospec.circle2/comfy.sdxl/shot_02.json
@@ -100,9 +103,9 @@ opsv app --model browser.chrome
 | `opsv circle refresh` | 重建依赖图，diff 更新各 `.circleN/_manifest.json` | `--dir` |
 | `opsv imagen` | 编译图像任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
 | `opsv animate` | 编译视频任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
-| `opsv comfy` | 编译 ComfyUI 任务为可执行 `.json` | `--model <m>`, `--param`, `--dry-run` |
+| `opsv comfy` | 编译 ComfyUI 任务为可执行 `.json` | `--model <m>`, `--workflow`, `--workflow-dir`, `--param`, `--dry-run` |
 | `opsv audio` | 编译音频任务（规划中，占位） | `--model <m>` |
-| `opsv app` | 浏览器自动化（daemon 隐式） | `--model <m>` |
+| `opsv webapp` | 浏览器自动化 | `--model <m>` |
 | `opsv run` | 执行编译后的任务 `.json` | `<paths...>`, `--retry`, `--dry-run` |
 | `opsv review` | Web UI 可视审阅 | `--port`, `--latest`, `--all`, `--ttl` |
 | `opsv script` | 分镜聚合 | `-d`, `-o`, `--dry-run` |

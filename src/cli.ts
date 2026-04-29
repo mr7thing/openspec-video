@@ -21,13 +21,13 @@ import { registerScriptCommand } from './commands/script';
 
 // Load .env before anything else
 const projectRoot = process.cwd();
-const opsvEnvPath = path.join(projectRoot, '.opsv', '.env');
 const rootEnvPath = path.join(projectRoot, '.env');
+const opsvEnvPath = path.join(projectRoot, '.opsv', '.env');
 
-if (fs.existsSync(opsvEnvPath)) {
-  dotenv.config({ path: opsvEnvPath });
-} else if (fs.existsSync(rootEnvPath)) {
+if (fs.existsSync(rootEnvPath)) {
   dotenv.config({ path: rootEnvPath });
+} else if (fs.existsSync(opsvEnvPath)) {
+  dotenv.config({ path: opsvEnvPath });
 } else {
   dotenv.config();
 }
@@ -41,7 +41,7 @@ const program = new Command();
 program
   .name('opsv')
   .version(VERSION)
-  .description('OpenSpec-Video v0.8 — Cinematic AI Automation CLI');
+  .description('OpenSpec-Video v0.8.5 — Cinematic AI Automation CLI');
 
 // Register all 11 commands
 registerInitCommand(program, VERSION);

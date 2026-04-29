@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.2
+# OpenSpec-Video (OpsV) v0.8.5
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -16,7 +16,10 @@ OpsV is a **spec-driven** cinematic AI automation framework. You write narrative
 # Install
 npm install -g videospec
 
-# Initialize project
+# Initialize project (in current directory)
+opsv init
+
+# Or create a named subdirectory
 opsv init my-project
 cd my-project
 
@@ -52,9 +55,9 @@ opsv
 │   └── refresh [--dir]           # Replaces old status + deps
 ├── imagen --model <m>            # Compile image tasks directly
 ├── animate --model <m>           # Compile video tasks directly
-├── comfy --model <m> [--param]   # Compile ComfyUI tasks
+├── comfy --model <m> [--workflow] [--workflow-dir] [--param]  # Compile ComfyUI tasks
 ├── audio --model <m>             # [planned]
-├── app --model <m>               # Browser automation
+├── webapp --model <m>            # Browser automation
 ├── run <paths...> [--retry]      # Execute by path reference
 ├── review [--port] [--latest|--all] [--ttl]
 └── script [-d] [-o] [--dry-run]
@@ -135,4 +138,4 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale b
 
 MIT
 
-> *OpsV v0.8.2 | 2026-04-28*
+> *OpsV v0.8.5 | 2026-04-29*
