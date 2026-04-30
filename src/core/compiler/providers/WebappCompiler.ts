@@ -11,8 +11,8 @@ export class WebappCompiler implements ProviderCompiler {
 
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const apiUrl = modelConfig.api_url || 'http://127.0.0.1:9700/generate';
-    const statusUrl = modelConfig.api_status_url || 'http://127.0.0.1:9700/status';
+    if (!modelConfig.api_url) throw new Error('WebappCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new Error('WebappCompiler: api_status_url is required in api_config.yaml');
     const defaults = modelConfig.defaults || {};
 
     const payload: Record<string, any> = {
@@ -44,8 +44,8 @@ export class WebappCompiler implements ProviderCompiler {
         modelKey: modelConfig.model || job.id,
         type: 'webapp' as const,
         shotId: job.id,
-        api_url: apiUrl,
-        api_status_url: statusUrl,
+        api_url: modelConfig.api_url,
+        api_status_url: modelConfig.api_status_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },

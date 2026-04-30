@@ -11,11 +11,12 @@ export class RunningHubCompiler implements ProviderCompiler {
 
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://www.runninghub.cn/task/openapi/comfyui/post';
-    const statusUrl = modelConfig.api_status_url || 'https://www.runninghub.cn/task/openapi/comfyui/status';
+    if (!modelConfig.api_url) throw new Error('RunningHubCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new Error('RunningHubCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('RunningHubCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      workflow_template: modelConfig.model || 'default',
+      workflow_template: modelConfig.model,
       parameters: {
         'input-prompt': job.prompt_en || job.payload.prompt,
       },
@@ -39,11 +40,11 @@ export class RunningHubCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'runninghub',
-        modelKey: modelConfig.model || 'default',
+        modelKey: modelConfig.model,
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,
-        api_url: apiUrl,
-        api_status_url: statusUrl,
+        api_url: modelConfig.api_url,
+        api_status_url: modelConfig.api_status_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },

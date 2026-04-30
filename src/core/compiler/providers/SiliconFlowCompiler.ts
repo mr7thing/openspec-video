@@ -23,10 +23,11 @@ export class SiliconFlowCompiler implements ProviderCompiler {
 
   private compileImageTask(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://api.siliconflow.cn/v1/images/generations';
+    if (!modelConfig.api_url) throw new Error('SiliconFlowCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('SiliconFlowCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      model: modelConfig.model || 'Qwen/Qwen2.5-VL-72B-Instruct',
+      model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
       image_size: this.resolveSize(job.payload.global_settings, modelConfig),
       batch_size: 1,
@@ -40,10 +41,10 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'siliconflow',
-        modelKey: modelConfig.model || 'qwenimg',
+        modelKey: modelConfig.model,
         type: 'imagen',
         shotId: job.id,
-        api_url: apiUrl,
+        api_url: modelConfig.api_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },
@@ -52,11 +53,12 @@ export class SiliconFlowCompiler implements ProviderCompiler {
 
   private compileVideoTask(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://api.siliconflow.cn/v1/video/submit';
-    const statusUrl = modelConfig.api_status_url || 'https://api.siliconflow.cn/v1/video/status';
+    if (!modelConfig.api_url) throw new Error('SiliconFlowCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new Error('SiliconFlowCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('SiliconFlowCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      model: modelConfig.model || 'wan',
+      model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
     };
 
@@ -72,11 +74,11 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'siliconflow',
-        modelKey: modelConfig.model || 'wan',
+        modelKey: modelConfig.model,
         type: 'video',
         shotId: job.id,
-        api_url: apiUrl,
-        api_status_url: statusUrl,
+        api_url: modelConfig.api_url,
+        api_status_url: modelConfig.api_status_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },

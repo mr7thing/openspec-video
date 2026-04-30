@@ -15,6 +15,9 @@ export class ComfyUICompiler implements ProviderCompiler {
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig, workflowPath, workflowDir, refCount } = ctx;
 
+    // Validate required config
+    if (!modelConfig.api_url) throw new Error('ComfyUICompiler: api_url is required in api_config.yaml');
+
     // 1. Resolve workflow file
     let workflowFile: string;
     if (workflowPath) {
@@ -101,7 +104,7 @@ export class ComfyUICompiler implements ProviderCompiler {
         modelKey: modelConfig.model || path.basename(workflowFile, '.json'),
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,
-        api_url: modelConfig.api_url || 'http://127.0.0.1:8188',
+        api_url: modelConfig.api_url,
         references: refImages.length > 0 ? refImages : undefined,
         workflowFile: path.basename(workflowFile),
         compiledAt: new Date().toISOString(),

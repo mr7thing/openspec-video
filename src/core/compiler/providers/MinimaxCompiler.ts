@@ -22,10 +22,11 @@ export class MinimaxCompiler implements ProviderCompiler {
 
   private compileImageTask(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://api.minimax.chat/v1/image_generation';
+    if (!modelConfig.api_url) throw new Error('MinimaxCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('MinimaxCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      model: modelConfig.model || 'minimax-image-01',
+      model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
       aspect_ratio: job.payload.global_settings?.aspect_ratio || '1:1',
     };
@@ -38,10 +39,10 @@ export class MinimaxCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'minimax',
-        modelKey: modelConfig.model || 'minimax-image-01',
+        modelKey: modelConfig.model,
         type: 'imagen',
         shotId: job.id,
-        api_url: apiUrl,
+        api_url: modelConfig.api_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },
@@ -50,11 +51,12 @@ export class MinimaxCompiler implements ProviderCompiler {
 
   private compileVideoTask(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://api.minimax.chat/v1/video_generation';
-    const statusUrl = modelConfig.api_status_url || 'https://api.minimax.chat/v1/query/video_generation';
+    if (!modelConfig.api_url) throw new Error('MinimaxCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new Error('MinimaxCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('MinimaxCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      model: modelConfig.model || 'video-01',
+      model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
     };
 
@@ -66,11 +68,11 @@ export class MinimaxCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'minimax',
-        modelKey: modelConfig.model || 'video-01',
+        modelKey: modelConfig.model,
         type: 'video',
         shotId: job.id,
-        api_url: apiUrl,
-        api_status_url: statusUrl,
+        api_url: modelConfig.api_url,
+        api_status_url: modelConfig.api_status_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },

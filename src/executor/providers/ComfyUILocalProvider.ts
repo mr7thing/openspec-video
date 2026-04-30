@@ -20,7 +20,8 @@ export class ComfyUILocalProvider {
   name = 'comfyui';
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
-    const apiUrl = task._opsv.api_url || 'http://127.0.0.1:8188';
+    const apiUrl = task._opsv.api_url;
+    if (!apiUrl) throw new Error('ComfyUILocalProvider: api_url is required in task._opsv');
     const shotId = task._opsv.shotId;
 
     try {

@@ -13,7 +13,6 @@ export class VolcengineCompiler implements ProviderCompiler {
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig, apiKey } = ctx;
     const isImage = modelConfig.type === 'imagen';
-    const apiUrl = modelConfig.api_url || 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
 
     if (isImage) {
       return this.compileImageTask(ctx);
@@ -23,11 +22,12 @@ export class VolcengineCompiler implements ProviderCompiler {
   }
 
   private compileImageTask(ctx: CompileContext): TaskJson {
-    const { job, modelConfig, apiKey } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
+    const { job, modelConfig } = ctx;
+    if (!modelConfig.api_url) throw new Error('VolcengineCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('VolcengineCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      model: modelConfig.model || 'seadream',
+      model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
       size: this.resolveSize(job.payload.global_settings, modelConfig),
       n: 1,
@@ -41,10 +41,10 @@ export class VolcengineCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'volcengine',
-        modelKey: modelConfig.model || 'seadream',
+        modelKey: modelConfig.model,
         type: 'imagen',
         shotId: job.id,
-        api_url: apiUrl,
+        api_url: modelConfig.api_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },
@@ -52,12 +52,13 @@ export class VolcengineCompiler implements ProviderCompiler {
   }
 
   private compileVideoTask(ctx: CompileContext): TaskJson {
-    const { job, modelConfig, apiKey } = ctx;
-    const apiUrl = modelConfig.api_url || 'https://ark.cn-beijing.volces.com/api/v3/contents/generations';
-    const statusUrl = modelConfig.api_status_url || apiUrl.replace('/generations', '');
+    const { job, modelConfig } = ctx;
+    if (!modelConfig.api_url) throw new Error('VolcengineCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new Error('VolcengineCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new Error('VolcengineCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
-      model: modelConfig.model || 'seedance-2',
+      model: modelConfig.model,
       content: [
         {
           type: 'video',
@@ -86,11 +87,11 @@ export class VolcengineCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'volcengine',
-        modelKey: modelConfig.model || 'seedance-2',
+        modelKey: modelConfig.model,
         type: 'video',
         shotId: job.id,
-        api_url: apiUrl,
-        api_status_url: statusUrl,
+        api_url: modelConfig.api_url,
+        api_status_url: modelConfig.api_status_url,
         references: ctx.referenceImages,
         compiledAt: new Date().toISOString(),
       },
