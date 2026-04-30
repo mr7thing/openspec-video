@@ -33,6 +33,8 @@ opsv circle refresh --dir videospec
 
 Rebuilds the graph, diffs against existing `_manifest.json` `assets` field, and updates per-circle manifests. Reports new/removed assets.
 
+**Layer topology detection** (v0.8.8): If any asset's layer assignment changes, `refresh` exits with error and prompts user to run `circle create` for a new batch.
+
 ## Key Files
 - `src/commands/circle.ts` — Command handler
 - `src/core/DependencyGraph.ts` — Graph engine, topological sort, circle naming, manifest writing

@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.8 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8)
+# OpsV 框架规范 (v0.8.8)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -69,6 +69,12 @@ OpsV 区分两种参考图来源，分别对应文档的两个不同区域：
 - `syncing` 资产虽已有 Approved References，但被视为"未就绪"，**阻断下游 Circle 执行**
 - Agent 检查 `syncing` 资产的 review 记录中的 `modified_task` 路径，对齐文档描述字段与修改后 task JSON
 - `opsv validate` 会自动校验 status 与 Approved References 一致性、syncing 字段对齐状态
+
+### Syncing Gate (v0.8.8)
+Produce 命令编译时会验证所有 `@ref` 引用的资产状态：
+- 引用的资产状态为 `syncing` → 跳过当前资产的编译，输出警告
+- 引用的资产状态为 `approved` → 通过验证，正常编译
+- 这是 Manifest-First 架构的关键保障，确保依赖链完整
 
 ### Circle 状态图标（`opsv circle refresh` 输出）
 
@@ -187,11 +193,11 @@ opsv circle refresh
 
 # 图像任务生成 + 编译（直接产出可执行 .json，无 jobs.json 中间层）
 opsv imagen --model volcengine.seadream-5.0-lite
-# 选项: --manifest <path>, --file <id>, --category <cat>, --status-skip <statuses>
+# 选项: --manifest, --file, --category, --status-skip, --dry-run
 
 # 视频任务生成 + 编译（直接产出可执行 .json）
 opsv animate --model volcengine.seedance-2.0
-# 选项: --manifest <path>, --file <id>, --category <cat>, --status-skip <statuses>
+# 选项: --manifest, --file, --category, --status-skip, --dry-run
 
 # ComfyUI 工作流编译
 opsv comfy --model runninghub.flux-schnell

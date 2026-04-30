@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.7 (Manifest-First Architecture)
+> 当前版本：v0.8.8 (Manifest-First Architecture)
 
 ## 命令总览
 
@@ -52,6 +52,8 @@ opsv imagen --model volcengine.seadream --status-skip none
 ```
 
 **Manifest-First**：produce 命令只从 manifest 读取，不扫描目录
+
+**Syncing Gate (v0.8.8)**：编译时验证所有 `@ref` 引用的资产状态。如果被引用资产是 `syncing`，跳过当前资产的编译并警告。`approved` 引用才能通过。
 
 **参考图解析**（v0.8.3）：
 - 编译时使用两种参考图来源：

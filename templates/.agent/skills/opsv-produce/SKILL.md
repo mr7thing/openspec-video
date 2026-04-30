@@ -1,20 +1,20 @@
 # opsv-produce Skill
 
 ## Overview
-Compile generation tasks for specific models. Each produce command reads `_manifest.json` (including `assets` field), skips approved assets, and writes provider-specific `.json` files to `{basename}.circle{N}/provider.model/` directories.
+Compile generation tasks for specific models. Each produce command reads `_manifest.json` (including `assets` field), skips approved assets, validates ref dependencies, and writes provider-specific `.json` files to `{basename}.circle{N}/provider.model/` directories.
 
 ## Commands
 
 ### imagen — Image generation
 ```bash
 opsv imagen --model volcengine.seadream
-opsv imagen --model siliconflow.qwenimg --circle circle1 --dry-run
+opsv imagen --model siliconflow.qwenimg --dry-run
 ```
 
 ### animate — Video generation
 ```bash
 opsv animate --model volcengine.seedance2
-opsv animate --model siliconflow.wan --circle circle2
+opsv animate --model siliconflow.wan
 ```
 
 ### comfy — ComfyUI workflow
@@ -28,23 +28,36 @@ opsv comfy --model runninghub.default --param '{"input-style":"anime"}'
 opsv audio --model test  # Not yet implemented
 ```
 
-### app — Browser automation
+### webapp — Browser automation
 ```bash
 opsv webapp --model webapp.gemini
 ```
 
-## Compilation Flow
-1. Read `_manifest.json` from target circle (including `assets` field)
-2. Filter out `approved` assets
-3. Load asset frontmatter and resolve `@ref` references
-4. Read reference images via two readers (v0.8.3):
-   - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs` (first reference block)
-   - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs` (second reference block)
-5. Build `Job` objects with prompt, references (`approvedRefs` + `designRefs`), frame_ref
-6. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
-7. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
+## CLI Options (v0.8.8)
 
-**`@FRAME:` resolution** (v0.8.3): searches `.circleN/<provider.model>/` directories instead of hardcoded `opsv-queue/videospec/`
+| Option | Description |
+|--------|-------------|
+| `--manifest <path>` | Path to `_manifest.json` (or directory containing it) |
+| `--file <id>` | Run specific asset by id from manifest |
+| `--category <cat>` | Filter assets by category |
+| `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
+| `--dry-run` | Show compiled tasks without writing files |
+
+## Compilation Flow (v0.8.8)
+1. Read `_manifest.json` from target circle (including `assets` field)
+2. Filter by `--file`, `--category`, `--status-skip`
+3. **Validate ref statuses**: all `@ref` references must point to `approved` assets (syncing blocks downstream)
+4. Load asset frontmatter and resolve `@ref` references
+5. Read reference images via two readers (v0.8.3):
+   - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs`
+   - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs`
+6. Build `Job` objects with prompt, references, frame_ref
+7. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
+8. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
+
+**Syncing Gate**: `syncing` assets block downstream compilation. If an asset's `@ref` points to a `syncing` asset, compilation is skipped with a warning.
+
+**`@FRAME:` resolution**: searches `.circleN/<provider.model>/` directories instead of hardcoded `opsv-queue/videospec/`
 
 ## Task JSON & Output Naming Convention
 
@@ -60,7 +73,8 @@ opsv webapp --model webapp.gemini
 - Agent iteration: `cp @hero.json @hero_2.json` → edit → `opsv run @hero_2.json` → output `@hero_2_1.png`
 
 ## Key Files
-- `src/commands/imagen.ts`, `animate.ts`, `comfy.ts`, `audio.ts`, `app.ts`
+- `src/commands/imagen.ts`, `animate.ts`, `comfy.ts`, `webapp.ts`
+- `src/commands/produceUtils.ts` — Shared utilities (v0.8.8)
 - `src/core/compiler/TaskBuilder.ts` — Shared compile orchestrator
 - `src/core/compiler/ProviderCompiler.ts` — Interface
 - `src/core/compiler/providers/` — Volcengine, SiliconFlow, Minimax, RunningHub, ComfyUI
