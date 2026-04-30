@@ -22,6 +22,7 @@ export function registerAnimateCommand(program: Command): void {
     .requiredOption('--model <model>', 'Provider model key (e.g. volcengine.seedance2)')
     .option('--dir <path>', 'Target directory (must match circle create --dir)', 'videospec')
     .option('--name <name>', 'Override target basename')
+    .option('--category <cat>', 'Filter assets by category (e.g. shot-production, shot-design)')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
@@ -38,10 +39,10 @@ export function registerAnimateCommand(program: Command): void {
 
         const pendingIds = readPendingAssetIds(circleDir);
 
-        const allAssets = assetManager.getAllAssets();
-        const shotAssets = allAssets.filter(
-          (a) => pendingIds.includes(a.id) && (a.category === 'shot-production' || a.category === 'shot-design')
-        );
+        const allAssets = options.category
+          ? assetManager.getByCategory(options.category)
+          : assetManager.getAllAssets();
+        const shotAssets = allAssets.filter((a) => pendingIds.includes(a.id));
 
         if (shotAssets.length === 0) {
           console.log(chalk.yellow('No pending shot assets found in this circle.'));

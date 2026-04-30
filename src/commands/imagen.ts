@@ -22,6 +22,7 @@ export function registerImagenCommand(program: Command): void {
     .requiredOption('--model <model>', 'Provider model key (e.g. volcengine.seadream)')
     .option('--dir <path>', 'Target directory (must match circle create --dir)', 'videospec')
     .option('--name <name>', 'Override target basename')
+    .option('--category <cat>', 'Filter assets by category (e.g. character, prop, scene)')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
@@ -40,7 +41,9 @@ export function registerImagenCommand(program: Command): void {
         // Read pending asset IDs from _manifest.json
         const pendingIds = readPendingAssetIds(circleDir);
 
-        const allAssets = assetManager.getAllElements();
+        const allAssets = options.category
+          ? assetManager.getByCategory(options.category)
+          : assetManager.getAllAssets();
         const targetAssets = allAssets.filter((a) => pendingIds.includes(a.id));
 
         if (targetAssets.length === 0) {

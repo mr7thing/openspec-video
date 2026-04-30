@@ -121,14 +121,8 @@ export class AssetManager {
     return Array.from(this.assets.values());
   }
 
-  getAllElements(): Asset[] {
-    return this.getAllAssets().filter((a) =>
-      ['character', 'prop', 'costume'].includes(a.category)
-    );
-  }
-
-  getAllScenes(): Asset[] {
-    return this.getAllAssets().filter((a) => a.category === 'scene');
+  getByCategory(category: string): Asset[] {
+    return this.getAllAssets().filter((a) => a.category === category);
   }
 
   getApprovedImagePath(id: string): string | null {
