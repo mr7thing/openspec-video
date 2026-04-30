@@ -1,5 +1,6 @@
 // ============================================================================
-// OpsV v0.8.2 — opsv imagen
+// OpsV v0.8.6 — opsv imagen
+// Reads from circle manifest, compiles to circle/{model}/
 // ============================================================================
 
 import { Command } from 'commander';
@@ -12,34 +13,37 @@ import { FrontmatterParser } from '../core/FrontmatterParser';
 import { RefResolver } from '../core/RefResolver';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { DesignRefReader } from '../core/DesignRefReader';
-import { DependencyGraph } from '../core/DependencyGraph';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
 
 export function registerImagenCommand(program: Command): void {
   program
     .command('imagen')
-    .description('Compile image generation tasks for a specific model')
+    .description('Compile image generation tasks from circle manifest')
     .requiredOption('--model <model>', 'Provider model key (e.g. volcengine.seadream)')
-    .option('--dir <path>', 'Target directory (must match circle create --dir)', 'videospec')
-    .option('--name <name>', 'Override target basename')
+    .option('--manifest <path>', 'Path to _manifest.json (or directory containing it)')
     .option('--category <cat>', 'Filter assets by category (e.g. character, prop, scene)')
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
+    .option('--file <id>', 'Run specific asset by id (from manifest)')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
-        const projectRoot = process.cwd();
+        const cwd = process.cwd();
         const modelKey = options.model;
-        const { provider } = TaskBuilder.parseModelKey(modelKey);
+
+        // Resolve manifest path
+        const manifestPath = resolveManifestPath(cwd, options.manifest);
+        const circleDir = path.dirname(manifestPath);
+
+        // projectRoot is one level up from circle dir (opsv-queue/)
+        const projectRoot = path.dirname(path.dirname(circleDir));
 
         const assetManager = new AssetManager(projectRoot);
         const approvedRefReader = new ApprovedRefReader(projectRoot);
         const designRefReader = new DesignRefReader(projectRoot);
         const refResolver = new RefResolver(projectRoot, approvedRefReader);
 
-        const { circleDir } = resolveTarget(projectRoot, options.dir, options.name);
-
-        // Read assets from circle manifest (not from directory scan)
+        // Read assets from circle manifest
         const circleAssets = await assetManager.loadCircleAssets(circleDir);
 
         // Parse status-skip option (default: approved)
@@ -48,19 +52,27 @@ export function registerImagenCommand(program: Command): void {
           ? []
           : statusSkipStr.split(',').map((s: string) => s.trim());
 
-        // Filter by category (if specified) and skip specified statuses
-        const targetAssets = circleAssets.assets.filter((a) => {
+        // Filter by file (if specified), category, and status
+        let targetAssets = circleAssets.assets;
+        if (options.file) {
+          targetAssets = targetAssets.filter((a) => a.id === options.file);
+          if (targetAssets.length === 0) {
+            throw new Error(`Asset "${options.file}" not found in manifest`);
+          }
+        }
+        targetAssets = targetAssets.filter((a) => {
           if (skipStatuses.includes(a.status)) return false;
           if (options.category && a.category !== options.category) return false;
           return true;
         });
 
         if (targetAssets.length === 0) {
-          console.log(chalk.yellow('No pending image assets found in this circle.'));
+          console.log(chalk.yellow('No pending image assets found.'));
           return;
         }
 
         console.log(chalk.cyan(`Compiling ${targetAssets.length} image tasks for ${modelKey}...`));
+        console.log(chalk.gray(`Manifest: ${manifestPath}`));
 
         const jobs: Job[] = [];
         for (const asset of targetAssets) {
@@ -68,6 +80,7 @@ export function registerImagenCommand(program: Command): void {
           jobs.push(job);
         }
 
+        // Output to circleDir/{model}/
         const outputDir = path.join(circleDir, modelKey);
         const builder = new TaskBuilder(projectRoot);
 
@@ -88,17 +101,33 @@ export function registerImagenCommand(program: Command): void {
     });
 }
 
-function resolveTarget(projectRoot: string, dirOption?: string, nameOption?: string): { targetDir: string; circleDir: string } {
-  const basename = nameOption || DependencyGraph.resolveTargetBasename(dirOption || 'videospec');
-  const queueRoot = path.join(projectRoot, 'opsv-queue');
-
-  const maxN = DependencyGraph.findLatestCircleN(queueRoot, basename);
-  if (maxN === 0) {
-    throw new Error(`No circle found for "${basename}". Run "opsv circle create --dir ${dirOption || 'videospec'}" first.`);
+function resolveManifestPath(cwd: string, manifestOption?: string): string {
+  if (manifestOption) {
+    // If it's a file, use it directly; if it's a dir, append _manifest.json
+    const manifestPath = fs.statSync(manifestOption).isDirectory()
+      ? path.join(manifestOption, '_manifest.json')
+      : manifestOption;
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(`Manifest not found: ${manifestPath}`);
+    }
+    return manifestPath;
   }
 
-  const circleDir = path.join(queueRoot, `${basename}.circle${maxN}`);
-  return { targetDir: dirOption || 'videospec', circleDir };
+  // Check current directory
+  const currentManifest = path.join(cwd, '_manifest.json');
+  if (fs.existsSync(currentManifest)) {
+    return currentManifest;
+  }
+
+  // Check parent directory (in case we're inside a circle dir)
+  const parentManifest = path.join(cwd, '..', '_manifest.json');
+  if (fs.existsSync(parentManifest)) {
+    return parentManifest;
+  }
+
+  throw new Error(
+    `No _manifest.json found. Run inside a circle directory or use --manifest <path>.`
+  );
 }
 
 async function buildImageJob(

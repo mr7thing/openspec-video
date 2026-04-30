@@ -12,36 +12,40 @@ import { FrontmatterParser } from '../core/FrontmatterParser';
 import { RefResolver } from '../core/RefResolver';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { DesignRefReader } from '../core/DesignRefReader';
-import { DependencyGraph } from '../core/DependencyGraph';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
 
 export function registerComfyCommand(program: Command): void {
   program
     .command('comfy')
-    .description('Compile ComfyUI workflow tasks for a specific model')
+    .description('Compile ComfyUI workflow tasks from circle manifest')
     .requiredOption('--model <model>', 'ComfyUI model key (e.g. comfyui.sdxl)')
-    .option('--dir <path>', 'Target directory (must match circle create --dir)', 'videospec')
-    .option('--name <name>', 'Override target basename')
+    .option('--manifest <path>', 'Path to _manifest.json (or directory containing it)')
     .option('--category <cat>', 'Filter assets by category')
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
+    .option('--file <id>', 'Run specific asset by id (from manifest)')
     .option('--workflow <file>', 'Specific workflow file (absolute path or filename in workflow-dir)')
     .option('--workflow-dir <dir>', 'Workflow template directory (overrides api_config defaults.templateDir)')
     .option('--param <json>', 'Override workflow parameters as JSON')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
-        const projectRoot = process.cwd();
+        const cwd = process.cwd();
         const modelKey = options.model;
+
+        // Resolve manifest path
+        const manifestPath = resolveManifestPath(cwd, options.manifest);
+        const circleDir = path.dirname(manifestPath);
+
+        // projectRoot is one level up from circle dir (opsv-queue/)
+        const projectRoot = path.dirname(path.dirname(circleDir));
 
         const assetManager = new AssetManager(projectRoot);
         const approvedRefReader = new ApprovedRefReader(projectRoot);
         const designRefReader = new DesignRefReader(projectRoot);
         const refResolver = new RefResolver(projectRoot, approvedRefReader);
 
-        const { circleDir } = resolveTarget(projectRoot, options.dir, options.name);
-
-        // Read assets from circle manifest (not from directory scan)
+        // Read assets from circle manifest
         const circleAssets = await assetManager.loadCircleAssets(circleDir);
 
         // Parse status-skip option (default: approved)
@@ -50,8 +54,15 @@ export function registerComfyCommand(program: Command): void {
           ? []
           : statusSkipStr.split(',').map((s: string) => s.trim());
 
-        // Filter by category (if specified) and skip specified statuses
-        const targetAssets = circleAssets.assets.filter((a) => {
+        // Filter by file (if specified), category, and status
+        let targetAssets = circleAssets.assets;
+        if (options.file) {
+          targetAssets = targetAssets.filter((a) => a.id === options.file);
+          if (targetAssets.length === 0) {
+            throw new Error(`Asset "${options.file}" not found in manifest`);
+          }
+        }
+        targetAssets = targetAssets.filter((a) => {
           if (skipStatuses.includes(a.status)) return false;
           if (options.category && a.category !== options.category) return false;
           return true;
@@ -63,6 +74,7 @@ export function registerComfyCommand(program: Command): void {
         }
 
         console.log(chalk.cyan(`Compiling ${targetAssets.length} comfy tasks for ${modelKey}...`));
+        console.log(chalk.gray(`Manifest: ${manifestPath}`));
 
         let paramOverrides: Record<string, any> = {};
         if (options.param) {
@@ -99,6 +111,7 @@ export function registerComfyCommand(program: Command): void {
           return;
         }
 
+        // Output to circleDir/{model}/
         const outputDir = path.join(circleDir, modelKey);
         const builder = new TaskBuilder(projectRoot);
 
@@ -123,17 +136,32 @@ export function registerComfyCommand(program: Command): void {
     });
 }
 
-function resolveTarget(projectRoot: string, dirOption?: string, nameOption?: string): { targetDir: string; circleDir: string } {
-  const basename = nameOption || DependencyGraph.resolveTargetBasename(dirOption || 'videospec');
-  const queueRoot = path.join(projectRoot, 'opsv-queue');
-
-  const maxN = DependencyGraph.findLatestCircleN(queueRoot, basename);
-  if (maxN === 0) {
-    throw new Error(`No circle found for "${basename}". Run "opsv circle create --dir ${dirOption || 'videospec'}" first.`);
+function resolveManifestPath(cwd: string, manifestOption?: string): string {
+  if (manifestOption) {
+    const manifestPath = fs.statSync(manifestOption).isDirectory()
+      ? path.join(manifestOption, '_manifest.json')
+      : manifestOption;
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(`Manifest not found: ${manifestPath}`);
+    }
+    return manifestPath;
   }
 
-  const circleDir = path.join(queueRoot, `${basename}.circle${maxN}`);
-  return { targetDir: dirOption || 'videospec', circleDir };
+  // Check current directory
+  const currentManifest = path.join(cwd, '_manifest.json');
+  if (fs.existsSync(currentManifest)) {
+    return currentManifest;
+  }
+
+  // Check parent directory
+  const parentManifest = path.join(cwd, '..', '_manifest.json');
+  if (fs.existsSync(parentManifest)) {
+    return parentManifest;
+  }
+
+  throw new Error(
+    `No _manifest.json found. Run inside a circle directory or use --manifest <path>.`
+  );
 }
 
 async function buildComfyJob(

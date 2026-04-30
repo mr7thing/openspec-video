@@ -1,4 +1,4 @@
-# OpsV v0.8.6 Specification
+# OpsV v0.8.7 Specification
 
 ## Overview
 
@@ -36,6 +36,8 @@ opsv
 
 | Option | Description |
 |--------|-------------|
+| `--manifest <path>` | Path to _manifest.json (or directory containing it). If not specified, auto-detects from current/parent directory. |
+| `--file <id>` | Run specific asset by id from manifest |
 | `--category <cat>` | Filter assets by category (user-defined in frontmatter) |
 | `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
 
@@ -74,7 +76,7 @@ The `_manifest.json` is the **single source of truth** for asset state:
 
 ```json
 {
-  "version": "0.8.6",
+  "version": "0.8.7",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [...],
@@ -143,11 +145,15 @@ video_path: "path/to/output.mp4"
 
 ## Circle Architecture
 
-Circles represent dependency layers determined by topological sort:
+Circles represent dependency layers determined by topological sort. Circle names use `zerocircle`, `firstcircle`, `secondcircle`, etc. (distinct from iteration-based `circleN` directory names):
 
-1. **ZeroCircle**: Assets with no dependencies (characters, props, scenes)
-2. **FirstCircle / Circle1**: Assets depending on ZeroCircle outputs
-3. **EndCircle**: Final outputs (video shots depending on approved images)
+| Circle Name | Condition | Example |
+|-------------|-----------|---------|
+| `zerocircle` | Layer 1 (no dependencies) | Characters, props, scenes |
+| `firstcircle` | Layer 2 (depends on zerocircle), or final layer when exactly 2 layers | Assets depending on zero outputs |
+| `secondcircle` | Layer 3 (when ≥4 layers) | Middle layers |
+| `thirdcircle` | Layer 4 (when ≥5 layers) | Middle layers |
+| `endcircle` | Final layer contains `shotlist.md` | Final video shot outputs (batch video generation) |
 
 `opsv circle create` builds the graph and creates a new circle directory (`basename.circleN`). The `--name` parameter sets the basename; `--dir` scopes creation to a specific directory. Each `circle create` increments the circle batch number (`.circle1`, `.circle2`, etc.).
 `opsv circle refresh` rebuilds the graph and diffs against existing state.
@@ -190,17 +196,16 @@ Rules:
 
 ## Compilation Flow (v0.8.6)
 
-1. Produce command (imagen/animate/comfy/webapp) reads `_manifest.json`
-2. Filters by `--category` (if specified) and `--status-skip` (default: approved)
-3. For each filtered asset, finds the `.md` file via `findAssetFilePath()` (searches `elements/` and `scenes/`)
-4. Resolves `@ref` references:
+1. Produce command (imagen/animate/comfy/webapp) locates `_manifest.json` via `--manifest` or auto-detection
+2. Reads asset list from manifest (includes filePath for each asset)
+3. Filters by `--file` (if specified), `--category` (if specified), and `--status-skip` (default: approved)
+4. For each filtered asset, reads the `.md` file using the filePath from manifest
+5. Resolves `@ref` references:
    - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → used for `@assetId:variant` resolution
    - **`DesignRefReader`**: reads `## Design References` from **current document** → used as `reference_images`
-5. Builds `Job` objects from frontmatter
-6. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
-7. Writes `TaskJson` to `basename.circleN/provider.model/shotId.json`
-
-**Key Change (v0.8.6)**: Produce commands no longer scan directories. They read only from manifest and resolve file paths on-demand.
+7. Builds `Job` objects from frontmatter
+8. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
+9. Writes `TaskJson` to `{circleDir}/{provider.model}/shotId.json`
 
 ## Execution Flow
 
@@ -258,9 +263,15 @@ Rules:
 ## Breaking Changes from v0.8.5
 
 - **Manifest-First Architecture**: Produce commands (`imagen`, `animate`, `comfy`, `webapp`) no longer scan directories. They read only from circle `_manifest.json`.
+- **`--manifest` option**: Produce commands accept `--manifest <path>` to specify manifest location. Auto-detects from current/parent directory if not specified.
+- **`--file` option**: Produce commands accept `--file <id>` to run specific assets from manifest.
 - **`_manifest.json` now includes `category`**: Each asset entry contains `{ status, layer, category }` instead of just `{ status, layer }`.
 - **`--category` option added**: Produce commands accept `--category <cat>` to filter assets by their frontmatter category field.
 - **`--status-skip` option added**: Produce commands accept `--status-skip <statuses>` (default: approved). Use `none` to skip nothing, or comma-separated list.
 - **Removed `getAllElements()` and `getAllScenes()`**: Category is user-defined; no hardcoded character/prop/scene filters. Use `--category` to filter.
 - **`CircleAssetEntry` now includes `filePath`**: `AssetManager.loadCircleAssets()` returns file paths for direct .md file access.
 - **No directory scanning in produce commands**: `AssetManager.loadFromVideospec()` no longer called by produce commands.
+
+## Breaking Changes from v0.8.5
+
+- **`endcircle` condition clarified**: `endcircle` is only used when the final layer contains `shotlist.md`. Regular shot assets (shot-production/shot-design category) do not trigger `endcircle` naming.

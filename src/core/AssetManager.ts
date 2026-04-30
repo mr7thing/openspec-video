@@ -31,6 +31,7 @@ export interface CircleAssetEntry {
 export interface CircleAssets {
   circleName: string;
   assets: CircleAssetEntry[];
+  circles?: Array<{ circle: string; layer: number; assetIds: string[] }>;
 }
 
 export class AssetManager {
@@ -102,7 +103,7 @@ export class AssetManager {
           category: info.category,
           filePath: this.findAssetFilePath(id),
         }));
-        return { circleName, assets };
+        return { circleName, assets, circles: data.circles };
       }
       // Fallback: circles[].status (old format without category)
       const assets: CircleAssetEntry[] = [];
@@ -111,10 +112,10 @@ export class AssetManager {
           assets.push({ id, status: status as string, filePath: this.findAssetFilePath(id) });
         }
       }
-      return { circleName, assets };
+      return { circleName, assets, circles: data.circles };
     }
 
-    return { circleName, assets: [] };
+    return { circleName, assets: [], circles: [] };
   }
 
   getAsset(id: string): Asset | undefined {

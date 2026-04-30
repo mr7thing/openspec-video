@@ -53,6 +53,7 @@ export class DependencyGraph {
   private graph: Map<string, Set<string>> = new Map();
   private statusMap: Map<string, string> = new Map();
   private categoryMap: Map<string, string> = new Map();
+  private documents: ParsedDocument[] = [];
 
   build(documents: ParsedDocument[]): void {
     this.graph.clear();
@@ -116,24 +117,31 @@ export class DependencyGraph {
     return { batches, cycles };
   }
 
-  getCircles(): CircleDefinition[] {
+  getCircles(documents?: ParsedDocument[]): CircleDefinition[] {
     const { batches } = this.topologicalSort();
     const circles: CircleDefinition[] = [];
+
+    // Check if final batch contains shotlist.md
+    const docs = documents || this.documents;
+    const lastBatchHasShotList = (batch: string[]): boolean => batch.includes('shotlist');
+
+    const ordinals = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'ninthcircle'];
 
     for (const [layerIdx, batch] of batches.entries()) {
       const layer = layerIdx + 1;
       let name: string;
+      const isLastLayer = layerIdx === batches.length - 1;
+      const hasShotList = lastBatchHasShotList(batch);
+      const totalLayers = batches.length;
 
       if (layer === 1) {
         name = 'zerocircle';
-      } else if (layerIdx === batches.length - 1 && batches.length > 2) {
+      } else if (isLastLayer && hasShotList) {
         name = 'endcircle';
-      } else if (layerIdx === batches.length - 1 && batches.length === 2) {
+      } else if (totalLayers === 2) {
         name = 'firstcircle';
-      } else if (batches.length === 1) {
-        name = 'zerocircle';
       } else {
-        name = `circle${layer - 1}`;
+        name = ordinals[layerIdx] || `circle${layer - 1}`;
       }
 
       circles.push({ name, layer, assetIds: batch });
@@ -277,7 +285,7 @@ export class DependencyGraph {
     }
 
     const manifest: Manifest = {
-      version: '0.8.2',
+      version: '0.8.7',
       target: targetDir,
       generatedAt: new Date().toISOString(),
       circles: circlesData,
@@ -379,6 +387,7 @@ export class DependencyGraph {
       }
     }
 
+    graph.documents = documents;
     graph.build(documents);
     return graph;
   }

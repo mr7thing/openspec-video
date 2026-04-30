@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.6
+# OpenSpec-Video (OpsV) v0.8.7
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -26,20 +26,21 @@ cd my-project
 # 1. Build dependency graph and create circle directories
 opsv circle create
 
-# 2. Compile image tasks (direct, no intermediate jobs.json)
+# 2. Enter circle directory and compile image tasks
+cd opsv-queue/videospec.circle1
 opsv imagen --model volcengine.seadream
 
 # 3. Execute compiled tasks
-opsv run opsv-queue/videospec.circle1/
+opsv run
 
 # 4. Review and approve
 opsv review
 
-# 5. Compile video tasks after approval
+# 5. Compile video tasks (only on circles with shot assets)
 opsv animate --model volcengine.seedance2
 
 # 6. Execute video tasks
-opsv run opsv-queue/videospec.circle2/
+opsv run
 ```
 
 ---
@@ -52,21 +53,47 @@ opsv
 ├── validate [-d]                 # Document validation
 ├── circle
 │   ├── create [--dir] [--name] [--skip-middle-circle]
-│   └── refresh [--dir]           # Replaces old status + deps
-├── imagen --model <m> [--category <cat>] [--status-skip <statuses>]
-├── animate --model <m> [--category <cat>] [--status-skip <statuses>]
-├── comfy --model <m> [--category <cat>] [--status-skip <statuses>] [--workflow] [--workflow-dir] [--param]
+│   └── refresh [--dir]           # Rebuild graph, diff, update manifest
+├── imagen --model <m>            # Compile image tasks
+├── animate --model <m>           # Compile video tasks
+├── comfy --model <m>             # Compile ComfyUI tasks
 ├── audio --model <m>             # [planned]
-├── webapp --model <m> [--category <cat>] [--status-skip <statuses>]
-├── run <paths...> [--retry]      # Execute by path reference
-├── review [--port] [--latest|--all] [--ttl]
+├── webapp --model <m>            # Browser automation
+├── run                           # Execute tasks in current circle
+├── review                        # Review and approve outputs
 └── script [-d] [-o] [--dry-run]
+```
+
+---
+
+## Circle Workflow
+
+Produce commands (`imagen`, `animate`, `comfy`, `webapp`) run inside a circle directory or with `--manifest`:
+
+```bash
+# Enter circle directory and run
+cd opsv-queue/videospec.circle1
+opsv imagen --model volcengine.seadream
+
+# Or specify manifest path
+opsv imagen --model volcengine.seadream --manifest opsv-queue/videospec.circle1/_manifest.json
+
+# Run specific asset by id
+opsv imagen --model volcengine.seadream --file hero
+
+# Filter by category
+opsv imagen --model volcengine.seadream --category character
+
+# Skip specific statuses (default: approved)
+opsv imagen --model volcengine.seadream --status-skip approved,drafting
 ```
 
 ### Produce Command Options
 
 | Option | Description |
 |--------|-------------|
+| `--manifest <path>` | Path to _manifest.json (or directory containing it) |
+| `--file <id>` | Run specific asset by id from manifest |
 | `--category <cat>` | Filter assets by category (from frontmatter) |
 | `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
 
@@ -80,12 +107,12 @@ Tasks are organized into **Circles** (dependency layers via topological sort):
 
 ```
 opsv-queue/
-  videospec.circle1/            # Build output (basename.circleN)
-    _manifest.json              # Circle manifest: id, status, layer, category
-    volcengine.seadream/        # provider.model flat (no iteration numbers)
+  videospec.circle1/            # Circle directory (basename.circleN)
+    _manifest.json              # Circle manifest: circles[], assets{}
+    volcengine.seadream/       # provider.model/
       @hero.json
       @hero_1.png
-  role.circle2/                 # Depends on circle1
+  role.circle2/                # Terminal circle (contains shots)
     _manifest.json
     volcengine.seedance2/
       shot_01.json
@@ -94,17 +121,18 @@ opsv-queue/
 
 ### Manifest Structure
 
-The `_manifest.json` contains all assets with their metadata:
-
 ```json
 {
-  "version": "0.8.6",
+  "version": "0.8.7",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
-  "circles": [...],
+  "circles": [
+    { "circle": "zerocircle", "layer": 1, "assetIds": ["hero", "villain"] },
+    { "circle": "endcircle", "layer": 2, "assetIds": ["shot_01"] }
+  ],
   "assets": {
     "hero": { "status": "approved", "layer": 1, "category": "character" },
-    "scene_01": { "status": "drafting", "layer": 2, "category": "scene" }
+    "shot_01": { "status": "drafting", "layer": 2, "category": "shot-production" }
   }
 }
 ```
@@ -116,26 +144,27 @@ drafting → syncing → approved
 ```
 
 - **drafting**: No review action recorded. Default for new assets.
-- **syncing**: Output reviewed and accepted, but fields not yet aligned with task JSON. Agent must verify visual descriptions match the actual generation result.
+- **syncing**: Output reviewed and accepted, but fields not yet aligned with task JSON.
 - **approved**: Fully aligned and locked. Unblocks downstream circles.
 
-### Type Values
+### API Configuration
 
-Aligned with produce commands: `imagen` | `video` | `audio` | `comfy` | `webapp`
+All provider API URLs and models must be configured in `.opsv/api_config.yaml`. No hardcoded defaults.
 
 ---
 
 ## Key Design Principles
 
-See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale behind these rules.
+See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale.
 
-1. **Spec-as-Code**: Markdown is the single source of truth. All generation parameters originate from frontmatter.
-2. **Intent-Execution Decoupling**: Produce commands compile; `opsv run` executes. No mixed responsibilities.
-3. **Physical State Machine**: Task state = file existence. Crash-safe, no in-memory dispatcher.
-4. **CLI Does Only Deterministic Actions**: CLI never modifies content fields. It only appends review records and updates status. All field alignment is the agent's responsibility.
+1. **Spec-as-Code**: Markdown is the single source of truth.
+2. **Intent-Execution Decoupling**: Produce commands compile; `opsv run` executes.
+3. **Physical State Machine**: Task state = file existence.
+4. **CLI Does Only Deterministic Actions**: CLI never modifies content fields.
 5. **By-Provider Parallelism**: Same provider serial, different providers parallel.
-6. **No Iteration Numbers**: Directories use circle names without `_1` suffixes. Incremental updates via `circle refresh`.
-7. **Manifest-First**: Produce commands read from circle manifest, never scan directories.
+6. **No Iteration Numbers**: Directories use circle names without `_N` suffixes.
+7. **Manifest-First**: Produce commands read from manifest only, never scan directories.
+8. **Circle-Bound Execution**: Produce commands run within or reference a specific circle.
 
 ---
 
@@ -163,4 +192,4 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale b
 
 MIT
 
-> *OpsV v0.8.6 | 2026-04-30*
+> *OpsV v0.8.7 | 2026-04-30*
