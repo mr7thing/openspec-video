@@ -98,8 +98,16 @@ export class QueueRunner {
 
             if (result.success) {
               console.log(chalk.green(`  [${provider}] ${task._opsv.shotId} ✓`));
+              // Remove error log on success
+              const errorLog = taskPath.replace(/\.json$/, '_error.log');
+              if (fs.existsSync(errorLog)) {
+                fs.unlinkSync(errorLog);
+              }
             } else {
               console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${result.error}`));
+              // Write error log for retry support
+              const errorLog = taskPath.replace(/\.json$/, '_error.log');
+              fs.writeFileSync(errorLog, JSON.stringify({ error: result.error, timestamp: new Date().toISOString() }));
             }
           } catch (err: any) {
             results.push({
@@ -110,6 +118,9 @@ export class QueueRunner {
               error: err.message,
             });
             console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${err.message}`));
+            // Write error log for retry support
+            const errorLog = taskPath.replace(/\.json$/, '_error.log');
+            fs.writeFileSync(errorLog, JSON.stringify({ error: err.message, timestamp: new Date().toISOString() }));
           }
         }
       }

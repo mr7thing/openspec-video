@@ -9,6 +9,11 @@ import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { logger } from '../utils/logger';
 
+// Read version from package.json
+const pkgPath = path.join(__dirname, '../../package.json');
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.8' };
+const MANIFEST_VERSION = pkg.version;
+
 export interface ParsedDocument {
   id: string;
   filePath: string;
@@ -296,7 +301,7 @@ export class DependencyGraph {
     }
 
     const manifest: Manifest = {
-      version: '0.8.8',
+      version: MANIFEST_VERSION,
       target: targetDir,
       generatedAt: new Date().toISOString(),
       circles: circlesData,
