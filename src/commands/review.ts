@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import express from 'express';
+import { execSync } from 'child_process';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { parseOutputFilename } from '../executor/naming';
 import { logger } from '../utils/logger';
@@ -33,6 +34,22 @@ export function registerReviewCommand(program: Command): void {
 
         const port = parseInt(options.port, 10);
         const ttl = parseInt(options.ttl, 10);
+
+        // Auto-commit pending changes before review
+        try {
+          execSync('git add -A', { cwd: projectRoot, stdio: 'ignore' });
+          const diff = execSync('git diff --cached --quiet', { cwd: projectRoot, encoding: 'utf-8', stdio: 'pipe' });
+          void diff; // suppress unused warning
+        } catch {
+          // diff returns non-zero when there are staged changes
+          try {
+            const timestamp = new Date().toISOString();
+            execSync(`git commit -m "pre-review checkpoint: ${timestamp}"`, { cwd: projectRoot, stdio: 'ignore' });
+            console.log(chalk.green(`Changes committed before review (${timestamp})`));
+          } catch {
+            // May fail if git not initialized or nothing to commit
+          }
+        }
 
         const app = express();
 

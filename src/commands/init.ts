@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
+import { execSync } from 'child_process';
 import { logger } from '../utils/logger';
 
 // Resolve templates directory relative to the compiled dist/ directory
@@ -99,7 +100,19 @@ opsv-queue/
 
         fs.writeFileSync(path.join(targetDir, '.gitignore'), gitignore);
 
+        // Initialize git repository
+        let gitInitFailed = false;
+        try {
+          execSync('git init', { cwd: targetDir, stdio: 'ignore' });
+          console.log(chalk.green('Git repository initialized'));
+        } catch {
+          gitInitFailed = true;
+        }
+
         console.log(chalk.green(`\nProject initialized at ${targetDir}`));
+        if (gitInitFailed) {
+          console.log(chalk.yellow('Warning: git init failed. Run "git init" manually to enable version control.'));
+        }
         console.log(chalk.cyan('\nNext steps:'));
         if (name) {
           console.log(`  cd ${name}`);

@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.8
+# OpenSpec-Video (OpsV) v0.8.9
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -123,7 +123,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.8",
+  "version": "0.8.9",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -168,6 +168,31 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale.
 
 ---
 
+## Git Integration
+
+OpsV uses git as the version control layer for all project assets.
+
+### Automatic Git Operations
+
+| Command | Git Action |
+|---------|------------|
+| `opsv init` | Runs `git init` after scaffolding |
+| `opsv review` | Auto-commits with `git add -A` before starting |
+
+### Commit Conventions
+
+- **Pre-review checkpoint**: `git commit -m "pre-review checkpoint: <ISO timestamp>"` — committed automatically by `opsv review` before the review server starts
+- All other commits are manual
+
+### Git Init Failure Handling
+
+- `opsv init`: If `git init` fails (e.g., git not installed, repo already exists), a warning is printed after scaffolding:
+  ```
+  Warning: git init failed. Run "git init" manually to enable version control.
+  ```
+
+---
+
 ## Supported Providers
 
 | Provider | Models | Type |
@@ -192,4 +217,4 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale.
 
 MIT
 
-> *OpsV v0.8.8 | 2026-04-30*
+> *OpsV v0.8.9 | 2026-04-30*

@@ -170,6 +170,7 @@
 | v0.8.3 | 2026-04-28 23:35 | 双通道参考图（Design + Approved）、DesignRefReader、@FRAME 路径修复 |
 | v0.8.4 | 2026-04-29 10:00 | ComfyUI --workflow/--workflow-dir、ref(N) 自动匹配、_opsv_workflow 验证 |
 | v0.8.5 | 2026-04-29 11:30 | init 模板复制化、.env 根目录化、cli.ts 优先级修正 |
+| v0.8.9 | 2026-04-30 | git init 自动执行、review 前置自动提交、Git 集成文档 |
 
 ---
 
@@ -227,3 +228,22 @@
     - `opsv init`：在当前目录直接初始化（不创建子目录）
     - `opsv init my-project`：创建子目录（不变）
     - 防重复保护：检测 `.opsv/api_config.yaml` 已存在时报错
+
+---
+
+## v0.8.9 — 2026-04-30
+
+### 变更要点
+
+33. **`opsv init` 自动执行 `git init`**
+    - 脚手架完成后自动初始化 git 仓库
+    - 失败时打印警告提示手动执行
+
+34. **`opsv review` 前置自动提交**
+    - 启动 review 服务器前自动执行 `git add -A`
+    - Commit message 格式：`pre-review checkpoint: <ISO timestamp>`
+    - 无变更时静默跳过（无报错）
+
+35. **Git 集成文档**
+    - README.md 新增 Git Integration 章节
+    - 说明自动操作和 commit 规范
