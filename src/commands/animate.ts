@@ -7,10 +7,11 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { TaskBuilder } from '../core/compiler/TaskBuilder';
-import { AssetManager, Asset } from '../core/AssetManager';
+import { AssetManager, CircleAssetEntry } from '../core/AssetManager';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { RefResolver } from '../core/RefResolver';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
+import { DesignRefReader } from '../core/DesignRefReader';
 import { DependencyGraph } from '../core/DependencyGraph';
 import { Job, FrameRef } from '../types/Job';
 import { logger } from '../utils/logger';
@@ -23,6 +24,7 @@ export function registerAnimateCommand(program: Command): void {
     .option('--dir <path>', 'Target directory (must match circle create --dir)', 'videospec')
     .option('--name <name>', 'Override target basename')
     .option('--category <cat>', 'Filter assets by category (e.g. shot-production, shot-design)')
+    .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
@@ -30,30 +32,38 @@ export function registerAnimateCommand(program: Command): void {
         const modelKey = options.model;
 
         const assetManager = new AssetManager(projectRoot);
-        await assetManager.loadFromVideospec();
-
         const approvedRefReader = new ApprovedRefReader(projectRoot);
+        const designRefReader = new DesignRefReader(projectRoot);
         const refResolver = new RefResolver(projectRoot, approvedRefReader);
 
         const { circleDir } = resolveTarget(projectRoot, options.dir, options.name);
 
-        const pendingIds = readPendingAssetIds(circleDir);
+        // Read assets from circle manifest (not from directory scan)
+        const circleAssets = await assetManager.loadCircleAssets(circleDir);
 
-        const allAssets = options.category
-          ? assetManager.getByCategory(options.category)
-          : assetManager.getAllAssets();
-        const shotAssets = allAssets.filter((a) => pendingIds.includes(a.id));
+        // Parse status-skip option (default: approved)
+        const statusSkipStr = options.statusSkip || 'approved';
+        const skipStatuses = statusSkipStr === 'none'
+          ? []
+          : statusSkipStr.split(',').map((s: string) => s.trim());
 
-        if (shotAssets.length === 0) {
+        // Filter by category (if specified) and skip specified statuses
+        const targetAssets = circleAssets.assets.filter((a) => {
+          if (skipStatuses.includes(a.status)) return false;
+          if (options.category && a.category !== options.category) return false;
+          return true;
+        });
+
+        if (targetAssets.length === 0) {
           console.log(chalk.yellow('No pending shot assets found in this circle.'));
           return;
         }
 
-        console.log(chalk.cyan(`Compiling ${shotAssets.length} video tasks for ${modelKey}...`));
+        console.log(chalk.cyan(`Compiling ${targetAssets.length} video tasks for ${modelKey}...`));
 
         const jobs: Job[] = [];
-        for (const asset of shotAssets) {
-          const job = await buildVideoJob(asset, refResolver, projectRoot, circleDir, modelKey);
+        for (const asset of targetAssets) {
+          const job = await buildVideoJob(asset, refResolver, designRefReader);
           jobs.push(job);
         }
 
@@ -77,17 +87,6 @@ export function registerAnimateCommand(program: Command): void {
     });
 }
 
-function readPendingAssetIds(circleDir: string): string[] {
-  const manifestPath = path.join(circleDir, '_manifest.json');
-  if (!fs.existsSync(manifestPath)) return [];
-
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-  const assets: Record<string, any> = manifest.assets || {};
-  return Object.entries(assets)
-    .filter(([_, info]) => info.status !== 'approved')
-    .map(([id]) => id);
-}
-
 function resolveTarget(projectRoot: string, dirOption?: string, nameOption?: string): { targetDir: string; circleDir: string } {
   const basename = nameOption || DependencyGraph.resolveTargetBasename(dirOption || 'videospec');
   const queueRoot = path.join(projectRoot, 'opsv-queue');
@@ -102,13 +101,16 @@ function resolveTarget(projectRoot: string, dirOption?: string, nameOption?: str
 }
 
 async function buildVideoJob(
-  asset: Asset,
+  asset: CircleAssetEntry,
   refResolver: RefResolver,
-  projectRoot: string,
-  circleDir: string,
-  modelKey: string
+  designRefReader: DesignRefReader
 ): Promise<Job> {
-  const content = fs.readFileSync(asset.filePath, 'utf-8');
+  const filePath = asset.filePath;
+  if (!filePath) {
+    throw new Error(`File path not found for asset: ${asset.id}`);
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
   const prompt = frontmatter.prompt_en || frontmatter.visual_detailed || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
@@ -134,10 +136,12 @@ async function buildVideoJob(
       .map((r) => r.resolvedImagePath!);
   }
 
-  if (asset.designRefs.length > 0) {
+  // Load design refs directly from file
+  const designRefs = await designRefReader.getAll(filePath);
+  if (designRefs.length > 0) {
     referenceImages = [
       ...referenceImages,
-      ...asset.designRefs.map((r) => r.filePath),
+      ...designRefs.map((r) => r.filePath),
     ];
   }
 

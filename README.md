@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.5
+# OpenSpec-Video (OpsV) v0.8.6
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -53,15 +53,22 @@ opsv
 ├── circle
 │   ├── create [--dir] [--name] [--skip-middle-circle]
 │   └── refresh [--dir]           # Replaces old status + deps
-├── imagen --model <m>            # Compile image tasks directly
-├── animate --model <m>           # Compile video tasks directly
-├── comfy --model <m> [--workflow] [--workflow-dir] [--param]  # Compile ComfyUI tasks
+├── imagen --model <m> [--category <cat>] [--status-skip <statuses>]
+├── animate --model <m> [--category <cat>] [--status-skip <statuses>]
+├── comfy --model <m> [--category <cat>] [--status-skip <statuses>] [--workflow] [--workflow-dir] [--param]
 ├── audio --model <m>             # [planned]
-├── webapp --model <m>            # Browser automation
+├── webapp --model <m> [--category <cat>] [--status-skip <statuses>]
 ├── run <paths...> [--retry]      # Execute by path reference
 ├── review [--port] [--latest|--all] [--ttl]
 └── script [-d] [-o] [--dry-run]
 ```
+
+### Produce Command Options
+
+| Option | Description |
+|--------|-------------|
+| `--category <cat>` | Filter assets by category (from frontmatter) |
+| `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
 
 ---
 
@@ -74,7 +81,7 @@ Tasks are organized into **Circles** (dependency layers via topological sort):
 ```
 opsv-queue/
   videospec.circle1/            # Build output (basename.circleN)
-    _manifest.json              # Circle manifest: status + assets list
+    _manifest.json              # Circle manifest: id, status, layer, category
     volcengine.seadream/        # provider.model flat (no iteration numbers)
       @hero.json
       @hero_1.png
@@ -83,6 +90,23 @@ opsv-queue/
     volcengine.seedance2/
       shot_01.json
       shot_01_1.mp4
+```
+
+### Manifest Structure
+
+The `_manifest.json` contains all assets with their metadata:
+
+```json
+{
+  "version": "0.8.6",
+  "target": "videospec",
+  "generatedAt": "2026-04-30T00:00:00.000Z",
+  "circles": [...],
+  "assets": {
+    "hero": { "status": "approved", "layer": 1, "category": "character" },
+    "scene_01": { "status": "drafting", "layer": 2, "category": "scene" }
+  }
+}
 ```
 
 ### Status Flow
@@ -111,6 +135,7 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale b
 4. **CLI Does Only Deterministic Actions**: CLI never modifies content fields. It only appends review records and updates status. All field alignment is the agent's responsibility.
 5. **By-Provider Parallelism**: Same provider serial, different providers parallel.
 6. **No Iteration Numbers**: Directories use circle names without `_1` suffixes. Incremental updates via `circle refresh`.
+7. **Manifest-First**: Produce commands read from circle manifest, never scan directories.
 
 ---
 
@@ -138,4 +163,4 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale b
 
 MIT
 
-> *OpsV v0.8.5 | 2026-04-29*
+> *OpsV v0.8.6 | 2026-04-30*

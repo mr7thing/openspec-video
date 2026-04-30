@@ -24,6 +24,8 @@ export interface Asset {
 export interface CircleAssetEntry {
   id: string;
   status: string;
+  category?: string;
+  filePath?: string;
 }
 
 export interface CircleAssets {
@@ -92,19 +94,21 @@ export class AssetManager {
 
     if (fs.existsSync(manifestPath)) {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-      // v0.8.2: assets from merged manifest
+      // v0.8.2+: assets from merged manifest (includes category)
       if (data.assets) {
-        const assets = Object.entries(data.assets).map(([id, info]: [string, any]) => ({
+        const assets: CircleAssetEntry[] = Object.entries(data.assets).map(([id, info]: [string, any]) => ({
           id,
           status: info.status || 'drafting',
+          category: info.category,
+          filePath: this.findAssetFilePath(id),
         }));
         return { circleName, assets };
       }
-      // Fallback: circles[].status (old format)
-      const assets: Array<{ id: string; status: string }> = [];
+      // Fallback: circles[].status (old format without category)
+      const assets: CircleAssetEntry[] = [];
       for (const circle of data.circles || []) {
         for (const [id, status] of Object.entries(circle.status || {})) {
-          assets.push({ id, status: status as string });
+          assets.push({ id, status: status as string, filePath: this.findAssetFilePath(id) });
         }
       }
       return { circleName, assets };
@@ -129,5 +133,17 @@ export class AssetManager {
     const asset = this.assets.get(id);
     if (!asset || asset.approvedRefs.length === 0) return null;
     return asset.approvedRefs[0].filePath;
+  }
+
+  findAssetFilePath(assetId: string): string | undefined {
+    const dirs = ['elements', 'scenes'];
+    const prefixes = ['@', ''];
+    for (const dir of dirs) {
+      for (const prefix of prefixes) {
+        const p = path.join(this.videospecRoot, dir, `${prefix}${assetId}.md`);
+        if (fs.existsSync(p)) return p;
+      }
+    }
+    return undefined;
   }
 }

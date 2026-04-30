@@ -1,4 +1,4 @@
-# OpsV v0.8.3 Specification
+# OpsV v0.8.6 Specification
 
 ## Overview
 
@@ -11,6 +11,7 @@ OpsV (OpenSpec-Video) is a cinematic AI automation framework that transforms str
 3. **Physical State Machine**: Task state = file existence (crash-safe)
 4. **Circle Architecture**: Dependency-layered batch execution with topological sorting
 5. **By-Provider Parallelism**: Same provider serial, different providers parallel
+6. **Manifest-First**: Produce commands read from circle manifest, never scan directories
 
 ## Command Tree (11 commands)
 
@@ -21,15 +22,22 @@ opsv
 ├── circle
 │   ├── create [--dir] [--name] [--skip-middle-circle]
 │   └── refresh [--dir]
-├── imagen --model <m>            # Compile image tasks
-├── animate --model <m>           # Compile video tasks
-├── comfy --model <m> [--param]   # Compile ComfyUI tasks
+├── imagen --model <m> [--category <cat>] [--status-skip <statuses>]
+├── animate --model <m> [--category <cat>] [--status-skip <statuses>]
+├── comfy --model <m> [--category <cat>] [--status-skip <statuses>] [--workflow] [--workflow-dir] [--param]
 ├── audio --model <m>             # [planned]
-├── webapp --model <m>            # Browser automation
+├── webapp --model <m> [--category <cat>] [--status-skip <statuses>]
 ├── run <path...> [--retry]       # Execute tasks
 ├── review [--port] [--latest|--all] [--ttl]
 └── script [-d] [-o] [--dry-run]
 ```
+
+### Produce Command Options
+
+| Option | Description |
+|--------|-------------|
+| `--category <cat>` | Filter assets by category (user-defined in frontmatter) |
+| `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
 
 ## Directory Structure
 
@@ -47,7 +55,7 @@ project/
     .env                           <- API keys
   opsv-queue/
     videospec.circle1/             <- Build output (basename.circleN)
-      _manifest.json               <- Circle manifest: status + assets list
+      _manifest.json               <- Circle manifest: id, status, layer, category
       volcengine.seadream/         <- provider.model
         @hero.json                 <- Compiled task
         @hero_1.png                <- Output
@@ -59,6 +67,25 @@ project/
         shot_01_first.png
         shot_01_last.png
 ```
+
+## Manifest Structure
+
+The `_manifest.json` is the **single source of truth** for asset state:
+
+```json
+{
+  "version": "0.8.6",
+  "target": "videospec",
+  "generatedAt": "2026-04-30T00:00:00.000Z",
+  "circles": [...],
+  "assets": {
+    "hero": { "status": "approved", "layer": 1, "category": "character" },
+    "scene_01": { "status": "drafting", "layer": 2, "category": "scene" }
+  }
+}
+```
+
+**Critical**: Produce commands read from manifest ONLY, never scan directories.
 
 ## Status State Machine
 
@@ -161,16 +188,19 @@ Rules:
 
 `@FRAME:shot_XX_last` resolution searches `.circleN/<provider.model>/` directories (v0.8.3) instead of hardcoded `opsv-queue/videospec/`.
 
-## Compilation Flow
+## Compilation Flow (v0.8.6)
 
-1. Produce command (imagen/animate/comfy) reads `_manifest.json`
-2. Filters out `approved` assets
-3. Resolves `@ref` references via two readers (v0.8.3):
-   - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs` (first reference block)
-   - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs` (second reference block)
-4. Builds `Job` objects from frontmatter (with `approvedRefs` + `designRefs`)
-5. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
-6. Writes `TaskJson` to `basename.circleN/provider.model/shotId.json`
+1. Produce command (imagen/animate/comfy/webapp) reads `_manifest.json`
+2. Filters by `--category` (if specified) and `--status-skip` (default: approved)
+3. For each filtered asset, finds the `.md` file via `findAssetFilePath()` (searches `elements/` and `scenes/`)
+4. Resolves `@ref` references:
+   - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → used for `@assetId:variant` resolution
+   - **`DesignRefReader`**: reads `## Design References` from **current document** → used as `reference_images`
+5. Builds `Job` objects from frontmatter
+6. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
+7. Writes `TaskJson` to `basename.circleN/provider.model/shotId.json`
+
+**Key Change (v0.8.6)**: Produce commands no longer scan directories. They read only from manifest and resolve file paths on-demand.
 
 ## Execution Flow
 
@@ -224,3 +254,13 @@ Rules:
 - Produce commands: second reference block now reads `designRefs` (from `## Design References`) instead of `approvedRefs` (from `## Approved References`)
 - `@FRAME:` resolution updated: now searches `.circleN/<provider.model>/` directories instead of hardcoded `opsv-queue/videospec/`
 - Section distinction clarified: `## Approved References` = output-side (images placed after review, referenced by other docs); `## Design References` = input-side (design reference images, used as `reference_images` during compilation)
+
+## Breaking Changes from v0.8.5
+
+- **Manifest-First Architecture**: Produce commands (`imagen`, `animate`, `comfy`, `webapp`) no longer scan directories. They read only from circle `_manifest.json`.
+- **`_manifest.json` now includes `category`**: Each asset entry contains `{ status, layer, category }` instead of just `{ status, layer }`.
+- **`--category` option added**: Produce commands accept `--category <cat>` to filter assets by their frontmatter category field.
+- **`--status-skip` option added**: Produce commands accept `--status-skip <statuses>` (default: approved). Use `none` to skip nothing, or comma-separated list.
+- **Removed `getAllElements()` and `getAllScenes()`**: Category is user-defined; no hardcoded character/prop/scene filters. Use `--category` to filter.
+- **`CircleAssetEntry` now includes `filePath`**: `AssetManager.loadCircleAssets()` returns file paths for direct .md file access.
+- **No directory scanning in produce commands**: `AssetManager.loadFromVideospec()` no longer called by produce commands.

@@ -42,7 +42,7 @@ export interface Manifest {
   target: string;
   generatedAt: string;
   circles: ManifestEntry[];
-  assets: Record<string, { status: string; layer: number }>;
+  assets: Record<string, { status: string; layer: number; category?: string }>;
 }
 
 function escapeRegex(s: string): string {
@@ -52,10 +52,12 @@ function escapeRegex(s: string): string {
 export class DependencyGraph {
   private graph: Map<string, Set<string>> = new Map();
   private statusMap: Map<string, string> = new Map();
+  private categoryMap: Map<string, string> = new Map();
 
   build(documents: ParsedDocument[]): void {
     this.graph.clear();
     this.statusMap.clear();
+    this.categoryMap.clear();
 
     for (const doc of documents) {
       const deps = new Set<string>();
@@ -74,6 +76,9 @@ export class DependencyGraph {
       this.graph.set(doc.id, deps);
       if (doc.frontmatter.status) {
         this.statusMap.set(doc.id, doc.frontmatter.status);
+      }
+      if (doc.frontmatter.category) {
+        this.categoryMap.set(doc.id, doc.frontmatter.category);
       }
     }
   }
@@ -251,15 +256,16 @@ export class DependencyGraph {
       fs.mkdirSync(circleDir, { recursive: true });
     }
 
-    const assets: Record<string, { status: string; layer: number }> = {};
+    const assets: Record<string, { status: string; layer: number; category?: string }> = {};
     const circlesData: ManifestEntry[] = [];
 
     for (const circle of circles) {
       const status: Record<string, string> = {};
       for (const id of circle.assetIds) {
         const s = this.statusMap.get(id) || 'drafting';
+        const c = this.categoryMap.get(id);
         status[id] = s;
-        assets[id] = { status: s, layer: circle.layer };
+        assets[id] = { status: s, layer: circle.layer, ...(c && { category: c }) };
       }
 
       circlesData.push({
