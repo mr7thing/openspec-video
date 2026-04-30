@@ -43,10 +43,14 @@ export class QueueRunner {
   }
 
   async runPaths(paths: string[], options: { retry?: boolean; dryRun?: boolean } = {}): Promise<ProviderResult[]> {
-    const tasks = this.collectTasks(paths);
+    const tasks = this.collectTasks(paths, options.retry);
 
     if (tasks.length === 0) {
-      console.log(chalk.yellow('No task .json files found at specified paths.'));
+      if (options.retry) {
+        console.log(chalk.yellow('No failed tasks found to retry.'));
+      } else {
+        console.log(chalk.yellow('No task .json files found at specified paths.'));
+      }
       return [];
     }
 
@@ -120,7 +124,7 @@ export class QueueRunner {
     return results;
   }
 
-  private collectTasks(paths: string[]): Array<{ task: TaskJson; path: string }> {
+  private collectTasks(paths: string[], retry?: boolean): Array<{ task: TaskJson; path: string }> {
     const results: Array<{ task: TaskJson; path: string }> = [];
 
     for (const p of paths) {
@@ -136,14 +140,14 @@ export class QueueRunner {
           logger.warn(`Failed to parse task JSON: ${resolved}`);
         }
       } else if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-        this.collectFromDir(resolved, results);
+        this.collectFromDir(resolved, results, retry);
       }
     }
 
     return results;
   }
 
-  private collectFromDir(dir: string, results: Array<{ task: TaskJson; path: string }>): void {
+  private collectFromDir(dir: string, results: Array<{ task: TaskJson; path: string }>, retry?: boolean): void {
     const entries = fs.readdirSync(dir);
     const outputFiles = new Set(
       entries.filter((e) => !e.endsWith('.json') && !e.endsWith('.log') && !e.startsWith('_'))
@@ -154,12 +158,22 @@ export class QueueRunner {
       const stat = fs.statSync(fullPath);
 
       if (stat.isDirectory()) {
-        this.collectFromDir(fullPath, results);
+        this.collectFromDir(fullPath, results, retry);
       } else if (entry.endsWith('.json') && !entry.startsWith('_')) {
         try {
           const task = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
           if (task._opsv) {
-            // Skip if output already exists
+            // When retry=true, include tasks with _error.log even if output exists
+            if (retry) {
+              const base = entry.replace(/\.json$/, '');
+              const errorLog = path.join(dir, `${base}_error.log`);
+              if (fs.existsSync(errorLog)) {
+                results.push({ task, path: fullPath });
+              }
+              continue;
+            }
+
+            // Skip if output already exists (non-retry mode)
             const base = entry.replace(/\.json$/, '');
             const hasOutput = Array.from(outputFiles).some((f) => f.startsWith(base + '_'));
             if (hasOutput && !getResumeTaskId(fullPath)) {

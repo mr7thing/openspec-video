@@ -103,17 +103,43 @@ export function registerCircleCommands(program: Command): void {
         const graph = DependencyGraph.buildFromDir(projectRoot, options.dir);
         const circles = graph.getCircles();
 
+        // Build new assets map with layer info
+        const newAssets: Record<string, { status: string; layer: number; category?: string }> = {};
+        for (const circle of circles) {
+          for (const id of circle.assetIds) {
+            const existing = existingAssets[id];
+            newAssets[id] = {
+              status: existing?.status || 'drafting',
+              layer: circle.layer,
+              category: existing?.category,
+            };
+          }
+        }
+
+        // Detect layer topology changes
+        const layerChanged: string[] = [];
+        for (const id of Object.keys(newAssets)) {
+          const oldLayer = existingAssets[id]?.layer;
+          const newLayer = newAssets[id]?.layer;
+          if (oldLayer !== undefined && newLayer !== undefined && oldLayer !== newLayer) {
+            layerChanged.push(`${id}: ${oldLayer} → ${newLayer}`);
+          }
+        }
+
+        if (layerChanged.length > 0) {
+          console.error(chalk.red('Layer topology changed. Run "opsv circle create" to create a new circle batch.'));
+          console.error(chalk.yellow('  Changed assets:'));
+          for (const change of layerChanged) {
+            console.error(chalk.yellow(`    ${change}`));
+          }
+          process.exit(1);
+        }
+
         // Write updated manifest with frontmatter as authoritative, existing status as fallback
         graph.writeCircleDir(queueRoot, basename, latestN, circles, options.dir, existingAssets);
 
         // Diff detection
-        const newAssetIds = new Set<string>();
-        for (const c of circles) {
-          for (const id of c.assetIds) {
-            newAssetIds.add(id);
-          }
-        }
-
+        const newAssetIds = new Set(Object.keys(newAssets));
         const existingAssetIds = Object.keys(existingAssets);
         const added = [...newAssetIds].filter((id) => !existingAssetIds.includes(id));
         const removed = existingAssetIds.filter((id) => !newAssetIds.has(id));
