@@ -105,9 +105,20 @@ export function registerReviewCommand(program: Command): void {
               reviewEntry += ` | modified_task: ${taskJsonPath}`;
             }
 
-            // Find source .md file and append review record
-            const elementsDir = path.join(process.cwd(), 'videospec', 'elements');
-            const scenesDir = path.join(process.cwd(), 'videospec', 'scenes');
+            // Read manifest to get target for source document lookup
+            const circleDir = path.join(queueRoot, circle);
+            const manifestPath = path.join(circleDir, '_manifest.json');
+            let manifestTarget = 'videospec'; // default
+
+            if (fs.existsSync(manifestPath)) {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+              manifestTarget = manifest.target || 'videospec';
+            }
+
+            // Build source document search paths from manifest.target
+            const targetRoot = path.join(process.cwd(), manifestTarget);
+            const elementsDir = path.join(targetRoot, 'elements');
+            const scenesDir = path.join(targetRoot, 'scenes');
             let sourceDocPath: string | null = null;
 
             for (const dir of [elementsDir, scenesDir]) {
@@ -130,8 +141,6 @@ export function registerReviewCommand(program: Command): void {
             }
 
             // Update _manifest.json assets field
-            const circleDir = path.join(queueRoot, circle);
-            const manifestPath = path.join(circleDir, '_manifest.json');
             if (fs.existsSync(manifestPath)) {
               const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
               if (manifest.assets && manifest.assets[assetId]) {

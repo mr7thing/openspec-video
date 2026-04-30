@@ -90,19 +90,12 @@ export function registerCircleCommands(program: Command): void {
         const circleDir = path.join(queueRoot, circleDirName);
         const manifestPath = path.join(circleDir, '_manifest.json');
 
-        // Read existing manifest to preserve status
-        let existingAssets: Record<string, string> = {};
+        // Read existing manifest to preserve status (as fallback)
+        let existingAssets: Record<string, { status: string; layer: number; category?: string }> = {};
         if (fs.existsSync(manifestPath)) {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
           if (manifest.assets) {
-            for (const [id, info] of Object.entries(manifest.assets)) {
-              existingAssets[id] = (info as any).status || 'drafting';
-            }
-          } else {
-            // Fallback: read from circles[].status (old format)
-            for (const circle of manifest.circles || []) {
-              Object.assign(existingAssets, circle.status || {});
-            }
+            existingAssets = manifest.assets;
           }
         }
 
@@ -110,32 +103,20 @@ export function registerCircleCommands(program: Command): void {
         const graph = DependencyGraph.buildFromDir(projectRoot, options.dir);
         const circles = graph.getCircles();
 
-        // Write updated manifest (overwrite existing)
-        graph.writeCircleDir(queueRoot, basename, latestN, circles, options.dir);
+        // Write updated manifest with frontmatter as authoritative, existing status as fallback
+        graph.writeCircleDir(queueRoot, basename, latestN, circles, options.dir, existingAssets);
 
         // Diff detection
-        const newAssets: Record<string, string> = {};
+        const newAssetIds = new Set<string>();
         for (const c of circles) {
           for (const id of c.assetIds) {
-            newAssets[id] = existingAssets[id] || 'drafting';
+            newAssetIds.add(id);
           }
         }
 
-        // Read the newly written manifest and preserve existing statuses
-        if (fs.existsSync(manifestPath)) {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-          if (manifest.assets) {
-            for (const [id, info] of Object.entries(manifest.assets) as [string, any][]) {
-              if (existingAssets[id]) {
-                info.status = existingAssets[id];
-              }
-            }
-            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-          }
-        }
-
-        const added = Object.keys(newAssets).filter((k) => !existingAssets[k]);
-        const removed = Object.keys(existingAssets).filter((k) => !newAssets[k]);
+        const existingAssetIds = Object.keys(existingAssets);
+        const added = [...newAssetIds].filter((id) => !existingAssetIds.includes(id));
+        const removed = existingAssetIds.filter((id) => !newAssetIds.has(id));
 
         if (added.length > 0) {
           console.log(chalk.yellow(`  New assets: ${added.join(', ')}`));

@@ -28,15 +28,12 @@ export function registerWebappCommand(program: Command): void {
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
-        const cwd = process.cwd();
+        const projectRoot = process.cwd();
         const modelKey = options.model;
 
         // Resolve manifest path
-        const manifestPath = resolveManifestPath(cwd, options.manifest);
+        const manifestPath = resolveManifestPath(projectRoot, options.manifest);
         const circleDir = path.dirname(manifestPath);
-
-        // projectRoot is one level up from circle dir (opsv-queue/)
-        const projectRoot = path.dirname(path.dirname(circleDir));
 
         const assetManager = new AssetManager(projectRoot);
         const approvedRefReader = new ApprovedRefReader(projectRoot);

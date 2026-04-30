@@ -255,7 +255,8 @@ export class DependencyGraph {
     basename: string,
     circleN: number,
     circles: CircleDefinition[],
-    targetDir: string
+    targetDir: string,
+    existingAssets?: Record<string, { status: string; layer: number; category?: string }>
   ): string {
     const circleDirName = `${basename}.circle${circleN}`;
     const circleDir = path.join(queueRoot, circleDirName);
@@ -270,8 +271,18 @@ export class DependencyGraph {
     for (const circle of circles) {
       const status: Record<string, string> = {};
       for (const id of circle.assetIds) {
-        const s = this.statusMap.get(id) || 'drafting';
-        const c = this.categoryMap.get(id);
+        // Frontmatter status is authoritative; manifest old value is fallback only
+        const frontmatterStatus = this.statusMap.get(id);
+        const existingAsset = existingAssets?.[id];
+        const existingStatus = existingAsset?.status;
+
+        // If frontmatter has a status (not just default 'drafting'), use it
+        // Otherwise fallback to existing manifest status
+        const s = (frontmatterStatus && frontmatterStatus !== 'drafting')
+          ? frontmatterStatus
+          : (existingStatus || 'drafting');
+
+        const c = this.categoryMap.get(id) || existingAsset?.category;
         status[id] = s;
         assets[id] = { status: s, layer: circle.layer, ...(c && { category: c }) };
       }
@@ -285,7 +296,7 @@ export class DependencyGraph {
     }
 
     const manifest: Manifest = {
-      version: '0.8.7',
+      version: '0.8.8',
       target: targetDir,
       generatedAt: new Date().toISOString(),
       circles: circlesData,
@@ -342,7 +353,7 @@ export class DependencyGraph {
       }
     }
 
-    // Resolve upstream dependencies: scan elements/ and scenes/ for referenced assets
+    // Resolve upstream dependencies: scan elements/ and scenes/ relative to resolvedTarget
     const upstreamDirs = ['elements', 'scenes'];
     const targetAssetIds = new Set(documents.map((d) => d.id));
     const targetRefs = new Set<string>();
@@ -361,9 +372,10 @@ export class DependencyGraph {
     }
 
     // Pull in upstream assets that are not yet approved
+    // Search relative to resolvedTarget (supports --dir elements/role, --dir videospec, etc.)
     if (targetRefs.size > 0) {
       for (const dir of upstreamDirs) {
-        const dirPath = path.join(projectRoot, 'videospec', dir);
+        const dirPath = path.join(resolvedTarget, dir);
         if (!fs.existsSync(dirPath)) continue;
 
         const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));

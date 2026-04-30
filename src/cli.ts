@@ -41,7 +41,7 @@ const program = new Command();
 program
   .name('opsv')
   .version(VERSION)
-  .description('OpenSpec-Video v0.8.5 — Cinematic AI Automation CLI');
+  .description(`OpenSpec-Video v${VERSION} — Cinematic AI Automation CLI`);
 
 // Register all 11 commands
 registerInitCommand(program, VERSION);

@@ -14,10 +14,10 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 | Circle | 职责 | 产出 |
 |--------|------|------|
-| **ZeroCircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec.circle1/volcengine.seadream/` |
-| **FirstCircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec.circle2/volcengine.seadream/` |
-| **...** | 中间层级（按需扩展） | ... |
-| **EndCircle** | 末端动态视频（自动推断） | `opsv-queue/videospec.circleN/volcengine.seedance/` |
+| **zerocircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec.circle1/volcengine.seadream/` |
+| **firstcircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec.circle2/volcengine.seadream/` |
+| **secondcircle** | 中间层级（按需扩展） | ... |
+| **endcircle** | 末端动态视频（仅当 shotlist.md 存在） | `opsv-queue/videospec.circleN/volcengine.seedance/` |
 
 **铁律**：
 - 严禁在 ZeroCircle 未完成 Review/Approve 时强行下发 FirstCircle
@@ -90,7 +90,7 @@ videospec/                         # 创意资产根目录
     ├── shot_01.md                # 分镜数据源（v0.8）
     ├── shot_02.md
     ├── Script.md                 # 聚合展示（由 opsv script 生成）
-    └── Shotlist.md               # 视频工程图纸（末环，独立不进依赖图）
+    └── shotlist.md               # 视频工程图纸（末环，独立不进依赖图）
 
 .opsv/                              # OpsV 内部状态
 ├── api_config.yaml
@@ -160,7 +160,7 @@ refs:
 - `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法
 - `refs` 参与拓扑排序，决定 Circle 分层
 - `Script.md` 由 `opsv script` 从 shot_*.md 聚合生成（带来源标注）
-- `Shotlist.md` 是末环，独立处理，不进依赖图
+- `shotlist.md` 是末环，独立处理，不进依赖图
 
 ## Agent 角色速查
 
@@ -187,11 +187,11 @@ opsv circle refresh
 
 # 图像任务生成 + 编译（直接产出可执行 .json，无 jobs.json 中间层）
 opsv imagen --model volcengine.seadream-5.0-lite
-# 选项: --preview, --shots, --circle <name>, --no-skip-approved, --skip-circle-check
+# 选项: --manifest <path>, --file <id>, --category <cat>, --status-skip <statuses>
 
 # 视频任务生成 + 编译（直接产出可执行 .json）
 opsv animate --model volcengine.seedance-2.0
-# 选项: --circle <name>, --skip-circle-check
+# 选项: --manifest <path>, --file <id>, --category <cat>, --status-skip <statuses>
 
 # ComfyUI 工作流编译
 opsv comfy --model runninghub.flux-schnell

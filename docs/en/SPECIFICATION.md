@@ -1,4 +1,4 @@
-# OpsV v0.8.7 Specification
+# OpsV v0.8.8 Specification
 
 ## Overview
 
@@ -76,7 +76,7 @@ The `_manifest.json` is the **single source of truth** for asset state:
 
 ```json
 {
-  "version": "0.8.7",
+  "version": "0.8.8",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [...],

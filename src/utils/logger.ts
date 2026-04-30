@@ -24,6 +24,11 @@ export interface LoggerOptions {
   timestamp?: boolean;
 }
 
+// Read version from package.json
+const pkgPath = path.join(__dirname, '../../package.json');
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.8' };
+const LOG_VERSION = pkg.version;
+
 const defaultOptions: LoggerOptions = {
   level: (process.env.LOG_LEVEL as LogLevel) || LogLevel.INFO,
   console: true,
@@ -112,7 +117,7 @@ export function initializeLogger(options: Partial<LoggerOptions> = {}): winston.
   const merged = { ...defaultOptions, ...options };
   loggerInstance = winston.createLogger({
     level: merged.level,
-    defaultMeta: { service: 'opsv', version: '0.8.1' },
+    defaultMeta: { service: 'opsv', version: LOG_VERSION },
     transports: createTransports(merged),
     exitOnError: false,
   });

@@ -26,12 +26,12 @@ export class VolcengineProvider {
     const configLoader = ConfigLoader.getInstance();
     configLoader.loadConfig(process.cwd());
 
-    let apiKey: string;
-    try {
-      apiKey = configLoader.getResolvedApiKey(`volcengine.${modelKey}`);
-    } catch {
-      apiKey = process.env.VOLCENGINE_API_KEY || process.env.ARK_API_KEY || '';
-    }
+    // Resolve modelKey - may be short name (seadream) or full key (volcengine.seadream)
+    const resolvedKey = modelKey.startsWith('volcengine.')
+      ? modelKey
+      : `volcengine.${modelKey}`;
+
+    const apiKey = configLoader.getResolvedApiKey(resolvedKey);
 
     const isImage = task._opsv.type === 'imagen';
 

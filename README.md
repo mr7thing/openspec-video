@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.7
+# OpenSpec-Video (OpsV) v0.8.8
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -123,7 +123,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.7",
+  "version": "0.8.8",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -192,4 +192,4 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale.
 
 MIT
 
-> *OpsV v0.8.7 | 2026-04-30*
+> *OpsV v0.8.8 | 2026-04-30*
