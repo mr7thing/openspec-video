@@ -18,8 +18,8 @@ npm-debug.log*
 .vscode/
 .idea/
 
-# Fix notes
-0.8.1fix.md
+# audit/ fix note
+docs/audit
 
 
 # key
@@ -28,3 +28,4 @@ npm-debug.log*
 
 # ensure templates
 !templates
+docs/0.8.7audit_report.md
