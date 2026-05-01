@@ -40,7 +40,7 @@ export class RunningHubCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'runninghub',
-        modelKey: modelConfig.model,
+        modelKey: ctx.modelKey,
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,
         api_url: modelConfig.api_url,

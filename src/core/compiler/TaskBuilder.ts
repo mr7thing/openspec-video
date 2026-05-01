@@ -63,6 +63,7 @@ export class TaskBuilder {
     for (const job of jobs) {
       const ctx: CompileContext = {
         job,
+        modelKey,
         modelConfig,
         apiKey,
         outputDir,

@@ -171,6 +171,7 @@
 | v0.8.4 | 2026-04-29 10:00 | ComfyUI --workflow/--workflow-dir、ref(N) 自动匹配、_opsv_workflow 验证 |
 | v0.8.5 | 2026-04-29 11:30 | init 模板复制化、.env 根目录化、cli.ts 优先级修正 |
 | v0.8.9 | 2026-04-30 | git init 自动执行、review 前置自动提交、Git 集成文档 |
+| v0.8.10 | 2026-05-01 | modelKey 存储修复、Minimax URL 解析修复、api_config 别名更新、新增 I2I 模型 |
 
 ---
 
@@ -247,3 +248,33 @@
 35. **Git 集成文档**
     - README.md 新增 Git Integration 章节
     - 说明自动操作和 commit 规范
+
+---
+
+## v0.8.10 — 2026-05-01
+
+### 变更要点
+
+36. **修复 `_opsv.modelKey` 存储错误**
+    - `CompileContext` 新增 `modelKey` 字段，传递原始 api_config key
+    - 所有 Compiler 的 `_opsv.modelKey` 改为存 api_config key（如 `volc.seadream5`），不再存 API model 名（如 `doubao-seedream-5-0-260128`）
+    - Executor 不再拼接 provider 前缀，直接用 `task._opsv.modelKey` 查配置
+
+37. **修复 MinimaxProvider 图片 URL 解析**
+    - MiniMax 图像 API 返回 `data.image_urls[0]`（数组），原代码字段路径错误
+    - 修正为 `response.data?.data?.image_urls?.[0]`
+
+38. **修复 `buildImageJob` 硬编码 `aspect_ratio: '1:1'`**
+    - `imagen.ts` 和 `comfy.ts` 的 `buildImageJob`/`buildComfyJob` 改为读取 `frontmatter.aspect_ratio`
+    - 不再忽略 frontmatter 配置
+
+39. **更新 `api_config.yaml` 模型别名**
+    - MiniMax: `minimax.image-01` → `minimax.img01`，`minimax.video-01` → `minimax.vid01`
+    - RunningHub: `runninghub.workflow` → `runninghub.default`
+    - 新增 `siliconflow.edit2509`（Qwen-Image-Edit I2I 模型）
+    - 所有模型添加 `docs_url` 字段
+    - `volc.seadream5` 添加 `quality_map` 解决最小分辨率限制
+
+40. **文档更新**
+    - README.md 新增 `--model` 参数与 API Config 别名章节
+    - 所有示例命令更新为新别名格式

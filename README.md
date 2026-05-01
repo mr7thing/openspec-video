@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.9
+# OpenSpec-Video (OpsV) v0.8.10
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -28,7 +28,7 @@ opsv circle create
 
 # 2. Enter circle directory and compile image tasks
 cd opsv-queue/videospec.circle1
-opsv imagen --model volcengine.seadream
+opsv imagen --model volc.seadream5
 
 # 3. Execute compiled tasks
 opsv run
@@ -37,7 +37,7 @@ opsv run
 opsv review
 
 # 5. Compile video tasks (only on circles with shot assets)
-opsv animate --model volcengine.seedance2
+opsv animate --model volc.seedance2
 
 # 6. Execute video tasks
 opsv run
@@ -66,6 +66,40 @@ opsv
 
 ---
 
+## `--model` 参数与 API Config 别名
+
+`--model` 参数使用 `api_config.yaml` 中定义的**模型别名**（key），不是 API 模型名。所有配置从 `api_config.yaml` 读取，代码无硬编码。
+
+```bash
+# 使用 api_config 中的别名
+opsv imagen --model volc.seadream5    # 不是 "doubao-seedream-5-0-260128"
+opsv animate --model volc.seedance2   # 不是 "doubao-seedance-2-0-260128"
+opsv imagen --model minimax.img01     # 不是 "image-01"
+opsv imagen --model siliconflow.qimg  # Qwen-Image T2I
+opsv imagen --model siliconflow.edit2509  # Qwen-Image-Edit I2I
+```
+
+### 可用模型别名
+
+| 别名 | 类型 | 说明 |
+|------|------|------|
+| `volc.seadream5` | imagen | 豆包 SeaDream 5.0 |
+| `volc.seedance2` | video | 豆包 Seedance 2.0 |
+| `volc.seedance2f` | video | 豆包 Seedance 2.0 Fast |
+| `siliconflow.qimg` | imagen | 硅基 Qwen-Image T2I |
+| `siliconflow.edit2509` | imagen | 硅基 Qwen-Image-Edit I2I |
+| `siliconflow.want2v` | video | 硅基 Wan T2V |
+| `siliconflow.wani2v` | video | 硅基 Wan I2V |
+| `minimax.img01` | imagen | MiniMax Image-01 |
+| `minimax.vid01` | video | MiniMax Hailuo 2.3 |
+| `comfylocal.workflow` | comfy | ComfyUI Local |
+| `runninghub.default` | comfy | RunningHub Cloud |
+| `webapp.gemini` | webapp | Gemini 浏览器自动化 |
+
+完整配置见 `.opsv/api_config.yaml`。
+
+---
+
 ## Circle Workflow
 
 Produce commands (`imagen`, `animate`, `comfy`, `webapp`) run inside a circle directory or with `--manifest`:
@@ -73,19 +107,19 @@ Produce commands (`imagen`, `animate`, `comfy`, `webapp`) run inside a circle di
 ```bash
 # Enter circle directory and run
 cd opsv-queue/videospec.circle1
-opsv imagen --model volcengine.seadream
+opsv imagen --model volc.seadream5
 
 # Or specify manifest path
-opsv imagen --model volcengine.seadream --manifest opsv-queue/videospec.circle1/_manifest.json
+opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec.circle1/_manifest.json
 
 # Run specific asset by id
-opsv imagen --model volcengine.seadream --file hero
+opsv imagen --model volc.seadream5 --file hero
 
 # Filter by category
-opsv imagen --model volcengine.seadream --category character
+opsv imagen --model volc.seadream5 --category character
 
 # Skip specific statuses (default: approved)
-opsv imagen --model volcengine.seadream --status-skip approved,drafting
+opsv imagen --model volc.seadream5 --status-skip approved,drafting
 ```
 
 ### Produce Command Options
@@ -109,12 +143,12 @@ Tasks are organized into **Circles** (dependency layers via topological sort):
 opsv-queue/
   videospec.circle1/            # Circle directory (basename.circleN)
     _manifest.json              # Circle manifest: circles[], assets{}
-    volcengine.seadream/       # provider.model/
+    volc.seadream5/           # api_config model alias
       @hero.json
       @hero_1.png
   role.circle2/                # Terminal circle (contains shots)
     _manifest.json
-    volcengine.seedance2/
+    volc.seedance2/
       shot_01.json
       shot_01_1.mp4
 ```
@@ -123,7 +157,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.9",
+  "version": "0.8.10",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -195,14 +229,14 @@ OpsV uses git as the version control layer for all project assets.
 
 ## Supported Providers
 
-| Provider | Models | Type |
-|----------|--------|------|
-| Volcengine | SeaDream 5.0, Seedance 2.0/2.0 Fast | imagen, video |
-| SiliconFlow | Qwen-Image, Wan 2.2 T2V/I2V | imagen, video |
-| MiniMax | image-01, Hailuo 2.3 | imagen, video |
-| RunningHub | ComfyUI Cloud | comfy |
-| ComfyUI Local | SDXL, custom workflows | comfy |
-| Browser (extension) | Gemini UI automation | webapp |
+| Provider | Aliases | Type |
+|----------|---------|------|
+| Volcengine | `volc.seadream5`, `volc.seedance2`, `volc.seedance2f` | imagen, video |
+| SiliconFlow | `siliconflow.qimg`, `siliconflow.edit2509`, `siliconflow.want2v`, `siliconflow.wani2v` | imagen, video |
+| MiniMax | `minimax.img01`, `minimax.vid01` | imagen, video |
+| RunningHub | `runninghub.default` | comfy |
+| ComfyUI Local | `comfylocal.workflow` | comfy |
+| Browser (extension) | `webapp.gemini` | webapp |
 
 ---
 
@@ -217,4 +251,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.8.9 | 2026-04-30*
+> *OpsV v0.8.10 | 2026-05-01*

@@ -41,7 +41,7 @@ export class WebappCompiler implements ProviderCompiler {
       ...payload,
       _opsv: {
         provider: 'webapp',
-        modelKey: modelConfig.model || job.id,
+        modelKey: ctx.modelKey,
         type: 'webapp' as const,
         shotId: job.id,
         api_url: modelConfig.api_url,

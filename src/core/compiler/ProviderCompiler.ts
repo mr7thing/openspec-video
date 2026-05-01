@@ -7,6 +7,7 @@ import { ModelConfig } from '../../utils/configLoader';
 
 export interface CompileContext {
   job: Job;
+  modelKey: string;
   modelConfig: ModelConfig;
   apiKey: string;
   outputDir: string;

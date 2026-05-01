@@ -26,7 +26,7 @@ export class RunningHubProvider {
 
     let apiKey: string;
     try {
-      apiKey = configLoader.getResolvedApiKey(`runninghub.${task._opsv.modelKey}`);
+      apiKey = configLoader.getResolvedApiKey(task._opsv.modelKey);
     } catch {
       apiKey = process.env.RUNNINGHUB_API_KEY || '';
     }

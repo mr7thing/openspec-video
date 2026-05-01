@@ -101,7 +101,7 @@ export class ComfyUICompiler implements ProviderCompiler {
       ...workflow,
       _opsv: {
         provider: 'comfyui',
-        modelKey: modelConfig.model || path.basename(workflowFile, '.json'),
+        modelKey: ctx.modelKey,
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,
         api_url: modelConfig.api_url,

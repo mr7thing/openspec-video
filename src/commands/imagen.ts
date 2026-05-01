@@ -136,8 +136,8 @@ async function buildImageJob(
     payload: {
       prompt,
       global_settings: {
-        aspect_ratio: '1:1',
-        quality: 'standard',
+        aspect_ratio: frontmatter.aspect_ratio || '1:1',
+        quality: frontmatter.quality || 'standard',
       },
     },
     reference_images: referenceImages.length > 0 ? referenceImages : undefined,

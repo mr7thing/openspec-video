@@ -26,7 +26,7 @@ export class MinimaxProvider {
 
     let apiKey: string;
     try {
-      apiKey = configLoader.getResolvedApiKey(`minimax.${task._opsv.modelKey}`);
+      apiKey = configLoader.getResolvedApiKey(task._opsv.modelKey);
     } catch {
       apiKey = process.env.MINIMAX_API_KEY || '';
     }
@@ -65,7 +65,8 @@ export class MinimaxProvider {
     });
 
     const imageUrl =
-      response.data?.data?.image_url ||
+      response.data?.data?.image_urls?.[0] ||
+      response.data?.data?.[0]?.image_urls?.[0] ||
       response.data?.data?.url ||
       response.data?.url;
 

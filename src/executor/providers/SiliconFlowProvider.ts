@@ -27,7 +27,7 @@ export class SiliconFlowProvider {
 
     let apiKey: string;
     try {
-      apiKey = configLoader.getResolvedApiKey(`siliconflow.${task._opsv.modelKey}`);
+      apiKey = configLoader.getResolvedApiKey(task._opsv.modelKey);
     } catch {
       apiKey = process.env.SILICONFLOW_API_KEY || '';
     }

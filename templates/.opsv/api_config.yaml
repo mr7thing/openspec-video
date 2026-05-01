@@ -12,12 +12,15 @@
 models:
   # ==========================================
   # 火山引擎 (Volcengine Ark)
+  # seedance2.0 文档: https://www.volcengine.com/docs/82379/2291680
+  # seadream5.0 文档: https://www.volcengine.com/docs/82379/1824121
   # ==========================================
-  volcengine.seadream:
+  volc.seadream5:
     provider: volcengine
     type: imagen
     model: doubao-seedream-5-0-260128
     api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    docs_url: https://www.volcengine.com/docs/82379/1824121
     required_env:
       - ARK_API_KEY
     supports_reference_images: true
@@ -30,13 +33,28 @@ models:
       output_format: "png"
       response_format: "url"
       watermark: false
+    quality_map:
+      "1920x1080": "2560x1440"
+      "2K": "2560x1440"
+      "hd": "2560x1440"
+      "standard": "2560x1440"
 
-  volcengine.seedance2:
+  volc.seedance2:
     provider: volcengine
     type: video
     model: doubao-seedance-2-0-260128
     api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
     api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    docs_url: https://www.volcengine.com/docs/82379/2291680
+    required_env:
+
+  volc.seedance2:
+    provider: volcengine
+    type: video
+    model: doubao-seedance-2-0-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    docs_url: https://www.volcengine.com/docs/82379/2291680
     required_env:
       - ARK_API_KEY
     supports_first_image: true
@@ -49,12 +67,13 @@ models:
       generate_audio: true
       watermark: false
 
-  volcengine.seedance2-fast:
+  volc.seedance2f:
     provider: volcengine
     type: video
     model: doubao-seedance-2-0-fast-260128
     api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
     api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    docs_url: https://www.volcengine.com/docs/82379/2291680
     required_env:
       - ARK_API_KEY
     supports_first_image: true
@@ -68,12 +87,16 @@ models:
 
   # ==========================================
   # 硅基流动 (SiliconFlow)
+  # 文档: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
+  # 文档: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
+  # 文档: https://docs.siliconflow.cn/cn/api-reference/videos/get_videos_status
   # ==========================================
-  siliconflow.qwenimg:
+  siliconflow.qimg:
     provider: siliconflow
     type: imagen
     model: Qwen/Qwen-Image
     api_url: https://api.siliconflow.cn/v1/images/generations
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
     required_env:
       - SILICONFLOW_API_KEY
     supports_reference_images: true
@@ -84,24 +107,41 @@ models:
       steps: 50
       seed: 42
 
-  siliconflow.wan-t2v:
+  siliconflow.edit2509:
+    provider: siliconflow
+    type: imagen
+    model: Qwen/Qwen-Image-Edit-2509
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_reference_images: true
+    max_reference_images: 3
+    defaults:
+      image_size: "1664x928"
+      num_inference_steps: 20
+      cfg: 4
+
+  siliconflow.want2v:
     provider: siliconflow
     type: video
     model: Wan-AI/Wan2.2-T2V-A14B
     api_url: https://api.siliconflow.cn/v1/video/submit
     api_status_url: https://api.siliconflow.cn/v1/video/status
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
     required_env:
       - SILICONFLOW_API_KEY
     defaults:
       image_size: "1280x720"
       seed: 42
 
-  siliconflow.wan-i2v:
+  siliconflow.wani2v:
     provider: siliconflow
     type: video
     model: Wan-AI/Wan2.2-I2V-A14B
     api_url: https://api.siliconflow.cn/v1/video/submit
     api_status_url: https://api.siliconflow.cn/v1/video/status
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
     required_env:
       - SILICONFLOW_API_KEY
     supports_first_image: true
@@ -112,11 +152,12 @@ models:
   # ==========================================
   # MiniMax 稀宇科技
   # ==========================================
-  minimax.image-01:
+  minimax.img01:
     provider: minimax
     type: imagen
     model: image-01
     api_url: https://api.minimaxi.com/v1/image_generation
+    docs_url: https://platform.minimaxi.com/docs/api-reference/image-generation-t2i
     required_env:
       - MINIMAX_API_KEY
     supports_reference_images: true
@@ -124,12 +165,13 @@ models:
     defaults:
       aspect_ratio: "16:9"
 
-  minimax.video-01:
+  minimax.vid01:
     provider: minimax
     type: video
     model: MiniMax-Hailuo-2.3
     api_url: https://api.minimaxi.com/v1/video_generation
     api_status_url: https://api.minimaxi.com/v1/query/video_generation
+    docs_url: https://platform.minimaxi.com/docs/api-reference/video-generation-t2v
     required_env:
       - MINIMAX_API_KEY
     supports_first_image: true
@@ -141,10 +183,10 @@ models:
   # ==========================================
   # ComfyUI Local
   # ==========================================
-  comfyui.sdxl:
-    provider: local
+  comfylocal.workflow:
+    provider: comfyuilocal
     type: comfy
-    model: any
+    model: workflow
     api_url: http://127.0.0.1:8188/prompt
     defaults:
       templateDir: ""
@@ -155,7 +197,7 @@ models:
   runninghub.default:
     provider: runninghub
     type: comfy
-    model: any
+    model: workflow
     api_url: https://www.runninghub.cn/task/openapi/comfyui/post
     api_status_url: https://www.runninghub.cn/task/openapi/comfyui/status
     required_env:
@@ -205,3 +247,5 @@ models:
   #     typing_speed: "human"
   #     watermark_removal: true
   #     upload_method: "paste"
+
+
