@@ -260,5 +260,5 @@ opsv animate --model volcengine.seedance-2.0
 | 资产 | 花名册 | `elements/*.md` + `scenes/*.md` | 架构完成 |
 | 剧本 | 定稿资产 | `shots/Script.md` | ZeroCircle 资产 approved |
 | 动画 | 定稿剧本 | `shots/Shotlist.md` | 剧本 approved |
-| 图像渲染 | 资产文档 | `opsv-queue/videospec.circle1/volcengine.seadream/*.png` | `opsv imagen --model` |
+| 图像渲染 | 资产文档 | `opsv-queue/videospec.circle1/volcengine.seadream_001/*.png` | `opsv imagen --model` |
 | 视频渲染 | Shotlist.md | `opsv-queue/videospec.circleN/volcengine.seedance/*.mp4` | `opsv animate --model` + `opsv run` |

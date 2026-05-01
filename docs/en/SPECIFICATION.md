@@ -58,12 +58,12 @@ project/
   opsv-queue/
     videospec.circle1/             <- Build output (basename.circleN)
       _manifest.json               <- Circle manifest: id, status, layer, category
-      volcengine.seadream/         <- provider.model
+      volcengine.seadream_001/     <- provider.model + sequence
         @hero.json                 <- Compiled task
         @hero_1.png                <- Output
     role.circle2/                  <- Next circle batch
       _manifest.json
-      volcengine.seedance2/
+      volcengine.seedance2_001/
         shot_01.json
         shot_01_1.mp4
         shot_01_first.png
@@ -205,7 +205,7 @@ Rules:
    - **`DesignRefReader`**: reads `## Design References` from **current document** → used as `reference_images`
 7. Builds `Job` objects from frontmatter
 8. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
-9. Writes `TaskJson` to `{circleDir}/{provider.model}/shotId.json`
+9. Writes `TaskJson` to `{circleDir}/{provider.model}_NNN/shotId.json`
 
 ## Execution Flow
 
@@ -241,7 +241,7 @@ Rules:
 - Generation type is determined solely by `--model` (from `api_config.yaml`), not by document category
 - Review approve no longer modifies `prompt_en` or content fields — CLI only appends review records + sets status
 - Review approve sets `approved` for original task outputs, `syncing` for modified task outputs
-- No iteration numbers in directory names (A1 incremental update)
+- Model queue directories use `_NNN` sequence suffixes for traceability (e.g. `volcengine.seadream_001`, `volcengine.seadream_002`)
 - Output naming convention: `id_1.ext` (original), `id_N_1.ext` (modified, N≥2)
 
 ## Breaking Changes from v0.8.1

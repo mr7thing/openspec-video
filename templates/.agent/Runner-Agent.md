@@ -27,10 +27,10 @@ opsv comfy compile workflow.json --provider runninghub --model runninghub.comfy-
 ### 2. 执行渲染
 ```bash
 # 执行指定路径的已编译任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/@hero.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
 opsv run opsv-queue/videospec.circle2/volcengine.seedance/
 # 也可一次执行多个路径
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/ opsv-queue/videospec.circle2/volcengine.seedance/
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ opsv-queue/videospec.circle2/volcengine.seedance/
 ```
 
 **产出命名约定**：

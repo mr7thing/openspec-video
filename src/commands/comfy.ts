@@ -13,7 +13,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses } from './produceUtils';
+import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
 
 export function registerComfyCommand(program: Command): void {
   program
@@ -102,8 +102,8 @@ export function registerComfyCommand(program: Command): void {
           return;
         }
 
-        // Output to circleDir/{model}/
-        const outputDir = path.join(circleDir, modelKey);
+        // Output to circleDir/{model}_NNN/
+        const outputDir = resolveModelQueueDir(circleDir, modelKey);
         const builder = new TaskBuilder(projectRoot);
 
         const results = builder.compileToDir(

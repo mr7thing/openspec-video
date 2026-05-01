@@ -20,6 +20,31 @@ export interface ProduceCommandOptions {
   dryRun?: boolean;
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Resolve the next available model queue directory with a 3-digit sequence suffix.
+ * E.g. given modelKey "volc.seadream", returns ".../volc.seadream_001" if none exists,
+ * or ".../volc.seadream_003" if _001 and _002 already exist.
+ */
+export function resolveModelQueueDir(circleDir: string, modelKey: string): string {
+  if (!fs.existsSync(circleDir)) {
+    return path.join(circleDir, `${modelKey}_001`);
+  }
+  const entries = fs.readdirSync(circleDir);
+  const pattern = new RegExp(`^${escapeRegex(modelKey)}_(\\d{3})$`);
+  let maxN = 0;
+  for (const e of entries) {
+    const m = e.match(pattern);
+    if (m) maxN = Math.max(maxN, parseInt(m[1]));
+  }
+  const nextN = maxN + 1;
+  const suffix = nextN.toString().padStart(3, '0');
+  return path.join(circleDir, `${modelKey}_${suffix}`);
+}
+
 export function resolveManifestPath(cwd: string, manifestOption?: string): string {
   if (manifestOption) {
     const manifestPath = fs.statSync(manifestOption).isDirectory()

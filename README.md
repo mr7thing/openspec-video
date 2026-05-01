@@ -31,7 +31,7 @@ cd opsv-queue/videospec.circle1
 opsv imagen --model volc.seadream5
 
 # 3. Execute compiled tasks
-opsv run
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/
 
 # 4. Review and approve
 opsv review
@@ -40,7 +40,7 @@ opsv review
 opsv animate --model volc.seedance2
 
 # 6. Execute video tasks
-opsv run
+opsv run opsv-queue/videospec.circle2/volcengine.seedance2_001/
 ```
 
 ---
@@ -143,12 +143,12 @@ Tasks are organized into **Circles** (dependency layers via topological sort):
 opsv-queue/
   videospec.circle1/            # Circle directory (basename.circleN)
     _manifest.json              # Circle manifest: circles[], assets{}
-    volc.seadream5/           # api_config model alias
+    volc.seadream5_001/         # api_config model alias + sequence
       @hero.json
       @hero_1.png
   role.circle2/                # Terminal circle (contains shots)
     _manifest.json
-    volc.seedance2/
+    volc.seedance2_001/
       shot_01.json
       shot_01_1.mp4
 ```
@@ -196,7 +196,7 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale.
 3. **Physical State Machine**: Task state = file existence.
 4. **CLI Does Only Deterministic Actions**: CLI never modifies content fields.
 5. **By-Provider Parallelism**: Same provider serial, different providers parallel.
-6. **No Iteration Numbers**: Directories use circle names without `_N` suffixes.
+6. **Model Queue Versioning**: Each compile creates a new model queue directory with a `_NNN` suffix (e.g. `volc.seadream_001`), preserving prior compilations for traceability and A/B adjustment.
 7. **Manifest-First**: Produce commands read from manifest only, never scan directories.
 8. **Circle-Bound Execution**: Produce commands run within or reference a specific circle.
 

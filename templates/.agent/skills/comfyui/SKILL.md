@@ -49,11 +49,11 @@ opsv comfy --model comfyui.sdxl --param '{"input-style":"anime","input-steps":30
 opsv comfy --model comfyui.sdxl --dry-run
 
 # 执行
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl/
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl/@hero.json
+opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/
+opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero.json
 
 # 重试失败任务
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl/ --retry
+opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/ --retry
 ```
 
 ---
@@ -141,7 +141,7 @@ resolveTarget() → 扫描 opsv-queue/*.circle*/ → 取最新 {basename}.circle
 ### 5. 产出
 
 ```
-opsv-queue/videospec.circle1/comfyui.sdxl/
+opsv-queue/videospec.circle1/comfyui.sdxl_001/
   @hero.json              ← 编译后的 TaskJson（含完整 workflow + _opsv 元数据）
   scene_forest.json
 ```
@@ -236,10 +236,10 @@ runninghub.default:
 
 ```bash
 # 复制现有任务，修改参数后重新执行
-cp opsv-queue/videospec.circle1/comfyui.sdxl/@hero.json \
-   opsv-queue/videospec.circle1/comfyui.sdxl/@hero_2.json
+cp opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero.json \
+   opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero_2.json
 # 编辑 @hero_2.json（修改 workflow 节点参数、seed 等）
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl/@hero_2.json
+opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero_2.json
 # → 生成 @hero_2_1.png
 
 # Review approve 后：

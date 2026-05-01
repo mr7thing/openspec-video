@@ -26,7 +26,7 @@
 ### opsv imagen
 编译 Markdown 文档为图像生成任务，带 `--model` 参数时**直接编译**产出可执行 `.json`，不再生成 `imagen_jobs.json` 中间层。
 
-**产出目录**：`opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json` 等
+**产出目录**：`opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json` 等
 
 ```bash
 # 基本用法（必须指定 --model）
@@ -121,17 +121,17 @@ opsv webapp --model webapp.wan --dry-run
 
 ```bash
 # 执行单个任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json
 
 # 执行整个 Provider 目录下所有任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/
 
 # 执行多个路径
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json \
-       opsv-queue/videospec.circle1/volcengine.seadream/shot_02.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json \
+       opsv-queue/videospec.circle1/volcengine.seadream_001/shot_02.json
 
 # 重试失败任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/ --retry
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --retry
 ```
 
 **行为**：
@@ -145,10 +145,10 @@ opsv run opsv-queue/videospec.circle1/volcengine.seadream/ --retry
 **Agent 直接操作**：
 ```bash
 # 复制并修改任务（序号递增）
-cp opsv-queue/videospec.circle1/volcengine.seadream/@hero.json \
-   opsv-queue/videospec.circle1/volcengine.seadream/@hero_2.json
+cp opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json \
+   opsv-queue/videospec.circle1/volcengine.seadream_001/@hero_2.json
 # 编辑 @hero_2.json 的 prompt 字段
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/@hero_2.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/@hero_2.json
 # → 生成 @hero_2_1.png（id_N_1.ext 模式，Review 后为 syncing 状态）
 ```
 

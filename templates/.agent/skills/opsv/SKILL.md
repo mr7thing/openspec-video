@@ -14,8 +14,8 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 | Circle | 职责 | 产出 |
 |--------|------|------|
-| **zerocircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec.circle1/volcengine.seadream/` |
-| **firstcircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec.circle2/volcengine.seadream/` |
+| **zerocircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec.circle1/volcengine.seadream_001/` |
+| **firstcircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec.circle2/volcengine.seadream_001/` |
 | **secondcircle** | 中间层级（按需扩展） | ... |
 | **endcircle** | 末端动态视频（仅当 shotlist.md 存在） | `opsv-queue/videospec.circleN/volcengine.seedance/` |
 
@@ -209,8 +209,8 @@ opsv webapp --model <provider.model>
 opsv audio --model <provider.model>
 
 # 按路径执行渲染
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/shot_01.json
-opsv run opsv-queue/videospec.circle1/volcengine.seadream/   # 执行目录下所有任务
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/   # 执行目录下所有任务
 opsv run <path1> <path2> ...                                      # 多路径
 
 # 审阅
