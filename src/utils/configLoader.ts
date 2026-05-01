@@ -83,6 +83,11 @@ export class ConfigLoader {
     const required = modelConfig.required_env || [];
     const fallback = modelConfig.fallback_env || [];
 
+    // No API key required (e.g. local ComfyUI)
+    if (required.length === 0 && fallback.length === 0) {
+      return '';
+    }
+
     for (const envVar of required) {
       if (process.env[envVar]) return process.env[envVar]!;
     }

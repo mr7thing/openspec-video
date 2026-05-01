@@ -38,7 +38,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     return {
       ...payload,
       _opsv: {
-        provider: 'minimax',
+        provider: modelConfig.provider || 'minimax',
         modelKey: ctx.modelKey,
         type: 'imagen',
         shotId: job.id,
@@ -67,7 +67,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     return {
       ...payload,
       _opsv: {
-        provider: 'minimax',
+        provider: modelConfig.provider || 'minimax',
         modelKey: ctx.modelKey,
         type: 'video',
         shotId: job.id,

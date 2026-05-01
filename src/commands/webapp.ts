@@ -14,7 +14,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
+import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, resolveProjectRoot } from './produceUtils';
 
 export function registerWebappCommand(program: Command): void {
   program
@@ -28,11 +28,12 @@ export function registerWebappCommand(program: Command): void {
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
-        const projectRoot = process.cwd();
+        const cwd = process.cwd();
         const modelKey = options.model;
 
-        // Resolve manifest path
-        const manifestPath = resolveManifestPath(projectRoot, options.manifest);
+        // Resolve manifest path and project root
+        const manifestPath = resolveManifestPath(cwd, options.manifest);
+        const projectRoot = resolveProjectRoot(cwd);
         const circleDir = path.dirname(manifestPath);
 
         const { assetManager, designRefReader, refResolver } = await buildProduceContext(projectRoot);

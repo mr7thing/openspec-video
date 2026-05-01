@@ -13,10 +13,17 @@ export class ComfyUICompiler implements ProviderCompiler {
   readonly provider = 'comfyui';
 
   compile(ctx: CompileContext): TaskJson {
-    const { job, modelConfig, workflowPath, workflowDir, refCount } = ctx;
+    const { job, modelConfig, workflowPath, workflowDir, refCount, projectRoot } = ctx;
 
     // Validate required config
     if (!modelConfig.api_url) throw new Error('ComfyUICompiler: api_url is required in api_config.yaml');
+
+    // Helper: resolve workflow directory relative to projectRoot if needed
+    const resolveWorkflowDir = (dir: string): string => {
+      if (path.isAbsolute(dir)) return dir;
+      if (projectRoot) return path.join(projectRoot, dir);
+      return dir;
+    };
 
     // 1. Resolve workflow file
     let workflowFile: string;
@@ -29,7 +36,7 @@ export class ComfyUICompiler implements ProviderCompiler {
         if (!dir) {
           throw new Error(`Cannot resolve --workflow "${workflowPath}": no workflow directory specified`);
         }
-        workflowFile = path.join(dir, workflowPath);
+        workflowFile = path.join(resolveWorkflowDir(dir), workflowPath);
       }
     } else {
       // Auto-match by ref(N) pattern
@@ -37,7 +44,7 @@ export class ComfyUICompiler implements ProviderCompiler {
       if (!dir) {
         throw new Error('No workflow directory specified. Use --workflow-dir or set defaults.templateDir in api_config.yaml');
       }
-      workflowFile = this.resolveWorkflow(dir, refCount || 0, job.id);
+      workflowFile = this.resolveWorkflow(resolveWorkflowDir(dir), refCount || 0, job.id);
     }
 
     if (!fs.existsSync(workflowFile)) {
@@ -47,20 +54,14 @@ export class ComfyUICompiler implements ProviderCompiler {
     // 2. Load workflow
     const workflow: Record<string, any> = JSON.parse(fs.readFileSync(workflowFile, 'utf-8'));
 
-    // 3. Validate _opsv_workflow metadata
+    // 3. Optional _opsv_workflow metadata (advanced override, not required)
     const meta = workflow._opsv_workflow;
-    if (!meta || !Array.isArray(meta.image_inputs) || meta.image_inputs.length === 0) {
-      throw new Error(
-        `Workflow ${path.basename(workflowFile)} missing _opsv_workflow.image_inputs. ` +
-        'Each workflow JSON must declare: { "_opsv_workflow": { "image_inputs": [...], "text_inputs": [...] } }'
-      );
-    }
 
     // 4. Build parameter map
     const parameters: Record<string, any> = {};
 
-    // Text inputs: map by _opsv_workflow.text_inputs order
-    const textInputs: string[] = Array.isArray(meta.text_inputs) ? meta.text_inputs : [];
+    // Text input: default to input-prompt node by title
+    const textInputs: string[] = Array.isArray(meta?.text_inputs) ? meta.text_inputs : [];
     if (textInputs.length > 0) {
       parameters[textInputs[0]] = job.prompt_en || job.payload.prompt;
     } else {
@@ -75,9 +76,11 @@ export class ComfyUICompiler implements ProviderCompiler {
       parameters['input-image2'] = job.payload.frame_ref.last;
     }
 
-    // Reference images: inject by _opsv_workflow.image_inputs order
+    // Reference images: inject by input-imageN node titles
     const refImages = ctx.referenceImages || job.reference_images || [];
-    const imageInputs = meta.image_inputs as string[];
+    const imageInputs: string[] = Array.isArray(meta?.image_inputs)
+      ? meta.image_inputs
+      : refImages.map((_, i) => `input-image${i + 1}`);
     for (let i = 0; i < imageInputs.length; i++) {
       if (i < refImages.length) {
         parameters[imageInputs[i]] = refImages[i];
@@ -100,7 +103,7 @@ export class ComfyUICompiler implements ProviderCompiler {
     return {
       ...workflow,
       _opsv: {
-        provider: 'comfyui',
+        provider: modelConfig.provider || 'comfyui',
         modelKey: ctx.modelKey,
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,

@@ -23,6 +23,8 @@ const COMPILERS: Record<string, ProviderCompiler> = {
   minimax: new MinimaxCompiler(),
   runninghub: new RunningHubCompiler(),
   comfyui: new ComfyUICompiler(),
+  comfyuilocal: new ComfyUICompiler(),
+  comfylocal: new ComfyUICompiler(),
   webapp: new WebappCompiler(),
 };
 
@@ -36,10 +38,12 @@ function getCompiler(provider: string): ProviderCompiler {
 
 export class TaskBuilder {
   private configLoader: ConfigLoader;
+  private projectRoot: string;
 
   constructor(projectRoot: string) {
     this.configLoader = ConfigLoader.getInstance();
     this.configLoader.loadConfig(projectRoot);
+    this.projectRoot = projectRoot;
   }
 
   compileToDir(
@@ -67,6 +71,7 @@ export class TaskBuilder {
         modelConfig,
         apiKey,
         outputDir,
+        projectRoot: this.projectRoot,
         workflowPath,
         workflowDir,
         refCount: job.reference_images?.length || 0,

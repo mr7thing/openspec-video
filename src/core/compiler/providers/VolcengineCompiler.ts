@@ -49,7 +49,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     return {
       ...payload,
       _opsv: {
-        provider: 'volcengine',
+        provider: modelConfig.provider || 'volcengine',
         modelKey: ctx.modelKey,
         type: 'imagen',
         shotId: job.id,
@@ -95,7 +95,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     return {
       ...payload,
       _opsv: {
-        provider: 'volcengine',
+        provider: modelConfig.provider || 'volcengine',
         modelKey: ctx.modelKey,
         type: 'video',
         shotId: job.id,

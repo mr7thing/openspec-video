@@ -11,6 +11,7 @@ export interface CompileContext {
   modelConfig: ModelConfig;
   apiKey: string;
   outputDir: string;
+  projectRoot?: string;
   referenceImages?: string[];
   workflowPath?: string;
   workflowDir?: string;

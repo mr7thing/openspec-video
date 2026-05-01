@@ -40,7 +40,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     return {
       ...payload,
       _opsv: {
-        provider: 'siliconflow',
+        provider: modelConfig.provider || 'siliconflow',
         modelKey: ctx.modelKey,
         type: 'imagen',
         shotId: job.id,
@@ -73,7 +73,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     return {
       ...payload,
       _opsv: {
-        provider: 'siliconflow',
+        provider: modelConfig.provider || 'siliconflow',
         modelKey: ctx.modelKey,
         type: 'video',
         shotId: job.id,

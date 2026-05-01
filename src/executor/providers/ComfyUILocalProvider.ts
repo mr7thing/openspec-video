@@ -17,11 +17,13 @@ import {
 } from '../polling';
 
 export class ComfyUILocalProvider {
-  name = 'comfyui';
+  name = 'comfyuilocal';
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
-    const apiUrl = task._opsv.api_url;
+    let apiUrl = task._opsv.api_url;
     if (!apiUrl) throw new Error('ComfyUILocalProvider: api_url is required in task._opsv');
+    // Normalize: strip trailing slash to avoid double slashes in URL construction
+    apiUrl = apiUrl.replace(/\/$/, '');
     const shotId = task._opsv.shotId;
 
     try {
@@ -63,19 +65,43 @@ export class ComfyUILocalProvider {
 
         const outputs = statusRes.data?.[promptId]?.outputs;
         if (outputs) {
+          const outputPaths: string[] = [];
+
           for (const nodeId in outputs) {
-            const images = outputs[nodeId]?.images;
-            if (images && images.length > 0) {
-              const img = images[0];
-              const imageUrl = `${apiUrl}/view?filename=${img.filename}&subfolder=${img.subfolder || ''}&type=${img.type || 'output'}`;
+            const nodeOutput = outputs[nodeId];
+            if (!nodeOutput || typeof nodeOutput !== 'object') continue;
 
-              const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-              const outputPath = outputFilePath(taskPath, 1, ext);
-              await downloadFile(imageUrl, outputPath);
+            // ComfyUI history outputs may contain images, gifs, audio, videos, etc.
+            // Each media type is an array of { filename, subfolder, type } objects.
+            for (const mediaKey of Object.keys(nodeOutput)) {
+              const mediaList = nodeOutput[mediaKey];
+              if (!Array.isArray(mediaList)) continue;
 
-              appendLog(taskPath, { event: 'succeeded', task_id: promptId });
-              return { taskPath, shotId, provider: 'comfyui', success: true, outputPath };
+              for (const media of mediaList) {
+                if (!media || !media.filename) continue;
+                const fileUrl = `${apiUrl}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder || '')}&type=${encodeURIComponent(media.type || 'output')}`;
+
+                // Use the original file extension from ComfyUI output
+                const extMatch = media.filename.match(/\.([^.]+)$/);
+                const ext = extMatch ? extMatch[1] : 'png';
+
+                const outputPath = outputFilePath(taskPath, outputPaths.length + 1, ext);
+                await downloadFile(fileUrl, outputPath);
+                outputPaths.push(outputPath);
+              }
             }
+          }
+
+          if (outputPaths.length > 0) {
+            appendLog(taskPath, { event: 'succeeded', task_id: promptId, output: outputPaths.join(', ') });
+            return {
+              taskPath,
+              shotId,
+              provider: task._opsv.provider || 'comfyui',
+              success: true,
+              outputPath: outputPaths[0],
+              outputPaths,
+            };
           }
         }
 
@@ -85,7 +111,7 @@ export class ComfyUILocalProvider {
       return {
         taskPath,
         shotId,
-        provider: 'comfyui',
+        provider: task._opsv.provider || 'comfyui',
         success: false,
         error: err.message,
       };
