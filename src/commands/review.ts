@@ -284,13 +284,13 @@ interface DocumentInfo {
   docId: string;
   docPath: string;
   circle: string;
-  category: 'elements' | 'scenes';
+  category: string;
   content?: string;
   outputs: Array<{ circle: string; provider: string; filename: string; path: string }>;
 }
 
 /**
- * Scan videospec/elements and videospec/scenes for .md documents,
+ * Scan videospec/ and all its subdirectories for .md documents,
  * then find all outputs across all circles that belong to each document.
  */
 function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
@@ -333,22 +333,23 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
     }
   }
 
-  // Scan elements and scenes directories
-  for (const category of ['elements', 'scenes'] as const) {
-    const dirPath = path.join(targetDir, category);
-    if (!fs.existsSync(dirPath)) continue;
+  // Scan all subdirectories under videospec/
+  const subdirs = fs.readdirSync(targetDir, { withFileTypes: true });
+  for (const subdir of subdirs) {
+    if (!subdir.isDirectory()) continue;
 
+    const dirPath = path.join(targetDir, subdir.name);
     const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
     for (const file of files) {
       const docId = file.replace(/^@/, '').replace(/\.md$/, '');
-      const categoryPath = category; // "elements" or "scenes"
+      const categoryPath = subdir.name;
       const key = `${categoryPath}/${docId}`;
 
       const doc: DocumentInfo = {
         docId,
         docPath: path.join(dirPath, file),
         circle: categoryPath,
-        category: categoryPath as 'elements' | 'scenes',
+        category: categoryPath,
         outputs: (outputIndex[key] || []).map((o) => ({
           circle: o.circle,
           provider: o.provider,

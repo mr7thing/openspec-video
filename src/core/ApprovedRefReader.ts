@@ -3,6 +3,7 @@
 // ============================================================================
 
 import path from 'path';
+import fs from 'fs';
 import { FileUtils } from '../utils/FileUtils';
 
 export interface ApprovedRef {
@@ -87,13 +88,18 @@ export class ApprovedRefReader {
   }
 
   private async findDocPath(assetId: string): Promise<string | null> {
-    const dirs = ['elements', 'scenes'];
     const prefixes = ['@', ''];
+    const videospecDir = path.join(this.projectRoot, 'videospec');
 
-    for (const dir of dirs) {
-      for (const prefix of prefixes) {
-        const p = path.join(this.projectRoot, 'videospec', dir, `${prefix}${assetId}.md`);
-        if (await FileUtils.exists(p)) return p;
+    if (!fs.existsSync(videospecDir)) return null;
+
+    const entries = fs.readdirSync(videospecDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        for (const prefix of prefixes) {
+          const p = path.join(videospecDir, entry.name, `${prefix}${assetId}.md`);
+          if (await FileUtils.exists(p)) return p;
+        }
       }
     }
     return null;

@@ -358,8 +358,7 @@ export class DependencyGraph {
       }
     }
 
-    // Resolve upstream dependencies: scan elements/ and scenes/ relative to resolvedTarget
-    const upstreamDirs = ['elements', 'scenes'];
+    // Resolve upstream dependencies: scan all subdirectories relative to resolvedTarget
     const targetAssetIds = new Set(documents.map((d) => d.id));
     const targetRefs = new Set<string>();
 
@@ -377,12 +376,13 @@ export class DependencyGraph {
     }
 
     // Pull in upstream assets that are not yet approved
-    // Search relative to resolvedTarget (supports --dir elements/role, --dir videospec, etc.)
-    if (targetRefs.size > 0) {
-      for (const dir of upstreamDirs) {
-        const dirPath = path.join(resolvedTarget, dir);
-        if (!fs.existsSync(dirPath)) continue;
+    // Search all subdirectories under resolvedTarget
+    if (targetRefs.size > 0 && fs.existsSync(resolvedTarget)) {
+      const entries = fs.readdirSync(resolvedTarget, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
 
+        const dirPath = path.join(resolvedTarget, entry.name);
         const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
         for (const file of files) {
           const id = file.replace(/^@/, '').replace(/\.md$/, '');

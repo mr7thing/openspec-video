@@ -120,7 +120,7 @@ opsv-queue/
         console.log('  Edit .env to add your API keys');
         console.log('  opsv circle create --dir videospec');
         console.log('  opsv imagen --model volcengine.seadream');
-        console.log('  opsv run opsv-queue/videospec.circle1/volcengine.seadream/');
+        console.log('  opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/');
       } catch (err: any) {
         logger.error(err.message);
         process.exit(1);

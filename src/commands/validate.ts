@@ -37,11 +37,11 @@ export function registerValidateCommand(program: Command, version: string): void
         let validFiles = 0;
         const errors: Array<{ file: string; message: string }> = [];
 
-        const dirs = ['elements', 'scenes'];
-        for (const dir of dirs) {
-          const dirPath = path.join(videospecDir, dir);
-          if (!fs.existsSync(dirPath)) continue;
+        const entries = fs.readdirSync(videospecDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
 
+          const dirPath = path.join(videospecDir, entry.name);
           const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
 
           for (const file of files) {

@@ -137,14 +137,27 @@ export class AssetManager {
   }
 
   findAssetFilePath(assetId: string): string | undefined {
-    const dirs = ['elements', 'scenes'];
     const prefixes = ['@', ''];
-    for (const dir of dirs) {
-      for (const prefix of prefixes) {
-        const p = path.join(this.videospecRoot, dir, `${prefix}${assetId}.md`);
-        if (fs.existsSync(p)) return p;
+
+    // 1. Check videospecRoot itself
+    for (const prefix of prefixes) {
+      const p = path.join(this.videospecRoot, `${prefix}${assetId}.md`);
+      if (fs.existsSync(p)) return p;
+    }
+
+    // 2. Scan all subdirectories under videospecRoot
+    if (fs.existsSync(this.videospecRoot)) {
+      const entries = fs.readdirSync(this.videospecRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          for (const prefix of prefixes) {
+            const p = path.join(this.videospecRoot, entry.name, `${prefix}${assetId}.md`);
+            if (fs.existsSync(p)) return p;
+          }
+        }
       }
     }
+
     return undefined;
   }
 }

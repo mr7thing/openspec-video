@@ -90,7 +90,8 @@ export function registerScriptCommand(program: Command): void {
           return;
         }
 
-        const outputPath = options.output || path.join(projectRoot, 'opsv-queue', 'videospec', '_script.json');
+        const targetBasename = path.basename(path.resolve(options.dir));
+        const outputPath = options.output || path.join(projectRoot, 'opsv-queue', targetBasename, '_script.json');
         await FileUtils.writeJson(outputPath, summary);
 
         console.log(chalk.green(`Script summary written to ${outputPath}`));
