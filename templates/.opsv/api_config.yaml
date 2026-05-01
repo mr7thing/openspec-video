@@ -33,6 +33,11 @@ models:
       output_format: "png"
       response_format: "url"
       watermark: false
+      # === 组图参数（仅 volc.seadream5 支持）===
+      # 一张 prompt 生成 max_images 张图（id_1.png, id_2.png...）
+      # 关闭请注释这两行
+      sequential_image_generation: "auto"  # 或 "on"
+      max_images: 4                         # 1~4张
     quality_map:
       "1920x1080": "2560x1440"
       "2K": "2560x1440"

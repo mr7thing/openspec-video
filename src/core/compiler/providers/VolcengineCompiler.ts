@@ -30,8 +30,17 @@ export class VolcengineCompiler implements ProviderCompiler {
       model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
       size: this.resolveSize(job.payload.global_settings, modelConfig),
-      n: 1,
     };
+
+    // Support sequential image generation (组图)
+    const seqGen = (modelConfig.defaults as any)?.sequential_image_generation;
+    if (seqGen) {
+      payload.sequential_image_generation = seqGen;
+      const maxImages = (modelConfig.defaults as any)?.max_images;
+      if (maxImages) {
+        payload.sequential_image_generation_options = { max_images: maxImages };
+      }
+    }
 
     if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
       payload.reference_images = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);

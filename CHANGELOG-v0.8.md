@@ -251,6 +251,25 @@
 
 ---
 
+## v0.8.11 — 2026-05-01
+
+### 变更要点
+
+41. **Review 服务 TTL 默认 15 分钟**
+    - `--ttl` 默认值从 `0`（永不关闭）改为 `900`（15分钟空闲自动关闭）
+
+42. **Review 文档预览功能**
+    - `/api/documents/:circle/:docId` 返回 markdown 文档内容
+    - `findDocument()` 读取并返回 `.md` 文件内容
+    - Review UI 中间面板渲染文档 markdown 预览
+
+43. **Review UI 文档中心重构**
+    - 左侧边栏按文档组织（elements/scenes）
+    - 输出文件按文档 ID 分组（`hero_01.png` 和 `hero_01_01.png` 同属 `hero` 文档）
+    - 使用 `/api/documents` 端点获取文档列表
+
+---
+
 ## v0.8.10 — 2026-05-01
 
 ### 变更要点

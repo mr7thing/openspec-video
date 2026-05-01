@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.10 — opsv review
+// OpsV v0.8.11 — opsv review
 // Scans *.circleN/ directories, reads/writes _manifest.json assets
 // UI served from templates/review-ui/
 // ============================================================================
@@ -21,7 +21,7 @@ export function registerReviewCommand(program: Command): void {
     .option('--port <number>', 'Server port', '3100')
     .option('--latest', 'Show only latest circle outputs')
     .option('--all', 'Show all circle outputs')
-    .option('--ttl <seconds>', 'Auto-shutdown after idle seconds', '0')
+    .option('--ttl <seconds>', 'Auto-shutdown after idle seconds (default: 900)', '900')
     .action(async (options: any) => {
       try {
         const projectRoot = process.cwd();
@@ -53,6 +53,22 @@ export function registerReviewCommand(program: Command): void {
         }
 
         const app = express();
+
+        // API: List documents (scans videospec/elements and videospec/scenes)
+        app.get('/api/documents', (_req, res) => {
+          const documents = scanDocuments(projectRoot, queueRoot);
+          res.json(documents);
+        });
+
+        // API: Get document content
+        app.get('/api/documents/:circle/:docId', (req, res) => {
+          const { circle, docId } = req.params;
+          const doc = findDocument(projectRoot, circle, docId);
+          if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+          }
+          res.json(doc);
+        });
 
         // API: List circle directories
         app.get('/api/circles', (_req, res) => {
@@ -262,4 +278,103 @@ function scanCircles(queueRoot: string, options: any): any[] {
   }
 
   return circles;
+}
+
+interface DocumentInfo {
+  docId: string;
+  docPath: string;
+  circle: string;
+  category: 'elements' | 'scenes';
+  content?: string;
+  outputs: Array<{ circle: string; provider: string; filename: string; path: string }>;
+}
+
+/**
+ * Scan videospec/elements and videospec/scenes for .md documents,
+ * then find all outputs across all circles that belong to each document.
+ */
+function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
+  const docs: DocumentInfo[] = [];
+  const targetDir = path.join(projectRoot, 'videospec');
+
+  if (!fs.existsSync(targetDir)) return docs;
+
+  // Read manifests from all circles to build output index
+  const outputIndex: Record<string, Array<{ circle: string; provider: string; filename: string }>> = {};
+
+  if (fs.existsSync(queueRoot)) {
+    const circleDirs = fs.readdirSync(queueRoot).filter((d) => /\.circle\d+$/.test(d));
+    for (const circleDir of circleDirs) {
+      const circlePath = path.join(queueRoot, circleDir);
+      const manifestPath = path.join(circlePath, '_manifest.json');
+
+      if (!fs.existsSync(manifestPath)) continue;
+
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      const manifestTarget = manifest.target || 'videospec';
+
+      // Map circle name to its target (e.g. "scenes.circle1" -> "videospec/scenes")
+      const circleTarget = manifestTarget.replace(/^videospec\/?/, '');
+
+      const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_'));
+      for (const providerDir of providerDirs) {
+        const providerPath = path.join(circlePath, providerDir);
+        if (!fs.statSync(providerPath).isDirectory()) continue;
+
+        const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json'));
+        for (const file of files) {
+          // Extract docId from filename: "hero_01.png" -> "hero"
+          const docId = file.replace(/(_\d+)+(\.[^.]+)$/, '');
+          const key = `${circleTarget}/${docId}`;
+          if (!outputIndex[key]) outputIndex[key] = [];
+          outputIndex[key].push({ circle: circleDir, provider: providerDir, filename: file });
+        }
+      }
+    }
+  }
+
+  // Scan elements and scenes directories
+  for (const category of ['elements', 'scenes'] as const) {
+    const dirPath = path.join(targetDir, category);
+    if (!fs.existsSync(dirPath)) continue;
+
+    const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
+    for (const file of files) {
+      const docId = file.replace(/^@/, '').replace(/\.md$/, '');
+      const categoryPath = category; // "elements" or "scenes"
+      const key = `${categoryPath}/${docId}`;
+
+      const doc: DocumentInfo = {
+        docId,
+        docPath: path.join(dirPath, file),
+        circle: categoryPath,
+        category: categoryPath as 'elements' | 'scenes',
+        outputs: (outputIndex[key] || []).map((o) => ({
+          circle: o.circle,
+          provider: o.provider,
+          filename: o.filename,
+          path: path.join(o.circle, o.provider, o.filename),
+        })),
+      };
+
+      docs.push(doc);
+    }
+  }
+
+  return docs;
+}
+
+/**
+ * Find a specific document by circle/category and docId.
+ */
+function findDocument(projectRoot: string, circle: string, docId: string): DocumentInfo | null {
+  const docs = scanDocuments(projectRoot, path.join(projectRoot, 'opsv-queue'));
+  const doc = docs.find((d) => d.circle === circle && d.docId === docId);
+  if (!doc) return null;
+
+  // Read markdown content
+  if (fs.existsSync(doc.docPath)) {
+    doc.content = fs.readFileSync(doc.docPath, 'utf-8');
+  }
+  return doc;
 }

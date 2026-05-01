@@ -29,7 +29,6 @@
             overflow: hidden;
         }
 
-        /* Header */
         .header {
             background: var(--surface);
             padding: 14px 24px;
@@ -39,17 +38,16 @@
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
         }
-        .header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+        .header h1 { font-size: 16px; font-weight: 700; }
         .header-info { font-size: 12px; color: var(--muted); }
 
-        /* Main layout */
         .main {
             display: flex;
             flex: 1;
             overflow: hidden;
         }
 
-        /* Left: Circle & Asset Tree */
+        /* Left Sidebar */
         .sidebar {
             width: 300px;
             background: var(--surface);
@@ -68,35 +66,10 @@
             letter-spacing: 0.08em;
             color: var(--muted);
         }
-        .sidebar-filters {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .filter-btn {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 500;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--muted);
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
-
-        .circle-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-        .circle-group { border-bottom: 1px solid var(--border); }
-        .circle-name {
+        .category-group { border-bottom: 1px solid var(--border); }
+        .category-name {
             padding: 10px 16px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: var(--muted);
             text-transform: uppercase;
@@ -107,10 +80,10 @@
             justify-content: space-between;
             align-items: center;
         }
-        .circle-name:hover { color: var(--text); }
-        .circle-name .count { font-size: 10px; background: var(--card); padding: 2px 6px; border-radius: 4px; }
+        .category-name:hover { color: var(--text); }
+        .category-name .count { font-size: 10px; background: var(--card); padding: 2px 6px; border-radius: 4px; }
 
-        .asset-item {
+        .doc-item {
             padding: 10px 16px 10px 28px;
             cursor: pointer;
             border-bottom: 1px solid rgba(255,255,255,0.03);
@@ -119,16 +92,17 @@
             flex-direction: column;
             gap: 4px;
         }
-        .asset-item:hover { background: rgba(255,255,255,0.03); }
-        .asset-item.active { background: rgba(99,102,241,0.15); border-left: 3px solid var(--accent); }
-        .asset-item .asset-id { font-size: 13px; font-weight: 600; }
-        .asset-item .asset-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+        .doc-item:hover { background: rgba(255,255,255,0.03); }
+        .doc-item.active { background: rgba(99,102,241,0.15); border-left: 3px solid var(--accent); padding-left: 25px; }
+        .doc-item .doc-id { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .doc-item .doc-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; }
         .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
         .status-dot.approved { background: var(--green); }
         .status-dot.syncing { background: var(--yellow); }
         .status-dot.drafting { background: var(--muted); }
+        .output-count { font-size: 10px; color: var(--muted); }
 
-        /* Right: Content Area */
+        /* Content Area */
         .content {
             flex: 1;
             display: flex;
@@ -136,7 +110,6 @@
             overflow: hidden;
         }
 
-        /* Toolbar */
         .toolbar {
             padding: 12px 20px;
             background: var(--surface);
@@ -147,7 +120,7 @@
             flex-shrink: 0;
         }
         .toolbar-left { display: flex; align-items: center; gap: 10px; }
-        .toolbar-right { display: flex; align-items: center; gap: 8px; }
+        .toolbar-right { display: flex; gap: 8px; }
         .btn {
             padding: 8px 16px;
             border: none;
@@ -156,9 +129,6 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
         }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-approve { background: var(--green); color: #000; }
@@ -168,7 +138,6 @@
         .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
         .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
 
-        /* Content Panes */
         .panes {
             display: flex;
             flex: 1;
@@ -177,7 +146,7 @@
 
         /* Doc Pane */
         .doc-pane {
-            width: 38%;
+            width: 40%;
             border-right: 1px solid var(--border);
             overflow-y: auto;
             background: #0d0d10;
@@ -191,23 +160,46 @@
             color: var(--muted);
             gap: 12px;
             font-size: 13px;
+            padding: 20px;
+            text-align: center;
         }
-        .doc-content { padding: 24px; }
+        .doc-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .doc-header h2 { font-size: 16px; margin-bottom: 4px; }
+        .doc-header .doc-id-badge { font-size: 11px; background: var(--card); padding: 3px 8px; border-radius: 4px; color: var(--muted); }
+        .doc-content { padding: 20px; font-size: 13px; line-height: 1.7; }
         .doc-content h1 { font-size: 18px; margin-bottom: 16px; color: var(--text); }
         .doc-content h2 { font-size: 15px; margin: 20px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-        .doc-content p { font-size: 13px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; }
-        .doc-content ul, .doc-content ol { font-size: 13px; color: #94a3b8; margin: 8px 0 10px 20px; }
-        .doc-content li { margin-bottom: 4px; }
+        .doc-content h3 { font-size: 14px; margin: 16px 0 8px; color: var(--text); }
+        .doc-content p { margin-bottom: 10px; color: #94a3b8; }
         .doc-content pre { background: var(--card); border-radius: 6px; padding: 12px; font-size: 12px; overflow-x: auto; margin: 10px 0; }
         .doc-content code { background: var(--card); padding: 2px 5px; border-radius: 4px; font-size: 12px; color: #a5b4fc; }
         .doc-content pre code { background: none; padding: 0; color: inherit; }
         .doc-content blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); font-style: italic; margin: 10px 0; }
+        .doc-content ul, .doc-content ol { margin: 8px 0 10px 20px; color: #94a3b8; }
+        .doc-content li { margin-bottom: 4px; }
         .doc-content img { max-width: 100%; border-radius: 6px; margin: 10px 0; }
-        .collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
-        .collapsible::before { content: '▶'; font-size: 10px; transition: transform 0.2s; }
-        .collapsible.collapsed::before { transform: rotate(-90deg); }
-        .collapsible-content { overflow: hidden; transition: max-height 0.3s; }
-        .collapsible.collapsed + .collapsible-content { max-height: 0 !important; }
+        .doc-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .doc-content th, .doc-content td { padding: 8px; border: 1px solid var(--border); text-align: left; }
+        .doc-content th { background: var(--card); }
+
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 0;
+        }
+        .collapsible-header::before { content: '▼'; font-size: 10px; transition: transform 0.2s; }
+        .collapsible-header.collapsed::before { transform: rotate(-90deg); }
+        .collapsible-content { overflow: hidden; }
+        .collapsible-content.collapsed { display: none; }
 
         /* Media Pane */
         .media-pane {
@@ -228,7 +220,7 @@
         }
         .media-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 16px;
         }
         .media-card {
@@ -243,11 +235,15 @@
         .media-card.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
         .media-card img, .media-card video { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #000; }
         .media-info { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
-        .media-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
-        .media-provider { font-size: 10px; color: var(--muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
+        .media-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+        .media-meta { font-size: 10px; color: var(--muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
         .selected-badge { position: absolute; top: 8px; right: 8px; background: var(--green); color: #000; width: 20px; height: 20px; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
         .media-card { position: relative; }
         .media-card.selected .selected-badge { display: flex; }
+
+        .output-group { margin-bottom: 24px; }
+        .output-group-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .output-group-title span { color: var(--text); font-size: 12px; }
 
         /* Preview Modal */
         .preview-modal {
@@ -263,9 +259,11 @@
         }
         .preview-modal.active { display: flex; }
         .preview-modal img, .preview-modal video { max-width: 95vw; max-height: 85vh; object-fit: contain; }
-        .preview-modal .preview-controls { display: flex; gap: 12px; align-items: center; }
-        .preview-modal .preview-name { font-size: 14px; color: #94a3b8; }
         .preview-close { position: absolute; top: 20px; right: 20px; background: var(--card); border: 1px solid var(--border); color: var(--text); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+        .preview-controls { display: flex; gap: 12px; align-items: center; }
+        .preview-name { font-size: 14px; color: #94a3b8; }
+        .preview-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .preview-btn:hover { border-color: var(--accent); }
 
         /* Review Modal */
         .review-modal {
@@ -288,10 +286,10 @@
         }
         .review-box h2 { font-size: 17px; margin-bottom: 6px; }
         .review-box .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
-        .review-media-preview { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); border-radius: 8px; margin-bottom: 16px; }
-        .review-media-preview img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; }
-        .review-media-preview .name { font-size: 13px; font-weight: 600; }
-        .review-media-preview .provider { font-size: 11px; color: var(--muted); }
+        .review-preview { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); border-radius: 8px; margin-bottom: 16px; }
+        .review-preview img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; }
+        .review-preview .name { font-size: 13px; font-weight: 600; }
+        .review-preview .provider { font-size: 11px; color: var(--muted); }
         .review-fields { display: flex; flex-direction: column; gap: 12px; }
         .review-fields label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
         .review-fields input, .review-fields textarea {
@@ -302,11 +300,6 @@
         }
         .review-fields textarea { resize: vertical; min-height: 80px; }
         .review-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 
         /* Toast */
         .toast {
@@ -329,6 +322,11 @@
             from { transform: translateY(10px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
     </style>
 </head>
 <body>
@@ -340,14 +338,10 @@
     <div class="main">
         <!-- Left Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-header">Circles &amp; Assets</div>
-            <div class="sidebar-filters" id="filterBar">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="approved">Approved</button>
-                <button class="filter-btn" data-filter="syncing">Syncing</button>
-                <button class="filter-btn" data-filter="drafting">Drafting</button>
+            <div class="sidebar-header">Documents</div>
+            <div id="docList" style="flex:1;overflow-y:auto;">
+                <div style="padding:20px;color:var(--muted);font-size:13px;">Loading...</div>
             </div>
-            <div class="circle-list" id="circleList">Loading...</div>
         </div>
 
         <!-- Right Content -->
@@ -360,7 +354,7 @@
                     <button class="btn btn-draft" id="draftBtn" disabled onclick="openReviewModal('drafting')">
                         ↩ Set Drafting
                     </button>
-                    <span id="currentAsset" style="font-size:12px;color:var(--muted);margin-left:8px;">—</span>
+                    <span id="currentDoc" style="font-size:12px;color:var(--muted);margin-left:8px;">—</span>
                 </div>
                 <div class="toolbar-right">
                     <button class="btn btn-ghost" onclick="location.reload()">↻ Refresh</button>
@@ -368,11 +362,11 @@
             </div>
 
             <div class="panes">
-                <!-- Document Pane -->
+                <!-- Doc Pane -->
                 <div class="doc-pane" id="docPane">
                     <div class="doc-empty">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <span>Select an asset from the left to preview</span>
+                        <span>Select a document from the left</span>
                     </div>
                 </div>
 
@@ -393,7 +387,7 @@
         <div id="previewContent"></div>
         <div class="preview-controls">
             <span class="preview-name" id="previewName"></span>
-            <button class="btn btn-approve" onclick="selectCurrentMedia()" style="font-size:12px;">✓ Select</button>
+            <button class="preview-btn" onclick="selectCurrentMedia()">✓ Select</button>
         </div>
     </div>
 
@@ -401,9 +395,9 @@
     <div class="review-modal" id="reviewModal">
         <div class="review-box">
             <h2 id="reviewModalTitle">Review Decision</h2>
-            <p class="subtitle" id="reviewModalSubtitle">Confirm your review decision</p>
+            <p class="subtitle" id="reviewModalSubtitle"></p>
 
-            <div class="review-media-preview" id="reviewMediaPreview" style="display:none;">
+            <div class="review-preview" id="reviewMediaPreview" style="display:none;">
                 <img id="reviewMediaThumb" src="" alt="">
                 <div>
                     <div class="name" id="reviewMediaName"></div>
@@ -425,78 +419,55 @@
         </div>
     </div>
 
-    <!-- Toast -->
     <div class="toast" id="toast"></div>
 
     <script>
-        // State
-        let circles = [];
-        let allAssets = [];
-        let selectedAssets = new Set(); // "circleName|assetId|outputPath"
-        let currentAsset = null;
-        let currentCircle = null;
-        let currentFilter = 'all';
-        let pendingReviewMedia = null; // { circle, assetId, outputPath, provider, name }
-
-        // API base
         const API = '';
 
-        // Init
+        let documents = [];
+        let selectedOutputs = new Set(); // "circle|provider|filename"
+        let currentDoc = null;
+        let pendingMedia = null;
+
         async function init() {
             try {
-                const res = await fetch(`${API}/api/circles`);
-                const json = await res.json();
-                circles = json;
-                document.getElementById('serverInfo').textContent = `${circles.length} circle(s) loaded`;
-                // Fetch assets for all circles in parallel
-                const assetsPromises = circles.map(c =>
-                    fetch(`${API}/api/circles/${c.name}/assets`)
-                        .then(r => r.json())
-                        .then(data => ({ circle: c.name, assets: data.assets || [] }))
-                        .catch(() => ({ circle: c.name, assets: [] }))
-                );
-                const results = await Promise.all(assetsPromises);
-                allAssets = results;
-                renderCircleList();
+                const res = await fetch(`${API}/api/documents`);
+                documents = await res.json();
+                document.getElementById('serverInfo').textContent = `${documents.length} document(s)`;
+                renderDocList();
             } catch (e) {
-                showToast('Failed to load circles: ' + e.message, 'error');
+                showToast('Failed to load documents: ' + e.message, 'error');
             }
         }
 
-        // Render circle list with assets (synchronous after data loaded)
-        function renderCircleList() {
-            const list = document.getElementById('circleList');
+        function renderDocList() {
+            const list = document.getElementById('docList');
 
-            if (circles.length === 0) {
-                list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;">No circles found. Run "opsv circle create" first.</div>';
-                return;
+            // Group by category
+            const groups = {};
+            for (const doc of documents) {
+                if (!groups[doc.category]) groups[doc.category] = [];
+                groups[doc.category].push(doc);
             }
 
             let html = '';
-            for (const circle of circles) {
-                const circleData = allAssets.find(a => a.circle === circle.name);
-                const assets = circleData ? circleData.assets : [];
-
-                const filteredAssets = assets.filter(a => currentFilter === 'all' || a.status === currentFilter);
-
+            for (const [category, docs] of Object.entries(groups)) {
                 html += `
-                    <div class="circle-group">
-                        <div class="circle-name" onclick="toggleCircle('${circle.name}')">
-                            <span>${circle.name}</span>
-                            <span class="count">${filteredAssets.length} / ${assets.length}</span>
+                    <div class="category-group">
+                        <div class="category-name" onclick="toggleCategory('${category}')">
+                            <span>${category}</span>
+                            <span class="count">${docs.length}</span>
                         </div>
-                        <div id="circle-${circle.name}" style="display:none;">
-                            ${filteredAssets.map(a => `
-                                <div class="asset-item ${currentAsset && currentAsset.id === a.id && currentCircle === circle.name ? 'active' : ''}"
-                                     onclick="selectAsset(event, '${circle.name}', '${a.id}')">
-                                    <span class="asset-id">
-                                        <span class="status-dot ${a.status}"></span>
-                                        ${a.id}
+                        <div id="cat-${category}">
+                            ${docs.map(doc => `
+                                <div class="doc-item ${currentDoc && currentDoc.docId === doc.docId ? 'active' : ''}"
+                                     onclick="selectDoc(event, '${doc.circle}', '${doc.docId}')">
+                                    <span class="doc-id">
+                                        <span class="status-dot drafting"></span>
+                                        ${doc.docId}
                                     </span>
-                                    <span class="asset-meta">
-                                        <span>Layer ${a.layer}</span>
-                                        <span>${a.status}</span>
-                                        <span>${a.outputs ? a.outputs.length + ' output(s)' : ''}</span>
+                                    <span class="doc-meta">
+                                        <span>${doc.outputs.length} output(s)</span>
                                     </span>
                                 </div>
                             `).join('')}
@@ -504,147 +475,206 @@
                     </div>
                 `;
             }
+
+            if (documents.length === 0) {
+                html = '<div style="padding:20px;color:var(--muted);font-size:13px;">No documents found. Run "opsv circle create" first.</div>';
             }
+
             list.innerHTML = html;
         }
 
-        function toggleCircle(name) {
-            const el = document.getElementById(`circle-${name}`);
+        function toggleCategory(name) {
+            const el = document.getElementById(`cat-${name}`);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
-        async function selectAsset(event, circleName, assetId) {
-            currentCircle = circleName;
-            currentAsset = { id: assetId, outputs: [] };
+        async function selectDoc(event, circle, docId) {
+            event.stopPropagation();
 
-            // Highlight
-            document.querySelectorAll('.asset-item').forEach(el => el.classList.remove('active'));
+            // Update active state
+            document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
             event.currentTarget.classList.add('active');
 
-            document.getElementById('currentAsset').textContent = `${circleName} / ${assetId}`;
+            // Find the document
+            currentDoc = documents.find(d => d.circle === circle && d.docId === docId);
+            if (!currentDoc) return;
 
-            // Load assets from API
-            const res = await fetch(`${API}/api/circles/${circleName}/assets`);
-            const json = await res.json();
-            const asset = (json.assets || []).find(a => a.id === assetId);
-            if (!asset) return;
+            document.getElementById('currentDoc').textContent = docId;
 
-            currentAsset = { ...asset, circle: circleName };
-
-            // Render doc placeholder (we don't have the actual doc content API, show basic info)
-            renderDocPane(asset);
+            // Render doc content
+            renderDocContent(currentDoc);
 
             // Render media
-            renderMediaPane(asset);
+            renderMedia(currentDoc);
         }
 
-        function renderDocPane(asset) {
+        function renderDocContent(doc) {
             const pane = document.getElementById('docPane');
-            pane.innerHTML = `
-                <div class="doc-content">
-                    <h1>${asset.id}</h1>
-                    <p style="color:var(--muted);font-size:12px;">Circle: ${currentCircle} | Layer: ${asset.layer} | Status: ${asset.status}</p>
-                    <h2>Frontmatter</h2>
-                    <pre><code>status: ${asset.status}
-layer: ${asset.layer}
-category: ${asset.category || '—'}
-</code></pre>
-                    <h2>Outputs</h2>
-                    ${asset.outputs && asset.outputs.length > 0
-                        ? `<ul>${asset.outputs.map(o => `<li>${o}</li>`).join('')}</ul>`
-                        : '<p style="color:var(--muted)">No outputs generated yet</p>'
-                    }
-                </div>
-            `;
 
-            // Make sections collapsible
-            pane.querySelectorAll('h2').forEach(h2 => {
-                h2.classList.add('collapsible');
-                h2.onclick = () => {
-                    h2.classList.toggle('collapsed');
+            // Fetch the actual .md content
+            fetch(`${API}/api/documents/${doc.circle}/${doc.docId}`)
+                .then(r => r.json())
+                .then(data => {
+                    const content = data.content || 'Document content not available';
+                    pane.innerHTML = `
+                        <div class="doc-header">
+                            <div>
+                                <h2>${doc.docId}</h2>
+                                <span class="doc-id-badge">${doc.category}</span>
+                            </div>
+                        </div>
+                        <div class="doc-content">
+                            ${renderMarkdown(content)}
+                        </div>
+                    `;
+                    initCollapsibles();
+                })
+                .catch(() => {
+                    pane.innerHTML = `
+                        <div class="doc-header">
+                            <div>
+                                <h2>${doc.docId}</h2>
+                                <span class="doc-id-badge">${doc.category}</span>
+                            </div>
+                        </div>
+                        <div class="doc-content">
+                            <p style="color:var(--muted)">Failed to load document content</p>
+                        </div>
+                    `;
+                });
+        }
+
+        function renderMarkdown(content) {
+            // Simple markdown rendering
+            let html = content
+                .replace(/^---[\s\S]*?---\n*/, '') // Remove frontmatter
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/`(.+?)`/g, '<code>$1</code>')
+                .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+                .replace(/^\| (.+) \|$/gm, (m) => {
+                    const cells = m.split('|').filter(c => c.trim());
+                    return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+                })
+                .replace(/(<tr>.*<\/tr>)/s, '<table>$1</table>')
+                .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1">')
+                .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
+                .replace(/^---$/gm, '<hr>')
+                .replace(/\n\n+/g, '</p><p>')
+                .replace(/^(?!<[hpuolbt]|<pre|<blockquote|<table|<hr)(.+)$/gm, '<p>$1</p>')
+                .replace(/<p><\/p>/g, '');
+
+            return html;
+        }
+
+        function initCollapsibles() {
+            document.querySelectorAll('.collapsible-header').forEach(h => {
+                h.onclick = () => {
+                    h.classList.toggle('collapsed');
+                    const content = h.nextElementSibling;
+                    if (content) content.classList.toggle('collapsed');
                 };
-                const next = h2.nextElementSibling;
-                if (next) {
-                    next.style.maxHeight = next.scrollHeight + 'px';
-                }
             });
         }
 
-        function renderMediaPane(asset) {
+        function renderMedia(doc) {
             const pane = document.getElementById('mediaPane');
 
-            if (!asset.outputs || asset.outputs.length === 0) {
+            if (!doc.outputs || doc.outputs.length === 0) {
                 pane.innerHTML = `
                     <div class="media-empty">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                        <span>No media files for this asset</span>
+                        <span>No outputs for this document</span>
                     </div>
                 `;
                 return;
             }
 
-            const circleName = currentCircle;
-            pane.innerHTML = `
-                <div class="media-grid">
-                    ${asset.outputs.map(output => {
-                        const filename = output.split('/').pop();
-                        const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(filename);
-                        const isVid = /\.(mp4|webm|mov|avi)$/i.test(filename);
-                        const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(filename);
-                        const key = `${circleName}|${asset.id}|${output}`;
-                        const selected = selectedAssets.has(key);
+            // Group outputs by circle
+            const byCircle = {};
+            for (const out of doc.outputs) {
+                if (!byCircle[out.circle]) byCircle[out.circle] = [];
+                byCircle[out.circle].push(out);
+            }
 
-                        return `
-                            <div class="media-card ${selected ? 'selected' : ''}"
-                                 onclick="toggleMediaSelection('${circleName}', '${asset.id}', '${output.replace(/\\/g, '\\\\')}')"
-                                 ondblclick="openPreview('${circleName}', '${output.replace(/\\/g, '\\\\')}')">
-                                <div class="selected-badge">✓</div>
-                                ${isImg ? `<img src="${API}/api/files/${circleName}/${output}" loading="lazy" alt="${filename}">` : ''}
-                                ${isVid ? `<video src="${API}/api/files/${circleName}/${output}" muted></video>` : ''}
-                                ${isAud ? `<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--card);"><span style="font-size:32px;">🔊</span></div>` : ''}
-                                <div class="media-info">
-                                    <span class="media-name" title="${filename}">${filename}</span>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
+            let html = '';
+            for (const [circle, outputs] of Object.entries(byCircle)) {
+                html += `
+                    <div class="output-group">
+                        <div class="output-group-title">${circle} <span>— ${outputs.length} file(s)</span></div>
+                        <div class="media-grid">
+                            ${outputs.map(out => {
+                                const key = `${out.circle}|${out.provider}|${out.filename}`;
+                                const selected = selectedOutputs.has(key);
+                                const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(out.filename);
+                                const isVid = /\.(mp4|webm|mov|avi)$/i.test(out.filename);
+                                const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(out.filename);
+                                const src = `${API}/api/files/${out.circle}/${out.provider}/${out.filename}`;
+
+                                return `
+                                    <div class="media-card ${selected ? 'selected' : ''}"
+                                         onclick="toggleSelection('${out.circle}', '${out.provider}', '${out.filename.replace(/\\/g, '\\\\')}')"
+                                         ondblclick="openPreview('${out.circle}', '${out.provider}', '${out.filename.replace(/\\/g, '\\\\')}')">
+                                        <div class="selected-badge">✓</div>
+                                        ${isImg ? `<img src="${src}" loading="lazy" alt="${out.filename}">` : ''}
+                                        ${isVid ? `<video src="${src}" muted></video>` : ''}
+                                        ${isAud ? `<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--card);"><span style="font-size:32px;">🔊</span></div>` : ''}
+                                        <div class="media-info">
+                                            <span class="media-name" title="${out.filename}">${out.filename}</span>
+                                            <span class="media-meta">${out.provider}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            pane.innerHTML = html;
         }
 
-        function toggleMediaSelection(circle, assetId, outputPath) {
-            const key = `${circle}|${assetId}|${outputPath}`;
-            if (selectedAssets.has(key)) {
-                selectedAssets.delete(key);
+        function toggleSelection(circle, provider, filename) {
+            const key = `${circle}|${provider}|${filename}`;
+            if (selectedOutputs.has(key)) {
+                selectedOutputs.delete(key);
             } else {
-                selectedAssets.add(key);
+                selectedOutputs.add(key);
             }
             updateSelectionUI();
         }
 
         function updateSelectionUI() {
-            document.getElementById('selectedCount').textContent = selectedAssets.size;
-            const hasSelection = selectedAssets.size > 0;
+            document.getElementById('selectedCount').textContent = selectedOutputs.size;
+            const hasSelection = selectedOutputs.size > 0;
             document.getElementById('approveBtn').disabled = !hasSelection;
             document.getElementById('draftBtn').disabled = !hasSelection;
 
             // Update card selection states
             document.querySelectorAll('.media-card').forEach(card => {
-                const onclick = card.getAttribute('onclick');
-                const match = onclick.match(/toggleMediaSelection\('([^']+)', '([^']+)', '([^']+)'/);
-                if (match) {
-                    const key = `${match[1]}|${match[2]}|${match[3]}`;
-                    card.classList.toggle('selected', selectedAssets.has(key));
-                }
+                card.classList.remove('selected');
             });
+            for (const key of selectedOutputs) {
+                const [circle, provider, filename] = key.split('|');
+                // Find matching card - simplified selector
+                document.querySelectorAll('.media-card').forEach(card => {
+                    const onclick = card.getAttribute('onclick') || '';
+                    if (onclick.includes(circle) && onclick.includes(provider) && onclick.includes(filename)) {
+                        card.classList.add('selected');
+                    }
+                });
+            }
         }
 
-        function openPreview(circle, outputPath) {
-            const filename = outputPath.split('/').pop();
+        function openPreview(circle, provider, filename) {
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(filename);
             const isVid = /\.(mp4|webm|mov|avi)$/i.test(filename);
             const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(filename);
-            const src = `${API}/api/files/${circle}/${outputPath}`;
+            const src = `${API}/api/files/${circle}/${provider}/${filename}`;
 
             const content = document.getElementById('previewContent');
             if (isImg) {
@@ -652,11 +682,17 @@ category: ${asset.category || '—'}
             } else if (isVid) {
                 content.innerHTML = `<video src="${src}" controls autoplay style="max-width:95vw;max-height:85vh;"></video>`;
             } else if (isAud) {
-                content.innerHTML = `<div style="background:var(--card);padding:40px;border-radius:12px;text-align:center;"><span style="font-size:64px;">🔊</span><p style="margin-top:16px;font-size:14px;color:var(--muted)">${filename}</p><audio src="${src}" controls style="margin-top:20px;"></audio></div>`;
+                content.innerHTML = `
+                    <div style="background:var(--card);padding:40px;border-radius:12px;text-align:center;">
+                        <span style="font-size:64px;">🔊</span>
+                        <p style="margin-top:16px;font-size:14px;color:var(--muted)">${filename}</p>
+                        <audio src="${src}" controls style="margin-top:20px;"></audio>
+                    </div>
+                `;
             }
 
             document.getElementById('previewName').textContent = filename;
-            pendingReviewMedia = { circle, outputPath };
+            pendingMedia = { circle, provider, filename };
             document.getElementById('previewModal').classList.add('active');
         }
 
@@ -665,51 +701,37 @@ category: ${asset.category || '—'}
         }
 
         function selectCurrentMedia() {
-            if (pendingReviewMedia) {
-                const { circle, outputPath } = pendingReviewMedia;
-                const assetId = currentAsset ? currentAsset.id : '';
-                const key = `${circle}|${assetId}|${outputPath}`;
-                if (!selectedAssets.has(key)) {
-                    selectedAssets.add(key);
+            if (pendingMedia) {
+                const key = `${pendingMedia.circle}|${pendingMedia.provider}|${pendingMedia.filename}`;
+                if (!selectedOutputs.has(key)) {
+                    selectedOutputs.add(key);
                     updateSelectionUI();
                 }
                 closePreview();
             }
         }
 
-        // Filters
-        document.getElementById('filterBar').addEventListener('click', async (e) => {
-            if (e.target.classList.contains('filter-btn')) {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                currentFilter = e.target.dataset.filter;
-                await init();
-            }
-        });
-
-        // Review Modal
         function openReviewModal(mode) {
-            if (selectedAssets.size === 0) return;
+            if (selectedOutputs.size === 0) return;
 
-            // Take first selected as representative
-            const first = Array.from(selectedAssets)[0].split('|');
-            const [circle, assetId, outputPath] = first;
-            const filename = outputPath.split('/').pop();
+            const first = Array.from(selectedOutputs)[0].split('|');
+            const [circle, provider, filename] = first;
+            const src = `${API}/api/files/${circle}/${provider}/${filename}`;
 
             document.getElementById('reviewMediaPreview').style.display = 'flex';
-            document.getElementById('reviewMediaThumb').src = `${API}/api/files/${circle}/${outputPath}`;
+            document.getElementById('reviewMediaThumb').src = src;
             document.getElementById('reviewMediaName').textContent = filename;
-            document.getElementById('reviewMediaProvider').textContent = outputPath.split('/')[0];
+            document.getElementById('reviewMediaProvider').textContent = `${circle} / ${provider}`;
             document.getElementById('reviewNote').value = '';
 
             if (mode === 'approved') {
                 document.getElementById('reviewModalTitle').textContent = '✓ Approve Output';
-                document.getElementById('reviewModalSubtitle').textContent = `${selectedAssets.size} output(s) selected`;
+                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected`;
                 document.getElementById('reviewSubmitBtn').textContent = 'Confirm Approve';
                 document.getElementById('reviewSubmitBtn').className = 'btn btn-approve';
             } else {
                 document.getElementById('reviewModalTitle').textContent = '↩ Set to Drafting';
-                document.getElementById('reviewModalSubtitle').textContent = `${selectedAssets.size} output(s) selected — this will reset status`;
+                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected`;
                 document.getElementById('reviewSubmitBtn').textContent = 'Confirm';
                 document.getElementById('reviewSubmitBtn').className = 'btn btn-draft';
             }
@@ -727,31 +749,31 @@ category: ${asset.category || '—'}
             const note = document.getElementById('reviewNote').value.trim();
             const results = [];
 
-            for (const key of selectedAssets) {
-                const [circle, assetId, outputPath] = key.split('|');
-                const filename = outputPath.split('/').pop();
+            for (const key of selectedOutputs) {
+                const [circle, provider, filename] = key.split('|');
+                // Extract docId from filename (e.g. "hero_01.png" -> "hero")
+                const docId = filename.replace(/(_\d+)+(\.[^.]+)$/, '');
 
                 try {
-                    const res = await fetch(`${API}/api/approve/${circle}/${assetId}`, {
+                    const res = await fetch(`${API}/api/approve/${circle}/${docId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             outputFile: filename,
-                            taskJsonPath: outputPath.replace(/\.[^.]+$/, '.json'),
                             note: note || undefined
                         })
                     });
                     const json = await res.json();
-                    results.push({ success: json.success, assetId, outputPath });
+                    results.push({ success: json.success, filename });
                 } catch (e) {
-                    results.push({ success: false, assetId, outputPath, error: e.message });
+                    results.push({ success: false, filename, error: e.message });
                 }
             }
 
             const allSuccess = results.every(r => r.success);
             if (allSuccess) {
-                showToast(`${results.length} asset(s) updated to ${mode}`, 'success');
-                selectedAssets.clear();
+                showToast(`${results.length} output(s) updated to ${mode}`, 'success');
+                selectedOutputs.clear();
                 updateSelectionUI();
                 closeReviewModal();
                 setTimeout(() => location.reload(), 800);
@@ -768,7 +790,6 @@ category: ${asset.category || '—'}
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        // Close modals on escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closePreview();

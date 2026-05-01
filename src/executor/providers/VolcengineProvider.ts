@@ -59,27 +59,44 @@ export class VolcengineProvider {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: 120000,
+      timeout: 300000,
     });
 
-    const imageUrl =
-      response.data?.data?.[0]?.url ||
-      response.data?.data?.url ||
-      response.data?.url;
+    // Handle multi-image response (sequential_image_generation)
+    const dataItems = response.data?.data;
+    let imageUrls: string[] = [];
 
-    if (!imageUrl) {
+    if (Array.isArray(dataItems)) {
+      // Multi-image response: extract all URLs
+      imageUrls = dataItems.map((item: any) => item.url).filter(Boolean);
+    } else {
+      // Single image response
+      const imageUrl =
+        dataItems?.[0]?.url ||
+        dataItems?.url ||
+        response.data?.url;
+      if (imageUrl) imageUrls = [imageUrl];
+    }
+
+    if (imageUrls.length === 0) {
       throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
-    const outputPath = outputFilePath(taskPath, 1, 'png');
-    await downloadFile(imageUrl, outputPath);
+    // Download all images with sequential indices
+    const outputPaths: string[] = [];
+    for (let i = 0; i < imageUrls.length; i++) {
+      const outputPath = outputFilePath(taskPath, i + 1, 'png');
+      await downloadFile(imageUrls[i], outputPath);
+      outputPaths.push(outputPath);
+    }
 
     return {
       taskPath,
       shotId,
       provider: 'volcengine',
       success: true,
-      outputPath,
+      outputPath: outputPaths[0], // Primary output is the first image
+      outputPaths, // All output paths for multi-image
     };
   }
 

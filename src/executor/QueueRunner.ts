@@ -22,6 +22,7 @@ export interface ProviderResult {
   provider: string;
   success: boolean;
   outputPath?: string;
+  outputPaths?: string[];
   error?: string;
 }
 
