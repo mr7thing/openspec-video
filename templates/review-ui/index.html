@@ -448,13 +448,22 @@
                 const json = await res.json();
                 circles = json;
                 document.getElementById('serverInfo').textContent = `${circles.length} circle(s) loaded`;
+                // Fetch assets for all circles in parallel
+                const assetsPromises = circles.map(c =>
+                    fetch(`${API}/api/circles/${c.name}/assets`)
+                        .then(r => r.json())
+                        .then(data => ({ circle: c.name, assets: data.assets || [] }))
+                        .catch(() => ({ circle: c.name, assets: [] }))
+                );
+                const results = await Promise.all(assetsPromises);
+                allAssets = results;
                 renderCircleList();
             } catch (e) {
                 showToast('Failed to load circles: ' + e.message, 'error');
             }
         }
 
-        // Render circle list with assets
+        // Render circle list with assets (synchronous after data loaded)
         function renderCircleList() {
             const list = document.getElementById('circleList');
 
@@ -465,9 +474,8 @@
 
             let html = '';
             for (const circle of circles) {
-                const assetsRes = await fetch(`${API}/api/circles/${circle.name}/assets`);
-                const assetsJson = await assetsRes.json();
-                const assets = assetsJson.assets || [];
+                const circleData = allAssets.find(a => a.circle === circle.name);
+                const assets = circleData ? circleData.assets : [];
 
                 const filteredAssets = assets.filter(a => currentFilter === 'all' || a.status === currentFilter);
 
@@ -480,7 +488,7 @@
                         <div id="circle-${circle.name}" style="display:none;">
                             ${filteredAssets.map(a => `
                                 <div class="asset-item ${currentAsset && currentAsset.id === a.id && currentCircle === circle.name ? 'active' : ''}"
-                                     onclick="selectAsset('${circle.name}', '${a.id}')">
+                                     onclick="selectAsset(event, '${circle.name}', '${a.id}')">
                                     <span class="asset-id">
                                         <span class="status-dot ${a.status}"></span>
                                         ${a.id}
@@ -495,15 +503,7 @@
                         </div>
                     </div>
                 `;
-
-                // Store assets globally for later
-                for (const a of assets) {
-                    const key = `${circle.name}|${a.id}`;
-                    const existing = allAssets.find(x => x.circle === circle.name && x.id === a.id);
-                    if (!existing) {
-                        allAssets.push({ ...a, circle: circle.name });
-                    }
-                }
+            }
             }
             list.innerHTML = html;
         }
@@ -513,7 +513,7 @@
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
-        async function selectAsset(circleName, assetId) {
+        async function selectAsset(event, circleName, assetId) {
             currentCircle = circleName;
             currentAsset = { id: assetId, outputs: [] };
 
