@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpsV Review</title>
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --surface: #18181c;
+            --card: #222228;
+            --accent: #6366f1;
+            --green: #22c55e;
+            --yellow: #eab308;
+            --red: #ef4444;
+            --text: #f1f5f9;
+            --muted: #64748b;
+            --border: rgba(255,255,255,0.07);
+            --radius: 10px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+        .header-info { font-size: 12px; color: var(--muted); }
+
+        /* Main layout */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left: Circle & Asset Tree */
+        .sidebar {
+            width: 300px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .sidebar-filters {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+
+        .circle-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .circle-group { border-bottom: 1px solid var(--border); }
+        .circle-name {
+            padding: 10px 16px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(0,0,0,0.2);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .circle-name:hover { color: var(--text); }
+        .circle-name .count { font-size: 10px; background: var(--card); padding: 2px 6px; border-radius: 4px; }
+
+        .asset-item {
+            padding: 10px 16px 10px 28px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: background 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .asset-item:hover { background: rgba(255,255,255,0.03); }
+        .asset-item.active { background: rgba(99,102,241,0.15); border-left: 3px solid var(--accent); }
+        .asset-item .asset-id { font-size: 13px; font-weight: 600; }
+        .asset-item .asset-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+        .status-dot.approved { background: var(--green); }
+        .status-dot.syncing { background: var(--yellow); }
+        .status-dot.drafting { background: var(--muted); }
+
+        /* Right: Content Area */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            padding: 12px 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .toolbar-left { display: flex; align-items: center; gap: 10px; }
+        .toolbar-right { display: flex; align-items: center; gap: 8px; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-approve { background: var(--green); color: #000; }
+        .btn-approve:hover:not(:disabled) { background: #16a34a; }
+        .btn-draft { background: var(--yellow); color: #000; }
+        .btn-draft:hover:not(:disabled) { background: #ca8a04; }
+        .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+        /* Content Panes */
+        .panes {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Doc Pane */
+        .doc-pane {
+            width: 38%;
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            background: #0d0d10;
+        }
+        .doc-empty {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            gap: 12px;
+            font-size: 13px;
+        }
+        .doc-content { padding: 24px; }
+        .doc-content h1 { font-size: 18px; margin-bottom: 16px; color: var(--text); }
+        .doc-content h2 { font-size: 15px; margin: 20px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        .doc-content p { font-size: 13px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; }
+        .doc-content ul, .doc-content ol { font-size: 13px; color: #94a3b8; margin: 8px 0 10px 20px; }
+        .doc-content li { margin-bottom: 4px; }
+        .doc-content pre { background: var(--card); border-radius: 6px; padding: 12px; font-size: 12px; overflow-x: auto; margin: 10px 0; }
+        .doc-content code { background: var(--card); padding: 2px 5px; border-radius: 4px; font-size: 12px; color: #a5b4fc; }
+        .doc-content pre code { background: none; padding: 0; color: inherit; }
+        .doc-content blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); font-style: italic; margin: 10px 0; }
+        .doc-content img { max-width: 100%; border-radius: 6px; margin: 10px 0; }
+        .collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+        .collapsible::before { content: '▶'; font-size: 10px; transition: transform 0.2s; }
+        .collapsible.collapsed::before { transform: rotate(-90deg); }
+        .collapsible-content { overflow: hidden; transition: max-height 0.3s; }
+        .collapsible.collapsed + .collapsible-content { max-height: 0 !important; }
+
+        /* Media Pane */
+        .media-pane {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg);
+        }
+        .media-empty {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            gap: 12px;
+            font-size: 13px;
+        }
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+        .media-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .media-card:hover { border-color: rgba(99,102,241,0.4); transform: translateY(-2px); }
+        .media-card.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+        .media-card img, .media-card video { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #000; }
+        .media-info { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
+        .media-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+        .media-provider { font-size: 10px; color: var(--muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
+        .selected-badge { position: absolute; top: 8px; right: 8px; background: var(--green); color: #000; width: 20px; height: 20px; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .media-card { position: relative; }
+        .media-card.selected .selected-badge { display: flex; }
+
+        /* Preview Modal */
+        .preview-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .preview-modal.active { display: flex; }
+        .preview-modal img, .preview-modal video { max-width: 95vw; max-height: 85vh; object-fit: contain; }
+        .preview-modal .preview-controls { display: flex; gap: 12px; align-items: center; }
+        .preview-modal .preview-name { font-size: 14px; color: #94a3b8; }
+        .preview-close { position: absolute; top: 20px; right: 20px; background: var(--card); border: 1px solid var(--border); color: var(--text); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+
+        /* Review Modal */
+        .review-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+        .review-modal.active { display: flex; }
+        .review-box {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 28px;
+            width: 440px;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .review-box h2 { font-size: 17px; margin-bottom: 6px; }
+        .review-box .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+        .review-media-preview { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); border-radius: 8px; margin-bottom: 16px; }
+        .review-media-preview img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; }
+        .review-media-preview .name { font-size: 13px; font-weight: 600; }
+        .review-media-preview .provider { font-size: 11px; color: var(--muted); }
+        .review-fields { display: flex; flex-direction: column; gap: 12px; }
+        .review-fields label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .review-fields input, .review-fields textarea {
+            width: 100%; padding: 10px 12px;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 13px;
+            font-family: inherit;
+        }
+        .review-fields textarea { resize: vertical; min-height: 80px; }
+        .review-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 2000;
+            display: none;
+            animation: slideIn 0.2s ease;
+        }
+        .toast.show { display: block; }
+        .toast.success { border-color: var(--green); }
+        .toast.error { border-color: var(--red); }
+        @keyframes slideIn {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>OpsV Review</h1>
+        <span class="header-info" id="serverInfo">Loading...</span>
+    </div>
+
+    <div class="main">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">Circles &amp; Assets</div>
+            <div class="sidebar-filters" id="filterBar">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="approved">Approved</button>
+                <button class="filter-btn" data-filter="syncing">Syncing</button>
+                <button class="filter-btn" data-filter="drafting">Drafting</button>
+            </div>
+            <div class="circle-list" id="circleList">Loading...</div>
+        </div>
+
+        <!-- Right Content -->
+        <div class="content">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button class="btn btn-approve" id="approveBtn" disabled onclick="openReviewModal('approved')">
+                        ✓ Approve (<span id="selectedCount">0</span>)
+                    </button>
+                    <button class="btn btn-draft" id="draftBtn" disabled onclick="openReviewModal('drafting')">
+                        ↩ Set Drafting
+                    </button>
+                    <span id="currentAsset" style="font-size:12px;color:var(--muted);margin-left:8px;">—</span>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-ghost" onclick="location.reload()">↻ Refresh</button>
+                </div>
+            </div>
+
+            <div class="panes">
+                <!-- Document Pane -->
+                <div class="doc-pane" id="docPane">
+                    <div class="doc-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Select an asset from the left to preview</span>
+                    </div>
+                </div>
+
+                <!-- Media Pane -->
+                <div class="media-pane" id="mediaPane">
+                    <div class="media-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        <span>No media to review</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="preview-modal" id="previewModal">
+        <button class="preview-close" onclick="closePreview()">✕</button>
+        <div id="previewContent"></div>
+        <div class="preview-controls">
+            <span class="preview-name" id="previewName"></span>
+            <button class="btn btn-approve" onclick="selectCurrentMedia()" style="font-size:12px;">✓ Select</button>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div class="review-modal" id="reviewModal">
+        <div class="review-box">
+            <h2 id="reviewModalTitle">Review Decision</h2>
+            <p class="subtitle" id="reviewModalSubtitle">Confirm your review decision</p>
+
+            <div class="review-media-preview" id="reviewMediaPreview" style="display:none;">
+                <img id="reviewMediaThumb" src="" alt="">
+                <div>
+                    <div class="name" id="reviewMediaName"></div>
+                    <div class="provider" id="reviewMediaProvider"></div>
+                </div>
+            </div>
+
+            <div class="review-fields">
+                <div>
+                    <label>Review Note</label>
+                    <textarea id="reviewNote" placeholder="Add comments or feedback..."></textarea>
+                </div>
+            </div>
+
+            <div class="review-actions">
+                <button class="btn btn-ghost" onclick="closeReviewModal()">Cancel</button>
+                <button class="btn btn-approve" id="reviewSubmitBtn" onclick="submitReview()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // State
+        let circles = [];
+        let allAssets = [];
+        let selectedAssets = new Set(); // "circleName|assetId|outputPath"
+        let currentAsset = null;
+        let currentCircle = null;
+        let currentFilter = 'all';
+        let pendingReviewMedia = null; // { circle, assetId, outputPath, provider, name }
+
+        // API base
+        const API = '';
+
+        // Init
+        async function init() {
+            try {
+                const res = await fetch(`${API}/api/circles`);
+                const json = await res.json();
+                circles = json;
+                document.getElementById('serverInfo').textContent = `${circles.length} circle(s) loaded`;
+                renderCircleList();
+            } catch (e) {
+                showToast('Failed to load circles: ' + e.message, 'error');
+            }
+        }
+
+        // Render circle list with assets
+        function renderCircleList() {
+            const list = document.getElementById('circleList');
+
+            if (circles.length === 0) {
+                list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;">No circles found. Run "opsv circle create" first.</div>';
+                return;
+            }
+
+            let html = '';
+            for (const circle of circles) {
+                const assetsRes = await fetch(`${API}/api/circles/${circle.name}/assets`);
+                const assetsJson = await assetsRes.json();
+                const assets = assetsJson.assets || [];
+
+                const filteredAssets = assets.filter(a => currentFilter === 'all' || a.status === currentFilter);
+
+                html += `
+                    <div class="circle-group">
+                        <div class="circle-name" onclick="toggleCircle('${circle.name}')">
+                            <span>${circle.name}</span>
+                            <span class="count">${filteredAssets.length} / ${assets.length}</span>
+                        </div>
+                        <div id="circle-${circle.name}" style="display:none;">
+                            ${filteredAssets.map(a => `
+                                <div class="asset-item ${currentAsset && currentAsset.id === a.id && currentCircle === circle.name ? 'active' : ''}"
+                                     onclick="selectAsset('${circle.name}', '${a.id}')">
+                                    <span class="asset-id">
+                                        <span class="status-dot ${a.status}"></span>
+                                        ${a.id}
+                                    </span>
+                                    <span class="asset-meta">
+                                        <span>Layer ${a.layer}</span>
+                                        <span>${a.status}</span>
+                                        <span>${a.outputs ? a.outputs.length + ' output(s)' : ''}</span>
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                // Store assets globally for later
+                for (const a of assets) {
+                    const key = `${circle.name}|${a.id}`;
+                    const existing = allAssets.find(x => x.circle === circle.name && x.id === a.id);
+                    if (!existing) {
+                        allAssets.push({ ...a, circle: circle.name });
+                    }
+                }
+            }
+            list.innerHTML = html;
+        }
+
+        function toggleCircle(name) {
+            const el = document.getElementById(`circle-${name}`);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function selectAsset(circleName, assetId) {
+            currentCircle = circleName;
+            currentAsset = { id: assetId, outputs: [] };
+
+            // Highlight
+            document.querySelectorAll('.asset-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            document.getElementById('currentAsset').textContent = `${circleName} / ${assetId}`;
+
+            // Load assets from API
+            const res = await fetch(`${API}/api/circles/${circleName}/assets`);
+            const json = await res.json();
+            const asset = (json.assets || []).find(a => a.id === assetId);
+            if (!asset) return;
+
+            currentAsset = { ...asset, circle: circleName };
+
+            // Render doc placeholder (we don't have the actual doc content API, show basic info)
+            renderDocPane(asset);
+
+            // Render media
+            renderMediaPane(asset);
+        }
+
+        function renderDocPane(asset) {
+            const pane = document.getElementById('docPane');
+            pane.innerHTML = `
+                <div class="doc-content">
+                    <h1>${asset.id}</h1>
+                    <p style="color:var(--muted);font-size:12px;">Circle: ${currentCircle} | Layer: ${asset.layer} | Status: ${asset.status}</p>
+                    <h2>Frontmatter</h2>
+                    <pre><code>status: ${asset.status}
+layer: ${asset.layer}
+category: ${asset.category || '—'}
+</code></pre>
+                    <h2>Outputs</h2>
+                    ${asset.outputs && asset.outputs.length > 0
+                        ? `<ul>${asset.outputs.map(o => `<li>${o}</li>`).join('')}</ul>`
+                        : '<p style="color:var(--muted)">No outputs generated yet</p>'
+                    }
+                </div>
+            `;
+
+            // Make sections collapsible
+            pane.querySelectorAll('h2').forEach(h2 => {
+                h2.classList.add('collapsible');
+                h2.onclick = () => {
+                    h2.classList.toggle('collapsed');
+                };
+                const next = h2.nextElementSibling;
+                if (next) {
+                    next.style.maxHeight = next.scrollHeight + 'px';
+                }
+            });
+        }
+
+        function renderMediaPane(asset) {
+            const pane = document.getElementById('mediaPane');
+
+            if (!asset.outputs || asset.outputs.length === 0) {
+                pane.innerHTML = `
+                    <div class="media-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        <span>No media files for this asset</span>
+                    </div>
+                `;
+                return;
+            }
+
+            const circleName = currentCircle;
+            pane.innerHTML = `
+                <div class="media-grid">
+                    ${asset.outputs.map(output => {
+                        const filename = output.split('/').pop();
+                        const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(filename);
+                        const isVid = /\.(mp4|webm|mov|avi)$/i.test(filename);
+                        const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(filename);
+                        const key = `${circleName}|${asset.id}|${output}`;
+                        const selected = selectedAssets.has(key);
+
+                        return `
+                            <div class="media-card ${selected ? 'selected' : ''}"
+                                 onclick="toggleMediaSelection('${circleName}', '${asset.id}', '${output.replace(/\\/g, '\\\\')}')"
+                                 ondblclick="openPreview('${circleName}', '${output.replace(/\\/g, '\\\\')}')">
+                                <div class="selected-badge">✓</div>
+                                ${isImg ? `<img src="${API}/api/files/${circleName}/${output}" loading="lazy" alt="${filename}">` : ''}
+                                ${isVid ? `<video src="${API}/api/files/${circleName}/${output}" muted></video>` : ''}
+                                ${isAud ? `<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--card);"><span style="font-size:32px;">🔊</span></div>` : ''}
+                                <div class="media-info">
+                                    <span class="media-name" title="${filename}">${filename}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function toggleMediaSelection(circle, assetId, outputPath) {
+            const key = `${circle}|${assetId}|${outputPath}`;
+            if (selectedAssets.has(key)) {
+                selectedAssets.delete(key);
+            } else {
+                selectedAssets.add(key);
+            }
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            document.getElementById('selectedCount').textContent = selectedAssets.size;
+            const hasSelection = selectedAssets.size > 0;
+            document.getElementById('approveBtn').disabled = !hasSelection;
+            document.getElementById('draftBtn').disabled = !hasSelection;
+
+            // Update card selection states
+            document.querySelectorAll('.media-card').forEach(card => {
+                const onclick = card.getAttribute('onclick');
+                const match = onclick.match(/toggleMediaSelection\('([^']+)', '([^']+)', '([^']+)'/);
+                if (match) {
+                    const key = `${match[1]}|${match[2]}|${match[3]}`;
+                    card.classList.toggle('selected', selectedAssets.has(key));
+                }
+            });
+        }
+
+        function openPreview(circle, outputPath) {
+            const filename = outputPath.split('/').pop();
+            const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(filename);
+            const isVid = /\.(mp4|webm|mov|avi)$/i.test(filename);
+            const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(filename);
+            const src = `${API}/api/files/${circle}/${outputPath}`;
+
+            const content = document.getElementById('previewContent');
+            if (isImg) {
+                content.innerHTML = `<img src="${src}" alt="${filename}">`;
+            } else if (isVid) {
+                content.innerHTML = `<video src="${src}" controls autoplay style="max-width:95vw;max-height:85vh;"></video>`;
+            } else if (isAud) {
+                content.innerHTML = `<div style="background:var(--card);padding:40px;border-radius:12px;text-align:center;"><span style="font-size:64px;">🔊</span><p style="margin-top:16px;font-size:14px;color:var(--muted)">${filename}</p><audio src="${src}" controls style="margin-top:20px;"></audio></div>`;
+            }
+
+            document.getElementById('previewName').textContent = filename;
+            pendingReviewMedia = { circle, outputPath };
+            document.getElementById('previewModal').classList.add('active');
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').classList.remove('active');
+        }
+
+        function selectCurrentMedia() {
+            if (pendingReviewMedia) {
+                const { circle, outputPath } = pendingReviewMedia;
+                const assetId = currentAsset ? currentAsset.id : '';
+                const key = `${circle}|${assetId}|${outputPath}`;
+                if (!selectedAssets.has(key)) {
+                    selectedAssets.add(key);
+                    updateSelectionUI();
+                }
+                closePreview();
+            }
+        }
+
+        // Filters
+        document.getElementById('filterBar').addEventListener('click', async (e) => {
+            if (e.target.classList.contains('filter-btn')) {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentFilter = e.target.dataset.filter;
+                await init();
+            }
+        });
+
+        // Review Modal
+        function openReviewModal(mode) {
+            if (selectedAssets.size === 0) return;
+
+            // Take first selected as representative
+            const first = Array.from(selectedAssets)[0].split('|');
+            const [circle, assetId, outputPath] = first;
+            const filename = outputPath.split('/').pop();
+
+            document.getElementById('reviewMediaPreview').style.display = 'flex';
+            document.getElementById('reviewMediaThumb').src = `${API}/api/files/${circle}/${outputPath}`;
+            document.getElementById('reviewMediaName').textContent = filename;
+            document.getElementById('reviewMediaProvider').textContent = outputPath.split('/')[0];
+            document.getElementById('reviewNote').value = '';
+
+            if (mode === 'approved') {
+                document.getElementById('reviewModalTitle').textContent = '✓ Approve Output';
+                document.getElementById('reviewModalSubtitle').textContent = `${selectedAssets.size} output(s) selected`;
+                document.getElementById('reviewSubmitBtn').textContent = 'Confirm Approve';
+                document.getElementById('reviewSubmitBtn').className = 'btn btn-approve';
+            } else {
+                document.getElementById('reviewModalTitle').textContent = '↩ Set to Drafting';
+                document.getElementById('reviewModalSubtitle').textContent = `${selectedAssets.size} output(s) selected — this will reset status`;
+                document.getElementById('reviewSubmitBtn').textContent = 'Confirm';
+                document.getElementById('reviewSubmitBtn').className = 'btn btn-draft';
+            }
+
+            document.getElementById('reviewModal').classList.add('active');
+            document.getElementById('reviewModal').dataset.mode = mode;
+        }
+
+        function closeReviewModal() {
+            document.getElementById('reviewModal').classList.remove('active');
+        }
+
+        async function submitReview() {
+            const mode = document.getElementById('reviewModal').dataset.mode;
+            const note = document.getElementById('reviewNote').value.trim();
+            const results = [];
+
+            for (const key of selectedAssets) {
+                const [circle, assetId, outputPath] = key.split('|');
+                const filename = outputPath.split('/').pop();
+
+                try {
+                    const res = await fetch(`${API}/api/approve/${circle}/${assetId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            outputFile: filename,
+                            taskJsonPath: outputPath.replace(/\.[^.]+$/, '.json'),
+                            note: note || undefined
+                        })
+                    });
+                    const json = await res.json();
+                    results.push({ success: json.success, assetId, outputPath });
+                } catch (e) {
+                    results.push({ success: false, assetId, outputPath, error: e.message });
+                }
+            }
+
+            const allSuccess = results.every(r => r.success);
+            if (allSuccess) {
+                showToast(`${results.length} asset(s) updated to ${mode}`, 'success');
+                selectedAssets.clear();
+                updateSelectionUI();
+                closeReviewModal();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                const failures = results.filter(r => !r.success).length;
+                showToast(`${failures} failed`, 'error');
+            }
+        }
+
+        function showToast(msg, type = '') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast show ' + type;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Close modals on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closePreview();
+                closeReviewModal();
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>

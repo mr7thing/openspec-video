@@ -1,6 +1,7 @@
 // ============================================================================
-// OpsV v0.8.2 — opsv review
+// OpsV v0.8.10 — opsv review
 // Scans *.circleN/ directories, reads/writes _manifest.json assets
+// UI served from templates/review-ui/
 // ============================================================================
 
 import { Command } from 'commander';
@@ -182,8 +183,8 @@ export function registerReviewCommand(program: Command): void {
           }
         });
 
-        // Serve static review UI
-        const publicDir = path.join(__dirname, '..', 'review-ui', 'public');
+        // Serve static review UI from templates/review-ui/
+        const publicDir = path.join(__dirname, '..', '..', 'templates', 'review-ui');
         if (fs.existsSync(publicDir)) {
           app.use(express.static(publicDir));
         } else {
@@ -237,7 +238,7 @@ function scanCircles(queueRoot: string, options: any): any[] {
 
   const entries = fs.readdirSync(queueRoot).filter((d) => {
     const fullPath = path.join(queueRoot, d);
-    return fs.statSync(fullPath).isDirectory() && d.includes('.circle');
+    return fs.statSync(fullPath).isDirectory() && /\.circle\d+$/.test(d);
   });
 
   for (const name of entries) {
