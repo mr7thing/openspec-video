@@ -236,6 +236,12 @@ opsv animate --model volcengine.seedance-2.0
 ### opsv review
 启动基于 Express 的本地 Web Review UI（默认端口 3456）。
 
+**参数**:
+- `--circle [path]`：启用基于 manifest 的 Review 模式。
+  - 无 path 时自动发现最新 manifest。
+  - 可传入 Circle 目录或 manifest 文件路径。
+  - 适用于从 `opsv circle create/refresh` 生成的 `_manifest.json` 进行审阅。
+
 **功能**:
 - **视觉反馈**: 实时对比多模型生成结果。
 - **Approve 条件判断**（根据生成物文件名自动决定）：
