@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8.8 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.12 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.8)
+# OpsV 框架规范 (v0.8.12)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -212,6 +212,10 @@ opsv audio --model <provider.model>
 opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json
 opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/   # 执行目录下所有任务
 opsv run <path1> <path2> ...                                      # 多路径
+
+# 迭代（修改任务后重跑）
+opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
+opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/   # 迭代整个目录
 
 # 审阅
 opsv review

@@ -169,7 +169,7 @@ Rules:
 - Initial: `id.json` → output `id_1.ext`
 - Modified tasks increment sequence: `id_2.json`, `id_3.json`...
 - Modified task outputs: `id_N_1.ext` (extra `_1` level, N≥2)
-- Agent iteration: `cp @hero.json @hero_2.json` → edit → `opsv run @hero_2.json` → output `@hero_2_1.png`
+- Agent iteration: `opsv iterate @hero.json` → edit generated `@hero_2.json` → `opsv run @hero_2.json` → output `@hero_2_1.png`
 
 ## @ Reference Syntax
 

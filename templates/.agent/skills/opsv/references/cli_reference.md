@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.8 (Manifest-First Architecture)
+> 当前版本：v0.8.12 (Manifest-First Architecture)
 
 ## 命令总览
 
@@ -16,6 +16,7 @@
 | `opsv audio --model` | 音频生成（规划中） | 音频管线 |
 | `opsv webapp --model` | WebApp 浏览器自动化 | 应用管线 |
 | `opsv run <paths...>` | 按路径引用执行渲染任务 | 执行 |
+| `opsv iterate <path>` | 克隆任务 JSON 或模型队列目录用于迭代 | 迭代 |
 | `opsv review` | 启动 Web Review UI 页面服务 | 审阅 |
 | `opsv script` | 从 shot_*.md 聚合生成 Script.md | 展示 |
 
@@ -142,14 +143,18 @@ opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --retry
 - 顺序执行，写 JSONL 日志（`{jobId}.log`），失败写 `{jobId}_error.log`。
 - 完成打印摘要，自动退出。
 
-**Agent 直接操作**：
+**Agent 迭代操作（必须使用 `opsv iterate`）**：
 ```bash
-# 复制并修改任务（序号递增）
-cp opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json \
-   opsv-queue/videospec.circle1/volcengine.seadream_001/@hero_2.json
-# 编辑 @hero_2.json 的 prompt 字段
+# 克隆任务（序号递增）
+opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
+# → 生成 @hero_2.json（自动删除 compiledAt，确保会被执行）
+# 编辑 @hero_2.json（修改 prompt、seed 等字段）
 opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/@hero_2.json
 # → 生成 @hero_2_1.png（id_N_1.ext 模式，Review 后为 syncing 状态）
+
+# 克隆整个目录（目录内任务保持原始名称）
+opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/
+# → 生成 volcengine.seadream_001_it_001/（目录下所有 task JSON 被复制）
 ```
 
 ### opsv circle

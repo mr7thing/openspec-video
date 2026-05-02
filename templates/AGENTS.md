@@ -107,6 +107,7 @@ opsv app --model browser.chrome
 | `opsv audio` | 编译音频任务（规划中，占位） | `--model <m>` |
 | `opsv webapp` | 浏览器自动化 | `--model <m>` |
 | `opsv run` | 执行编译后的任务 `.json` | `<paths...>`, `--retry`, `--dry-run` |
+| `opsv iterate` | 克隆任务 JSON 或模型目录用于迭代 | `<path>` |
 | `opsv review` | Web UI 可视审阅 | `--port`, `--latest`, `--all`, `--ttl` |
 | `opsv script` | 分镜聚合 | `-d`, `-o`, `--dry-run` |
 
@@ -266,17 +267,17 @@ Agent 看到 `syncing` 后**必须执行**：
 1. **定位问题**：查看 `draft_ref` 和 `reviews` 记录了解驳回原因
 2. **修改方案**（二选一）：
    - **方案A**：修改源 `.md` 的 `visual_detailed` / `prompt_en` → 重新 `opsv imagen --model <m>` → `opsv run`
-   - **方案B**：直接复制并修改 Circle 目录下的 task JSON（快速迭代）
+   - **方案B**：使用 `opsv iterate` 克隆 task JSON 后修改并执行（快速迭代）
 3. **快速迭代示例**：
    ```bash
-   # 复制任务
-   cp opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01.json \
-      opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01_v2.json
-   # 编辑 shot_01_v2.json → 执行 → Approve → 对齐 syncing
-   opsv run opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01_v2.json
+   # 克隆任务（必须使用 opsv iterate，自动清除 compiledAt）
+   opsv iterate opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01.json
+   # → 生成 shot_01_2.json（序号自动递增）
+   # 编辑 shot_01_2.json → 执行 → Approve → 对齐 syncing
+   opsv run opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01_2.json
    opsv review
    ```
-4. **迭代文件命名规范**：`{jobId}_v{N}.json`，N 从 2 递增
+4. **迭代文件命名规范**：`{jobId}_{N}.json`，N 从 2 递增。严禁手动 `cp`，必须使用 `opsv iterate`
 
 ### Circle 跨环迭代
 

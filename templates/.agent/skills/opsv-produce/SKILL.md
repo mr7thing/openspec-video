@@ -70,7 +70,11 @@ opsv webapp --model webapp.gemini
 - Initial: `id.json` → output `id_1.ext`
 - Modified tasks increment sequence: `id_2.json`, `id_3.json`...
 - Modified task outputs: `id_N_1.ext` (extra `_1` level)
-- Agent iteration: `cp @hero.json @hero_2.json` → edit → `opsv run @hero_2.json` → output `@hero_2_1.png`
+- **Agent iteration: `opsv iterate @hero.json` → edit generated `@hero_2.json` → `opsv run @hero_2.json` → output `@hero_2_1.png`**
+
+`opsv iterate` 是修改任务并重新执行的唯一正确方式：
+- **File mode**: `opsv iterate task.json` → 生成 `task_2.json`, `task_3.json`, ...（序号自动递增，自动清除 `_opsv.compiledAt`）
+- **Directory mode**: `opsv iterate model_dir/` → 生成 `model_dir_it_001/`, `model_dir_it_002/`, ...（目录内所有 task JSON 被复制，保持原始名称，自动清除 `compiledAt`）
 
 ## Key Files
 - `src/commands/imagen.ts`, `animate.ts`, `comfy.ts`, `webapp.ts`
