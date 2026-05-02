@@ -427,8 +427,8 @@ interface DocumentInfo {
 }
 
 /**
- * Legacy: Scan videospec/ and all its subdirectories for .md documents,
- * then find all outputs across all circles that belong to each document.
+ * Legacy: Global review — scans videospec/ subdirectories for all .md documents,
+ * enriched with category/status from all circle manifests when available.
  */
 function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
   const docs: DocumentInfo[] = [];
@@ -436,6 +436,8 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
 
   if (!fs.existsSync(targetDir)) return docs;
 
+  // 1. Read all manifests to build asset info and output index
+  const assetInfoMap: Record<string, { category: string; status: string }> = {};
   const outputIndex: Record<string, Array<{ circle: string; provider: string; filename: string }>> = {};
 
   if (fs.existsSync(queueRoot)) {
@@ -444,11 +446,16 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
       const circlePath = path.join(queueRoot, circleDir);
       const manifestPath = path.join(circlePath, '_manifest.json');
 
-      if (!fs.existsSync(manifestPath)) continue;
-
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-      const manifestTarget = manifest.target || 'videospec';
-      const circleTarget = manifestTarget.replace(/^videospec\/?/, '');
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        const assetsMap = manifest.assets || {};
+        for (const [id, info] of Object.entries(assetsMap)) {
+          assetInfoMap[id] = {
+            category: (info as any).category || 'other',
+            status: (info as any).status || 'drafting',
+          };
+        }
+      }
 
       const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_'));
       for (const providerDir of providerDirs) {
@@ -458,14 +465,14 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
         const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json') && !f.endsWith('.log'));
         for (const file of files) {
           const docId = file.replace(/(_\d+)+(\.[^.]+)$/, '');
-          const key = `${circleTarget}/${docId}`;
-          if (!outputIndex[key]) outputIndex[key] = [];
-          outputIndex[key].push({ circle: circleDir, provider: providerDir, filename: file });
+          if (!outputIndex[docId]) outputIndex[docId] = [];
+          outputIndex[docId].push({ circle: circleDir, provider: providerDir, filename: file });
         }
       }
     }
   }
 
+  // 2. Scan videospec/ subdirectories for ALL .md files (global review)
   const subdirs = fs.readdirSync(targetDir, { withFileTypes: true });
   for (const subdir of subdirs) {
     if (!subdir.isDirectory()) continue;
@@ -474,16 +481,15 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
     const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
     for (const file of files) {
       const docId = file.replace(/^@/, '').replace(/\.md$/, '');
-      const categoryPath = subdir.name;
-      const key = `${categoryPath}/${docId}`;
+      const info = assetInfoMap[docId];
 
       const doc: DocumentInfo = {
         docId,
         docPath: path.join(dirPath, file),
-        circle: categoryPath,
-        category: categoryPath,
-        status: 'drafting',
-        outputs: (outputIndex[key] || []).map((o) => ({
+        circle: subdir.name,
+        category: info?.category || subdir.name,
+        status: info?.status || 'drafting',
+        outputs: (outputIndex[docId] || []).map((o) => ({
           circle: o.circle,
           provider: o.provider,
           filename: o.filename,
