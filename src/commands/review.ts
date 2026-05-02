@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.13 — opsv review
+// OpsV v0.8.14 — opsv review
 // Supports --circle mode: manifest-driven review with zero hardcoded paths
 // Legacy mode (no --circle) preserves original behavior
 // ============================================================================

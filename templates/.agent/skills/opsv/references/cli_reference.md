@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.12 (Manifest-First Architecture)
+> 当前版本：v0.8.14 (Manifest-First Architecture)
 
 ## 命令总览
 
@@ -133,6 +133,10 @@ opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json \
 
 # 重试失败任务
 opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --retry
+
+# 设置并发数（覆盖 api_config 中的配置）
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --concurrency 3
+opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ -c 3
 ```
 
 **行为**：
@@ -140,8 +144,23 @@ opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --retry
 - 传入目录路径时，扫描该目录下所有 `.json` 任务文件顺序执行。
 - 跳过已有产出结果的任务。
 - 跳过已有 `_error.log` 的任务（除非 `--retry`）。
-- 顺序执行，写 JSONL 日志（`{jobId}.log`），失败写 `{jobId}_error.log`。
+- 默认串行执行，写 JSONL 日志（`{jobId}.log`），失败写 `{jobId}_error.log`。
 - 完成打印摘要，自动退出。
+
+**并发控制（v0.8.14）**：
+- 默认串行（`concurrency = 1`）。
+- 可在 `api_config.yaml` 的 model 配置中设置 `concurrency: N` 来开启单 provider 内并发。
+- CLI `--concurrency <number>` 或 `-c <number>` 可覆盖 api_config 中的配置。
+- 并发优先级：`CLI flag > api_config > 默认 1`。
+- 并发模式：provider 之间并行，provider 内部按并发数控制并行度。
+
+```yaml
+# api_config.yaml 示例
+models:
+  siliconflow.wani2v:
+    provider: siliconflow
+    concurrency: 3
+```
 
 **Agent 迭代操作（必须使用 `opsv iterate`）**：
 ```bash
