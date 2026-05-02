@@ -13,7 +13,7 @@ export function registerRunCommand(program: Command): void {
     .description('Execute compiled task .json files by path')
     .option('--retry', 'Retry failed tasks')
     .option('--dry-run', 'Show execution plan without running')
-    .option('-c, --concurrency <number>', 'Max concurrent tasks per provider (overrides api_config)', parseInt)
+    .option('-c, --concurrency <number>', 'Max concurrent tasks per provider (overrides api_config)', (v) => parseInt(v, 10))
     .action(async (paths: string[], options: any) => {
       try {
         const runner = new QueueRunner();

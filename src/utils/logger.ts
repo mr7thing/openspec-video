@@ -5,6 +5,7 @@
 import winston from 'winston';
 import path from 'path';
 import fs from 'fs';
+import { resolveProjectRoot } from './projectResolver';
 
 export enum LogLevel {
   ERROR = 'error',
@@ -32,7 +33,7 @@ const LOG_VERSION = pkg.version;
 const defaultOptions: LoggerOptions = {
   level: (process.env.LOG_LEVEL as LogLevel) || LogLevel.INFO,
   console: true,
-  logDir: path.join(process.cwd(), 'logs'),
+  logDir: path.join(resolveProjectRoot(process.cwd()), 'logs'),
   file: true,
   json: false,
   timestamp: true,

@@ -10,6 +10,7 @@ import { DesignRefReader } from '../core/DesignRefReader';
 import { RefResolver } from '../core/RefResolver';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { Job } from '../types/Job';
+import { resolveProjectRoot } from '../utils/projectResolver';
 
 export interface ProduceCommandOptions {
   model: string;
@@ -18,21 +19,6 @@ export interface ProduceCommandOptions {
   statusSkip?: string;
   file?: string;
   dryRun?: boolean;
-}
-
-/**
- * Resolve the project root by walking up from cwd until finding .opsv/api_config.yaml.
- * Falls back to cwd if no marker is found.
- */
-export function resolveProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, '.opsv', 'api_config.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
 }
 
 function escapeRegex(s: string): string {

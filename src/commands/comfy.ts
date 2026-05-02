@@ -13,7 +13,8 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, resolveProjectRoot } from './produceUtils';
+import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
+import { resolveProjectRoot } from '../utils/projectResolver';
 
 export function registerComfyCommand(program: Command): void {
   program

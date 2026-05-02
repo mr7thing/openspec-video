@@ -16,6 +16,7 @@ import { ComfyUILocalProvider } from './providers/ComfyUILocalProvider';
 import { WebappProvider } from './providers/WebappProvider';
 import { isTaskCompleted, getResumeTaskId } from './polling';
 import { ConfigLoader } from '../utils/configLoader';
+import { resolveProjectRoot } from '../utils/projectResolver';
 
 export interface ProviderResult {
   taskPath: string;
@@ -80,7 +81,7 @@ export class QueueRunner {
 
     // Pre-load config for concurrency lookups
     const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(process.cwd());
+    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
 
     // Run providers in parallel
     const providerPromises = Array.from(byProvider.entries()).map(

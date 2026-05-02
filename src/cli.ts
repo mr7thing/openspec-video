@@ -19,9 +19,10 @@ import { registerRunCommand } from './commands/run';
 import { registerReviewCommand } from './commands/review';
 import { registerScriptCommand } from './commands/script';
 import { registerIterateCommand } from './commands/iterate';
+import { resolveProjectRoot } from './utils/projectResolver';
 
-// Load .env before anything else
-const projectRoot = process.cwd();
+// Load .env from the resolved project root (not just cwd)
+const projectRoot = resolveProjectRoot(process.cwd());
 const rootEnvPath = path.join(projectRoot, '.env');
 const opsvEnvPath = path.join(projectRoot, '.opsv', '.env');
 

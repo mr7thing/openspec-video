@@ -12,6 +12,7 @@ import { outputFilePath } from '../naming';
 import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
+import { resolveProjectRoot } from '../../utils/projectResolver';
 import {
   appendLog,
   getResumeTaskId,
@@ -25,7 +26,7 @@ export class SiliconFlowProvider {
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
     const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(process.cwd());
+    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
 
     let apiKey: string;
     try {
