@@ -4,6 +4,8 @@
 // ============================================================================
 
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
 import { outputFilePath } from '../naming';
@@ -80,6 +82,16 @@ export class SiliconFlowProvider {
     return { taskPath, shotId, provider: 'siliconflow', success: true, outputPath };
   }
 
+  private async resolveImageField(value: string): Promise<string> {
+    if (!value) return value;
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    // Local file path — convert to base64 data URI
+    const data = fs.readFileSync(value);
+    const ext = path.extname(value).slice(1) || 'png';
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+    return `data:${mime};base64,${data.toString('base64')}`;
+  }
+
   private async executeVideo(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
     const submitUrl = task._opsv.api_url;
     const statusUrl = task._opsv.api_status_url;
@@ -90,6 +102,14 @@ export class SiliconFlowProvider {
     if (!requestId) {
       const payload = { ...task };
       delete (payload as any)._opsv;
+
+      // Convert local image paths to base64 data URIs for API submission
+      if (payload.image) {
+        payload.image = await this.resolveImageField(payload.image);
+      }
+      if (payload.tail_image) {
+        payload.tail_image = await this.resolveImageField(payload.tail_image);
+      }
 
       const submitRes = await axios.post(submitUrl, payload, {
         headers: {

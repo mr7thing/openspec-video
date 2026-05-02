@@ -15,6 +15,7 @@ import { RunningHubProvider } from './providers/RunningHubProvider';
 import { ComfyUILocalProvider } from './providers/ComfyUILocalProvider';
 import { WebappProvider } from './providers/WebappProvider';
 import { isTaskCompleted, getResumeTaskId } from './polling';
+import { ConfigLoader } from '../utils/configLoader';
 
 export interface ProviderResult {
   taskPath: string;
@@ -45,7 +46,7 @@ export class QueueRunner {
     this.providers.set('webapp', new WebappProvider());
   }
 
-  async runPaths(paths: string[], options: { retry?: boolean; dryRun?: boolean } = {}): Promise<ProviderResult[]> {
+  async runPaths(paths: string[], options: { retry?: boolean; dryRun?: boolean; concurrency?: number } = {}): Promise<ProviderResult[]> {
     const tasks = this.collectTasks(paths, options.retry);
 
     if (tasks.length === 0) {
@@ -77,53 +78,30 @@ export class QueueRunner {
 
     const results: ProviderResult[] = [];
 
+    // Pre-load config for concurrency lookups
+    const configLoader = ConfigLoader.getInstance();
+    configLoader.loadConfig(process.cwd());
+
     // Run providers in parallel
     const providerPromises = Array.from(byProvider.entries()).map(
       async ([provider, entries]) => {
-        // Tasks within same provider run serially
-        for (const { task, path: taskPath } of entries) {
-          const handler = this.providers.get(provider);
-          if (!handler) {
-            results.push({
-              taskPath,
-              shotId: task._opsv.shotId,
-              provider,
-              success: false,
-              error: `Unknown provider: ${provider}`,
-            });
-            continue;
+        // Determine concurrency: CLI flag > model config > default 1
+        let concurrency = options.concurrency ?? 1;
+        if (!options.concurrency && entries.length > 0) {
+          const firstTask = entries[0].task;
+          const modelConfig = configLoader.getModelConfig(firstTask._opsv.modelKey);
+          if (modelConfig?.concurrency && modelConfig.concurrency > 1) {
+            concurrency = modelConfig.concurrency;
           }
+        }
 
-          try {
-            console.log(chalk.cyan(`  [${provider}] Running ${task._opsv.shotId}...`));
-            const result = await handler.execute(task, taskPath);
-            results.push(result);
-
-            if (result.success) {
-              console.log(chalk.green(`  [${provider}] ${task._opsv.shotId} ✓`));
-              // Remove error log on success
-              const errorLog = taskPath.replace(/\.json$/, '_error.log');
-              if (fs.existsSync(errorLog)) {
-                fs.unlinkSync(errorLog);
-              }
-            } else {
-              console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${result.error}`));
-              // Write error log for retry support
-              const errorLog = taskPath.replace(/\.json$/, '_error.log');
-              fs.writeFileSync(errorLog, JSON.stringify({ error: result.error, timestamp: new Date().toISOString() }));
-            }
-          } catch (err: any) {
-            results.push({
-              taskPath,
-              shotId: task._opsv.shotId,
-              provider,
-              success: false,
-              error: err.message,
-            });
-            console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${err.message}`));
-            // Write error log for retry support
-            const errorLog = taskPath.replace(/\.json$/, '_error.log');
-            fs.writeFileSync(errorLog, JSON.stringify({ error: err.message, timestamp: new Date().toISOString() }));
+        if (concurrency > 1) {
+          console.log(chalk.cyan(`\n[${provider}] Running ${entries.length} tasks with concurrency ${concurrency}...`));
+          await this.runWithConcurrency(entries, concurrency, provider, results);
+        } else {
+          console.log(chalk.cyan(`\n[${provider}] Running ${entries.length} tasks sequentially...`));
+          for (const { task, path: taskPath } of entries) {
+            await this.runTask(task, taskPath, provider, results);
           }
         }
       }
@@ -136,6 +114,79 @@ export class QueueRunner {
     console.log(chalk.cyan(`\nDone: ${succeeded} succeeded, ${failed} failed`));
 
     return results;
+  }
+
+  private async runTask(
+    task: TaskJson,
+    taskPath: string,
+    provider: string,
+    results: ProviderResult[]
+  ): Promise<void> {
+    const handler = this.providers.get(provider);
+    if (!handler) {
+      results.push({
+        taskPath,
+        shotId: task._opsv.shotId,
+        provider,
+        success: false,
+        error: `Unknown provider: ${provider}`,
+      });
+      return;
+    }
+
+    try {
+      console.log(chalk.cyan(`  [${provider}] Running ${task._opsv.shotId}...`));
+      const result = await handler.execute(task, taskPath);
+      results.push(result);
+
+      if (result.success) {
+        console.log(chalk.green(`  [${provider}] ${task._opsv.shotId} ✓`));
+        // Remove error log on success
+        const errorLog = taskPath.replace(/\.json$/, '_error.log');
+        if (fs.existsSync(errorLog)) {
+          fs.unlinkSync(errorLog);
+        }
+      } else {
+        console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${result.error}`));
+        // Write error log for retry support
+        const errorLog = taskPath.replace(/\.json$/, '_error.log');
+        fs.writeFileSync(errorLog, JSON.stringify({ error: result.error, timestamp: new Date().toISOString() }));
+      }
+    } catch (err: any) {
+      results.push({
+        taskPath,
+        shotId: task._opsv.shotId,
+        provider,
+        success: false,
+        error: err.message,
+      });
+      console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${err.message}`));
+      // Write error log for retry support
+      const errorLog = taskPath.replace(/\.json$/, '_error.log');
+      fs.writeFileSync(errorLog, JSON.stringify({ error: err.message, timestamp: new Date().toISOString() }));
+    }
+  }
+
+  private async runWithConcurrency(
+    entries: Array<{ task: TaskJson; path: string }>,
+    concurrency: number,
+    provider: string,
+    results: ProviderResult[]
+  ): Promise<void> {
+    const executing = new Set<Promise<void>>();
+
+    for (const { task, path: taskPath } of entries) {
+      const promise = this.runTask(task, taskPath, provider, results).then(() => {
+        executing.delete(promise);
+      });
+      executing.add(promise);
+
+      if (executing.size >= concurrency) {
+        await Promise.race(executing);
+      }
+    }
+
+    await Promise.all(executing);
   }
 
   private collectTasks(paths: string[], retry?: boolean): Array<{ task: TaskJson; path: string }> {

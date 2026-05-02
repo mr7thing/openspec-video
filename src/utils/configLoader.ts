@@ -29,6 +29,7 @@ export interface ModelConfig {
   max_reference_images?: number;
   supports_audio?: boolean;
   supports_video_ref?: boolean;
+  concurrency?: number;
 }
 
 export interface ApiConfig {

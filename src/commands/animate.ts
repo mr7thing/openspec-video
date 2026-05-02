@@ -16,6 +16,12 @@ import { Job, FrameRef } from '../types/Job';
 import { logger } from '../utils/logger';
 import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, resolveProjectRoot } from './produceUtils';
 
+function resolveFrameRef(filePath: string, frameRef: string | undefined): string | null {
+  if (!frameRef) return null;
+  if (frameRef.startsWith('http') || frameRef.startsWith('data:')) return frameRef;
+  return path.resolve(path.dirname(filePath), frameRef);
+}
+
 export function registerAnimateCommand(program: Command): void {
   program
     .command('animate')
@@ -116,13 +122,13 @@ async function buildVideoJob(
   let frameRef: FrameRef | undefined;
   if (frontmatter.frame_ref) {
     frameRef = {
-      first: frontmatter.frame_ref.first || null,
-      last: frontmatter.frame_ref.last || null,
+      first: resolveFrameRef(filePath, frontmatter.frame_ref.first),
+      last: resolveFrameRef(filePath, frontmatter.frame_ref.last),
     };
   } else if (frontmatter.first_frame || frontmatter.last_frame) {
     frameRef = {
-      first: frontmatter.first_frame || null,
-      last: frontmatter.last_frame || null,
+      first: resolveFrameRef(filePath, frontmatter.first_frame),
+      last: resolveFrameRef(filePath, frontmatter.last_frame),
     };
   }
 

@@ -63,11 +63,11 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     };
 
     if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
-      payload.image_url = job.payload.frame_ref.first;
+      payload.image = job.payload.frame_ref.first;
     }
 
     if (job.payload.frame_ref?.last && modelConfig.supports_last_image) {
-      payload.tail_image_url = job.payload.frame_ref.last;
+      payload.tail_image = job.payload.frame_ref.last;
     }
 
     return {

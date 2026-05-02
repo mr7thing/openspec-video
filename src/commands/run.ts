@@ -13,12 +13,14 @@ export function registerRunCommand(program: Command): void {
     .description('Execute compiled task .json files by path')
     .option('--retry', 'Retry failed tasks')
     .option('--dry-run', 'Show execution plan without running')
+    .option('-c, --concurrency <number>', 'Max concurrent tasks per provider (overrides api_config)', parseInt)
     .action(async (paths: string[], options: any) => {
       try {
         const runner = new QueueRunner();
         const results = await runner.runPaths(paths, {
           retry: options.retry || false,
           dryRun: options.dryRun || false,
+          concurrency: options.concurrency,
         });
 
         if (!options.dryRun) {

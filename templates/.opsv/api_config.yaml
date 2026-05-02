@@ -8,6 +8,11 @@
 #   opsv imagen --model volcengine.seadream
 #   opsv animate --model volcengine.seedance2
 #   opsv run opsv-queue/videospec.circle1/
+#
+# 并发控制:
+#   在 model 下添加 concurrency 可指定该 provider 的单 provider 内并发数
+#   CLI: opsv run --concurrency 3 <dir> 可覆盖 api_config 中的设置
+#   默认串行 (concurrency=1)，仅对支持并发的 API 建议调高
 
 models:
   # ==========================================
@@ -136,6 +141,8 @@ models:
     docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
     required_env:
       - SILICONFLOW_API_KEY
+    # 并发数: 允许同时提交 N 个任务到该 provider (默认 1)
+    concurrency: 3
     defaults:
       image_size: "1280x720"
       seed: 42
