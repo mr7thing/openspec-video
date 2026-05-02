@@ -148,7 +148,16 @@ export class QueueRunner {
         try {
           const task = JSON.parse(fs.readFileSync(resolved, 'utf-8'));
           if (task._opsv) {
-            results.push({ task, path: resolved });
+            if (retry) {
+              const errorLog = resolved.replace(/\.json$/, '_error.log');
+              if (fs.existsSync(errorLog)) {
+                results.push({ task, path: resolved });
+              }
+              continue;
+            }
+            if (!this.shouldSkipTask(resolved, task, path.dirname(resolved))) {
+              results.push({ task, path: resolved });
+            }
           }
         } catch (err) {
           logger.warn(`Failed to parse task JSON: ${resolved}`);
@@ -187,10 +196,10 @@ export class QueueRunner {
               continue;
             }
 
-            // Skip if output already exists (non-retry mode)
+            // Skip only if manifest says approved; otherwise re-run even if output exists
             const base = entry.replace(/\.json$/, '');
             const hasOutput = Array.from(outputFiles).some((f) => f.startsWith(base + '_'));
-            if (hasOutput && !getResumeTaskId(fullPath)) {
+            if (hasOutput && !getResumeTaskId(fullPath) && this.shouldSkipTask(fullPath, task, dir)) {
               continue;
             }
             results.push({ task, path: fullPath });
@@ -200,5 +209,37 @@ export class QueueRunner {
         }
       }
     }
+  }
+
+  /**
+   * Determine if a task should be skipped based on manifest status.
+   * Returns true only if the manifest exists and the asset status is 'approved'.
+   */
+  private shouldSkipTask(taskPath: string, task: TaskJson, startDir: string): boolean {
+    const manifestAssets = this.findManifestAssets(startDir);
+    if (!manifestAssets) return false;
+    const shotId = task._opsv?.shotId;
+    if (!shotId) return false;
+    return manifestAssets[shotId]?.status === 'approved';
+  }
+
+  /**
+   * Walk up from startDir looking for _manifest.json and return its assets map.
+   */
+  private findManifestAssets(startDir: string): Record<string, { status: string }> | null {
+    let current = startDir;
+    while (current !== path.dirname(current)) {
+      const manifestPath = path.join(current, '_manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        try {
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+          return manifest.assets || null;
+        } catch {
+          return null;
+        }
+      }
+      current = path.dirname(current);
+    }
+    return null;
   }
 }
