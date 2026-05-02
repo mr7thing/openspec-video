@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.14
+# OpenSpec-Video (OpsV) v0.8.15
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -157,7 +157,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.14",
+  "version": "0.8.15",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -251,4 +251,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.8.14 | 2026-05-02*
+> *OpsV v0.8.15 | 2026-05-02*

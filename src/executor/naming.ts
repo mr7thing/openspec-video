@@ -13,6 +13,11 @@
 // ============================================================================
 
 import path from 'path';
+import fs from 'fs';
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export function deriveOutputBase(taskPath: string): string {
   return path.basename(taskPath, '.json');
@@ -32,6 +37,28 @@ export function outputFilename(taskPath: string, index: number, ext: string): st
 export function outputFilePath(taskPath: string, index: number, ext: string): string {
   const outputDir = path.dirname(taskPath);
   return path.join(outputDir, outputFilename(taskPath, index, ext));
+}
+
+/**
+ * Scan the output directory for existing files matching base_*.<ext>,
+ * and return the next available index (max existing index + 1).
+ */
+export function resolveNextOutputIndex(taskPath: string, ext: string): number {
+  const outputDir = path.dirname(taskPath);
+  const base = deriveOutputBase(taskPath);
+  const pattern = new RegExp(`^${escapeRegex(base)}_(\\d+)\\.${escapeRegex(ext)}$`);
+
+  let maxIndex = 0;
+  if (fs.existsSync(outputDir)) {
+    const entries = fs.readdirSync(outputDir);
+    for (const entry of entries) {
+      const match = entry.match(pattern);
+      if (match) {
+        maxIndex = Math.max(maxIndex, parseInt(match[1], 10));
+      }
+    }
+  }
+  return maxIndex + 1;
 }
 
 /**

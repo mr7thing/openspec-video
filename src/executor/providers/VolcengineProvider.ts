@@ -6,7 +6,7 @@
 import axios from 'axios';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
-import { outputFilePath } from '../naming';
+import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
@@ -83,10 +83,11 @@ export class VolcengineProvider {
       throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
-    // Download all images with sequential indices
+    // Download all images with sequential indices (auto-increment from existing)
     const outputPaths: string[] = [];
+    let nextIndex = resolveNextOutputIndex(taskPath, 'png');
     for (let i = 0; i < imageUrls.length; i++) {
-      const outputPath = outputFilePath(taskPath, i + 1, 'png');
+      const outputPath = outputFilePath(taskPath, nextIndex + i, 'png');
       await downloadFile(imageUrls[i], outputPath);
       outputPaths.push(outputPath);
     }
@@ -157,7 +158,7 @@ export class VolcengineProvider {
         const videoUrl = statusRes.data?.video_url || statusRes.data?.data?.video_url;
         if (!videoUrl) throw new Error('Completed but no video_url found');
 
-        const outputPath = outputFilePath(taskPath, 1, 'mp4');
+        const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
         await downloadFile(videoUrl, outputPath);
 
         appendLog(taskPath, { event: 'succeeded', task_id: requestId });

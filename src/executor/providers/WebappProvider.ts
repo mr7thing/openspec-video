@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
-import { outputFilePath } from '../naming';
+import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
 import {
@@ -42,6 +42,8 @@ export class WebappProvider {
 
       // 2. Check for resume from .log
       let taskId = getResumeTaskId(taskPath);
+      const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
+      let outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, ext), ext);
 
       if (!taskId) {
         // 3. Submit new task
@@ -49,8 +51,7 @@ export class WebappProvider {
         delete (payload as any)._opsv;
 
         // Add output_path so extension knows where to save
-        const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-        payload.output_path = outputFilePath(taskPath, 1, ext);
+        payload.output_path = outputPath;
 
         const submitRes = await axios.post(submitUrl, payload, {
           headers: { 'Content-Type': 'application/json' },
@@ -88,9 +89,6 @@ export class WebappProvider {
 
         if (status === 'succeeded' || status === 'completed') {
           appendLog(taskPath, { event: 'polling', status, task_id: taskId });
-
-          const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-          const outputPath = outputFilePath(taskPath, 1, ext);
 
           // Prefer base64 output_data, fallback to output_url
           const outputData = statusRes.data?.output_data;

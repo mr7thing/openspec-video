@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.14 (Manifest-First Architecture)
+> 当前版本：v0.8.15 (Manifest-First Architecture)
 
 ## 命令总览
 
@@ -147,7 +147,7 @@ opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ -c 3
 - 默认串行执行，写 JSONL 日志（`{jobId}.log`），失败写 `{jobId}_error.log`。
 - 完成打印摘要，自动退出。
 
-**并发控制（v0.8.14）**：
+**并发控制（v0.8.15）**：
 - 默认串行（`concurrency = 1`）。
 - 可在 `api_config.yaml` 的 model 配置中设置 `concurrency: N` 来开启单 provider 内并发。
 - CLI `--concurrency <number>` 或 `-c <number>` 可覆盖 api_config 中的配置。

@@ -5,7 +5,7 @@
 import axios from 'axios';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
-import { outputFilePath } from '../naming';
+import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
@@ -84,7 +84,7 @@ export class RunningHubProvider {
           if (!outputUrl) throw new Error('Completed but no output URL found');
 
           const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-          const outputPath = outputFilePath(taskPath, 1, ext);
+          const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, ext), ext);
           await downloadFile(outputUrl, outputPath);
 
           appendLog(taskPath, { event: 'succeeded', task_id: taskId });

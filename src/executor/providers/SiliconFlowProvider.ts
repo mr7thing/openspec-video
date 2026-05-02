@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
-import { outputFilePath } from '../naming';
+import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
@@ -77,7 +77,7 @@ export class SiliconFlowProvider {
       throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
-    const outputPath = outputFilePath(taskPath, 1, 'png');
+    const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'png'), 'png');
     await downloadFile(imageUrl, outputPath);
 
     return { taskPath, shotId, provider: 'siliconflow', success: true, outputPath };
@@ -159,7 +159,7 @@ export class SiliconFlowProvider {
         const videoUrl = statusRes.data?.results?.videos?.[0]?.url || statusRes.data?.data?.video_url;
         if (!videoUrl) throw new Error('Completed but no video_url found');
 
-        const outputPath = outputFilePath(taskPath, 1, 'mp4');
+        const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
         await downloadFile(videoUrl, outputPath);
 
         appendLog(taskPath, { event: 'succeeded', task_id: requestId });

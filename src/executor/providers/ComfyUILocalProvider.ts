@@ -5,7 +5,7 @@
 import axios from 'axios';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
-import { outputFilePath } from '../naming';
+import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
 import {
@@ -66,6 +66,7 @@ export class ComfyUILocalProvider {
         const outputs = statusRes.data?.[promptId]?.outputs;
         if (outputs) {
           const outputPaths: string[] = [];
+          let nextIndex = resolveNextOutputIndex(taskPath, 'png');
 
           for (const nodeId in outputs) {
             const nodeOutput = outputs[nodeId];
@@ -85,7 +86,7 @@ export class ComfyUILocalProvider {
                 const extMatch = media.filename.match(/\.([^.]+)$/);
                 const ext = extMatch ? extMatch[1] : 'png';
 
-                const outputPath = outputFilePath(taskPath, outputPaths.length + 1, ext);
+                const outputPath = outputFilePath(taskPath, nextIndex + outputPaths.length, ext);
                 await downloadFile(fileUrl, outputPath);
                 outputPaths.push(outputPath);
               }
