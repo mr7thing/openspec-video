@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.8.12",
+  "version": "0.8.13",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework: structured narrative specs → production-ready media via multi-provider pipeline.",
   "main": "dist/index.js",
   "bin": {

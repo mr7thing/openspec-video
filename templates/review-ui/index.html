@@ -323,6 +323,27 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
+        /* Filter Bar */
+        .filter-bar {
+            padding: 10px 16px;
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .filter-bar select, .filter-bar input {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+        }
+        .filter-bar select { min-width: 110px; cursor: pointer; }
+        .filter-bar input { flex: 1; }
+        .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -339,6 +360,12 @@
         <!-- Left Sidebar -->
         <div class="sidebar">
             <div class="sidebar-header">Documents</div>
+            <div class="filter-bar">
+                <select id="categoryFilter" onchange="applyFilters()">
+                    <option value="">All Categories</option>
+                </select>
+                <input type="text" id="searchInput" placeholder="🔍 Search..." oninput="applyFilters()">
+            </div>
             <div id="docList" style="flex:1;overflow-y:auto;">
                 <div style="padding:20px;color:var(--muted);font-size:13px;">Loading...</div>
             </div>
@@ -425,6 +452,7 @@
         const API = '';
 
         let documents = [];
+        let filteredDocuments = [];
         let selectedOutputs = new Set(); // "circle|provider|filename"
         let currentDoc = null;
         let pendingMedia = null;
@@ -433,6 +461,8 @@
             try {
                 const res = await fetch(`${API}/api/documents`);
                 documents = await res.json();
+                filteredDocuments = [...documents];
+                populateCategoryFilter();
                 document.getElementById('serverInfo').textContent = `${documents.length} document(s)`;
                 renderDocList();
             } catch (e) {
@@ -440,12 +470,38 @@
             }
         }
 
+        function populateCategoryFilter() {
+            const select = document.getElementById('categoryFilter');
+            const categories = [...new Set(documents.map(d => d.category).filter(Boolean))].sort();
+            let html = '<option value="">All Categories</option>';
+            for (const cat of categories) {
+                const count = documents.filter(d => d.category === cat).length;
+                html += `<option value="${cat}">${cat} (${count})</option>`;
+            }
+            select.innerHTML = html;
+        }
+
+        function applyFilters() {
+            const category = document.getElementById('categoryFilter').value;
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+            filteredDocuments = documents.filter(doc => {
+                const matchCategory = !category || doc.category === category;
+                const matchSearch = !query ||
+                    doc.docId.toLowerCase().includes(query) ||
+                    (doc.category && doc.category.toLowerCase().includes(query));
+                return matchCategory && matchSearch;
+            });
+
+            renderDocList();
+        }
+
         function renderDocList() {
             const list = document.getElementById('docList');
 
             // Group by category
             const groups = {};
-            for (const doc of documents) {
+            for (const doc of filteredDocuments) {
                 if (!groups[doc.category]) groups[doc.category] = [];
                 groups[doc.category].push(doc);
             }
@@ -463,7 +519,7 @@
                                 <div class="doc-item ${currentDoc && currentDoc.docId === doc.docId ? 'active' : ''}"
                                      onclick="selectDoc(event, '${doc.circle}', '${doc.docId}')">
                                     <span class="doc-id">
-                                        <span class="status-dot drafting"></span>
+                                        <span class="status-dot ${doc.status || 'drafting'}"></span>
                                         ${doc.docId}
                                     </span>
                                     <span class="doc-meta">
@@ -476,8 +532,8 @@
                 `;
             }
 
-            if (documents.length === 0) {
-                html = '<div style="padding:20px;color:var(--muted);font-size:13px;">No documents found. Run "opsv circle create" first.</div>';
+            if (filteredDocuments.length === 0) {
+                html = '<div style="padding:20px;color:var(--muted);font-size:13px;">No documents match the current filters.</div>';
             }
 
             list.innerHTML = html;

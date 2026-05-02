@@ -1,7 +1,7 @@
 // ============================================================================
-// OpsV v0.8.11 — opsv review
-// Scans *.circleN/ directories, reads/writes _manifest.json assets
-// UI served from templates/review-ui/
+// OpsV v0.8.13 — opsv review
+// Supports --circle mode: manifest-driven review with zero hardcoded paths
+// Legacy mode (no --circle) preserves original behavior
 // ============================================================================
 
 import { Command } from 'commander';
@@ -19,8 +19,9 @@ export function registerReviewCommand(program: Command): void {
     .command('review')
     .description('Start visual review server')
     .option('--port <number>', 'Server port', '3100')
-    .option('--latest', 'Show only latest circle outputs')
-    .option('--all', 'Show all circle outputs')
+    .option('--circle [path]', 'Run in manifest-driven mode. Auto-discovers latest manifest if no path given. Accepts circle dir or manifest file path.')
+    .option('--latest', 'Show only latest circle outputs (legacy mode)')
+    .option('--all', 'Show all circle outputs (legacy mode)')
     .option('--ttl <seconds>', 'Auto-shutdown after idle seconds (default: 900)', '900')
     .action(async (options: any) => {
       try {
@@ -36,13 +37,29 @@ export function registerReviewCommand(program: Command): void {
         const port = parseInt(options.port, 10);
         const ttl = parseInt(options.ttl, 10);
 
+        // Resolve manifest for --circle mode
+        const circleMode = options.circle !== undefined;
+        const manifestInfo = circleMode
+          ? resolveManifestPath(projectRoot, options.circle === true ? undefined : options.circle)
+          : null;
+
+        if (circleMode && !manifestInfo) {
+          console.error(chalk.red('No manifest found. Run "opsv circle create" first.'));
+          process.exit(1);
+        }
+
+        if (circleMode && manifestInfo) {
+          const manifest = JSON.parse(fs.readFileSync(manifestInfo.manifestPath, 'utf-8'));
+          const assetCount = Object.keys(manifest.assets || {}).length;
+          console.log(chalk.cyan(`Manifest-driven mode: ${manifestInfo.circleName} (${assetCount} assets, target: ${manifest.target || 'videospec'})`));
+        }
+
         // Auto-commit pending changes before review
         try {
           execSync('git add -A', { cwd: projectRoot, stdio: 'ignore' });
           const diff = execSync('git diff --cached --quiet', { cwd: projectRoot, encoding: 'utf-8', stdio: 'pipe' });
-          void diff; // suppress unused warning
+          void diff;
         } catch {
-          // diff returns non-zero when there are staged changes
           try {
             const timestamp = new Date().toISOString();
             execSync(`git commit -m "pre-review checkpoint: ${timestamp}"`, { cwd: projectRoot, stdio: 'ignore' });
@@ -54,26 +71,62 @@ export function registerReviewCommand(program: Command): void {
 
         const app = express();
 
-        // API: List documents (scans videospec/elements and videospec/scenes)
+        // API: List documents
         app.get('/api/documents', (_req, res) => {
-          const documents = scanDocuments(projectRoot, queueRoot);
-          res.json(documents);
+          if (circleMode && manifestInfo) {
+            const docs = scanDocumentsFromManifest(
+              manifestInfo.manifestPath,
+              manifestInfo.circleDir,
+              manifestInfo.circleName,
+              projectRoot
+            );
+            res.json(docs);
+          } else {
+            res.json(scanDocuments(projectRoot, queueRoot));
+          }
         });
 
         // API: Get document content
         app.get('/api/documents/:circle/:docId', (req, res) => {
           const { circle, docId } = req.params;
-          const doc = findDocument(projectRoot, circle, docId);
-          if (!doc) {
-            return res.status(404).json({ error: 'Document not found' });
+
+          if (circleMode && manifestInfo) {
+            const doc = findDocumentFromManifest(
+              manifestInfo.manifestPath,
+              manifestInfo.circleDir,
+              manifestInfo.circleName,
+              projectRoot,
+              docId
+            );
+            if (!doc) {
+              return res.status(404).json({ error: 'Document not found' });
+            }
+            res.json(doc);
+          } else {
+            const doc = findDocument(projectRoot, circle, docId);
+            if (!doc) {
+              return res.status(404).json({ error: 'Document not found' });
+            }
+            res.json(doc);
           }
-          res.json(doc);
         });
 
-        // API: List circle directories
+        // API: List circles
         app.get('/api/circles', (_req, res) => {
-          const circles = scanCircles(queueRoot, options);
-          res.json(circles);
+          if (circleMode && manifestInfo) {
+            const manifest = JSON.parse(fs.readFileSync(manifestInfo.manifestPath, 'utf-8'));
+            const assets = manifest.assets || {};
+            const assetCount = Object.keys(assets).length;
+            const layers = new Set(Object.values(assets).map((a: any) => a.layer));
+            res.json([{
+              name: manifestInfo.circleName,
+              target: manifest.target || '',
+              assetCount,
+              layers: layers.size,
+            }]);
+          } else {
+            res.json(scanCircles(queueRoot, options));
+          }
         });
 
         // API: Get assets for a circle directory
@@ -88,7 +141,6 @@ export function registerReviewCommand(program: Command): void {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
           const assetsMap: Record<string, any> = manifest.assets || {};
 
-          // Enrich with output files
           const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
             const outputs: string[] = [];
             const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_'));
@@ -99,14 +151,14 @@ export function registerReviewCommand(program: Command): void {
 
               const files = fs.readdirSync(providerPath);
               const matches = files.filter(
-                (f) => f.startsWith(id) && !f.endsWith('.json')
+                (f) => f.startsWith(id) && !f.endsWith('.json') && !f.endsWith('.log')
               );
               for (const f of matches) {
                 outputs.push(path.join(providerDir, f));
               }
             }
 
-            return { id, status: info.status, layer: info.layer, outputs };
+            return { id, status: info.status, layer: info.layer, category: info.category, outputs };
           });
 
           res.json({ circle: req.params.name, assets: enriched });
@@ -122,7 +174,7 @@ export function registerReviewCommand(program: Command): void {
           }
         });
 
-        // Approve endpoint
+        // Approve endpoint — unified: reads manifest for target, uses findAssetFilePathUnder
         app.post('/api/approve/:circle/:assetId', express.json(), async (req, res) => {
           const { circle, assetId } = req.params;
           const { outputFile, taskJsonPath } = req.body || {};
@@ -130,7 +182,6 @@ export function registerReviewCommand(program: Command): void {
           try {
             const now = new Date().toISOString();
 
-            // Determine approval status from output filename convention
             const parsed = outputFile ? parseOutputFilename(outputFile) : { isModified: false };
             const newStatus = parsed.isModified ? 'syncing' : 'approved';
 
@@ -139,33 +190,20 @@ export function registerReviewCommand(program: Command): void {
               reviewEntry += ` | modified_task: ${taskJsonPath}`;
             }
 
-            // Read manifest to get target for source document lookup
+            // Read circle manifest to get target for source document lookup
             const circleDir = path.join(queueRoot, circle);
-            const manifestPath = path.join(circleDir, '_manifest.json');
-            let manifestTarget = 'videospec'; // default
+            const circleManifestPath = path.join(circleDir, '_manifest.json');
+            let targetRoot = path.join(projectRoot, 'videospec');
 
-            if (fs.existsSync(manifestPath)) {
-              const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-              manifestTarget = manifest.target || 'videospec';
-            }
-
-            // Build source document search paths from manifest.target
-            const targetRoot = path.join(process.cwd(), manifestTarget);
-            const elementsDir = path.join(targetRoot, 'elements');
-            const scenesDir = path.join(targetRoot, 'scenes');
-            let sourceDocPath: string | null = null;
-
-            for (const dir of [elementsDir, scenesDir]) {
-              if (!fs.existsSync(dir)) continue;
-              for (const prefix of ['@', '']) {
-                const p = path.join(dir, `${prefix}${assetId}.md`);
-                if (fs.existsSync(p)) {
-                  sourceDocPath = p;
-                  break;
-                }
+            if (fs.existsSync(circleManifestPath)) {
+              const manifest = JSON.parse(fs.readFileSync(circleManifestPath, 'utf-8'));
+              if (manifest.target) {
+                targetRoot = path.resolve(projectRoot, manifest.target);
               }
-              if (sourceDocPath) break;
             }
+
+            // Find source document using manifest.target (no hardcoded subdirs)
+            const sourceDocPath = findAssetFilePathUnder(targetRoot, assetId);
 
             if (sourceDocPath) {
               const content = fs.readFileSync(sourceDocPath, 'utf-8');
@@ -175,18 +213,17 @@ export function registerReviewCommand(program: Command): void {
             }
 
             // Update _manifest.json assets field
-            if (fs.existsSync(manifestPath)) {
-              const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+            if (fs.existsSync(circleManifestPath)) {
+              const manifest = JSON.parse(fs.readFileSync(circleManifestPath, 'utf-8'));
               if (manifest.assets && manifest.assets[assetId]) {
                 manifest.assets[assetId].status = newStatus;
               }
-              // Also update circles[].status for backward compatibility
               for (const c of manifest.circles || []) {
                 if (c.status && c.status[assetId]) {
                   c.status[assetId] = newStatus;
                 }
               }
-              fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+              fs.writeFileSync(circleManifestPath, JSON.stringify(manifest, null, 2));
             }
 
             const note = parsed.isModified
@@ -247,6 +284,105 @@ export function registerReviewCommand(program: Command): void {
     });
 }
 
+// ============================================================================
+// Manifest resolution
+// ============================================================================
+
+interface ManifestInfo {
+  manifestPath: string;
+  circleDir: string;
+  circleName: string;
+}
+
+function resolveManifestPath(projectRoot: string, circleOption?: string): ManifestInfo | null {
+  const queueRoot = path.join(projectRoot, 'opsv-queue');
+
+  if (circleOption) {
+    const resolved = path.resolve(circleOption);
+
+    // Case 1: direct manifest file path
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isFile() && resolved.endsWith('_manifest.json')) {
+      const circleDir = path.dirname(resolved);
+      return { manifestPath: resolved, circleDir, circleName: path.basename(circleDir) };
+    }
+
+    // Case 2: circle directory path
+    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+      const manifestPath = path.join(resolved, '_manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        return { manifestPath, circleDir: resolved, circleName: path.basename(resolved) };
+      }
+    }
+
+    // Case 3: relative to queueRoot
+    const relPath = path.join(queueRoot, circleOption);
+    if (fs.existsSync(relPath) && fs.statSync(relPath).isDirectory()) {
+      const manifestPath = path.join(relPath, '_manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        return { manifestPath, circleDir: relPath, circleName: path.basename(relPath) };
+      }
+    }
+
+    return null;
+  }
+
+  // Auto-discover latest manifest by generatedAt
+  if (!fs.existsSync(queueRoot)) return null;
+
+  let latest: { path: string; generatedAt: string; circleDir: string; circleName: string } | null = null;
+
+  const entries = fs.readdirSync(queueRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory() && /\.circle\d+$/.test(entry.name)) {
+      const mp = path.join(queueRoot, entry.name, '_manifest.json');
+      if (fs.existsSync(mp)) {
+        const data = JSON.parse(fs.readFileSync(mp, 'utf-8'));
+        const ts = data.generatedAt || '1970-01-01T00:00:00.000Z';
+        if (!latest || ts > latest.generatedAt) {
+          latest = { path: mp, generatedAt: ts, circleDir: path.join(queueRoot, entry.name), circleName: entry.name };
+        }
+      }
+    }
+  }
+
+  return latest
+    ? { manifestPath: latest.path, circleDir: latest.circleDir, circleName: latest.circleName }
+    : null;
+}
+
+// ============================================================================
+// Generic asset file path resolver (no hardcoded subdirs)
+// ============================================================================
+
+function findAssetFilePathUnder(targetRoot: string, assetId: string): string | undefined {
+  const prefixes = ['@', ''];
+
+  // Check targetRoot itself
+  for (const prefix of prefixes) {
+    const p = path.join(targetRoot, `${prefix}${assetId}.md`);
+    if (fs.existsSync(p)) return p;
+  }
+
+  // Scan all subdirectories under targetRoot
+  if (fs.existsSync(targetRoot)) {
+    const entries = fs.readdirSync(targetRoot, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        for (const prefix of prefixes) {
+          const p = path.join(targetRoot, entry.name, `${prefix}${assetId}.md`);
+          if (fs.existsSync(p)) return p;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+// ============================================================================
+// Legacy mode helpers (unchanged logic, preserved for backward compatibility)
+// ============================================================================
+
 function scanCircles(queueRoot: string, options: any): any[] {
   const circles: any[] = [];
 
@@ -285,12 +421,13 @@ interface DocumentInfo {
   docPath: string;
   circle: string;
   category: string;
+  status: string;
   content?: string;
   outputs: Array<{ circle: string; provider: string; filename: string; path: string }>;
 }
 
 /**
- * Scan videospec/ and all its subdirectories for .md documents,
+ * Legacy: Scan videospec/ and all its subdirectories for .md documents,
  * then find all outputs across all circles that belong to each document.
  */
 function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
@@ -299,7 +436,6 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
 
   if (!fs.existsSync(targetDir)) return docs;
 
-  // Read manifests from all circles to build output index
   const outputIndex: Record<string, Array<{ circle: string; provider: string; filename: string }>> = {};
 
   if (fs.existsSync(queueRoot)) {
@@ -312,8 +448,6 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
 
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
       const manifestTarget = manifest.target || 'videospec';
-
-      // Map circle name to its target (e.g. "scenes.circle1" -> "videospec/scenes")
       const circleTarget = manifestTarget.replace(/^videospec\/?/, '');
 
       const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_'));
@@ -321,9 +455,8 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
         const providerPath = path.join(circlePath, providerDir);
         if (!fs.statSync(providerPath).isDirectory()) continue;
 
-        const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json'));
+        const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json') && !f.endsWith('.log'));
         for (const file of files) {
-          // Extract docId from filename: "hero_01.png" -> "hero"
           const docId = file.replace(/(_\d+)+(\.[^.]+)$/, '');
           const key = `${circleTarget}/${docId}`;
           if (!outputIndex[key]) outputIndex[key] = [];
@@ -333,7 +466,6 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
     }
   }
 
-  // Scan all subdirectories under videospec/
   const subdirs = fs.readdirSync(targetDir, { withFileTypes: true });
   for (const subdir of subdirs) {
     if (!subdir.isDirectory()) continue;
@@ -350,6 +482,7 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
         docPath: path.join(dirPath, file),
         circle: categoryPath,
         category: categoryPath,
+        status: 'drafting',
         outputs: (outputIndex[key] || []).map((o) => ({
           circle: o.circle,
           provider: o.provider,
@@ -365,15 +498,82 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
   return docs;
 }
 
-/**
- * Find a specific document by circle/category and docId.
- */
 function findDocument(projectRoot: string, circle: string, docId: string): DocumentInfo | null {
   const docs = scanDocuments(projectRoot, path.join(projectRoot, 'opsv-queue'));
   const doc = docs.find((d) => d.circle === circle && d.docId === docId);
   if (!doc) return null;
 
-  // Read markdown content
+  if (fs.existsSync(doc.docPath)) {
+    doc.content = fs.readFileSync(doc.docPath, 'utf-8');
+  }
+  return doc;
+}
+
+// ============================================================================
+// Manifest-driven helpers (--circle mode)
+// ============================================================================
+
+function scanDocumentsFromManifest(
+  manifestPath: string,
+  circleDir: string,
+  circleName: string,
+  projectRoot: string
+): DocumentInfo[] {
+  if (!fs.existsSync(manifestPath)) return [];
+
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  const assetsMap: Record<string, any> = manifest.assets || {};
+  const targetRoot = path.resolve(projectRoot, manifest.target || 'videospec');
+
+  const docs: DocumentInfo[] = [];
+
+  for (const [id, info] of Object.entries(assetsMap)) {
+    const docPath = findAssetFilePathUnder(targetRoot, id);
+    if (!docPath) continue;
+
+    const outputs: Array<{ circle: string; provider: string; filename: string; path: string }> = [];
+    const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_'));
+
+    for (const providerDir of dirs) {
+      const providerPath = path.join(circleDir, providerDir);
+      if (!fs.statSync(providerPath).isDirectory()) continue;
+
+      const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json') && !f.endsWith('.log'));
+      const matches = files.filter((f) => f.startsWith(id));
+      for (const f of matches) {
+        outputs.push({
+          circle: circleName,
+          provider: providerDir,
+          filename: f,
+          path: path.join(circleName, providerDir, f),
+        });
+      }
+    }
+
+    docs.push({
+      docId: id,
+      docPath,
+      circle: circleName,
+      category: (info as any).category || 'other',
+      status: (info as any).status || 'drafting',
+      outputs,
+    });
+  }
+
+  return docs;
+}
+
+function findDocumentFromManifest(
+  manifestPath: string,
+  circleDir: string,
+  circleName: string,
+  projectRoot: string,
+  docId: string
+): DocumentInfo | null {
+  const docs = scanDocumentsFromManifest(manifestPath, circleDir, circleName, projectRoot);
+  const doc = docs.find((d) => d.docId === docId);
+  if (!doc) return null;
+
   if (fs.existsSync(doc.docPath)) {
     doc.content = fs.readFileSync(doc.docPath, 'utf-8');
   }

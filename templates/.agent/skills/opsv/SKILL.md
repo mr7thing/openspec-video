@@ -176,6 +176,48 @@ refs:
 | **Runner-Agent** | 任务生成、编译执行、物理渲染、产物归档 | `ops-workflow.md` |
 | **Guardian-Agent** | 文档校验、审查把关、状态同步、质量守卫 | `ops-workflow.md` |
 
+## Frontmatter 格式规范
+
+**⚠️ 关键约束：`---` 分隔符必须是文件第一行**
+
+OpsV 的 `FrontmatterParser` 要求 YAML frontmatter 的 `---` 开始符必须出现在文件的第一行。文件开头的任何 Markdown 注释、标题、或空行都会导致解析失败。
+
+**正确格式**：
+```markdown
+---
+category: shot-production
+status: drafting
+title: Shot 01
+duration: "5s"
+first_frame: "/path/to/shot_01_1.png"
+refs:
+  - scene_lab
+  - hero
+visual_detailed: |
+  场景描述文字...
+---
+
+正文从此处开始...
+```
+
+**错误格式（常见）**：
+```markdown
+# Shot Title
+> 描述文字
+
+---
+category: shot-production
+# --- 必须在这里（即第一行），不能有任何前置内容
+```
+
+**Shot 文档结构**：
+- 每个 shot 是独立 `.md` 文件，拥有自己的 frontmatter
+- frontmatter 必填字段：`category`、`status`
+- Shot 特定字段：`duration`、`first_frame`、`last_frame`、`frame_ref`
+- Prompt 取值优先级：`prompt_en` → `visual_detailed` → `visual_brief` → body 第一段
+- `refs` 数组中的 `@assetId` 或 `@assetId:variant` 引用会在 body 中解析
+- `@FRAME:shotId_type` 只用于 body 的 `refs` 数组，不用于 frontmatter 字段
+
 ## 关键工作流命令
 
 ```bash
