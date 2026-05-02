@@ -192,9 +192,9 @@ models:
     provider: comfyuilocal
     type: comfy
     model: workflow
-    api_url: http://127.0.0.1:8188/prompt
+    api_url: http://127.0.0.1:8188/
     defaults:
-      templateDir: ""
+      templateDir: "comfyui_workflow_templates"
 
   # ==========================================
   # RunningHub (ComfyUI Cloud)
