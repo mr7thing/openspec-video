@@ -204,16 +204,52 @@ models:
       templateDir: "comfyui_workflow_templates"
 
   # ==========================================
-  # RunningHub (ComfyUI Cloud)
+  # RunningHub (ComfyUI Cloud) — v2 API
+  # 文档: https://www.runninghub.cn/runninghub-api-doc-cn/api-276613249
+  # 文件上传: https://www.runninghub.cn/runninghub-api-doc-cn/api-425749007
+  #
+  # 不再使用本地 workflow JSON 文件。通过 node_mappings 将 OpsV 参数
+  # 直接映射到 RunningHub 的 nodeId + fieldName。
+  # 可用 opsv comfy-node-mapping <workflow.json> 自动发现节点映射。
   # ==========================================
   runninghub.default:
     provider: runninghub
     type: comfy
-    model: workflow
-    api_url: https://www.runninghub.cn/task/openapi/comfyui/post
+    workflowId: "your-workflow-id-here"
+    api_url: https://www.runninghub.cn/task/openapi/create
     api_status_url: https://www.runninghub.cn/task/openapi/comfyui/status
     required_env:
       - RUNNINGHUB_API_KEY
+    supports_first_image: true
+    supports_reference_images: true
+    max_reference_images: 4
+    node_mappings:
+      # 提示词节点 (通常是 CLIPTextEncode)
+      prompt:
+        nodeId: "6"
+        fieldName: "text"
+      # 负向提示词节点
+      negative_prompt:
+        nodeId: "7"
+        fieldName: "text"
+      # 参考图片节点 (LoadImage)
+      image1:
+        nodeId: "10"
+        fieldName: "image"
+      # 首帧/尾帧 (视频工作流)
+      # first_frame:
+      #   nodeId: "15"
+      #   fieldName: "image"
+      # 其他自定义参数直接按 key 映射
+      # seed:
+      #   nodeId: "3"
+      #   fieldName: "seed"
+    defaults:
+      addMetadata: true
+      instanceType: ""
+      usePersonalQueue: false
+      retainSeconds: null
+      accessPassword: null
 
   # ==========================================
   # Web App 浏览器自动化

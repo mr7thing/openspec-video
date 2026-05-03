@@ -60,6 +60,13 @@ export class SiliconFlowProvider {
     const payload = { ...task };
     delete (payload as any)._opsv;
 
+    // Convert local reference image paths to base64 data URIs
+    if (Array.isArray(payload.reference_images)) {
+      payload.reference_images = await Promise.all(
+        payload.reference_images.map((url: string) => this.resolveImageField(url))
+      );
+    }
+
     const response = await axios.post(apiUrl, payload, {
       headers: {
         Authorization: `Bearer ${apiKey}`,

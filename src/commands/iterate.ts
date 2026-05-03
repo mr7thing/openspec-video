@@ -85,7 +85,7 @@ async function iterateDirectory(dirPath: string): Promise<void> {
   const sourceName = path.basename(dirPath);
   const baseName = resolveDirBase(sourceName);
   const nextSeq = findNextDirSeq(parentDir, baseName);
-  const destName = `${baseName}_it_${String(nextSeq).padStart(3, '0')}`;
+  const destName = `${baseName}_${nextSeq}`;
   const destPath = path.join(parentDir, destName);
 
   fs.mkdirSync(destPath, { recursive: true });
@@ -133,28 +133,28 @@ async function iterateDirectory(dirPath: string): Promise<void> {
 
 function resolveTaskBase(filename: string): string {
   const name = filename.replace(/\.json$/, '');
-  // Strip trailing _N where N >= 2
+  // Strip trailing _N where N >= 1 (always trace back to the original base)
   const match = name.match(/^(.*)_(\d+)$/);
-  if (match && parseInt(match[2], 10) >= 2) {
+  if (match && parseInt(match[2], 10) >= 1) {
     return match[1];
   }
   return name;
 }
 
 function resolveDirBase(dirName: string): string {
-  // Strip trailing _it_NNN where NNN >= 1
-  const match = dirName.match(/^(.*)_it_(\d{3})$/);
-  if (match) {
+  // Strip trailing _N where N >= 1 (always trace back to the original base)
+  const match = dirName.match(/^(.*)_(\d+)$/);
+  if (match && parseInt(match[2], 10) >= 1) {
     return match[1];
   }
   return dirName;
 }
 
 function findNextTaskSeq(dir: string, base: string): number {
-  if (!fs.existsSync(dir)) return 2;
+  if (!fs.existsSync(dir)) return 1;
   const entries = fs.readdirSync(dir);
   const pattern = new RegExp(`^${escapeRegex(base)}_(\\d+)\\.json$`);
-  let maxN = 1;
+  let maxN = 0;
   for (const e of entries) {
     const m = e.match(pattern);
     if (m) {
@@ -167,7 +167,7 @@ function findNextTaskSeq(dir: string, base: string): number {
 function findNextDirSeq(parentDir: string, sourceName: string): number {
   if (!fs.existsSync(parentDir)) return 1;
   const entries = fs.readdirSync(parentDir, { withFileTypes: true });
-  const pattern = new RegExp(`^${escapeRegex(sourceName)}_it_(\\d{3})$`);
+  const pattern = new RegExp(`^${escapeRegex(sourceName)}_(\\d+)$`);
   let maxN = 0;
   for (const e of entries) {
     if (!e.isDirectory()) continue;

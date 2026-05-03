@@ -22,7 +22,7 @@ export interface PromptPayload {
   camera?: { type: string; motion: string };
   duration?: string;
   frame_ref?: FrameRef;
-  extra?: { media_refs: string[] };
+  extra?: { media_refs: string[]; [key: string]: any };
 }
 
 export interface Job {
@@ -54,6 +54,7 @@ export interface TaskJson {
     api_url: string;
     api_status_url?: string;
     references?: string[];
+    workflowId?: string;
     workflowFile?: string;
     compiledAt: string;
   };

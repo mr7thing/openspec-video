@@ -3,6 +3,8 @@
 // ============================================================================
 
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
@@ -50,12 +52,27 @@ export class MinimaxProvider {
     }
   }
 
+  private async resolveImageField(value: string): Promise<string> {
+    if (!value) return value;
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    // Local file path — convert to base64 data URI
+    const data = fs.readFileSync(value);
+    const ext = path.extname(value).slice(1) || 'png';
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+    return `data:${mime};base64,${data.toString('base64')}`;
+  }
+
   private async executeImage(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
     const apiUrl = task._opsv.api_url;
     const shotId = task._opsv.shotId;
 
     const payload = { ...task };
     delete (payload as any)._opsv;
+
+    // Convert local reference image path to base64 data URI
+    if (payload.reference_image) {
+      payload.reference_image = await this.resolveImageField(payload.reference_image);
+    }
 
     const response = await axios.post(apiUrl, payload, {
       headers: {

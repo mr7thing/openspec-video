@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8.15 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.16 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.15)
+# OpsV 框架规范 (v0.8.16)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -242,7 +242,11 @@ opsv animate --model volcengine.seedance-2.0
 # 选项: --manifest, --file, --category, --status-skip, --dry-run
 
 # ComfyUI 工作流编译
-opsv comfy --model runninghub.flux-schnell
+opsv comfy --model comfylocal.klein9b    # 本地 ComfyUI（使用 workflow JSON 模板）
+opsv comfy --model runninghub.default     # RunningHub 云端（使用 node_mappings）
+
+# 生成 node_mappings（RunningHub / ComfyUI 配置辅助）
+opsv comfy-node-mapping my_workflow.json -o mappings.json
 
 # WebApp 生成（新增）
 opsv webapp --model <provider.model>

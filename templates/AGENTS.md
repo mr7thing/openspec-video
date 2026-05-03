@@ -76,14 +76,28 @@ opsv run opsv-queue/videospec.circle2/volcengine.seedance2_001/shot_01.json
 
 ### ComfyUI 工作流
 
+**ComfyUI Local**（本地）：
 ```bash
 # 编译 ComfyUI 任务
-opsv comfy --model comfyui.sdxl --dry-run
-opsv comfy --model comfyui.sdxl --workflow ref2          # 指定 workflow
-opsv comfy --model comfyui.sdxl --workflow-dir workflows/sdxl/  # 指定 workflow 目录
+opsv comfy --model comfylocal.klein9b --dry-run
+opsv comfy --model comfylocal.klein9b --workflow ref2
+opsv comfy --model comfylocal.klein9b --workflow-dir workflows/sdxl/
 
 # 执行
-opsv run opsv-queue/videospec.circle2/comfy.sdxl_001/shot_02.json
+opsv run opsv-queue/videospec.circle2/comfylocal.klein9b_001/shot_02.json
+```
+
+**RunningHub**（云端，v0.8.16+）：不再使用本地 workflow JSON，通过 `node_mappings` 映射参数。
+```bash
+# 1. 在 ComfyUI 中将节点标题改为 opsv-prompt, opsv-image1 等
+# 2. 导出 API 格式 JSON
+# 3. 生成 node_mappings
+opsv comfy-node-mapping my_workflow.json -o mappings.json
+
+# 4. 将 mappings.json 内容粘贴到 api_config.yaml 的 node_mappings 下
+# 5. 编译并执行
+opsv comfy --model runninghub.default --dry-run
+opsv run opsv-queue/videospec.circle2/runninghub.default_001/
 ```
 
 ### 浏览器自动化
@@ -104,6 +118,7 @@ opsv app --model browser.chrome
 | `opsv imagen` | 编译图像任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
 | `opsv animate` | 编译视频任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
 | `opsv comfy` | 编译 ComfyUI 任务为可执行 `.json` | `--model <m>`, `--workflow`, `--workflow-dir`, `--param`, `--dry-run` |
+| `opsv comfy-node-mapping` | 从 workflow JSON 提取 node_mappings | `<workflow-file>`, `--output`, `--prefix` |
 | `opsv audio` | 编译音频任务（规划中，占位） | `--model <m>` |
 | `opsv webapp` | 浏览器自动化 | `--model <m>` |
 | `opsv run` | 执行编译后的任务 `.json` | `<paths...>`, `--retry`, `--dry-run` |

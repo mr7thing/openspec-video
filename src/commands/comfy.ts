@@ -116,7 +116,7 @@ export function registerComfyCommand(program: Command): void {
         if (options.dryRun) {
           console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));
           for (const task of results) {
-            const wf = task._opsv?.workflowFile || '?';
+            const wf = task._opsv?.workflowId || task._opsv?.workflowFile || '?';
             console.log(`  ${task._opsv.shotId} (workflow: ${wf})`);
           }
         } else {

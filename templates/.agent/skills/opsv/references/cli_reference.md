@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.15 (Manifest-First Architecture)
+> 当前版本：v0.8.16 (RunningHub v2 API + Node Mapping)
 
 ## 命令总览
 
@@ -13,6 +13,7 @@
 | `opsv imagen --model` | 编译文档为图像任务，直接产出可执行 `.json` | 图像管线 |
 | `opsv animate --model` | 编译 Shotlist 为视频任务，直接产出可执行 `.json` | 视频管线 |
 | `opsv comfy --model` | ComfyUI 工作流编译与执行 | 自定义管线 |
+| `opsv comfy-node-mapping` | 从 ComfyUI workflow JSON 提取 node_mappings | 配置辅助 |
 | `opsv audio --model` | 音频生成（规划中） | 音频管线 |
 | `opsv webapp --model` | WebApp 浏览器自动化 | 应用管线 |
 | `opsv run <paths...>` | 按路径引用执行渲染任务 | 执行 |
@@ -88,15 +89,47 @@ opsv animate --model volcengine.seedance --dry-run
 **endcircle 条件**：`endcircle` 仅在最终层包含 `shotlist.md` 时使用。
 
 ### opsv comfy
-ComfyUI 工作流编译为任务描述 JSON（inputs/outputs），带 `--model` 时直接产出可执行文件。
+ComfyUI 工作流编译为任务描述 JSON，带 `--model` 时直接产出可执行文件。
 
 ```bash
-opsv comfy --model runninghub.flux-schnell
+# ComfyUI Local（本地工作流）
+opsv comfy --model comfylocal.klein9b
+
+# RunningHub（云端 ComfyUI）— v2 API，不再使用本地 workflow JSON
+opsv comfy --model runninghub.default
 ```
 
-- 产出可执行任务 JSON，包含 inputs/outputs 声明
-- Agent 从 `.agent/skills/` 找到对应 workflow，复制到 Provider 目录，注入变量
-- ComfyUI Local 和 RunningHub 都是 `type: comfy`，只是 provider 不同
+**ComfyUI Local**：加载本地 `templateDir` 下的 workflow JSON 模板（`ref0.json`, `ref1.json`…），按参考图数量自动匹配，注入参数后输出完整 ComfyUI 任务 JSON。
+
+**RunningHub (v0.8.16+)**：不再加载本地 workflow JSON。通过 `api_config.yaml` 中的 `node_mappings` 将 OpsV 参数直接映射到 RH 的 `nodeId + fieldName`，输出标准 RH 格式 `{workflowId, nodeInfoList[]}`。任务完成后自动下载结果文件 + 原始 ComfyUI workflow JSON。
+
+**通用选项**：
+- `--workflow <file>`：指定 workflow 文件（ComfyUI Local 适用）
+- `--workflow-dir <dir>`：指定 workflow 模板目录
+- `--param <json>`：覆盖 workflow 参数
+- `--dry-run`：预览模式
+
+### opsv comfy-node-mapping
+分析 ComfyUI API 格式 workflow JSON，提取 title 以 `opsv-` 为前缀的节点，生成可直接用于 `api_config.yaml` 的 `node_mappings`。
+
+```bash
+# 输出到终端
+opsv comfy-node-mapping my_workflow.json
+
+# 保存到文件
+opsv comfy-node-mapping my_workflow.json -o node_mappings.json
+
+# 使用自定义前缀
+opsv comfy-node-mapping my_workflow.json --prefix rh-
+```
+
+**使用流程**：
+1. 在 ComfyUI 中右键节点 → **Title**，将需要外部控制的节点重命名为 `opsv-prompt`、`opsv-image1`、`opsv-negative_prompt` 等
+2. 导出 API 格式 JSON（Save → API format）
+3. 运行 `opsv comfy-node-mapping workflow.json`
+4. 将输出的 JSON 复制到 `api_config.yaml` 的 `node_mappings:` 下
+
+**fieldName 推断优先级**：`text` → `image` → `video` → `audio` → `seed` → `width` → `height` → 第一个输入字段。
 
 ### opsv audio
 音频生成（规划中）。

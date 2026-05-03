@@ -34,6 +34,8 @@ export interface ModelConfig {
   supports_audio?: boolean;
   supports_video_ref?: boolean;
   concurrency?: number;
+  workflowId?: string;
+  node_mappings?: Record<string, { nodeId: string; fieldName: string }>;
 }
 
 export interface ApiConfig {
