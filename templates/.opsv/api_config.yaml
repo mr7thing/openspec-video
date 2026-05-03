@@ -53,17 +53,8 @@ models:
     provider: volcengine
     type: video
     model: doubao-seedance-2-0-260128
-    api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
-    api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
-    docs_url: https://www.volcengine.com/docs/82379/2291680
-    required_env:
-
-  volc.seedance2:
-    provider: volcengine
-    type: video
-    model: doubao-seedance-2-0-260128
-    api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
-    api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
     docs_url: https://www.volcengine.com/docs/82379/2291680
     required_env:
       - ARK_API_KEY
@@ -71,6 +62,10 @@ models:
     supports_last_image: true
     supports_reference_images: true
     max_reference_images: 9
+    supports_reference_videos: true
+    max_reference_videos: 3
+    supports_reference_audios: true
+    max_reference_audios: 1
     defaults:
       ratio: "16:9"
       duration: 5
@@ -81,14 +76,19 @@ models:
     provider: volcengine
     type: video
     model: doubao-seedance-2-0-fast-260128
-    api_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
-    api_status_url: https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks
+    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
     docs_url: https://www.volcengine.com/docs/82379/2291680
     required_env:
       - ARK_API_KEY
     supports_first_image: true
+    supports_last_image: true
     supports_reference_images: true
     max_reference_images: 9
+    supports_reference_videos: true
+    max_reference_videos: 3
+    supports_reference_audios: true
+    max_reference_audios: 1
     defaults:
       ratio: "16:9"
       duration: 5

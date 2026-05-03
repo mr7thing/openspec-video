@@ -135,10 +135,24 @@ async function buildVideoJob(
 
   let referenceImages: string[] = [];
   if (frontmatter.refs && frontmatter.refs.length > 0) {
-    const refs = await refResolver.parseAll(body);
-    referenceImages = refs
-      .filter((r) => r.resolvedImagePath)
-      .map((r) => r.resolvedImagePath!);
+    // Check if refs are direct paths (start with . or /) or @asset references
+    const directPaths = frontmatter.refs.filter((r: string) => r.startsWith('.') || r.startsWith('/'));
+    const assetRefs = frontmatter.refs.filter((r: string) => !r.startsWith('.') && !r.startsWith('/'));
+
+    // Resolve direct paths relative to the shotlist file
+    for (const refPath of directPaths) {
+      const resolved = resolveFrameRef(filePath, refPath);
+      if (resolved) referenceImages.push(resolved);
+    }
+
+    // Parse @asset references from body
+    if (assetRefs.length > 0 || body.includes('@')) {
+      const refs = await refResolver.parseAll(body);
+      referenceImages = [
+        ...referenceImages,
+        ...refs.filter((r) => r.resolvedImagePath).map((r) => r.resolvedImagePath!),
+      ];
+    }
   }
 
   // Load design refs directly from file
@@ -148,6 +162,24 @@ async function buildVideoJob(
       ...referenceImages,
       ...designRefs.map((r) => r.filePath),
     ];
+  }
+
+  // Resolve reference video paths (HTTP URLs or local paths)
+  let referenceVideos: string[] = [];
+  if (frontmatter.ref_videos && frontmatter.ref_videos.length > 0) {
+    for (const refPath of frontmatter.ref_videos) {
+      const resolved = resolveFrameRef(filePath, refPath);
+      if (resolved) referenceVideos.push(resolved);
+    }
+  }
+
+  // Resolve reference audio paths (HTTP URLs or local paths)
+  let referenceAudios: string[] = [];
+  if (frontmatter.ref_audios && frontmatter.ref_audios.length > 0) {
+    for (const refPath of frontmatter.ref_audios) {
+      const resolved = resolveFrameRef(filePath, refPath);
+      if (resolved) referenceAudios.push(resolved);
+    }
   }
 
   return {
@@ -164,5 +196,7 @@ async function buildVideoJob(
       frame_ref: frameRef,
     },
     reference_images: referenceImages.length > 0 ? referenceImages : undefined,
+    reference_videos: referenceVideos.length > 0 ? referenceVideos : undefined,
+    reference_audios: referenceAudios.length > 0 ? referenceAudios : undefined,
   };
 }

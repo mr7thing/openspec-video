@@ -13,6 +13,8 @@ export interface CompileContext {
   outputDir: string;
   projectRoot?: string;
   referenceImages?: string[];
+  referenceVideos?: string[];
+  referenceAudios?: string[];
   workflowPath?: string;
   workflowDir?: string;
   refCount?: number;

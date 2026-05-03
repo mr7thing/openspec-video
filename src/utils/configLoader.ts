@@ -27,6 +27,10 @@ export interface ModelConfig {
   supports_last_image?: boolean;
   supports_reference_images?: boolean;
   max_reference_images?: number;
+  supports_reference_videos?: boolean;
+  max_reference_videos?: number;
+  supports_reference_audios?: boolean;
+  max_reference_audios?: number;
   supports_audio?: boolean;
   supports_video_ref?: boolean;
   concurrency?: number;

@@ -4,6 +4,8 @@
 // ============================================================================
 
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
@@ -46,6 +48,36 @@ export class VolcengineProvider {
         error: err.message,
       };
     }
+  }
+
+  private async resolveImageField(value: string): Promise<string> {
+    if (!value) return value;
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    // Local file path — convert to base64 data URI
+    const data = fs.readFileSync(value);
+    const ext = path.extname(value).slice(1) || 'png';
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+    return `data:${mime};base64,${data.toString('base64')}`;
+  }
+
+  private async resolveVideoField(value: string): Promise<string> {
+    if (!value) return value;
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    // Video files are typically too large for base64; require HTTP URL
+    throw new Error(
+      `Local video paths are not supported for API submission. ` +
+      `Please upload the video to a URL or use a TOS/S3 link: ${value}`
+    );
+  }
+
+  private async resolveAudioField(value: string): Promise<string> {
+    if (!value) return value;
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    // Audio files are typically too large for base64; require HTTP URL
+    throw new Error(
+      `Local audio paths are not supported for API submission. ` +
+      `Please upload the audio to a URL or use a TOS/S3 link: ${value}`
+    );
   }
 
   private async executeImage(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
@@ -104,7 +136,7 @@ export class VolcengineProvider {
 
   private async executeVideo(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
     const submitUrl = task._opsv.api_url;
-    const statusUrl = task._opsv.api_status_url || submitUrl.replace('/generations', '');
+    const statusUrl = task._opsv.api_status_url || submitUrl;
     const shotId = task._opsv.shotId;
 
     // Check for resume from .log
@@ -113,6 +145,21 @@ export class VolcengineProvider {
     if (!requestId) {
       const payload = { ...task };
       delete (payload as any)._opsv;
+
+      // Convert local media paths in content to appropriate formats
+      if (Array.isArray(payload.content)) {
+        for (const item of payload.content) {
+          if (item.image_url?.url) {
+            item.image_url.url = await this.resolveImageField(item.image_url.url);
+          }
+          if (item.video_url?.url) {
+            item.video_url.url = await this.resolveVideoField(item.video_url.url);
+          }
+          if (item.audio_url?.url) {
+            item.audio_url.url = await this.resolveAudioField(item.audio_url.url);
+          }
+        }
+      }
 
       const submitRes = await axios.post(submitUrl, payload, {
         headers: {
@@ -148,14 +195,17 @@ export class VolcengineProvider {
       const interval = getPollIntervalMs(elapsed);
       await sleep(interval);
 
-      const statusRes = await axios.get(`${statusUrl}?id=${requestId}`, {
+      const statusRes = await axios.get(`${statusUrl}/${requestId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
 
       const status = statusRes.data?.status || statusRes.data?.data?.status;
 
       if (status === 'succeeded' || status === 'completed') {
-        const videoUrl = statusRes.data?.video_url || statusRes.data?.data?.video_url;
+        const videoUrl =
+          statusRes.data?.content?.video_url ||
+          statusRes.data?.video_url ||
+          statusRes.data?.data?.video_url;
         if (!videoUrl) throw new Error('Completed but no video_url found');
 
         const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');

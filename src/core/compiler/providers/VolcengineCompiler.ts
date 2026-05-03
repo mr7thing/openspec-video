@@ -70,14 +70,16 @@ export class VolcengineCompiler implements ProviderCompiler {
       model: modelConfig.model,
       content: [
         {
-          type: 'video',
+          type: 'text',
           text: job.prompt_en || job.payload.prompt,
         },
       ],
     };
 
     if (job.payload.duration) {
-      payload.duration = job.payload.duration;
+      const durationStr = String(job.payload.duration);
+      const durationNum = parseInt(durationStr, 10);
+      payload.duration = isNaN(durationNum) ? job.payload.duration : durationNum;
     }
 
     if (job.payload.camera) {
@@ -85,11 +87,32 @@ export class VolcengineCompiler implements ProviderCompiler {
     }
 
     if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
-      payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.first } });
+      payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.first }, role: 'first_frame' });
     }
 
     if (job.payload.frame_ref?.last && modelConfig.supports_last_image) {
-      payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.last } });
+      payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.last }, role: 'last_frame' });
+    }
+
+    if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
+      const refs = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
+      for (const url of refs) {
+        payload.content.push({ type: 'image_url', image_url: { url }, role: 'reference_image' });
+      }
+    }
+
+    if (ctx.referenceVideos && ctx.referenceVideos.length > 0 && modelConfig.supports_reference_videos) {
+      const refs = ctx.referenceVideos.slice(0, modelConfig.max_reference_videos || 3);
+      for (const url of refs) {
+        payload.content.push({ type: 'video_url', video_url: { url }, role: 'reference_video' });
+      }
+    }
+
+    if (ctx.referenceAudios && ctx.referenceAudios.length > 0 && modelConfig.supports_reference_audios) {
+      const refs = ctx.referenceAudios.slice(0, modelConfig.max_reference_audios || 1);
+      for (const url of refs) {
+        payload.content.push({ type: 'audio_url', audio_url: { url }, role: 'reference_audio' });
+      }
     }
 
     return {

@@ -52,5 +52,7 @@ export const ShotProductionFrontmatterSchema = BaseFrontmatterSchema.extend({
     last: z.string().nullable().optional(),
   }).optional(),
   video_path: z.string().nullable().optional(),
+  ref_videos: z.array(z.string()).optional(),
+  ref_audios: z.array(z.string()).optional(),
 });
 export type ShotProductionFrontmatter = z.infer<typeof ShotProductionFrontmatterSchema>;

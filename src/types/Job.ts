@@ -31,6 +31,8 @@ export interface Job {
   prompt_en?: string;
   payload: PromptPayload;
   reference_images?: string[];
+  reference_videos?: string[];
+  reference_audios?: string[];
   output_path?: string;
   seed?: number;
   _meta?: JobMeta;

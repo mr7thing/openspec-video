@@ -18,8 +18,8 @@ description: Seedance 2.0 视频生成专家。精通火山方舟 Seedance 2.0/2
 
 | 操作 | 方法 | URL |
 |------|------|-----|
-| 提交任务 | POST | `/api/v3/content_generation/tasks` |
-| 查询状态 | GET | `/api/v3/content_generation/tasks/{task_id}` |
+| 提交任务 | POST | `/api/v3/contents/generations/tasks` |
+| 查询状态 | GET | `/api/v3/contents/generations/tasks/{task_id}` |
 
 状态值：`queued` → `running` → `succeeded` / `failed`
 
@@ -140,7 +140,7 @@ description: Seedance 2.0 视频生成专家。精通火山方舟 Seedance 2.0/2
 | text | 1 | — |
 | image_url | 9 | `reference_image` / `first_frame` / `last_frame` |
 | video_url | 3 | `reference_video` |
-| audio_url | 3 | `reference_audio` |
+| audio_url | 1 | `reference_audio` |
 
 ### role 详解
 
@@ -265,6 +265,36 @@ opsv animate --model volcengine.seedance2 --circle circle2
 opsv animate --model volcengine.seedance2-fast --circle circle2
 ```
 
+### Shot 文件 Frontmatter 格式
+
+```yaml
+---
+category: shot-production
+status: drafting
+title: Shot 01 — 描述
+duration: "5s"
+first_frame: null
+last_frame: null
+refs:
+  - "../../opsv-queue/.../参考图.png"
+ref_videos:
+  - "https://.../参考视频.mp4"
+ref_audios:
+  - "https://.../背景音.mp3"
+visual_detailed: |
+  提示词内容...
+---
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `duration` | string | 视频时长，如 `"5s"` |
+| `first_frame` | string / null | 首帧图片路径或 URL |
+| `last_frame` | string / null | 尾帧图片路径或 URL |
+| `refs` | string[] | 参考图片路径（相对路径或 @asset 引用） |
+| `ref_videos` | string[] | 参考视频 URL（仅支持 HTTP URL） |
+| `ref_audios` | string[] | 参考音频 URL（仅支持 HTTP URL） |
+
 ### 常见场景的 global_settings / payload 配置
 
 ```json
@@ -277,11 +307,8 @@ opsv animate --model volcengine.seedance2-fast --circle circle2
 // 方屏 1:1, 5秒无声
 { "global_settings": { "ratio": "1:1", "duration": 5, "generate_audio": false } }
 
-// 首帧+尾帧控制 (在 shotlist.md 中配置)
+// 首帧+尾帧控制 (在 shot 文件 frontmatter 中配置 first_frame / last_frame)
 { "frame_ref": { "first": "https://首帧图", "last": "https://尾帧图" } }
-
-// 音视频多模态参考
-{ "extra": { "media_refs": ["https://参考视频.mp4", "https://背景音.mp3"] } }
 ```
 
 ### 编译后 .json 示例 (I2V 首帧)
@@ -303,8 +330,8 @@ opsv animate --model volcengine.seedance2-fast --circle circle2
     "modelKey": "seedance-2.0",
     "type": "video",
     "shotId": "shot_01",
-    "api_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
-    "api_status_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
+    "api_url": "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
+    "api_status_url": "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
     "compiledAt": "2026-04-24T12:00:00.000Z",
     "references": ["https://首帧图.png"]
   }
@@ -332,8 +359,8 @@ opsv animate --model volcengine.seedance2-fast --circle circle2
     "modelKey": "seedance-2.0",
     "type": "video",
     "shotId": "shot_02",
-    "api_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
-    "api_status_url": "https://ark.cn-beijing.volces.com/api/v3/content_generation/tasks",
+    "api_url": "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
+    "api_status_url": "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks",
     "compiledAt": "2026-04-24T12:00:00.000Z",
     "references": ["https://角色图.png"]
   }
