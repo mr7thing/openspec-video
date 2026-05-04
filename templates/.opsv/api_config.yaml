@@ -211,6 +211,7 @@ models:
   # 不再使用本地 workflow JSON 文件。通过 node_mappings 将 OpsV 参数
   # 直接映射到 RunningHub 的 nodeId + fieldName。
   # 可用 opsv comfy-node-mapping <workflow.json> 自动发现节点映射。
+  # 优先级：frontmatter.workflow / node_mapping > api_config.workflowId / node_mappings
   # ==========================================
   runninghub.default:
     provider: runninghub

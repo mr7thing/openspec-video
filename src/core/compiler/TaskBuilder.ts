@@ -72,12 +72,13 @@ export class TaskBuilder {
         apiKey,
         outputDir,
         projectRoot: this.projectRoot,
-        workflowPath,
+        workflowPath: workflowPath || job.workflow,
         workflowDir,
         referenceImages: job.reference_images,
         referenceVideos: job.reference_videos,
         referenceAudios: job.reference_audios,
         refCount: (job.reference_images?.length || 0) + (job.reference_videos?.length || 0) + (job.reference_audios?.length || 0),
+        nodeMapping: job.node_mapping,
       };
 
       const taskJson = compiler.compile(ctx);

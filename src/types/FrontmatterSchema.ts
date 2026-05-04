@@ -23,6 +23,11 @@ export const BaseFrontmatterSchema = z.object({
   prompt_en: z.string().optional(),
   refs: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),
+  workflow: z.string().optional(),
+  node_mapping: z.record(z.object({
+    nodeId: z.string(),
+    fieldName: z.string(),
+  })).optional(),
 });
 export type BaseFrontmatter = z.infer<typeof BaseFrontmatterSchema>;
 

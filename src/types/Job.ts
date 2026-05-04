@@ -35,6 +35,8 @@ export interface Job {
   reference_audios?: string[];
   output_path?: string;
   seed?: number;
+  workflow?: string;
+  node_mapping?: Record<string, { nodeId: string; fieldName: string }>;
   _meta?: JobMeta;
 }
 

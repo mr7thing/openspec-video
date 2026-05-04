@@ -169,6 +169,8 @@ async function buildComfyJob(
     id: asset.id,
     type: 'comfy' as const,
     prompt_en: prompt,
+    workflow: frontmatter.workflow,
+    node_mapping: frontmatter.node_mapping,
     payload: {
       prompt,
       global_settings: {

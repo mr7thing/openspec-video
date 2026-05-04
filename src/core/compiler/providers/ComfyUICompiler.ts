@@ -59,36 +59,50 @@ export class ComfyUICompiler implements ProviderCompiler {
 
     // 4. Build parameter map
     const parameters: Record<string, any> = {};
-
-    // Text input: default to input-prompt node by title
-    const textInputs: string[] = Array.isArray(meta?.text_inputs) ? meta.text_inputs : [];
-    if (textInputs.length > 0) {
-      parameters[textInputs[0]] = job.prompt_en || job.payload.prompt;
-    } else {
-      parameters['input-prompt'] = job.prompt_en || job.payload.prompt;
-    }
-
-    // Frame refs (legacy, for backward compat)
-    if (job.payload.frame_ref?.first) {
-      parameters['input-image1'] = job.payload.frame_ref.first;
-    }
-    if (job.payload.frame_ref?.last) {
-      parameters['input-image2'] = job.payload.frame_ref.last;
-    }
-
-    // Reference images: inject by input-imageN node titles
     const refImages = ctx.referenceImages || job.reference_images || [];
-    const imageInputs: string[] = Array.isArray(meta?.image_inputs)
-      ? meta.image_inputs
-      : refImages.map((_, i) => `input-image${i + 1}`);
-    for (let i = 0; i < imageInputs.length; i++) {
-      if (i < refImages.length) {
-        parameters[imageInputs[i]] = refImages[i];
+
+    if (ctx.nodeMapping) {
+      // Unified mode: keys match nodeMapping (prompt, image1, image2, ...)
+      parameters['prompt'] = job.prompt_en || job.payload.prompt;
+      for (let i = 0; i < refImages.length; i++) {
+        parameters[`image${i + 1}`] = refImages[i];
       }
-      // Remaining slots stay empty (workflow template defaults)
+      if (job.payload.frame_ref?.first) {
+        parameters['first_frame'] = job.payload.frame_ref.first;
+      }
+      if (job.payload.frame_ref?.last) {
+        parameters['last_frame'] = job.payload.frame_ref.last;
+      }
+    } else {
+      // Legacy mode: keys match _meta.title (input-prompt, input-image1, ...)
+      const textInputs: string[] = Array.isArray(meta?.text_inputs) ? meta.text_inputs : [];
+      if (textInputs.length > 0) {
+        parameters[textInputs[0]] = job.prompt_en || job.payload.prompt;
+      } else {
+        parameters['input-prompt'] = job.prompt_en || job.payload.prompt;
+      }
+
+      // Frame refs (legacy, for backward compat)
+      if (job.payload.frame_ref?.first) {
+        parameters['input-image1'] = job.payload.frame_ref.first;
+      }
+      if (job.payload.frame_ref?.last) {
+        parameters['input-image2'] = job.payload.frame_ref.last;
+      }
+
+      // Reference images: inject by input-imageN node titles
+      const imageInputs: string[] = Array.isArray(meta?.image_inputs)
+        ? meta.image_inputs
+        : refImages.map((_, i) => `input-image${i + 1}`);
+      for (let i = 0; i < imageInputs.length; i++) {
+        if (i < refImages.length) {
+          parameters[imageInputs[i]] = refImages[i];
+        }
+        // Remaining slots stay empty (workflow template defaults)
+      }
     }
 
-    // Extra params from payload
+    // Extra params from payload (always included)
     if (job.payload.extra) {
       for (const [key, value] of Object.entries(job.payload.extra)) {
         if (key !== 'media_refs' && value !== undefined && value !== null) {
@@ -98,7 +112,11 @@ export class ComfyUICompiler implements ProviderCompiler {
     }
 
     // 5. Inject into workflow nodes
-    this.injectParameters(workflow, parameters);
+    if (ctx.nodeMapping) {
+      this.injectByNodeMapping(workflow, parameters, ctx.nodeMapping);
+    } else {
+      this.injectParameters(workflow, parameters);
+    }
 
     return {
       ...workflow,
@@ -186,6 +204,23 @@ export class ComfyUICompiler implements ProviderCompiler {
           }
         }
       }
+    }
+  }
+
+  // Unified injection: use explicit nodeMapping (frontmatter or api_config)
+  private injectByNodeMapping(
+    workflow: Record<string, any>,
+    params: Record<string, any>,
+    nodeMapping: Record<string, { nodeId: string; fieldName: string }>
+  ): void {
+    for (const [paramKey, value] of Object.entries(params)) {
+      const mapping = nodeMapping[paramKey];
+      if (!mapping) continue;
+
+      const node = workflow[mapping.nodeId];
+      if (!node || !node.inputs) continue;
+
+      node.inputs[mapping.fieldName] = value;
     }
   }
 }

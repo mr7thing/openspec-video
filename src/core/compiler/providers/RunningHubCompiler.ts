@@ -1,6 +1,6 @@
 // ============================================================================
 // OpsV v0.9 RunningHub Provider Compiler
-// Redesigned for RH v2 API: workflowId + nodeInfoList (no local workflow JSON)
+// Unified parameter mapping: reads nodeMapping from frontmatter or api_config
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
@@ -15,22 +15,31 @@ export class RunningHubCompiler implements ProviderCompiler {
 
     if (!modelConfig.api_url) throw new Error('RunningHubCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.api_status_url) throw new Error('RunningHubCompiler: api_status_url is required in api_config.yaml');
-    if (!modelConfig.workflowId) throw new Error('RunningHubCompiler: workflowId is required in api_config.yaml');
 
-    const workflowId = modelConfig.workflowId;
-    const mappings = modelConfig.node_mappings || {};
+    // workflowId 来源：frontmatter.workflow > api_config.workflowId
+    const workflowId = ctx.workflowPath || modelConfig.workflowId;
+    if (!workflowId) {
+      throw new Error(
+        'RunningHubCompiler: workflowId is required. ' +
+        'Set it in frontmatter (workflow: "...") or in api_config.yaml (workflowId: "...").'
+      );
+    }
+
+    // nodeMapping 来源：frontmatter.node_mapping > api_config.node_mappings
+    const mappings = ctx.nodeMapping || modelConfig.node_mappings || {};
 
     if (Object.keys(mappings).length === 0) {
       throw new Error(
-        'RunningHubCompiler: node_mappings is required in api_config.yaml. ' +
-        'Use opsv inspect --model <key> to discover node IDs for your workflow.'
+        'RunningHubCompiler: node_mapping is required. ' +
+        'Set it in frontmatter (node_mapping: { ... }) or in api_config.yaml (node_mappings: { ... }). ' +
+        'Use "opsv comfy-node-mapping <workflow.json>" to generate it.'
       );
     }
 
     const nodeInfoList: Array<{ nodeId: string; fieldName: string; fieldValue: any }> = [];
 
     // ------------------------------------------------------------------------
-    // Map parameters via node_mappings
+    // Map parameters via nodeMapping (unified logic for all comfy providers)
     // ------------------------------------------------------------------------
 
     // Prompt
