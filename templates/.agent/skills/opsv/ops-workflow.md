@@ -111,7 +111,16 @@ opsv animate --model volcengine.seedance-2.0
 # ComfyUI 工作流
 opsv comfy --model comfylocal.klein9b     # 本地 ComfyUI
 opsv comfy --model runninghub.default      # RunningHub 云端
-opsv comfy-node-mapping workflow.json -o mappings.json  # 生成 node_mappings
+
+# ComfyUI / RunningHub 工作流配置流程
+# 1. 在 ComfyUI 中将需要外部控制的节点标题改为 opsv-xxx（如 opsv-prompt, opsv-image1）
+# 2. 导出 API 格式 JSON（Save → API format）
+# 3. 运行 comfy-node-mapping 生成 node_mapping
+opsv comfy-node-mapping my_workflow.json -o mappings.json
+# 4. 将 workflowId 和 node_mapping 填入 markdown frontmatter（见 references/workflow_template.md）
+# 5. 编译并执行
+opsv comfy --model runninghub.default --dry-run
+opsv run opsv-queue/.../runninghub.default_001/
 
 # WebApp 生成
 opsv webapp --model <provider.model>

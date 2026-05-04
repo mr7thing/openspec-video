@@ -285,3 +285,6 @@ opsv script
 - **运维管线**（校验 → 生成 → 编译 → 渲染 → 审查）→ 见 `ops-workflow.md`
 - **CLI 速查** → 见 `references/cli_reference.md`
 - **文档模板** → 见 `references/` 目录
+  - `element_template.md` — 角色/道具/场景等静态资产
+  - `scene_template.md` — 场景描述
+  - `workflow_template.md` — ComfyUI / RunningHub 工作流配置（含 workflow + node_mapping）
