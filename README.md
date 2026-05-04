@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.15
+# OpenSpec-Video (OpsV) v0.8.17
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -92,8 +92,8 @@ opsv imagen --model siliconflow.edit2509  # Qwen-Image-Edit I2I
 | `siliconflow.wani2v` | video | 硅基 Wan I2V |
 | `minimax.img01` | imagen | MiniMax Image-01 |
 | `minimax.vid01` | video | MiniMax Hailuo 2.3 |
-| `comfylocal.workflow` | comfy | ComfyUI Local |
-| `runninghub.default` | comfy | RunningHub Cloud |
+| `comfylocal.*` | comfy | ComfyUI Local (workflow_path + node_mapping in frontmatter) |
+| `runninghub.*` | comfy | RunningHub Cloud (workflow_id + node_mapping in frontmatter) |
 | `webapp.gemini` | webapp | Gemini 浏览器自动化 |
 
 完整配置见 `.opsv/api_config.yaml`。
@@ -157,7 +157,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.15",
+  "version": "0.8.17",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -251,4 +251,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.8.15 | 2026-05-02*
+> *OpsV v0.8.17 | 2026-05-03*

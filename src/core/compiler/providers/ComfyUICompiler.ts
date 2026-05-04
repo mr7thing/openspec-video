@@ -62,16 +62,32 @@ export class ComfyUICompiler implements ProviderCompiler {
     const refImages = ctx.referenceImages || job.reference_images || [];
 
     if (ctx.nodeMapping) {
-      // Unified mode: keys match nodeMapping (prompt, image1, image2, ...)
-      parameters['prompt'] = job.prompt_en || job.payload.prompt;
-      for (let i = 0; i < refImages.length; i++) {
-        parameters[`image${i + 1}`] = refImages[i];
-      }
-      if (job.payload.frame_ref?.first) {
-        parameters['first_frame'] = job.payload.frame_ref.first;
-      }
-      if (job.payload.frame_ref?.last) {
-        parameters['last_frame'] = job.payload.frame_ref.last;
+      // Unified mode: iterate nodeMapping keys, resolve value from job dynamically
+      for (const key of Object.keys(ctx.nodeMapping)) {
+        let value: any = undefined;
+
+        if (key === 'prompt') {
+          value = job.prompt_en || job.payload.prompt;
+        } else if (key === 'negative_prompt') {
+          value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
+        } else if (key.startsWith('image')) {
+          const idx = parseInt(key.replace('image', ''), 10) - 1;
+          if (!isNaN(idx) && idx >= 0 && idx < refImages.length) {
+            value = refImages[idx];
+          }
+        } else if (key === 'first_frame') {
+          value = job.payload.frame_ref?.first;
+        } else if (key === 'last_frame') {
+          value = job.payload.frame_ref?.last;
+        } else if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') {
+          value = job.payload.extra[key];
+        } else if (modelConfig.defaults && key in modelConfig.defaults) {
+          value = modelConfig.defaults[key];
+        }
+
+        if (value !== undefined && value !== null) {
+          parameters[key] = value;
+        }
       }
     } else {
       // Legacy mode: keys match _meta.title (input-prompt, input-image1, ...)

@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8.16 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.17 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.16)
+# OpsV 框架规范 (v0.8.17)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 

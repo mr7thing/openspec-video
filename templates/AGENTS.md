@@ -17,6 +17,7 @@
 3. **消除机械劳作**：当大导演要求核对资产、检查死链时，必须果断调用 `opsv validate`。
 4. **反射同步 (Reflective Sync)**：Markdown 正文是用户的最高意志。一旦正文变动，必须同步更新 YAML 中的 `visual_detailed` 等字段。
 5. **直接编译执行**：v0.8 取消 `queue compile` / `queue run` 中间层，所有任务由 `opsv imagen` / `opsv animate` / `opsv comfy` 直接编译为可执行 `.json`，再由 `opsv run` 统一执行。
+6. **产物不可删除原则**：**除非用户明确要求，决不允许删除 `opsv-queue/` 下的任何产物**（包括 `_manifest.json`、任务 JSON、渲染输出、目录等）。OpsV 采用增量创建模式，每次编译生成新的队列目录（如 `volc.seadream_001`、`volc.seadream_002`），保留所有历史产物供审查和回溯。
 </core_principles>
 
 <role_trinity>
@@ -87,17 +88,19 @@ opsv comfy --model comfylocal.klein9b --workflow-dir workflows/sdxl/
 opsv run opsv-queue/videospec.circle2/comfylocal.klein9b_001/shot_02.json
 ```
 
-**RunningHub**（云端，v0.8.16+）：不再使用本地 workflow JSON，通过 `node_mappings` 映射参数。
+**RunningHub**（云端，v0.8.17+）：workflow 和 node_mapping 配置在 frontmatter 中。
 ```bash
 # 1. 在 ComfyUI 中将节点标题改为 opsv-prompt, opsv-image1 等
 # 2. 导出 API 格式 JSON
-# 3. 生成 node_mappings
+# 3. 生成 node_mapping
 opsv comfy-node-mapping my_workflow.json -o mappings.json
 
-# 4. 将 mappings.json 内容粘贴到 api_config.yaml 的 node_mappings 下
+# 4. 将 workflowId 和 node_mapping 填入 markdown frontmatter（见 references/workflow_template.md）
 # 5. 编译并执行
 opsv comfy --model runninghub.default --dry-run
 opsv run opsv-queue/videospec.circle2/runninghub.default_001/
+# 强制使用 api_config 的 mapping
+opsv comfy --model runninghub.default --force-api-mapping
 ```
 
 ### 浏览器自动化
@@ -117,7 +120,7 @@ opsv app --model browser.chrome
 | `opsv circle refresh` | 重建依赖图，diff 更新各 `.circleN/_manifest.json` | `--dir` |
 | `opsv imagen` | 编译图像任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
 | `opsv animate` | 编译视频任务为可执行 `.json` | `--model <m>`, `--circle`, `--dry-run` |
-| `opsv comfy` | 编译 ComfyUI 任务为可执行 `.json` | `--model <m>`, `--workflow`, `--workflow-dir`, `--param`, `--dry-run` |
+| `opsv comfy` | 编译 ComfyUI 任务为可执行 `.json` | `--model <m>`, `--workflow`, `--workflow-dir`, `--param`, `--dry-run`, `--force-api-mapping` |
 | `opsv comfy-node-mapping` | 从 workflow JSON 提取 node_mappings | `<workflow-file>`, `--output`, `--prefix` |
 | `opsv audio` | 编译音频任务（规划中，占位） | `--model <m>` |
 | `opsv webapp` | 浏览器自动化 | `--model <m>` |

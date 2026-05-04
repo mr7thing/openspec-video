@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.16 (RunningHub v2 API + Node Mapping)
+> 当前版本：v0.8.17 (ComfyUI Unified Compilation + Per-Task Workflow)
 
 ## 命令总览
 

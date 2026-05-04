@@ -35,7 +35,9 @@ export interface Job {
   reference_audios?: string[];
   output_path?: string;
   seed?: number;
-  workflow?: string;
+  workflow?: string;                            // Deprecated: use workflow_id or workflow_path
+  workflow_id?: string;                          // RunningHub workflowId
+  workflow_path?: string;                        // ComfyUI Local JSON filename
   node_mapping?: Record<string, { nodeId: string; fieldName: string }>;
   _meta?: JobMeta;
 }

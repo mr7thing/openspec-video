@@ -28,6 +28,7 @@ export function registerComfyCommand(program: Command): void {
     .option('--workflow <file>', 'Specific workflow file (absolute path or filename in workflow-dir)')
     .option('--workflow-dir <dir>', 'Workflow template directory (overrides api_config defaults.templateDir)')
     .option('--param <json>', 'Override workflow parameters as JSON')
+    .option('--force-api-mapping', 'Force use api_config.node_mappings, ignore frontmatter node_mapping')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: any) => {
       try {
@@ -110,7 +111,7 @@ export function registerComfyCommand(program: Command): void {
 
         const results = builder.compileToDir(
           jobs, modelKey, outputDir, options.dryRun,
-          workflowPath, workflowDir
+          workflowPath, workflowDir, options.forceApiMapping
         );
 
         if (options.dryRun) {
@@ -170,6 +171,8 @@ async function buildComfyJob(
     type: 'comfy' as const,
     prompt_en: prompt,
     workflow: frontmatter.workflow,
+    workflow_id: frontmatter.workflow_id,
+    workflow_path: frontmatter.workflow_path,
     node_mapping: frontmatter.node_mapping,
     payload: {
       prompt,

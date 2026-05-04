@@ -23,7 +23,9 @@ export const BaseFrontmatterSchema = z.object({
   prompt_en: z.string().optional(),
   refs: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),
-  workflow: z.string().optional(),
+  workflow: z.string().optional(),              // Deprecated: use workflow_id or workflow_path
+  workflow_id: z.string().optional(),            // RunningHub workflowId
+  workflow_path: z.string().optional(),          // ComfyUI Local JSON filename
   node_mapping: z.record(z.object({
     nodeId: z.string(),
     fieldName: z.string(),

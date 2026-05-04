@@ -52,7 +52,8 @@ export class TaskBuilder {
     outputDir: string,
     dryRun = false,
     workflowPath?: string,
-    workflowDir?: string
+    workflowDir?: string,
+    forceApiMapping?: boolean
   ): TaskJson[] {
     const modelConfig = this.configLoader.getModelConfig(modelKey);
     if (!modelConfig) {
@@ -72,13 +73,16 @@ export class TaskBuilder {
         apiKey,
         outputDir,
         projectRoot: this.projectRoot,
-        workflowPath: workflowPath || job.workflow,
+        workflowPath: workflowPath || job.workflow_path || job.workflow_id || job.workflow,
+        forceApiMapping,
         workflowDir,
         referenceImages: job.reference_images,
         referenceVideos: job.reference_videos,
         referenceAudios: job.reference_audios,
         refCount: (job.reference_images?.length || 0) + (job.reference_videos?.length || 0) + (job.reference_audios?.length || 0),
-        nodeMapping: job.node_mapping,
+        nodeMapping: forceApiMapping
+          ? modelConfig.node_mappings
+          : (job.node_mapping || modelConfig.node_mappings),
       };
 
       const taskJson = compiler.compile(ctx);

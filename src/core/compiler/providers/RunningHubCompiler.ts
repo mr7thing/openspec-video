@@ -16,7 +16,7 @@ export class RunningHubCompiler implements ProviderCompiler {
     if (!modelConfig.api_url) throw new Error('RunningHubCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.api_status_url) throw new Error('RunningHubCompiler: api_status_url is required in api_config.yaml');
 
-    // workflowId 来源：frontmatter.workflow > api_config.workflowId
+    // workflowId 来源：frontmatter.workflow_id > api_config.workflowId
     const workflowId = ctx.workflowPath || modelConfig.workflowId;
     if (!workflowId) {
       throw new Error(

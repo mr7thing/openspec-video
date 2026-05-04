@@ -19,6 +19,7 @@ export interface CompileContext {
   workflowDir?: string;
   refCount?: number;
   nodeMapping?: Record<string, { nodeId: string; fieldName: string }>;
+  forceApiMapping?: boolean;
 }
 
 export interface ProviderCompiler {
