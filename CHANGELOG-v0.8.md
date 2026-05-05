@@ -1,6 +1,18 @@
 # OpsV v0.8.x 会话变更记录
 
-> 记录范围：v0.8.1 → v0.8.5，涵盖 2026-04-28 ~ 2026-04-29 全部会话
+> 记录范围：v0.8.1 → v0.8.18，涵盖 2026-04-28 ~ 2026-05-05 全部会话
+
+---
+
+## v0.8.18 — 2026-05-05
+
+### 变更要点
+
+1. **修复所有 Provider Compiler 忽略 `api_config.yaml` `defaults` 配置的问题**
+   - `MinimaxCompiler`：Image `aspect_ratio` 支持 `defaults.aspect_ratio` 回退；Video 新增 `resolution` / `duration` 读取（frontmatter > api_config.defaults）
+   - `VolcengineCompiler`：Image `resolveSize` 优先级改为 `defaults.size` > `quality_map` > `aspect_ratio sizeMap`；自动合并 `defaults` 中剩余字段（`steps`、`cfg_scale`、`negative_prompt`、`watermark` 等）；Video 支持 `defaults` 中 `duration`/`ratio`/`generate_audio`/`watermark` 等字段
+   - `SiliconFlowCompiler`：Image `resolveSize` 优先级改为 `defaults.image_size` > `quality_map` > `aspect_ratio sizeMap`；自动合并 `defaults` 中剩余字段（`cfg_scale`、`steps`、`seed` 等）；Video 支持 `defaults` 中 `image_size`/`seed` 等字段
+   - 影响文件：`MinimaxCompiler.ts`、`VolcengineCompiler.ts`、`SiliconFlowCompiler.ts`
 
 ---
 

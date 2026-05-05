@@ -28,7 +28,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     const payload: Record<string, any> = {
       model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
-      aspect_ratio: job.payload.global_settings?.aspect_ratio || '1:1',
+      aspect_ratio: job.payload.global_settings?.aspect_ratio || modelConfig.defaults?.aspect_ratio || '1:1',
     };
 
     if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
@@ -59,6 +59,20 @@ export class MinimaxCompiler implements ProviderCompiler {
       model: modelConfig.model,
       prompt: job.prompt_en || job.payload.prompt,
     };
+
+    // Resolution: frontmatter > api_config.defaults
+    const resolution = (job.payload.global_settings as any)?.resolution || modelConfig.defaults?.resolution;
+    if (resolution) {
+      payload.resolution = resolution;
+    }
+
+    // Duration: frontmatter > api_config.defaults
+    const duration = job.payload.duration || modelConfig.defaults?.duration;
+    if (duration !== undefined && duration !== null) {
+      const durationStr = String(duration);
+      const durationNum = parseInt(durationStr, 10);
+      payload.duration = isNaN(durationNum) ? duration : durationNum;
+    }
 
     if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
       payload.first_frame_image = job.payload.frame_ref.first;

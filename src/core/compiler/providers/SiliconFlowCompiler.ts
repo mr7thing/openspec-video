@@ -33,6 +33,15 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       batch_size: 1,
     };
 
+    // Merge remaining defaults (cfg_scale, steps, seed, num_inference_steps, cfg, etc.)
+    const defaults = modelConfig.defaults || {};
+    for (const [key, value] of Object.entries(defaults)) {
+      if (['image_size'].includes(key)) continue;
+      if (value !== undefined && value !== null && payload[key] === undefined) {
+        payload[key] = value;
+      }
+    }
+
     if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
       payload.image = ctx.referenceImages[0];
     }
@@ -70,6 +79,15 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       payload.tail_image = job.payload.frame_ref.last;
     }
 
+    // Merge defaults (image_size, seed, etc.)
+    const defaults = modelConfig.defaults || {};
+    for (const [key, value] of Object.entries(defaults)) {
+      if (['model', 'prompt', 'image', 'tail_image'].includes(key)) continue;
+      if (value !== undefined && value !== null && payload[key] === undefined) {
+        payload[key] = value;
+      }
+    }
+
     return {
       ...payload,
       _opsv: {
@@ -86,6 +104,11 @@ export class SiliconFlowCompiler implements ProviderCompiler {
   }
 
   private resolveSize(globalSettings: any, modelConfig: ModelConfig): string {
+    // Priority: defaults.image_size > quality_map > aspect_ratio sizeMap > fallback
+    if (modelConfig.defaults?.image_size) {
+      return modelConfig.defaults.image_size;
+    }
+
     const quality = globalSettings?.quality || 'standard';
     if (modelConfig.quality_map && modelConfig.quality_map[quality]) {
       return modelConfig.quality_map[quality];

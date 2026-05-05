@@ -42,6 +42,15 @@ export class VolcengineCompiler implements ProviderCompiler {
       }
     }
 
+    // Merge remaining defaults (steps, cfg_scale, negative_prompt, output_format, watermark, etc.)
+    const defaults = modelConfig.defaults || {};
+    for (const [key, value] of Object.entries(defaults)) {
+      if (['size', 'sequential_image_generation', 'max_images'].includes(key)) continue;
+      if (value !== undefined && value !== null && payload[key] === undefined) {
+        payload[key] = value;
+      }
+    }
+
     if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
       payload.reference_images = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
     }
@@ -76,14 +85,25 @@ export class VolcengineCompiler implements ProviderCompiler {
       ],
     };
 
-    if (job.payload.duration) {
-      const durationStr = String(job.payload.duration);
+    // Duration: frontmatter > api_config.defaults
+    const duration = job.payload.duration || modelConfig.defaults?.duration;
+    if (duration !== undefined && duration !== null) {
+      const durationStr = String(duration);
       const durationNum = parseInt(durationStr, 10);
-      payload.duration = isNaN(durationNum) ? job.payload.duration : durationNum;
+      payload.duration = isNaN(durationNum) ? duration : durationNum;
     }
 
     if (job.payload.camera) {
       payload.camera = job.payload.camera;
+    }
+
+    // Merge remaining defaults (ratio, generate_audio, watermark, etc.)
+    const videoDefaults = modelConfig.defaults || {};
+    for (const [key, value] of Object.entries(videoDefaults)) {
+      if (['model', 'content', 'camera', 'duration'].includes(key)) continue;
+      if (value !== undefined && value !== null && payload[key] === undefined) {
+        payload[key] = value;
+      }
     }
 
     if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
@@ -131,6 +151,11 @@ export class VolcengineCompiler implements ProviderCompiler {
   }
 
   private resolveSize(globalSettings: any, modelConfig: ModelConfig): string {
+    // Priority: defaults.size > quality_map > aspect_ratio sizeMap > fallback
+    if (modelConfig.defaults?.size) {
+      return modelConfig.defaults.size;
+    }
+
     const quality = globalSettings?.quality || 'standard';
     if (modelConfig.quality_map && modelConfig.quality_map[quality]) {
       return modelConfig.quality_map[quality];
