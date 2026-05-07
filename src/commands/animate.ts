@@ -189,7 +189,7 @@ async function buildVideoJob(
     payload: {
       prompt,
       global_settings: {
-        aspect_ratio: '16:9',
+        aspect_ratio: frontmatter.aspect_ratio,
         quality: 'standard',
       },
       duration: frontmatter.duration,

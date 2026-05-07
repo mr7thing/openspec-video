@@ -147,7 +147,7 @@ async function buildWebappJob(
     payload: {
       prompt,
       global_settings: {
-        aspect_ratio: frontmatter.aspect_ratio || '1:1',
+        aspect_ratio: frontmatter.aspect_ratio,
         quality: 'standard',
       },
       frame_ref: frameRef,
