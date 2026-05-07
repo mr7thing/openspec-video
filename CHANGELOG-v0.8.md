@@ -1,6 +1,18 @@
 # OpsV v0.8.x 会话变更记录
 
-> 记录范围：v0.8.1 → v0.8.19，涵盖 2026-04-28 ~ 2026-05-07 全部会话
+> 记录范围：v0.8.1 → v0.8.20，涵盖 2026-04-28 ~ 2026-05-08 全部会话
+
+---
+
+## v0.8.20 — 2026-05-08
+
+### 变更要点
+
+1. **修复 `AssetManager.findAssetFilePath` 忽略 manifest `target` 导致读取错误目录同名文件的问题**
+   - `loadCircleAssets` 现在读取 manifest 中的 `target` 字段（如 `"videospec/shotframes2"`），提取子目录名作为 `preferredSubdir`
+   - `findAssetFilePath` 新增可选参数 `preferredSubdir`，优先在 target 指定子目录查找，找不到才 fallback 扫描其他目录
+   - 解决多个 circle 子目录存在同名 asset 文件时，编译可能随机读取到错误版本的问题
+   - 影响文件：`src/core/AssetManager.ts`
 
 ---
 

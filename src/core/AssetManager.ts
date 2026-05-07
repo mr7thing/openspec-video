@@ -95,13 +95,18 @@ export class AssetManager {
 
     if (fs.existsSync(manifestPath)) {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      // Extract preferred subdir from manifest target (e.g. "videospec/shotframes2" -> "shotframes2")
+      const preferredSubdir = data.target
+        ? path.basename(data.target)
+        : undefined;
+
       // v0.8.2+: assets from merged manifest (includes category)
       if (data.assets) {
         const assets: CircleAssetEntry[] = Object.entries(data.assets).map(([id, info]: [string, any]) => ({
           id,
           status: info.status || 'drafting',
           category: info.category,
-          filePath: this.findAssetFilePath(id),
+          filePath: this.findAssetFilePath(id, preferredSubdir),
         }));
         return { circleName, assets, circles: data.circles };
       }
@@ -109,7 +114,7 @@ export class AssetManager {
       const assets: CircleAssetEntry[] = [];
       for (const circle of data.circles || []) {
         for (const [id, status] of Object.entries(circle.status || {})) {
-          assets.push({ id, status: status as string, filePath: this.findAssetFilePath(id) });
+          assets.push({ id, status: status as string, filePath: this.findAssetFilePath(id, preferredSubdir) });
         }
       }
       return { circleName, assets, circles: data.circles };
@@ -136,7 +141,7 @@ export class AssetManager {
     return asset.approvedRefs[0].filePath;
   }
 
-  findAssetFilePath(assetId: string): string | undefined {
+  findAssetFilePath(assetId: string, preferredSubdir?: string): string | undefined {
     const prefixes = ['@', ''];
 
     // 1. Check videospecRoot itself
@@ -145,11 +150,24 @@ export class AssetManager {
       if (fs.existsSync(p)) return p;
     }
 
-    // 2. Scan all subdirectories under videospecRoot
+    // 2. Check preferred subdirectory first (if specified)
+    if (preferredSubdir) {
+      const preferredDir = path.join(this.videospecRoot, preferredSubdir);
+      if (fs.existsSync(preferredDir) && fs.statSync(preferredDir).isDirectory()) {
+        for (const prefix of prefixes) {
+          const p = path.join(preferredDir, `${prefix}${assetId}.md`);
+          if (fs.existsSync(p)) return p;
+        }
+      }
+    }
+
+    // 3. Scan all subdirectories under videospecRoot (fallback)
     if (fs.existsSync(this.videospecRoot)) {
       const entries = fs.readdirSync(this.videospecRoot, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory()) {
+          // Skip preferred subdir since we already checked it
+          if (preferredSubdir && entry.name === preferredSubdir) continue;
           for (const prefix of prefixes) {
             const p = path.join(this.videospecRoot, entry.name, `${prefix}${assetId}.md`);
             if (fs.existsSync(p)) return p;
