@@ -13,6 +13,9 @@ import { execSync } from 'child_process';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { parseOutputFilename } from '../executor/naming';
 import { logger } from '../utils/logger';
+import { CloudClient } from '../tunnel/CloudClient';
+import { TunnelClient } from '../tunnel/TunnelClient';
+import dotenv from 'dotenv';
 
 export function registerReviewCommand(program: Command): void {
   program
@@ -23,6 +26,10 @@ export function registerReviewCommand(program: Command): void {
     .option('--latest', 'Show only latest circle outputs (legacy mode)')
     .option('--all', 'Show all circle outputs (legacy mode)')
     .option('--ttl <seconds>', 'Auto-shutdown after idle seconds (default: 900)', '900')
+    .option('--cloud', 'Enable OpsV Review Cloud tunnel')
+    .option('--refresh', 'Refresh the active OpsV Review Cloud session JWT')
+    .option('--close', 'Close the active OpsV Review Cloud session')
+    .option('--status', 'Show the status of the active OpsV Review Cloud session')
     .action(async (options: any) => {
       try {
         const projectRoot = process.cwd();
@@ -36,6 +43,43 @@ export function registerReviewCommand(program: Command): void {
 
         const port = parseInt(options.port, 10);
         const ttl = parseInt(options.ttl, 10);
+
+        dotenv.config();
+        const cloudApiKey = process.env.OPSV_CLOUD_API_KEY;
+        const cloudUrl = process.env.OPSV_CLOUD_URL || 'https://api.review.opsv.cloud';
+        const sessionStorePath = path.join(projectRoot, '.opsv', 'cloud_session.json');
+
+        if (options.refresh || options.close || options.status) {
+          if (!cloudApiKey) {
+            console.error(chalk.red('OPSV_CLOUD_API_KEY is missing in .env'));
+            process.exit(1);
+          }
+          if (!fs.existsSync(sessionStorePath)) {
+            console.error(chalk.yellow('No active cloud session found locally.'));
+            process.exit(0);
+          }
+          const sessionData = JSON.parse(fs.readFileSync(sessionStorePath, 'utf-8'));
+          const client = new CloudClient(cloudUrl, cloudApiKey);
+
+          if (options.refresh) {
+            console.log(chalk.cyan('Refreshing cloud session...'));
+            const res = await client.refreshSession(sessionData.sessionId);
+            console.log(chalk.green('═══════════════════════════════════════'));
+            console.log(chalk.green('  New Review URL (30-min expiry):'));
+            console.log(chalk.cyan(`  ${res.reviewUrl}`));
+            console.log(chalk.green('═══════════════════════════════════════'));
+          } else if (options.close) {
+            console.log(chalk.cyan('Closing cloud session...'));
+            await client.closeSession(sessionData.sessionId);
+            fs.unlinkSync(sessionStorePath);
+            console.log(chalk.green('Session closed successfully.'));
+          } else if (options.status) {
+            console.log(chalk.cyan(`Active Session ID: ${sessionData.sessionId}`));
+            console.log(chalk.cyan(`Current Review URL: ${sessionData.reviewUrl}`));
+            console.log(chalk.cyan(`Started At: ${sessionData.startedAt || 'Unknown'}`));
+          }
+          process.exit(0);
+        }
 
         // Resolve manifest for --circle mode
         const circleMode = options.circle !== undefined;
@@ -261,14 +305,51 @@ export function registerReviewCommand(program: Command): void {
           console.log(chalk.green(`Review server running at http://localhost:${port}`));
         });
 
+        let tunnelClient: TunnelClient | null = null;
+        if (options.cloud) {
+          if (!cloudApiKey) {
+            console.error(chalk.red('OPSV_CLOUD_API_KEY is missing in .env'));
+            process.exit(1);
+          }
+          console.log(chalk.cyan(`Connecting to OpsV Cloud: ${cloudUrl}...`));
+          const client = new CloudClient(cloudUrl, cloudApiKey);
+          const session = await client.createSession();
+          
+          fs.mkdirSync(path.join(projectRoot, '.opsv'), { recursive: true });
+          fs.writeFileSync(sessionStorePath, JSON.stringify({
+            sessionId: session.sessionId,
+            reviewUrl: session.reviewUrl,
+            startedAt: new Date().toISOString()
+          }, null, 2));
+
+          console.log(chalk.green('═══════════════════════════════════════'));
+          console.log(chalk.green('  OpsV Review Cloud Session Started'));
+          console.log(chalk.green('  Review URL (30-min expiry):'));
+          console.log(chalk.cyan(`  ${session.reviewUrl}`));
+          console.log(chalk.green('═══════════════════════════════════════'));
+          console.log(chalk.gray('  Run "opsv review --cloud --refresh" to generate a new link'));
+
+          tunnelClient = new TunnelClient(cloudUrl, session.sessionToken, port);
+          await tunnelClient.connect();
+        }
+
         // TTL auto-shutdown
         if (ttl > 0) {
           let idleTimer: NodeJS.Timeout;
 
           const resetTimer = () => {
             clearTimeout(idleTimer);
-            idleTimer = setTimeout(() => {
+            idleTimer = setTimeout(async () => {
               console.log(chalk.yellow(`Idle for ${ttl}s, shutting down...`));
+              if (options.cloud && fs.existsSync(sessionStorePath)) {
+                try {
+                  const sessionData = JSON.parse(fs.readFileSync(sessionStorePath, 'utf-8'));
+                  const client = new CloudClient(cloudUrl, cloudApiKey!);
+                  await client.closeSession(sessionData.sessionId);
+                  fs.unlinkSync(sessionStorePath);
+                  tunnelClient?.close();
+                } catch (e) {}
+              }
               server.close();
               process.exit(0);
             }, ttl * 1000);
@@ -277,6 +358,23 @@ export function registerReviewCommand(program: Command): void {
           resetTimer();
           server.on('request', resetTimer);
         }
+
+        // Handle process exit to clean up cloud session
+        const cleanup = async () => {
+          if (options.cloud && fs.existsSync(sessionStorePath)) {
+            try {
+              const sessionData = JSON.parse(fs.readFileSync(sessionStorePath, 'utf-8'));
+              const client = new CloudClient(cloudUrl, cloudApiKey!);
+              await client.closeSession(sessionData.sessionId);
+              fs.unlinkSync(sessionStorePath);
+              tunnelClient?.close();
+            } catch (e) {}
+          }
+          process.exit();
+        };
+
+        process.on('SIGINT', cleanup);
+        process.on('SIGTERM', cleanup);
       } catch (err: any) {
         logger.error(err.message);
         process.exit(1);
