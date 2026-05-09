@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.17 (ComfyUI Unified Compilation + Per-Task Workflow)
+> 当前版本：v0.8.22 (ComfyUI Unified Compilation + Per-Task Workflow)
 
 ## 命令总览
 
@@ -92,16 +92,20 @@ opsv animate --model volcengine.seedance --dry-run
 ComfyUI 工作流编译为任务描述 JSON，带 `--model` 时直接产出可执行文件。
 
 ```bash
-# ComfyUI Local（本地工作流）
+# ComfyUI Local（本地工作流，需 node_mapping）
 opsv comfy --model comfylocal.klein9b
 
-# RunningHub（云端 ComfyUI）— v2 API，不再使用本地 workflow JSON
+# RunningHub（云端 ComfyUI，需 node_mapping）— v2 API
 opsv comfy --model runninghub.default
 ```
 
-**ComfyUI Local**：加载本地 `templateDir` 下的 workflow JSON 模板（`ref0.json`, `ref1.json`…），按参考图数量自动匹配，注入参数后输出完整 ComfyUI 任务 JSON。
+**ComfyUI Local**：加载本地 `templateDir` 下的 workflow JSON 模板，通过 frontmatter 中的 `node_mapping` 将 OpsV 参数注入对应节点。`_opsv_workflow` legacy 模式已移除。支持 `seed: random`（自动替换为随机自然数）。
 
-**RunningHub (v0.8.16+)**：不再加载本地 workflow JSON。通过 `api_config.yaml` 中的 `node_mappings` 将 OpsV 参数直接映射到 RH 的 `nodeId + fieldName`，输出标准 RH 格式 `{workflowId, nodeInfoList[]}`。任务完成后自动下载结果文件 + 原始 ComfyUI workflow JSON。
+**RunningHub (v0.8.22+)**：通过 frontmatter 中的 `node_mapping` 将 OpsV 参数映射到 RH 节点，输出标准 RH 格式 `{workflowId, nodeInfoList[]}`。调用 v2 API：
+- `POST /task/openapi/create`  创建任务
+- `POST /task/openapi/status`  查询状态
+- `POST /task/openapi/outputs` 获取结果
+任务完成后自动下载结果文件 + 原始 ComfyUI workflow JSON。
 
 **通用选项**：
 - `--workflow <file>`：指定 workflow 文件（ComfyUI Local 适用）
@@ -110,7 +114,7 @@ opsv comfy --model runninghub.default
 - `--dry-run`：预览模式
 
 ### opsv comfy-node-mapping
-分析 ComfyUI API 格式 workflow JSON，提取 title 以 `opsv-` 为前缀的节点，生成可直接用于 `api_config.yaml` 的 `node_mappings`。
+分析 ComfyUI API 格式 workflow JSON，提取 title 以 `opsv-` 为前缀的节点，生成可直接用于 `api_config.yaml` 或 frontmatter `node_mapping` 的映射配置。本地 ComfyUI 和 RunningHub 通用。
 
 ```bash
 # 输出到终端
@@ -127,7 +131,9 @@ opsv comfy-node-mapping my_workflow.json --prefix rh-
 1. 在 ComfyUI 中右键节点 → **Title**，将需要外部控制的节点重命名为 `opsv-prompt`、`opsv-image1`、`opsv-negative_prompt` 等
 2. 导出 API 格式 JSON（Save → API format）
 3. 运行 `opsv comfy-node-mapping workflow.json`
-4. 将输出的 JSON 复制到 `api_config.yaml` 的 `node_mappings:` 下
+4. 将输出的 JSON 复制到 frontmatter `node_mapping:` 或 `api_config.yaml` 的 `node_mappings:` 下
+
+**参考图映射**：`image1`、`image2`… 严格匹配 `image\d+` 模式，按数字顺序对应参考图列表。
 
 **fieldName 推断优先级**：`text` → `image` → `video` → `audio` → `seed` → `width` → `height` → 第一个输入字段。
 

@@ -38,82 +38,47 @@ export class RunningHubCompiler implements ProviderCompiler {
 
     const nodeInfoList: Array<{ nodeId: string; fieldName: string; fieldValue: any }> = [];
 
-    // ------------------------------------------------------------------------
-    // Map parameters via nodeMapping (unified logic for all comfy providers)
-    // ------------------------------------------------------------------------
-
-    // Prompt
-    if (mappings.prompt) {
-      const promptText = job.prompt_en || job.payload.prompt;
-      if (promptText) {
-        nodeInfoList.push({
-          nodeId: mappings.prompt.nodeId,
-          fieldName: mappings.prompt.fieldName,
-          fieldValue: promptText,
-        });
-      }
-    }
-
-    // Negative prompt (from defaults or extra)
-    if (mappings.negative_prompt) {
-      const neg = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
-      if (neg) {
-        nodeInfoList.push({
-          nodeId: mappings.negative_prompt.nodeId,
-          fieldName: mappings.negative_prompt.fieldName,
-          fieldValue: neg,
-        });
-      }
-    }
-
     // Reference images (supports up to max_reference_images)
     const refImages = ctx.referenceImages || job.reference_images || [];
     const maxRefImages = modelConfig.max_reference_images || 9;
     const cappedRefImages = refImages.slice(0, maxRefImages);
 
-    for (let i = 0; i < cappedRefImages.length; i++) {
-      const key = `image${i + 1}`;
-      if (mappings[key]) {
-        nodeInfoList.push({
-          nodeId: mappings[key].nodeId,
-          fieldName: mappings[key].fieldName,
-          fieldValue: cappedRefImages[i],
-        });
-      }
-    }
-
     if (cappedRefImages.length < refImages.length) {
       logger.warn(`RunningHubCompiler: ${refImages.length} ref images provided, using first ${maxRefImages} (max_reference_images limit)`);
     }
 
-    // First / last frame
-    if (mappings.first_frame && job.payload.frame_ref?.first) {
-      nodeInfoList.push({
-        nodeId: mappings.first_frame.nodeId,
-        fieldName: mappings.first_frame.fieldName,
-        fieldValue: job.payload.frame_ref.first,
-      });
-    }
-    if (mappings.last_frame && job.payload.frame_ref?.last) {
-      nodeInfoList.push({
-        nodeId: mappings.last_frame.nodeId,
-        fieldName: mappings.last_frame.fieldName,
-        fieldValue: job.payload.frame_ref.last,
-      });
-    }
+    // ------------------------------------------------------------------------
+    // Map parameters via nodeMapping (unified logic for all comfy providers)
+    // Iterate node_mapping keys and resolve value by OpsV naming convention.
+    // ------------------------------------------------------------------------
+    for (const [key, mapping] of Object.entries(mappings)) {
+      let value: any = undefined;
 
-    // Extra params (skip media_refs and already-mapped keys)
-    if (job.payload.extra) {
-      for (const [key, value] of Object.entries(job.payload.extra)) {
-        if (key === 'media_refs') continue;
-        if (value === undefined || value === null) continue;
-        if (mappings[key]) {
-          nodeInfoList.push({
-            nodeId: mappings[key].nodeId,
-            fieldName: mappings[key].fieldName,
-            fieldValue: value,
-          });
+      if (key === 'prompt') {
+        value = job.prompt_en || job.payload.prompt;
+      } else if (key === 'negative_prompt') {
+        value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
+      } else if (/^image\d+$/.test(key)) {
+        const idx = parseInt(key.replace('image', ''), 10) - 1;
+        if (!isNaN(idx) && idx >= 0 && idx < cappedRefImages.length) {
+          value = cappedRefImages[idx];
         }
+      } else if (key === 'first_frame') {
+        value = job.payload.frame_ref?.first;
+      } else if (key === 'last_frame') {
+        value = job.payload.frame_ref?.last;
+      } else if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') {
+        value = job.payload.extra[key];
+      } else if (modelConfig.defaults && key in modelConfig.defaults) {
+        value = modelConfig.defaults[key];
+      }
+
+      if (value !== undefined && value !== null) {
+        nodeInfoList.push({
+          nodeId: mapping.nodeId,
+          fieldName: mapping.fieldName,
+          fieldValue: value,
+        });
       }
     }
 
@@ -130,19 +95,19 @@ export class RunningHubCompiler implements ProviderCompiler {
     if (defaults.addMetadata !== undefined) {
       payload.addMetadata = defaults.addMetadata;
     }
-    if (defaults.retainSeconds) {
+    if (defaults.retainSeconds !== undefined && defaults.retainSeconds !== null) {
       payload.retainSeconds = defaults.retainSeconds;
     }
-    if (defaults.instanceType) {
+    if (defaults.instanceType !== undefined && defaults.instanceType !== null) {
       payload.instanceType = defaults.instanceType;
     }
     if (defaults.usePersonalQueue !== undefined) {
       payload.usePersonalQueue = defaults.usePersonalQueue;
     }
-    if (defaults.accessPassword) {
+    if (defaults.accessPassword !== undefined && defaults.accessPassword !== null) {
       payload.accessPassword = defaults.accessPassword;
     }
-    if (defaults.webhookUrl) {
+    if (defaults.webhookUrl !== undefined && defaults.webhookUrl !== null) {
       payload.webhookUrl = defaults.webhookUrl;
     }
 

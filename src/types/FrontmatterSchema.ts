@@ -21,6 +21,7 @@ export const BaseFrontmatterSchema = z.object({
   visual_brief: z.string().optional(),
   visual_detailed: z.string().optional(),
   prompt_en: z.string().optional(),
+  negative_prompt: z.string().optional(),
   refs: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),
   workflow: z.string().optional(),              // Deprecated: use workflow_id or workflow_path

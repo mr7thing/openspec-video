@@ -2,7 +2,7 @@
 
 从文档校验到物理渲染的完整运维与审查协议。涵盖 Guardian-Agent 与 Runner-Agent 的全部操作规程。
 
-> 当前版本：v0.8.17 (ComfyUI Unified Compilation + Per-Task Workflow)
+> 当前版本：v0.8.22 (ComfyUI Unified Compilation + Per-Task Workflow)
 
 ---
 
@@ -108,19 +108,25 @@ opsv imagen --model volcengine.seadream-5.0-lite --circle circle2
 opsv animate --model volcengine.seedance-2.0
 # 产出: opsv-queue/videospec.circle2/volcengine.seedance_001/shot_01.json 等
 
-# ComfyUI 工作流
-opsv comfy --model comfylocal.klein9b     # 本地 ComfyUI
-opsv comfy --model runninghub.default      # RunningHub 云端
+# ComfyUI 工作流（v0.8.22+，两种 provider 均使用 node_mapping）
+opsv comfy --model comfylocal.klein9b     # 本地 ComfyUI（需 node_mapping）
+opsv comfy --model runninghub.default      # RunningHub 云端（v2 API，需 node_mapping）
 
-# ComfyUI / RunningHub 工作流配置流程
+# ComfyUI / RunningHub 工作流配置流程（两种 provider 通用，_opsv_workflow legacy 模式已移除）
 # 1. 在 ComfyUI 中将需要外部控制的节点标题改为 opsv-xxx（如 opsv-prompt, opsv-image1）
 # 2. 导出 API 格式 JSON（Save → API format）
-# 3. 运行 comfy-node-mapping 生成 node_mapping
+# 3. 运行 comfy-node-mapping 生成 node_mapping（本地和 RunningHub 通用）
 opsv comfy-node-mapping my_workflow.json -o mappings.json
-# 4. 将 workflowId 和 node_mapping 填入 markdown frontmatter（见 references/workflow_template.md）
+# 4. 将 workflowId（RunningHub）或 workflow_path（本地）和 node_mapping 填入 markdown frontmatter
+#    支持 seed: random（自动替换为随机自然数）
 # 5. 编译并执行
 opsv comfy --model runninghub.default --dry-run
 opsv run opsv-queue/.../runninghub.default_001/
+
+# RunningHub v2 API 端点
+# POST /task/openapi/create   创建任务
+# POST /task/openapi/status   查询状态
+# POST /task/openapi/outputs  获取结果
 
 # WebApp 生成
 opsv webapp --model <provider.model>

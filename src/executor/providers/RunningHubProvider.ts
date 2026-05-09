@@ -21,23 +21,30 @@ import {
   getElapsedMs,
   sleep,
 } from '../polling';
+import { generateRandomSeed } from '../../utils/randomSeed';
 
 export class RunningHubProvider {
   name = 'runninghub';
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
     const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
+    configLoader.loadConfig(resolveProjectRoot(path.dirname(taskPath)));
 
     let apiKey: string;
     try {
       apiKey = configLoader.getResolvedApiKey(task._opsv.modelKey);
-    } catch {
-      apiKey = process.env.RUNNINGHUB_API_KEY || '';
+    } catch (err: any) {
+      // Only fall back to env for missing-key errors; rethrow config problems
+      const envKey = process.env.RUNNINGHUB_API_KEY || '';
+      if (!envKey) {
+        throw new Error(`RunningHub API key not found: ${err.message}`);
+      }
+      apiKey = envKey;
     }
 
     const submitUrl = task._opsv.api_url;
     const statusUrl = task._opsv.api_status_url;
+    if (!statusUrl) throw new Error('RunningHubProvider: api_status_url is required in task._opsv');
     const shotId = task._opsv.shotId;
     const workflowId = task._opsv.workflowId;
 
@@ -51,12 +58,19 @@ export class RunningHubProvider {
         const payload = { ...task };
         delete (payload as any)._opsv;
 
-        // Upload local files referenced in nodeInfoList and replace with server fileName
+        // Resolve 'random' placeholders and upload local files in nodeInfoList
         if (Array.isArray(payload.nodeInfoList)) {
           for (const item of payload.nodeInfoList) {
+            if (item.fieldValue === 'random') {
+              item.fieldValue = generateRandomSeed();
+              logger.info(`[RunningHub] Resolved random seed for node ${item.nodeId}.${item.fieldName}`);
+            }
             if (item.fieldValue && typeof item.fieldValue === 'string') {
               const val = item.fieldValue;
-              if (!val.startsWith('http') && !val.startsWith('data:') && fs.existsSync(val)) {
+              if (!val.startsWith('http') && !val.startsWith('data:')) {
+                if (!fs.existsSync(val)) {
+                  throw new Error(`Reference file not found: ${val} (node ${item.nodeId}.${item.fieldName})`);
+                }
                 const fileName = await this.uploadFile(val, apiKey, baseUrl);
                 item.fieldValue = fileName;
               }
@@ -102,34 +116,62 @@ export class RunningHubProvider {
         const interval = getPollIntervalMs(elapsed);
         await sleep(interval);
 
-        const statusRes = await axios.get(`${statusUrl}?taskId=${taskId}`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: 30000,
-        });
+        // Query task status (POST /task/openapi/status)
+        // Response: { code: 0, msg: "", data: "QUEUED" | "RUNNING" | "SUCCESS" | "FAILED" }
+        const statusRes = await this.withRetry(
+          () => axios.post(
+            statusUrl,
+            { apiKey, taskId },
+            {
+              headers: { Authorization: `Bearer ${apiKey}` },
+              timeout: 30000,
+            }
+          ),
+          `status query for ${taskId}`
+        );
 
-        const status = statusRes.data?.data?.status || statusRes.data?.status;
+        if (statusRes.data?.code !== 0) {
+          const msg = statusRes.data?.msg || JSON.stringify(statusRes.data);
+          throw new Error(`RunningHub status query failed: ${msg}`);
+        }
 
-        if (status === 'SUCCESS' || status === 'completed' || status === 'succeeded') {
+        const status = statusRes.data?.data;
+
+        if (status === 'SUCCESS') {
+          // Query task outputs (POST /task/openapi/outputs)
+          // Response: { code: 0, msg: "success", data: [{ fileUrl, fileType, ... }] }
+          const resultRes = await this.withRetry(
+            () => axios.post(
+              `${baseUrl}/task/openapi/outputs`,
+              { apiKey, taskId },
+              {
+                headers: { Authorization: `Bearer ${apiKey}` },
+                timeout: 30000,
+              }
+            ),
+            `result query for ${taskId}`
+          );
+
+          if (resultRes.data?.code !== 0) {
+            const msg = resultRes.data?.msg || JSON.stringify(resultRes.data);
+            throw new Error(`RunningHub result query failed: ${msg}`);
+          }
+
           const outputPaths: string[] = [];
+          const outputs = resultRes.data?.data || [];
 
-          // 1. Download result file(s)
-          const outputs = statusRes.data?.data?.output || [];
+          const extIndices: Record<string, number> = {};
           if (Array.isArray(outputs) && outputs.length > 0) {
             for (let i = 0; i < outputs.length; i++) {
-              const url = outputs[i]?.url || outputs[i];
+              const url = outputs[i]?.fileUrl;
               if (!url) continue;
-              const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-              const idx = resolveNextOutputIndex(taskPath, ext) + i;
-              const outputPath = outputFilePath(taskPath, idx, ext);
+              const rawType = outputs[i]?.fileType;
+              const ext = rawType ? this.mapFileTypeToExt(rawType) : (task._opsv.type === 'video' ? 'mp4' : 'png');
+              if (!(ext in extIndices)) {
+                extIndices[ext] = resolveNextOutputIndex(taskPath, ext);
+              }
+              const outputPath = outputFilePath(taskPath, extIndices[ext]++, ext);
               await downloadFile(url, outputPath);
-              outputPaths.push(outputPath);
-            }
-          } else {
-            const singleUrl = statusRes.data?.data?.url || statusRes.data?.data?.output;
-            if (singleUrl) {
-              const ext = task._opsv.type === 'video' ? 'mp4' : 'png';
-              const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, ext), ext);
-              await downloadFile(singleUrl, outputPath);
               outputPaths.push(outputPath);
             }
           }
@@ -138,7 +180,7 @@ export class RunningHubProvider {
             throw new Error('Completed but no output URL found');
           }
 
-          // 2. Download original ComfyUI workflow JSON
+          // Download original ComfyUI workflow JSON
           if (workflowId) {
             try {
               const workflowPath = await this.fetchWorkflowJson(workflowId, apiKey, baseUrl, taskPath);
@@ -156,13 +198,13 @@ export class RunningHubProvider {
             shotId,
             provider: 'runninghub',
             success: true,
-            outputPaths: outputPaths.length > 1 ? outputPaths : undefined,
-            outputPath: outputPaths.length === 1 ? outputPaths[0] : undefined,
+            outputPath: outputPaths[0],
+            outputPaths,
           };
         }
 
-        if (status === 'FAIL' || status === 'failed' || status === 'FAILED') {
-          const reason = statusRes.data?.data?.error || statusRes.data?.msg || JSON.stringify(statusRes.data);
+        if (status === 'FAILED') {
+          const reason = statusRes.data?.msg || JSON.stringify(statusRes.data);
           appendLog(taskPath, { event: 'failed', task_id: taskId, error: reason });
           throw new Error(`Task failed: ${reason}`);
         }
@@ -201,7 +243,7 @@ export class RunningHubProvider {
 
     if (response.data?.code !== 0) {
       throw new Error(
-        `RunningHub file upload failed for ${filePath}: ${response.data?.message || JSON.stringify(response.data)}`
+        `RunningHub file upload failed for ${filePath}: ${response.data?.msg || JSON.stringify(response.data)}`
       );
     }
 
@@ -259,6 +301,37 @@ export class RunningHubProvider {
 
     logger.info(`[RunningHub] Saved workflow JSON → ${path.basename(workflowPath)}`);
     return workflowPath;
+  }
+
+  // --------------------------------------------------------------------------
+  // Map RunningHub fileType / MIME type to file extension
+  // --------------------------------------------------------------------------
+  private mapFileTypeToExt(fileType: string): string {
+    if (fileType.includes('/')) {
+      const mimeExt = fileType.split('/').pop();
+      if (mimeExt) return mimeExt;
+    }
+    return fileType;
+  }
+
+  // --------------------------------------------------------------------------
+  // Retry an async operation with exponential backoff
+  // --------------------------------------------------------------------------
+  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> {
+    let lastErr: any;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        lastErr = err;
+        if (i < maxRetries - 1) {
+          const delay = Math.min(1000 * Math.pow(2, i), 30000);
+          logger.warn(`[RunningHub] ${label} failed (attempt ${i + 1}/${maxRetries}): ${err.message}. Retrying in ${delay}ms...`);
+          await sleep(delay);
+        }
+      }
+    }
+    throw lastErr;
   }
 
   // --------------------------------------------------------------------------

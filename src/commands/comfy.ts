@@ -148,6 +148,8 @@ async function buildComfyJob(
 
   // Collect reference images
   let referenceImages: string[] = [];
+  let referenceVideos: string[] = [];
+  let referenceAudios: string[] = [];
 
   // External refs (@assetId:variant → resolved image paths)
   if (frontmatter.refs && frontmatter.refs.length > 0) {
@@ -166,6 +168,18 @@ async function buildComfyJob(
     ];
   }
 
+  // Video/audio refs from frontmatter (shot-production assets)
+  const fmAny = frontmatter as any;
+  if (fmAny.ref_videos) {
+    referenceVideos = fmAny.ref_videos;
+  }
+  if (fmAny.ref_audios) {
+    referenceAudios = fmAny.ref_audios;
+  }
+
+  // Deduplicate reference images
+  referenceImages = [...new Set(referenceImages)];
+
   return {
     id: asset.id,
     type: 'comfy' as const,
@@ -182,9 +196,12 @@ async function buildComfyJob(
       },
       extra: {
         media_refs: [],
+        negative_prompt: frontmatter.negative_prompt,
         ...paramOverrides,
       },
     },
     reference_images: referenceImages.length > 0 ? referenceImages : undefined,
+    reference_videos: referenceVideos.length > 0 ? referenceVideos : undefined,
+    reference_audios: referenceAudios.length > 0 ? referenceAudios : undefined,
   };
 }

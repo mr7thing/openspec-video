@@ -75,9 +75,9 @@ opsv animate --model volcengine.seedance2
 opsv run opsv-queue/videospec.circle2/volcengine.seedance2_001/shot_01.json
 ```
 
-### ComfyUI 工作流
+### ComfyUI 工作流（v0.8.22+）
 
-**ComfyUI Local**（本地）：
+**ComfyUI Local**（本地，需 node_mapping）：
 ```bash
 # 编译 ComfyUI 任务
 opsv comfy --model comfylocal.klein9b --dry-run
@@ -88,20 +88,23 @@ opsv comfy --model comfylocal.klein9b --workflow-dir workflows/sdxl/
 opsv run opsv-queue/videospec.circle2/comfylocal.klein9b_001/shot_02.json
 ```
 
-**RunningHub**（云端，v0.8.17+）：workflow 和 node_mapping 配置在 frontmatter 中。
+**RunningHub**（云端，v2 API，需 node_mapping）：workflow 和 node_mapping 配置在 frontmatter 中。
 ```bash
 # 1. 在 ComfyUI 中将节点标题改为 opsv-prompt, opsv-image1 等
 # 2. 导出 API 格式 JSON
-# 3. 生成 node_mapping
+# 3. 生成 node_mapping（本地和 RunningHub 通用）
 opsv comfy-node-mapping my_workflow.json -o mappings.json
 
-# 4. 将 workflowId 和 node_mapping 填入 markdown frontmatter（见 references/workflow_template.md）
+# 4. 将 workflowId（RunningHub）或 workflow_path（本地）和 node_mapping 填入 markdown frontmatter
+#    支持 seed: random（自动替换为随机自然数）
 # 5. 编译并执行
 opsv comfy --model runninghub.default --dry-run
 opsv run opsv-queue/videospec.circle2/runninghub.default_001/
 # 强制使用 api_config 的 mapping
 opsv comfy --model runninghub.default --force-api-mapping
 ```
+
+RunningHub v2 API 端点：`POST /task/openapi/create`（创建）、`POST /task/openapi/status`（查询）、`POST /task/openapi/outputs`（获取结果）。
 
 ### 浏览器自动化
 

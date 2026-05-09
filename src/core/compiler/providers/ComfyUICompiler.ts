@@ -52,87 +52,75 @@ export class ComfyUICompiler implements ProviderCompiler {
     }
 
     // 2. Load workflow
-    const workflow: Record<string, any> = JSON.parse(fs.readFileSync(workflowFile, 'utf-8'));
+    let workflow: Record<string, any>;
+    try {
+      workflow = JSON.parse(fs.readFileSync(workflowFile, 'utf-8'));
+    } catch (parseErr: any) {
+      throw new Error(`Failed to parse workflow JSON ${workflowFile}: ${parseErr.message}`);
+    }
 
-    // 3. Optional _opsv_workflow metadata (advanced override, not required)
-    const meta = workflow._opsv_workflow;
+    // 3. Optional _opsv_workflow metadata (legacy, ignored in unified mode)
+    // const meta = workflow._opsv_workflow;
 
-    // 4. Build parameter map
+    // 4. Build parameter map — unified mode only
+    if (!ctx.nodeMapping || Object.keys(ctx.nodeMapping).length === 0) {
+      throw new Error(
+        'ComfyUICompiler: node_mapping is required. ' +
+        'Use "opsv comfy-node-mapping <workflow.json>" to generate it, ' +
+        'then add it to frontmatter or api_config.yaml.'
+      );
+    }
+
     const parameters: Record<string, any> = {};
-    const refImages = ctx.referenceImages || job.reference_images || [];
+    let refImages = ctx.referenceImages || job.reference_images || [];
 
-    if (ctx.nodeMapping) {
-      // Unified mode: iterate nodeMapping keys, resolve value from job dynamically
-      for (const key of Object.keys(ctx.nodeMapping)) {
-        let value: any = undefined;
+    // Cap reference images if max_reference_images is configured
+    if (modelConfig.max_reference_images !== undefined && refImages.length > modelConfig.max_reference_images) {
+      logger.warn(`ComfyUICompiler: ${refImages.length} ref images provided, using first ${modelConfig.max_reference_images} (max_reference_images limit)`);
+      refImages = refImages.slice(0, modelConfig.max_reference_images);
+    }
 
-        if (key === 'prompt') {
-          value = job.prompt_en || job.payload.prompt;
-        } else if (key === 'negative_prompt') {
-          value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
-        } else if (key.startsWith('image')) {
-          const idx = parseInt(key.replace('image', ''), 10) - 1;
-          if (!isNaN(idx) && idx >= 0 && idx < refImages.length) {
-            value = refImages[idx];
-          }
-        } else if (key === 'first_frame') {
-          value = job.payload.frame_ref?.first;
-        } else if (key === 'last_frame') {
-          value = job.payload.frame_ref?.last;
-        } else if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') {
-          value = job.payload.extra[key];
-        } else if (modelConfig.defaults && key in modelConfig.defaults) {
-          value = modelConfig.defaults[key];
+    // Iterate nodeMapping keys, resolve value by OpsV naming convention
+    for (const key of Object.keys(ctx.nodeMapping)) {
+      let value: any = undefined;
+
+      if (key === 'prompt') {
+        value = job.prompt_en || job.payload.prompt;
+      } else if (key === 'negative_prompt') {
+        value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
+      } else if (/^image\d+$/.test(key)) {
+        const idx = parseInt(key.replace('image', ''), 10) - 1;
+        if (!isNaN(idx) && idx >= 0 && idx < refImages.length) {
+          value = refImages[idx];
         }
-
-        if (value !== undefined && value !== null) {
-          parameters[key] = value;
-        }
-      }
-    } else {
-      // Legacy mode: keys match _meta.title (input-prompt, input-image1, ...)
-      const textInputs: string[] = Array.isArray(meta?.text_inputs) ? meta.text_inputs : [];
-      if (textInputs.length > 0) {
-        parameters[textInputs[0]] = job.prompt_en || job.payload.prompt;
-      } else {
-        parameters['input-prompt'] = job.prompt_en || job.payload.prompt;
+      } else if (key === 'first_frame') {
+        value = job.payload.frame_ref?.first;
+      } else if (key === 'last_frame') {
+        value = job.payload.frame_ref?.last;
+      } else if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') {
+        value = job.payload.extra[key];
+      } else if (modelConfig.defaults && key in modelConfig.defaults) {
+        value = modelConfig.defaults[key];
       }
 
-      // Frame refs (legacy, for backward compat)
-      if (job.payload.frame_ref?.first) {
-        parameters['input-image1'] = job.payload.frame_ref.first;
-      }
-      if (job.payload.frame_ref?.last) {
-        parameters['input-image2'] = job.payload.frame_ref.last;
-      }
-
-      // Reference images: inject by input-imageN node titles
-      const imageInputs: string[] = Array.isArray(meta?.image_inputs)
-        ? meta.image_inputs
-        : refImages.map((_, i) => `input-image${i + 1}`);
-      for (let i = 0; i < imageInputs.length; i++) {
-        if (i < refImages.length) {
-          parameters[imageInputs[i]] = refImages[i];
-        }
-        // Remaining slots stay empty (workflow template defaults)
+      if (value !== undefined && value !== null) {
+        parameters[key] = value;
       }
     }
 
-    // Extra params from payload (always included)
+    // Extra params from payload (only if mapped in nodeMapping and not already set)
     if (job.payload.extra) {
       for (const [key, value] of Object.entries(job.payload.extra)) {
         if (key !== 'media_refs' && value !== undefined && value !== null) {
-          parameters[key] = value;
+          if (ctx.nodeMapping[key] && !(key in parameters)) {
+            parameters[key] = value;
+          }
         }
       }
     }
 
     // 5. Inject into workflow nodes
-    if (ctx.nodeMapping) {
-      this.injectByNodeMapping(workflow, parameters, ctx.nodeMapping);
-    } else {
-      this.injectParameters(workflow, parameters);
-    }
+    this.injectByNodeMapping(workflow, parameters, ctx.nodeMapping);
 
     return {
       ...workflow,
@@ -193,36 +181,6 @@ export class ComfyUICompiler implements ProviderCompiler {
     throw new Error(`No matching workflow for refCount=${refCount} in ${dir}`);
   }
 
-  private injectParameters(workflow: Record<string, any>, params: Record<string, any>): void {
-    const paramKeys = Object.keys(params);
-
-    for (const nodeId in workflow) {
-      const node = workflow[nodeId];
-      if (!node || nodeId === '_opsv_workflow') continue;
-
-      const title = node._meta?.title || node.title || '';
-
-      if (paramKeys.includes(title)) {
-        const injectValue = params[title];
-
-        if (node.inputs) {
-          if ('text' in node.inputs) {
-            node.inputs['text'] = injectValue;
-          } else if ('text_1' in node.inputs) {
-            node.inputs['text_1'] = injectValue;
-          } else if ('image' in node.inputs) {
-            node.inputs['image'] = injectValue;
-          } else if ('video' in node.inputs) {
-            node.inputs['video'] = injectValue;
-          } else {
-            const firstKey = Object.keys(node.inputs)[0];
-            if (firstKey) node.inputs[firstKey] = injectValue;
-          }
-        }
-      }
-    }
-  }
-
   // Unified injection: use explicit nodeMapping (frontmatter or api_config)
   private injectByNodeMapping(
     workflow: Record<string, any>,
@@ -234,7 +192,14 @@ export class ComfyUICompiler implements ProviderCompiler {
       if (!mapping) continue;
 
       const node = workflow[mapping.nodeId];
-      if (!node || !node.inputs) continue;
+      if (!node) {
+        logger.warn(`ComfyUICompiler: nodeId "${mapping.nodeId}" not found in workflow for param "${paramKey}"`);
+        continue;
+      }
+      if (!node.inputs) {
+        logger.warn(`ComfyUICompiler: node "${mapping.nodeId}" has no inputs for param "${paramKey}"`);
+        continue;
+      }
 
       node.inputs[mapping.fieldName] = value;
     }

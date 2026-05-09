@@ -50,6 +50,16 @@ export function registerComfyNodeMappingCommand(program: Command): void {
         const prefix = options.prefix || 'opsv-';
         const mappings = extractMappings(workflow, prefix);
 
+        // Detect duplicate nodeId+fieldName targets
+        const seenTargets = new Set<string>();
+        for (const [key, val] of Object.entries(mappings)) {
+          const target = `${val.nodeId}:${val.fieldName}`;
+          if (seenTargets.has(target)) {
+            logger.warn(`Duplicate mapping target: "${key}" maps to node ${val.nodeId}.${val.fieldName} which is already used by another key`);
+          }
+          seenTargets.add(target);
+        }
+
         if (Object.keys(mappings).length === 0) {
           logger.warn(`No nodes with title prefix "${prefix}" found in ${path.basename(filePath)}`);
           logger.warn(`Tip: Rename nodes in ComfyUI (right-click → Title) to use prefix "${prefix}"`);

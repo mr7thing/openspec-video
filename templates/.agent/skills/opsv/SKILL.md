@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8.17 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.22 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.17)
+# OpsV 框架规范 (v0.8.22)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -190,6 +190,7 @@ status: drafting
 title: Shot 01
 duration: "5s"
 first_frame: "/path/to/shot_01_1.png"
+negative_prompt: "low quality, blurry"
 refs:
   - scene_lab
   - hero
@@ -217,6 +218,7 @@ category: shot-production
 - Prompt 取值优先级：`prompt_en` → `visual_detailed` → `visual_brief` → body 第一段
 - `refs` 数组中的 `@assetId` 或 `@assetId:variant` 引用会在 body 中解析
 - `@FRAME:shotId_type` 只用于 body 的 `refs` 数组，不用于 frontmatter 字段
+- ComfyUI / RunningHub 工作流支持 `seed: random`（自动替换为随机自然数）
 
 ## 关键工作流命令
 
@@ -241,11 +243,11 @@ opsv imagen --model volcengine.seadream-5.0-lite
 opsv animate --model volcengine.seedance-2.0
 # 选项: --manifest, --file, --category, --status-skip, --dry-run
 
-# ComfyUI 工作流编译
-opsv comfy --model comfylocal.klein9b    # 本地 ComfyUI（使用 workflow JSON 模板）
-opsv comfy --model runninghub.default     # RunningHub 云端（使用 node_mappings）
+# ComfyUI 工作流编译（node_mapping 必填）
+opsv comfy --model comfylocal.klein9b    # 本地 ComfyUI（使用 node_mapping）
+opsv comfy --model runninghub.default     # RunningHub 云端（使用 node_mapping）
 
-# 生成 node_mappings（RunningHub / ComfyUI 配置辅助）
+# 生成 node_mappings（本地和 RunningHub 通用）
 opsv comfy-node-mapping my_workflow.json -o mappings.json
 
 # WebApp 生成（新增）

@@ -1,6 +1,79 @@
 # OpsV v0.8.x 会话变更记录
 
-> 记录范围：v0.8.1 → v0.8.21，涵盖 2026-04-28 ~ 2026-05-08 全部会话
+> 记录范围：v0.8.1 → v0.8.22，涵盖 2026-04-28 ~ 2026-05-09 全部会话
+
+---
+
+## v0.8.22 — 2026-05-09
+
+### 变更要点
+
+1. **ComfyUI 统一 node_mapping 模式（Breaking）**
+   - 移除 ComfyUICompiler 的 legacy `_opsv_workflow` 模式，所有 comfy provider（comfylocal / runninghub）统一强制使用 `node_mapping`
+   - `opsv comfy-node-mapping` 生成的映射同时适用于本地和云端
+   - `TaskBuilder` 空 `node_mapping: {}` 现在正确 fallback 到 `api_config.node_mappings`
+   - 影响文件：`ComfyUICompiler.ts`、`TaskBuilder.ts`、`comfy.ts`
+
+2. **RunningHub API v2 查询接口修复（Breaking）**
+   - 状态查询从 `GET /task/openapi/comfyui/status?taskId=...` 改为 `POST /task/openapi/status`（body 传 `{apiKey, taskId}`）
+   - 新增独立的结果查询 `POST /task/openapi/outputs`（返回 `data[].fileUrl / fileType`）
+   - 状态响应解析修正：`data` 直接是状态字符串（`"SUCCESS"|"FAILED"|...`），非 `data.status`
+   - 影响文件：`RunningHubProvider.ts`、`api_config.yaml`
+
+3. **随机种子支持（random）**
+   - `api_config.defaults.seed: random` 或 frontmatter `seed: random` 在 `opsv run` 执行时自动生成 `< 10^16` 的随机自然数
+   - 每次 `opsv run` 得到不同 seed，无需重新编译
+   - 影响文件：`randomSeed.ts`（新增）、`RunningHubProvider.ts`、`ComfyUILocalProvider.ts`
+
+4. **ComfyUI 执行器健壮性提升**
+   - ComfyUI Local 检测节点执行错误（`status_str === 'error'`），立即失败而非无限轮询
+   - `outputs` 存在但无有效文件时主动报错
+   - 轮询网络错误增加指数退避重试（3 次）
+   - 失败时写入 `failed` log（与 RunningHub 一致）
+   - `/history` timeout 从 10s 提升到 30s
+   - 影响文件：`ComfyUILocalProvider.ts`
+
+5. **RunningHub 执行器健壮性提升**
+   - 轮询网络错误增加指数退避重试（3 次）
+   - 本地引用文件不存在时主动抛错（`Reference file not found: ...`），不再静默透传服务器
+   - API key 解析从 `taskPath` 推导项目根目录，修复 `opsv run /abs/path` 时 cwd 不对的问题
+   - `fileType` 支持 MIME 类型映射（`image/png` → `png`）
+   - 返回形状统一：始终同时返回 `outputPath` + `outputPaths`
+   - 影响文件：`RunningHubProvider.ts`
+
+6. **输出索引按扩展名隔离**
+   - `png` 和 `mp4` 不再共享同一个索引计数器，避免交叉跳跃
+   - 影响文件：`ComfyUILocalProvider.ts`、`RunningHubProvider.ts`
+
+7. **image 前缀匹配严格化**
+   - `key.startsWith('image')` → `/^image\d+$/.test(key)`
+   - `image_quality` 等 key 不再被误匹配为参考图
+   - 影响文件：`ComfyUICompiler.ts`、`RunningHubCompiler.ts`
+
+8. **ComfyUICompiler 注入增加警告**
+   - `nodeId` 不存在或节点无 `inputs` 时 `logger.warn`，不再静默跳过
+   - JSON 解析失败时带上文件路径
+   - 支持 `max_reference_images` 截断（本地也生效）
+   - 影响文件：`ComfyUICompiler.ts`
+
+9. **RunningHubCompiler defaults 真值修复**
+   - `retainSeconds: 0`、`instanceType: ""` 等 falsy 但合法的值不再被跳过
+   - 影响文件：`RunningHubCompiler.ts`
+
+10. **参考图体系扩展**
+    - `buildComfyJob` 支持 `ref_videos` / `ref_audios`（shot-production frontmatter）
+    - 参考图自动去重
+    - `refCount` 只计 `reference_images`（不再混入 video/audio）
+    - 影响文件：`comfy.ts`、`TaskBuilder.ts`
+
+11. **Frontmatter 新增 `negative_prompt`**
+    - `BaseFrontmatterSchema` 新增 `negative_prompt` 字段
+    - 优先级：`frontmatter.negative_prompt` > `api_config.defaults.negative_prompt`
+    - 影响文件：`FrontmatterSchema.ts`、`comfy.ts`
+
+12. ** comfyNodeMapping 重复目标检测**
+    - 同一 `nodeId:fieldName` 被多个 key 映射时发出 warn
+    - 影响文件：`comfyNodeMapping.ts`
 
 ---
 

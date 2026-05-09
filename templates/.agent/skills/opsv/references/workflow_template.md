@@ -1,10 +1,11 @@
 ---
 category: shot-production
 status: drafting
-# ComfyUI Local 和 RunningHub 各用各自的 workflow 字段
+# ComfyUI Local 和 RunningHub 均需要 node_mapping（两种 provider 通用）
 workflow_id: "1904136902449209346"    # RunningHub workflowId
 workflow_path: "ref2.json"             # ComfyUI Local JSON 文件名
-# node_mapping 格式通用（两种 provider 一致）
+negative_prompt: "low quality, blurry"  # 可选：负面提示词
+# node_mapping 格式通用（两种 provider 一致，必填）
 node_mapping:                          # 用 opsv comfy-node-mapping <workflow.json> 生成
   prompt:
     nodeId: "6"
@@ -18,6 +19,7 @@ node_mapping:                          # 用 opsv comfy-node-mapping <workflow.j
   seed:
     nodeId: "3"
     fieldName: "seed"
+    # 支持 seed: random（自动替换为随机自然数）
 # CLI: opsv comfy --model <key> --force-api-mapping  # 强制使用 api_config 的 mapping
 refs:
   - role_hero

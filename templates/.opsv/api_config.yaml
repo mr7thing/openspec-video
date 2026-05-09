@@ -200,6 +200,14 @@ models:
     type: comfy
     model: workflow
     api_url: http://127.0.0.1:8188/
+    node_mappings:
+      # 本地 ComfyUI 同样需要 node_mapping
+      prompt:
+        nodeId: "6"
+        fieldName: "text"
+      negative_prompt:
+        nodeId: "7"
+        fieldName: "text"
     defaults:
       templateDir: "comfyui_workflow_templates"
 
@@ -218,7 +226,7 @@ models:
     type: comfy
     workflowId: "your-workflow-id-here"
     api_url: https://www.runninghub.cn/task/openapi/create
-    api_status_url: https://www.runninghub.cn/task/openapi/comfyui/status
+    api_status_url: https://www.runninghub.cn/task/openapi/status
     required_env:
       - RUNNINGHUB_API_KEY
     supports_first_image: true
@@ -251,6 +259,9 @@ models:
       usePersonalQueue: false
       retainSeconds: null
       accessPassword: null
+      # seed 支持固定数字或 "random" (opsv run 时自动生成 16 位以内随机自然数)
+      # seed: 42
+      # seed: random
 
   # ==========================================
   # Web App 浏览器自动化

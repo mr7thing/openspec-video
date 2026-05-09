@@ -79,10 +79,10 @@ export class TaskBuilder {
         referenceImages: job.reference_images,
         referenceVideos: job.reference_videos,
         referenceAudios: job.reference_audios,
-        refCount: (job.reference_images?.length || 0) + (job.reference_videos?.length || 0) + (job.reference_audios?.length || 0),
+        refCount: job.reference_images?.length || 0,
         nodeMapping: forceApiMapping
-          ? modelConfig.node_mappings
-          : (job.node_mapping || modelConfig.node_mappings),
+          ? (modelConfig.node_mappings && Object.keys(modelConfig.node_mappings).length > 0 ? modelConfig.node_mappings : undefined)
+          : (job.node_mapping && Object.keys(job.node_mapping).length > 0 ? job.node_mapping : modelConfig.node_mappings),
       };
 
       const taskJson = compiler.compile(ctx);
