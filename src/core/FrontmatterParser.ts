@@ -5,6 +5,8 @@
 import yaml from 'js-yaml';
 import { z } from 'zod';
 import { BaseFrontmatterSchema } from '../types/FrontmatterSchema';
+import { ReviewEntry } from '../types/ManifestSchema';
+import { formatReviewEntry } from '../utils/reviewEntry';
 
 export class FrontmatterParser {
   static parse<T extends z.ZodType>(
@@ -54,11 +56,12 @@ export class FrontmatterParser {
     return `---\n${newYaml}\n---\n${body}`;
   }
 
-  static appendReview(content: string, reviewEntry: string): string {
+  static appendReview(content: string, reviewEntry: string | ReviewEntry): string {
     const { rawYaml, body } = FrontmatterParser.split(content);
     const parsed = yaml.load(rawYaml) as Record<string, any>;
     if (!parsed.reviews) parsed.reviews = [];
-    parsed.reviews.push(reviewEntry);
+    const entry = typeof reviewEntry === 'string' ? reviewEntry : formatReviewEntry(reviewEntry);
+    parsed.reviews.push(entry);
     const newYaml = yaml.dump(parsed, { lineWidth: -1, noRefs: true }).trim();
     return `---\n${newYaml}\n---\n${body}`;
   }

@@ -46,32 +46,12 @@ export function resolveModelQueueDir(circleDir: string, modelKey: string): strin
   return path.join(circleDir, `${modelKey}_${suffix}`);
 }
 
+/**
+ * @deprecated Use ManifestReader.resolveForProduce instead.
+ */
 export function resolveManifestPath(cwd: string, manifestOption?: string): string {
-  if (manifestOption) {
-    const manifestPath = fs.statSync(manifestOption).isDirectory()
-      ? path.join(manifestOption, '_manifest.json')
-      : manifestOption;
-    if (!fs.existsSync(manifestPath)) {
-      throw new Error(`Manifest not found: ${manifestPath}`);
-    }
-    return manifestPath;
-  }
-
-  // Check current directory
-  const currentManifest = path.join(cwd, '_manifest.json');
-  if (fs.existsSync(currentManifest)) {
-    return currentManifest;
-  }
-
-  // Check parent directory
-  const parentManifest = path.join(cwd, '..', '_manifest.json');
-  if (fs.existsSync(parentManifest)) {
-    return parentManifest;
-  }
-
-  throw new Error(
-    `No _manifest.json found. Run inside a circle directory or use --manifest <path>.`
-  );
+  const { ManifestReader } = require('../core/ManifestReader');
+  return new ManifestReader().resolveForProduce(cwd, manifestOption);
 }
 
 export function parseStatusSkip(statusSkipOption?: string): string[] {

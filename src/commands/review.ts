@@ -1,20 +1,55 @@
 // ============================================================================
-// OpsV v0.8.15 — opsv review
+// OpsV v0.8 — opsv review
 // Supports --circle mode: manifest-driven review with zero hardcoded paths
-// Legacy mode (no --circle) preserves original behavior
+// Legacy mode (no --circle) preserves original behavior (deprecated)
 // ============================================================================
 
 import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import chalk from 'chalk';
 import express from 'express';
 import { execSync } from 'child_process';
-import { FrontmatterParser } from '../core/FrontmatterParser';
-import { parseOutputFilename } from '../executor/naming';
+import { ManifestReader } from '../core/ManifestReader';
+import { ManifestReviewStrategy, LegacyReviewStrategy } from '../core/ReviewStrategy';
+import { ApproveService } from '../core/ApproveService';
+import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
-import { resolveWithin, sanitizePathComponent } from '../utils/pathSecurity';
+import { resolveWithin } from '../utils/pathSecurity';
+
+function autoCommitPendingChanges(projectRoot: string): void {
+  try {
+    execSync('git add -A', { cwd: projectRoot, stdio: 'ignore' });
+    execSync('git diff --cached --quiet', { cwd: projectRoot, encoding: 'utf-8', stdio: 'pipe' });
+  } catch {
+    try {
+      const timestamp = new Date().toISOString();
+      execSync(`git commit -m "pre-review checkpoint: ${timestamp}"`, { cwd: projectRoot, stdio: 'ignore' });
+      console.log(chalk.green(`Changes committed before review (${timestamp})`));
+    } catch {
+      // May fail if git not initialized or nothing to commit
+    }
+  }
+}
+
+function setupTtlShutdown(server: http.Server, ttl: number): void {
+  if (ttl <= 0) return;
+  let idleTimer: NodeJS.Timeout;
+
+  const resetTimer = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      console.log(chalk.yellow(`Idle for ${ttl}s, shutting down...`));
+      server.close();
+      process.exit(0);
+    }, ttl * 1000);
+  };
+
+  resetTimer();
+  server.on('request', resetTimer);
+}
 
 export function registerReviewCommand(program: Command): void {
   program
@@ -36,13 +71,17 @@ export function registerReviewCommand(program: Command): void {
           process.exit(1);
         }
 
-        const port = parseInt(options.port, 10);
-        const ttl = parseInt(options.ttl, 10);
+        const parsed = ReviewOptionsSchema.safeParse(options);
+        if (!parsed.success) {
+          console.error(chalk.red('Invalid options'));
+          process.exit(1);
+        }
+        const opts: ReviewOptions = parsed.data;
 
-        // Resolve manifest for --circle mode
-        const circleMode = options.circle !== undefined;
+        const manifestReader = new ManifestReader();
+        const circleMode = opts.circle !== undefined;
         const manifestInfo = circleMode
-          ? resolveManifestPath(projectRoot, options.circle === true ? undefined : options.circle)
+          ? manifestReader.resolveForReview(projectRoot, opts.circle === true ? undefined : opts.circle as string)
           : null;
 
         if (circleMode && !manifestInfo) {
@@ -51,119 +90,38 @@ export function registerReviewCommand(program: Command): void {
         }
 
         if (circleMode && manifestInfo) {
-          const manifest = JSON.parse(fs.readFileSync(manifestInfo.manifestPath, 'utf-8'));
-          const assetCount = Object.keys(manifest.assets || {}).length;
-          console.log(chalk.cyan(`Manifest-driven mode: ${manifestInfo.circleName} (${assetCount} assets, target: ${manifest.target || 'videospec'})`));
+          const assetCount = Object.keys(manifestInfo.manifest.assets || {}).length;
+          console.log(chalk.cyan(`Manifest-driven mode: ${manifestInfo.circleName} (${assetCount} assets, target: ${manifestInfo.manifest.target || 'videospec'})`));
         }
 
-        // Auto-commit pending changes before review
-        try {
-          execSync('git add -A', { cwd: projectRoot, stdio: 'ignore' });
-          const diff = execSync('git diff --cached --quiet', { cwd: projectRoot, encoding: 'utf-8', stdio: 'pipe' });
-          void diff;
-        } catch {
-          try {
-            const timestamp = new Date().toISOString();
-            execSync(`git commit -m "pre-review checkpoint: ${timestamp}"`, { cwd: projectRoot, stdio: 'ignore' });
-            console.log(chalk.green(`Changes committed before review (${timestamp})`));
-          } catch {
-            // May fail if git not initialized or nothing to commit
-          }
-        }
+        autoCommitPendingChanges(projectRoot);
+
+        const strategy = circleMode && manifestInfo
+          ? new ManifestReviewStrategy(manifestInfo, manifestReader, projectRoot)
+          : new LegacyReviewStrategy(projectRoot, queueRoot, opts, manifestReader);
 
         const app = express();
 
         // API: List documents
         app.get('/api/documents', (_req, res) => {
-          if (circleMode && manifestInfo) {
-            const docs = scanDocumentsFromManifest(
-              manifestInfo.manifestPath,
-              manifestInfo.circleDir,
-              manifestInfo.circleName,
-              projectRoot
-            );
-            res.json(docs);
-          } else {
-            res.json(scanDocuments(projectRoot, queueRoot));
-          }
+          res.json(strategy.listDocuments());
         });
 
         // API: Get document content
         app.get('/api/documents/:circle/:docId', (req, res) => {
-          const { circle, docId } = req.params;
-
-          if (circleMode && manifestInfo) {
-            const doc = findDocumentFromManifest(
-              manifestInfo.manifestPath,
-              manifestInfo.circleDir,
-              manifestInfo.circleName,
-              projectRoot,
-              docId
-            );
-            if (!doc) {
-              return res.status(404).json({ error: 'Document not found' });
-            }
-            res.json(doc);
-          } else {
-            const doc = findDocument(projectRoot, circle, docId);
-            if (!doc) {
-              return res.status(404).json({ error: 'Document not found' });
-            }
-            res.json(doc);
-          }
+          const doc = strategy.findDocument(req.params.circle, req.params.docId);
+          if (!doc) return res.status(404).json({ error: 'Document not found' });
+          res.json(doc);
         });
 
         // API: List circles
         app.get('/api/circles', (_req, res) => {
-          if (circleMode && manifestInfo) {
-            const manifest = JSON.parse(fs.readFileSync(manifestInfo.manifestPath, 'utf-8'));
-            const assets = manifest.assets || {};
-            const assetCount = Object.keys(assets).length;
-            const layers = new Set(Object.values(assets).map((a: any) => a.layer));
-            res.json([{
-              name: manifestInfo.circleName,
-              target: manifest.target || '',
-              assetCount,
-              layers: layers.size,
-            }]);
-          } else {
-            res.json(scanCircles(queueRoot, options));
-          }
+          res.json(strategy.listCircles());
         });
 
         // API: Get assets for a circle directory
         app.get('/api/circles/:name/assets', (req, res) => {
-          const circleDir = path.join(queueRoot, req.params.name);
-          const manifestPath = path.join(circleDir, '_manifest.json');
-
-          if (!fs.existsSync(manifestPath)) {
-            return res.json({ assets: [] });
-          }
-
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-          const assetsMap: Record<string, any> = manifest.assets || {};
-
-          const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
-            const outputs: string[] = [];
-            const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_'));
-
-            for (const providerDir of dirs) {
-              const providerPath = path.join(circleDir, providerDir);
-              if (!fs.statSync(providerPath).isDirectory()) continue;
-
-              const files = fs.readdirSync(providerPath);
-              const matches = files.filter(
-                (f) => f.startsWith(id) && !f.endsWith('.json') && !f.endsWith('.log')
-              );
-              for (const f of matches) {
-                outputs.push(path.join(providerDir, f));
-              }
-            }
-
-            return { id, status: info.status, layer: info.layer, category: info.category, outputs };
-          });
-
-          res.json({ circle: req.params.name, assets: enriched });
+          res.json(strategy.listCircleAssets(req.params.name));
         });
 
         // Serve output files
@@ -180,79 +138,21 @@ export function registerReviewCommand(program: Command): void {
           }
         });
 
-        // Approve endpoint — unified: reads manifest for target, uses findAssetFilePathUnder
+        // Approve endpoint
         app.post('/api/approve/:circle/:assetId', express.json(), async (req, res) => {
-          const { circle, assetId } = req.params;
-          const { outputFile, taskJsonPath } = req.body || {};
-
           try {
-            // Security: validate path components
-            if (!sanitizePathComponent(circle) || !sanitizePathComponent(assetId)) {
-              res.status(400).json({ error: 'Invalid circle or assetId' });
-              return;
-            }
-
-            const now = new Date().toISOString();
-
-            const parsed = outputFile ? parseOutputFilename(outputFile) : { isModified: false };
-            const newStatus = parsed.isModified ? 'syncing' : 'approved';
-
-            let reviewEntry = `${now} approved output: ${outputFile || assetId}`;
-            if (parsed.isModified && taskJsonPath) {
-              reviewEntry += ` | modified_task: ${taskJsonPath}`;
-            }
-
-            // Read circle manifest to get target for source document lookup
-            const circleDir = resolveWithin(queueRoot, circle);
-            if (!circleDir) {
-              res.status(403).json({ error: 'Forbidden' });
-              return;
-            }
-            const circleManifestPath = path.join(circleDir, '_manifest.json');
-            let targetRoot = getProjectDir(projectRoot, 'videospec');
-
-            if (fs.existsSync(circleManifestPath)) {
-              const manifest = JSON.parse(fs.readFileSync(circleManifestPath, 'utf-8'));
-              if (manifest.target) {
-                const resolvedTarget = resolveWithin(projectRoot, manifest.target);
-                if (resolvedTarget) {
-                  targetRoot = resolvedTarget;
-                }
-                // If manifest.target escapes projectRoot, keep default targetRoot
-              }
-            }
-
-            // Find source document using manifest.target (no hardcoded subdirs)
-            const sourceDocPath = findAssetFilePathUnder(targetRoot, assetId);
-
-            if (sourceDocPath) {
-              const content = fs.readFileSync(sourceDocPath, 'utf-8');
-              const updated = FrontmatterParser.appendReview(content, reviewEntry);
-              const finalContent = FrontmatterParser.updateField(updated, 'status', newStatus);
-              fs.writeFileSync(sourceDocPath, finalContent);
-            }
-
-            // Update _manifest.json assets field
-            if (fs.existsSync(circleManifestPath)) {
-              const manifest = JSON.parse(fs.readFileSync(circleManifestPath, 'utf-8'));
-              if (manifest.assets && manifest.assets[assetId]) {
-                manifest.assets[assetId].status = newStatus;
-              }
-              for (const c of manifest.circles || []) {
-                if (c.status && c.status[assetId]) {
-                  c.status[assetId] = newStatus;
-                }
-              }
-              fs.writeFileSync(circleManifestPath, JSON.stringify(manifest, null, 2));
-            }
-
-            const note = parsed.isModified
-              ? 'Modified task — agent must align fields before setting approved'
-              : 'Original task — directly approved';
-
-            res.json({ success: true, status: newStatus, note });
+            const approveService = new ApproveService(projectRoot, queueRoot, manifestReader);
+            const result = approveService.execute({
+              circle: req.params.circle,
+              assetId: req.params.assetId,
+              outputFile: req.body?.outputFile,
+              taskJsonPath: req.body?.taskJsonPath,
+            });
+            res.json(result);
           } catch (err: any) {
-            res.status(500).json({ error: err.message });
+            const status = err.message === 'Invalid circle or assetId' ? 400
+              : err.message === 'Forbidden' ? 403 : 500;
+            res.status(status).json({ error: err.message });
           }
         });
 
@@ -277,375 +177,14 @@ export function registerReviewCommand(program: Command): void {
           });
         }
 
-        const server = app.listen(port, () => {
-          console.log(chalk.green(`Review server running at http://localhost:${port}`));
+        const server = app.listen(opts.port, () => {
+          console.log(chalk.green(`Review server running at http://localhost:${opts.port}`));
         });
 
-        // TTL auto-shutdown
-        if (ttl > 0) {
-          let idleTimer: NodeJS.Timeout;
-
-          const resetTimer = () => {
-            clearTimeout(idleTimer);
-            idleTimer = setTimeout(() => {
-              console.log(chalk.yellow(`Idle for ${ttl}s, shutting down...`));
-              server.close();
-              process.exit(0);
-            }, ttl * 1000);
-          };
-
-          resetTimer();
-          server.on('request', resetTimer);
-        }
+        setupTtlShutdown(server, opts.ttl);
       } catch (err: any) {
         logger.error(err.message);
         process.exit(1);
       }
     });
-}
-
-// ============================================================================
-// Manifest resolution
-// ============================================================================
-
-interface ManifestInfo {
-  manifestPath: string;
-  circleDir: string;
-  circleName: string;
-}
-
-function resolveManifestPath(projectRoot: string, circleOption?: string): ManifestInfo | null {
-  const queueRoot = getProjectDir(projectRoot, 'queue');
-
-  if (circleOption) {
-    const resolved = path.resolve(circleOption);
-
-    // Case 1: direct manifest file path
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isFile() && resolved.endsWith('_manifest.json')) {
-      const circleDir = path.dirname(resolved);
-      return { manifestPath: resolved, circleDir, circleName: path.basename(circleDir) };
-    }
-
-    // Case 2: circle directory path
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-      const manifestPath = path.join(resolved, '_manifest.json');
-      if (fs.existsSync(manifestPath)) {
-        return { manifestPath, circleDir: resolved, circleName: path.basename(resolved) };
-      }
-    }
-
-    // Case 3: relative to queueRoot (sanitized)
-    const relPath = resolveWithin(queueRoot, circleOption);
-    if (relPath && fs.existsSync(relPath) && fs.statSync(relPath).isDirectory()) {
-      const manifestPath = path.join(relPath, '_manifest.json');
-      if (fs.existsSync(manifestPath)) {
-        return { manifestPath, circleDir: relPath, circleName: path.basename(relPath) };
-      }
-    }
-
-    return null;
-  }
-
-  // Auto-discover latest manifest by generatedAt
-  if (!fs.existsSync(queueRoot)) return null;
-
-  let latest: { path: string; generatedAt: string; circleDir: string; circleName: string } | null = null;
-
-  const entries = fs.readdirSync(queueRoot, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.isDirectory() && /\.circle\d+$/.test(entry.name)) {
-      const mp = path.join(queueRoot, entry.name, '_manifest.json');
-      if (fs.existsSync(mp)) {
-        const data = JSON.parse(fs.readFileSync(mp, 'utf-8'));
-        const ts = data.generatedAt || '1970-01-01T00:00:00.000Z';
-        if (!latest || ts > latest.generatedAt) {
-          latest = { path: mp, generatedAt: ts, circleDir: path.join(queueRoot, entry.name), circleName: entry.name };
-        }
-      }
-    }
-  }
-
-  return latest
-    ? { manifestPath: latest.path, circleDir: latest.circleDir, circleName: latest.circleName }
-    : null;
-}
-
-// ============================================================================
-// Generic asset file path resolver (no hardcoded subdirs)
-// ============================================================================
-
-function findAssetFilePathUnder(
-  targetRoot: string,
-  assetId: string,
-  preferredSubdir?: string
-): string | undefined {
-  if (!sanitizePathComponent(assetId)) return undefined;
-
-  const prefixes = ['@', ''];
-
-  // 1. Check targetRoot itself
-  for (const prefix of prefixes) {
-    const p = path.join(targetRoot, `${prefix}${assetId}.md`);
-    if (fs.existsSync(p)) return p;
-  }
-
-  // 2. Check preferred subdirectory first (if specified)
-  if (preferredSubdir) {
-    const safeSubdir = sanitizePathComponent(preferredSubdir);
-    if (safeSubdir) {
-      const preferredDir = path.join(targetRoot, safeSubdir);
-      if (fs.existsSync(preferredDir) && fs.statSync(preferredDir).isDirectory()) {
-        for (const prefix of prefixes) {
-          const p = path.join(preferredDir, `${prefix}${assetId}.md`);
-          if (fs.existsSync(p)) return p;
-        }
-      }
-    }
-  }
-
-  // 3. Scan all subdirectories under targetRoot (fallback)
-  if (fs.existsSync(targetRoot)) {
-    const entries = fs.readdirSync(targetRoot, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (!sanitizePathComponent(entry.name)) continue;
-      for (const prefix of prefixes) {
-        const p = path.join(targetRoot, entry.name, `${prefix}${assetId}.md`);
-        if (fs.existsSync(p)) return p;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-// ============================================================================
-// Legacy mode helpers (unchanged logic, preserved for backward compatibility)
-// ============================================================================
-
-function scanCircles(queueRoot: string, options: any): any[] {
-  const circles: any[] = [];
-
-  if (!fs.existsSync(queueRoot)) return circles;
-
-  const entries = fs.readdirSync(queueRoot).filter((d) => {
-    const fullPath = path.join(queueRoot, d);
-    return fs.statSync(fullPath).isDirectory() && /\.circle\d+$/.test(d);
-  });
-
-  for (const name of entries) {
-    const manifestPath = path.join(queueRoot, name, '_manifest.json');
-    if (fs.existsSync(manifestPath)) {
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-      const assets = manifest.assets || {};
-      const assetCount = Object.keys(assets).length;
-      const layers = new Set(Object.values(assets).map((a: any) => a.layer));
-      circles.push({
-        name,
-        target: manifest.target || '',
-        assetCount,
-        layers: layers.size,
-      });
-    }
-  }
-
-  if (options.latest && circles.length > 0) {
-    return [circles[circles.length - 1]];
-  }
-
-  return circles;
-}
-
-interface DocumentInfo {
-  docId: string;
-  docPath: string;
-  circle: string;
-  category: string;
-  status: string;
-  content?: string;
-  outputs: Array<{ circle: string; provider: string; filename: string; path: string }>;
-}
-
-/**
- * Legacy: Global review — scans videospec/ subdirectories for all .md documents,
- * enriched with category/status from all circle manifests when available.
- */
-function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
-  const docs: DocumentInfo[] = [];
-  const targetDir = getProjectDir(projectRoot, 'videospec');
-
-  if (!fs.existsSync(targetDir)) return docs;
-
-  // 1. Read all manifests to build asset info and output index
-  const assetInfoMap: Record<string, { category: string; status: string }> = {};
-  const outputIndex: Record<string, Array<{ circle: string; provider: string; filename: string }>> = {};
-
-  if (fs.existsSync(queueRoot)) {
-    const circleDirs = fs.readdirSync(queueRoot).filter((d) => /\.circle\d+$/.test(d));
-    for (const circleDir of circleDirs) {
-      const circlePath = path.join(queueRoot, circleDir);
-      const manifestPath = path.join(circlePath, '_manifest.json');
-
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-        const assetsMap = manifest.assets || {};
-        for (const [id, info] of Object.entries(assetsMap)) {
-          assetInfoMap[id] = {
-            category: (info as any).category || 'other',
-            status: (info as any).status || 'drafting',
-          };
-        }
-      }
-
-      const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_') && sanitizePathComponent(d));
-      for (const providerDir of providerDirs) {
-        const providerPath = path.join(circlePath, providerDir);
-        if (!fs.statSync(providerPath).isDirectory()) continue;
-
-        const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json') && !f.endsWith('.log'));
-        for (const file of files) {
-          const docId = file.replace(/(_\d+)+(\.[^.]+)$/, '');
-          if (!outputIndex[docId]) outputIndex[docId] = [];
-          outputIndex[docId].push({ circle: circleDir, provider: providerDir, filename: file });
-        }
-      }
-    }
-  }
-
-  // 2. Scan videospec/ root and subdirectories for ALL .md files (global review)
-  // 2a. Check targetDir root itself
-  if (fs.existsSync(targetDir)) {
-    const rootFiles = fs.readdirSync(targetDir).filter((f) => f.endsWith('.md'));
-    for (const file of rootFiles) {
-      const docId = file.replace(/^@/, '').replace(/\.md$/, '');
-      const info = assetInfoMap[docId];
-      docs.push({
-        docId,
-        docPath: path.join(targetDir, file),
-        circle: 'root',
-        category: info?.category || 'root',
-        status: info?.status || 'drafting',
-        outputs: (outputIndex[docId] || []).map((o) => ({
-          circle: o.circle,
-          provider: o.provider,
-          filename: o.filename,
-          path: path.join(o.circle, o.provider, o.filename),
-        })),
-      });
-    }
-  }
-
-  // 2b. Scan subdirectories
-  const subdirs = fs.readdirSync(targetDir, { withFileTypes: true });
-  for (const subdir of subdirs) {
-    if (!subdir.isDirectory()) continue;
-    if (!sanitizePathComponent(subdir.name)) continue;
-
-    const dirPath = path.join(targetDir, subdir.name);
-    const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
-    for (const file of files) {
-      const docId = file.replace(/^@/, '').replace(/\.md$/, '');
-      const info = assetInfoMap[docId];
-
-      const doc: DocumentInfo = {
-        docId,
-        docPath: path.join(dirPath, file),
-        circle: subdir.name,
-        category: info?.category || subdir.name,
-        status: info?.status || 'drafting',
-        outputs: (outputIndex[docId] || []).map((o) => ({
-          circle: o.circle,
-          provider: o.provider,
-          filename: o.filename,
-          path: path.join(o.circle, o.provider, o.filename),
-        })),
-      };
-
-      docs.push(doc);
-    }
-  }
-
-  return docs;
-}
-
-function findDocument(projectRoot: string, circle: string, docId: string): DocumentInfo | null {
-  const docs = scanDocuments(projectRoot, getProjectDir(projectRoot, 'queue'));
-  const doc = docs.find((d) => d.circle === circle && d.docId === docId);
-  if (!doc) return null;
-
-  if (fs.existsSync(doc.docPath)) {
-    doc.content = fs.readFileSync(doc.docPath, 'utf-8');
-  }
-  return doc;
-}
-
-// ============================================================================
-// Manifest-driven helpers (--circle mode)
-// ============================================================================
-
-function scanDocumentsFromManifest(
-  manifestPath: string,
-  circleDir: string,
-  circleName: string,
-  projectRoot: string
-): DocumentInfo[] {
-  if (!fs.existsSync(manifestPath)) return [];
-
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-  const assetsMap: Record<string, any> = manifest.assets || {};
-  const targetRoot = path.resolve(projectRoot, manifest.target || getProjectDir(projectRoot, 'videospec'));
-
-  const docs: DocumentInfo[] = [];
-
-  for (const [id, info] of Object.entries(assetsMap)) {
-    const docPath = findAssetFilePathUnder(targetRoot, id);
-    if (!docPath) continue;
-
-    const outputs: Array<{ circle: string; provider: string; filename: string; path: string }> = [];
-    const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_') && sanitizePathComponent(d));
-
-    for (const providerDir of dirs) {
-      const providerPath = path.join(circleDir, providerDir);
-      if (!fs.statSync(providerPath).isDirectory()) continue;
-
-      const files = fs.readdirSync(providerPath).filter((f) => !f.endsWith('.json') && !f.endsWith('.log'));
-      const matches = files.filter((f) => f.startsWith(id));
-      for (const f of matches) {
-        outputs.push({
-          circle: circleName,
-          provider: providerDir,
-          filename: f,
-          path: path.join(circleName, providerDir, f),
-        });
-      }
-    }
-
-    docs.push({
-      docId: id,
-      docPath,
-      circle: circleName,
-      category: (info as any).category || 'other',
-      status: (info as any).status || 'drafting',
-      outputs,
-    });
-  }
-
-  return docs;
-}
-
-function findDocumentFromManifest(
-  manifestPath: string,
-  circleDir: string,
-  circleName: string,
-  projectRoot: string,
-  docId: string
-): DocumentInfo | null {
-  const docs = scanDocumentsFromManifest(manifestPath, circleDir, circleName, projectRoot);
-  const doc = docs.find((d) => d.docId === docId);
-  if (!doc) return null;
-
-  if (fs.existsSync(doc.docPath)) {
-    doc.content = fs.readFileSync(doc.docPath, 'utf-8');
-  }
-  return doc;
 }
