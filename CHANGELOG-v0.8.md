@@ -1,6 +1,24 @@
 # OpsV v0.8.x 会话变更记录
 
-> 记录范围：v0.8.1 → v0.8.22，涵盖 2026-04-28 ~ 2026-05-09 全部会话
+> 记录范围：v0.8.1 → v0.8.23，涵盖 2026-04-28 ~ 2026-05-10 全部会话
+
+---
+
+## v0.8.23 — 2026-05-10
+
+### 变更要点
+
+1. **Code Review Audit 修复补完（v0.8.22 → v0.8.23）**
+   - `src/commands/review.ts` 补全审计 §8 路径遍历防护：
+     - `/api/files/:circle/:provider/:file` 改用 `resolveWithin()` 限制访问范围
+     - `POST /api/approve/:circle/:assetId` 对 `circle`/`assetId` 执行 `sanitizePathComponent()` 校验
+     - `resolveManifestPath()` 改用 `getProjectDir()` + `resolveWithin()`
+     - `findAssetFilePathUnder()` 新增 `preferredSubdir` 参数，与 `AssetManager` 行为对齐；对 `assetId` 和子目录名执行 `sanitizePathComponent()`
+     - `scanDocuments()` 新增 `videospec/` 根目录扫描（此前漏掉根目录 `.md`），子目录过滤增加 `sanitizePathComponent()`
+     - `scanDocumentsFromManifest()` provider 目录过滤增加 `sanitizePathComponent()`
+   - 新增 `src/utils/pathSecurity.ts`：`resolveWithin()` + `sanitizePathComponent()`
+   - 修复 `withFileives` → `withFileTypes` 拼写错误（TypeScript 编译阻塞）
+   - 影响文件：`src/commands/review.ts`、`src/utils/pathSecurity.ts`
 
 ---
 
@@ -269,6 +287,7 @@
 | v0.8.5 | 2026-04-29 11:30 | init 模板复制化、.env 根目录化、cli.ts 优先级修正 |
 | v0.8.9 | 2026-04-30 | git init 自动执行、review 前置自动提交、Git 集成文档 |
 | v0.8.10 | 2026-05-01 | modelKey 存储修复、Minimax URL 解析修复、api_config 别名更新、新增 I2I 模型 |
+| v0.8.23 | 2026-05-10 | Audit §8 review.ts 路径遍历防护补完、pathSecurity 工具 |
 
 ---
 

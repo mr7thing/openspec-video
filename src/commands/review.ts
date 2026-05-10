@@ -14,6 +14,7 @@ import { FrontmatterParser } from '../core/FrontmatterParser';
 import { parseOutputFilename } from '../executor/naming';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
+import { resolveWithin, sanitizePathComponent } from '../utils/pathSecurity';
 
 export function registerReviewCommand(program: Command): void {
   program
@@ -167,7 +168,11 @@ export function registerReviewCommand(program: Command): void {
 
         // Serve output files
         app.get('/api/files/:circle/:provider/:file', (req, res) => {
-          const filePath = path.join(queueRoot, req.params.circle, req.params.provider, req.params.file);
+          const filePath = resolveWithin(queueRoot, req.params.circle, req.params.provider, req.params.file);
+          if (!filePath) {
+            res.status(403).send('Forbidden');
+            return;
+          }
           if (fs.existsSync(filePath)) {
             res.sendFile(filePath);
           } else {
@@ -181,6 +186,12 @@ export function registerReviewCommand(program: Command): void {
           const { outputFile, taskJsonPath } = req.body || {};
 
           try {
+            // Security: validate path components
+            if (!sanitizePathComponent(circle) || !sanitizePathComponent(assetId)) {
+              res.status(400).json({ error: 'Invalid circle or assetId' });
+              return;
+            }
+
             const now = new Date().toISOString();
 
             const parsed = outputFile ? parseOutputFilename(outputFile) : { isModified: false };
@@ -192,14 +203,22 @@ export function registerReviewCommand(program: Command): void {
             }
 
             // Read circle manifest to get target for source document lookup
-            const circleDir = path.join(queueRoot, circle);
+            const circleDir = resolveWithin(queueRoot, circle);
+            if (!circleDir) {
+              res.status(403).json({ error: 'Forbidden' });
+              return;
+            }
             const circleManifestPath = path.join(circleDir, '_manifest.json');
             let targetRoot = getProjectDir(projectRoot, 'videospec');
 
             if (fs.existsSync(circleManifestPath)) {
               const manifest = JSON.parse(fs.readFileSync(circleManifestPath, 'utf-8'));
               if (manifest.target) {
-                targetRoot = path.resolve(projectRoot, manifest.target);
+                const resolvedTarget = resolveWithin(projectRoot, manifest.target);
+                if (resolvedTarget) {
+                  targetRoot = resolvedTarget;
+                }
+                // If manifest.target escapes projectRoot, keep default targetRoot
               }
             }
 
@@ -296,7 +315,7 @@ interface ManifestInfo {
 }
 
 function resolveManifestPath(projectRoot: string, circleOption?: string): ManifestInfo | null {
-  const queueRoot = path.join(projectRoot, 'opsv-queue');
+  const queueRoot = getProjectDir(projectRoot, 'queue');
 
   if (circleOption) {
     const resolved = path.resolve(circleOption);
@@ -315,9 +334,9 @@ function resolveManifestPath(projectRoot: string, circleOption?: string): Manife
       }
     }
 
-    // Case 3: relative to queueRoot
-    const relPath = path.join(queueRoot, circleOption);
-    if (fs.existsSync(relPath) && fs.statSync(relPath).isDirectory()) {
+    // Case 3: relative to queueRoot (sanitized)
+    const relPath = resolveWithin(queueRoot, circleOption);
+    if (relPath && fs.existsSync(relPath) && fs.statSync(relPath).isDirectory()) {
       const manifestPath = path.join(relPath, '_manifest.json');
       if (fs.existsSync(manifestPath)) {
         return { manifestPath, circleDir: relPath, circleName: path.basename(relPath) };
@@ -355,24 +374,44 @@ function resolveManifestPath(projectRoot: string, circleOption?: string): Manife
 // Generic asset file path resolver (no hardcoded subdirs)
 // ============================================================================
 
-function findAssetFilePathUnder(targetRoot: string, assetId: string): string | undefined {
+function findAssetFilePathUnder(
+  targetRoot: string,
+  assetId: string,
+  preferredSubdir?: string
+): string | undefined {
+  if (!sanitizePathComponent(assetId)) return undefined;
+
   const prefixes = ['@', ''];
 
-  // Check targetRoot itself
+  // 1. Check targetRoot itself
   for (const prefix of prefixes) {
     const p = path.join(targetRoot, `${prefix}${assetId}.md`);
     if (fs.existsSync(p)) return p;
   }
 
-  // Scan all subdirectories under targetRoot
+  // 2. Check preferred subdirectory first (if specified)
+  if (preferredSubdir) {
+    const safeSubdir = sanitizePathComponent(preferredSubdir);
+    if (safeSubdir) {
+      const preferredDir = path.join(targetRoot, safeSubdir);
+      if (fs.existsSync(preferredDir) && fs.statSync(preferredDir).isDirectory()) {
+        for (const prefix of prefixes) {
+          const p = path.join(preferredDir, `${prefix}${assetId}.md`);
+          if (fs.existsSync(p)) return p;
+        }
+      }
+    }
+  }
+
+  // 3. Scan all subdirectories under targetRoot (fallback)
   if (fs.existsSync(targetRoot)) {
     const entries = fs.readdirSync(targetRoot, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory()) {
-        for (const prefix of prefixes) {
-          const p = path.join(targetRoot, entry.name, `${prefix}${assetId}.md`);
-          if (fs.existsSync(p)) return p;
-        }
+      if (!entry.isDirectory()) continue;
+      if (!sanitizePathComponent(entry.name)) continue;
+      for (const prefix of prefixes) {
+        const p = path.join(targetRoot, entry.name, `${prefix}${assetId}.md`);
+        if (fs.existsSync(p)) return p;
       }
     }
   }
@@ -458,7 +497,7 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
         }
       }
 
-      const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_'));
+      const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_') && sanitizePathComponent(d));
       for (const providerDir of providerDirs) {
         const providerPath = path.join(circlePath, providerDir);
         if (!fs.statSync(providerPath).isDirectory()) continue;
@@ -473,10 +512,34 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
     }
   }
 
-  // 2. Scan videospec/ subdirectories for ALL .md files (global review)
+  // 2. Scan videospec/ root and subdirectories for ALL .md files (global review)
+  // 2a. Check targetDir root itself
+  if (fs.existsSync(targetDir)) {
+    const rootFiles = fs.readdirSync(targetDir).filter((f) => f.endsWith('.md'));
+    for (const file of rootFiles) {
+      const docId = file.replace(/^@/, '').replace(/\.md$/, '');
+      const info = assetInfoMap[docId];
+      docs.push({
+        docId,
+        docPath: path.join(targetDir, file),
+        circle: 'root',
+        category: info?.category || 'root',
+        status: info?.status || 'drafting',
+        outputs: (outputIndex[docId] || []).map((o) => ({
+          circle: o.circle,
+          provider: o.provider,
+          filename: o.filename,
+          path: path.join(o.circle, o.provider, o.filename),
+        })),
+      });
+    }
+  }
+
+  // 2b. Scan subdirectories
   const subdirs = fs.readdirSync(targetDir, { withFileTypes: true });
   for (const subdir of subdirs) {
     if (!subdir.isDirectory()) continue;
+    if (!sanitizePathComponent(subdir.name)) continue;
 
     const dirPath = path.join(targetDir, subdir.name);
     const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
@@ -539,7 +602,7 @@ function scanDocumentsFromManifest(
     if (!docPath) continue;
 
     const outputs: Array<{ circle: string; provider: string; filename: string; path: string }> = [];
-    const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_'));
+    const dirs = fs.readdirSync(circleDir).filter((d) => !d.startsWith('_') && sanitizePathComponent(d));
 
     for (const providerDir of dirs) {
       const providerPath = path.join(circleDir, providerDir);
