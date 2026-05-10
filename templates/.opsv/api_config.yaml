@@ -176,6 +176,8 @@ models:
     max_reference_images: 1
     defaults:
       aspect_ratio: "16:9"
+      size: "1920x1080"
+      quality: "hd"
 
   minimax.vid01:
     provider: minimax
@@ -233,7 +235,7 @@ models:
     supports_reference_images: true
     max_reference_images: 4
     node_mappings:
-      # 提示词节点 (通常是 CLIPTextEncode)
+      # 提示词节点 (通常是 CLIPTextEncode 或 CR Prompt Text)
       prompt:
         nodeId: "6"
         fieldName: "text"
@@ -241,6 +243,10 @@ models:
       negative_prompt:
         nodeId: "7"
         fieldName: "text"
+      # 种子节点 (CR Seed / KSampler seed 等)
+      seed:
+        nodeId: "116"
+        fieldName: "seed"
       # 参考图片节点 (LoadImage)
       image1:
         nodeId: "10"
@@ -250,18 +256,14 @@ models:
       #   nodeId: "15"
       #   fieldName: "image"
       # 其他自定义参数直接按 key 映射
-      # seed:
-      #   nodeId: "3"
-      #   fieldName: "seed"
     defaults:
       addMetadata: true
       instanceType: ""
       usePersonalQueue: false
       retainSeconds: null
       accessPassword: null
-      # seed 支持固定数字或 "random" (opsv run 时自动生成 16 位以内随机自然数)
-      # seed: 42
-      # seed: random
+      # seed 支持固定数字或 "random" (opsv run 时自动生成 < 10^16 的随机自然数)
+      seed: random
 
   # ==========================================
   # Web App 浏览器自动化

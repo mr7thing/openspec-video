@@ -68,11 +68,21 @@ export class RunningHubProvider {
             if (item.fieldValue && typeof item.fieldValue === 'string') {
               const val = item.fieldValue;
               if (!val.startsWith('http') && !val.startsWith('data:')) {
-                if (!fs.existsSync(val)) {
+                // Skip strings that are clearly not file paths (long text, multiline)
+                if (val.length > 4096 || val.includes('\n')) {
+                  continue;
+                }
+                if (fs.existsSync(val)) {
+                  const fileName = await this.uploadFile(val, apiKey, baseUrl);
+                  item.fieldValue = fileName;
+                } else if (
+                  val.includes('/') || val.includes('\\') ||
+                  /\.(png|jpg|jpeg|webp|gif|bmp|mp4|mov|avi|mkv|wav|mp3|ogg|flac)$/i.test(val)
+                ) {
+                  // Looks like a file path but doesn't exist
                   throw new Error(`Reference file not found: ${val} (node ${item.nodeId}.${item.fieldName})`);
                 }
-                const fileName = await this.uploadFile(val, apiKey, baseUrl);
-                item.fieldValue = fileName;
+                // Otherwise silently skip (likely a text value like prompt)
               }
             }
           }
@@ -86,6 +96,7 @@ export class RunningHubProvider {
             'Content-Type': 'application/json',
           },
           timeout: 120000,
+          transformResponse: [(data) => this.parseBigIntResponse(data)],
         });
 
         // Response: { code: 0, msg: 'success', data: { taskId, taskStatus, clientId, promptTips } }
@@ -125,6 +136,7 @@ export class RunningHubProvider {
             {
               headers: { Authorization: `Bearer ${apiKey}` },
               timeout: 30000,
+              transformResponse: [(data) => this.parseBigIntResponse(data)],
             }
           ),
           `status query for ${taskId}`
@@ -147,6 +159,7 @@ export class RunningHubProvider {
               {
                 headers: { Authorization: `Bearer ${apiKey}` },
                 timeout: 30000,
+                transformResponse: [(data) => this.parseBigIntResponse(data)],
               }
             ),
             `result query for ${taskId}`
@@ -239,6 +252,7 @@ export class RunningHubProvider {
       timeout: 120000,
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
+      transformResponse: [(data) => this.parseBigIntResponse(data)],
     });
 
     if (response.data?.code !== 0) {
@@ -273,6 +287,7 @@ export class RunningHubProvider {
       {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
+        transformResponse: [(data) => this.parseBigIntResponse(data)],
       }
     );
 
@@ -312,6 +327,19 @@ export class RunningHubProvider {
       if (mimeExt) return mimeExt;
     }
     return fileType;
+  }
+
+  // --------------------------------------------------------------------------
+  // Parse JSON response while preserving big integers as strings
+  // --------------------------------------------------------------------------
+  private parseBigIntResponse(data: string): any {
+    if (!data || typeof data !== 'string') return data;
+    return JSON.parse(data, (key, value) => {
+      if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+        return String(value);
+      }
+      return value;
+    });
   }
 
   // --------------------------------------------------------------------------
