@@ -391,6 +391,12 @@
     - 所有模型添加 `docs_url` 字段
     - `volc.seadream5` 添加 `quality_map` 解决最小分辨率限制
 
+41. **Code Review 修复 (v0.8.22 audit)**
+    - **P0 竞态/正确性**: QueueRunner 并发 `.finally()` 修复；TaskBuilder `compileToDir()` 改为 `async` 并补 `await`；ConfigLoader 单例加锁；DependencyGraph 循环检测改用 DFS 避免误标 blocked 节点
+    - **P1 鲁棒性**: ComfyUICompiler `over` 排序；TaskBuilder `forceApiMapping` 空值防御；所有 Provider `resolveImageField` 异步化 + MIME 补全；RefResolver `FRAME:` 校验 + ref 正则扩展；OpsVError 栈去重 / toJSON 脱敏 / i18n；`yaml.load` 限制为 `JSON_SCHEMA`
+    - **P2 配置化**: `ModelConfig` 新增 `timeout` / `max_poll_duration` / `retry`；`ApiConfig` 新增 `settings.dirs` / `settings.polling.intervals`；所有 Provider 超时/轮询/重试从配置读取；`SiliconFlowCompiler` 补全 `4:3` / `3:4` 尺寸映射；`getProjectDir()` 归一化 `videospec` / `opsv-queue` 目录名；`fileToBase64.ts` 补全 MIME map
+    - 影响文件：24 个源文件（详见 `docs/audit/0.8.22fix.md`）
+
 40. **文档更新**
     - README.md 新增 `--model` 参数与 API Config 别名章节
     - 所有示例命令更新为新别名格式

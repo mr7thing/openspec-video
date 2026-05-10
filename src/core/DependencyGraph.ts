@@ -8,6 +8,7 @@ import path from 'path';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { logger } from '../utils/logger';
+import { getProjectDir } from '../utils/configLoader';
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../../package.json');
@@ -108,7 +109,8 @@ export class DependencyGraph {
       }
 
       if (batch.length === 0) {
-        cycles.push(...remaining.keys());
+        const cycleNodes = this.findCycleNodes(remaining);
+        cycles.push(...cycleNodes);
         break;
       }
 
@@ -130,7 +132,7 @@ export class DependencyGraph {
     const docs = documents || this.documents;
     const lastBatchHasShotList = (batch: string[]): boolean => batch.includes('shotlist');
 
-    const ordinals = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'ninthcircle'];
+    const ordinals = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'eighthcircle', 'ninthcircle'];
 
     for (const [layerIdx, batch] of batches.entries()) {
       const layer = layerIdx + 1;
@@ -409,7 +411,38 @@ export class DependencyGraph {
     return graph;
   }
 
+  private findCycleNodes(remaining: Map<string, Set<string>>): string[] {
+    const cycleNodes = new Set<string>();
+    const visited = new Set<string>();
+
+    const dfs = (node: string, path: string[]) => {
+      visited.add(node);
+      path.push(node);
+      const deps = remaining.get(node) || new Set();
+      for (const dep of deps) {
+        if (!remaining.has(dep)) continue;
+        if (!visited.has(dep)) {
+          dfs(dep, path);
+        } else if (path.includes(dep)) {
+          const idx = path.indexOf(dep);
+          for (let i = idx; i < path.length; i++) {
+            cycleNodes.add(path[i]);
+          }
+        }
+      }
+      path.pop();
+    };
+
+    for (const node of remaining.keys()) {
+      if (!visited.has(node)) {
+        dfs(node, []);
+      }
+    }
+
+    return [...cycleNodes];
+  }
+
   static buildFromProject(projectRoot: string): DependencyGraph {
-    return DependencyGraph.buildFromDir(projectRoot, 'videospec');
+    return DependencyGraph.buildFromDir(projectRoot, getProjectDir(projectRoot, 'videospec'));
   }
 }

@@ -5,6 +5,7 @@
 import path from 'path';
 import fs from 'fs';
 import { FileUtils } from '../utils/FileUtils';
+import { getProjectDir } from '../utils/configLoader';
 
 export interface ApprovedRef {
   variant: string;
@@ -89,7 +90,7 @@ export class ApprovedRefReader {
 
   private async findDocPath(assetId: string): Promise<string | null> {
     const prefixes = ['@', ''];
-    const videospecDir = path.join(this.projectRoot, 'videospec');
+    const videospecDir = getProjectDir(this.projectRoot, 'videospec');
 
     if (!fs.existsSync(videospecDir)) return null;
 

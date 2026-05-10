@@ -109,7 +109,7 @@ export function registerComfyCommand(program: Command): void {
         const outputDir = resolveModelQueueDir(circleDir, modelKey);
         const builder = new TaskBuilder(projectRoot);
 
-        const results = builder.compileToDir(
+        const results = await builder.compileToDir(
           jobs, modelKey, outputDir, options.dryRun,
           workflowPath, workflowDir, options.forceApiMapping
         );

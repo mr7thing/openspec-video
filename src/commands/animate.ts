@@ -88,7 +88,7 @@ export function registerAnimateCommand(program: Command): void {
         const outputDir = resolveModelQueueDir(circleDir, modelKey);
         const builder = new TaskBuilder(projectRoot);
 
-        const results = builder.compileToDir(jobs, modelKey, outputDir, options.dryRun);
+        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun);
 
         if (options.dryRun) {
           console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));

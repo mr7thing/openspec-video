@@ -5,6 +5,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { readFile } from 'fs/promises';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
@@ -27,6 +28,7 @@ export class MinimaxProvider {
     const configLoader = ConfigLoader.getInstance();
     configLoader.loadConfig(resolveProjectRoot(process.cwd()));
 
+    const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
     let apiKey: string;
     try {
       apiKey = configLoader.getResolvedApiKey(task._opsv.modelKey);
@@ -38,9 +40,9 @@ export class MinimaxProvider {
 
     try {
       if (isImage) {
-        return await this.executeImage(task, taskPath, apiKey);
+        return await this.executeImage(task, taskPath, apiKey, modelConfig);
       }
-      return await this.executeVideo(task, taskPath, apiKey);
+      return await this.executeVideo(task, taskPath, apiKey, modelConfig);
     } catch (err: any) {
       return {
         taskPath,
@@ -56,13 +58,22 @@ export class MinimaxProvider {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
     // Local file path — convert to base64 data URI
-    const data = fs.readFileSync(value);
+    const data = await readFile(value);
     const ext = path.extname(value).slice(1) || 'png';
-    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      jfif: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+      bmp: 'image/bmp',
+      gif: 'image/gif',
+    };
+    const mime = mimeMap[ext.toLowerCase()] || `image/${ext}`;
     return `data:${mime};base64,${data.toString('base64')}`;
   }
 
-  private async executeImage(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
+  private async executeImage(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
     const apiUrl = task._opsv.api_url;
     const shotId = task._opsv.shotId;
 
@@ -79,7 +90,7 @@ export class MinimaxProvider {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: 120000,
+      timeout: modelConfig?.timeout?.submit || 120000,
     });
 
     const imageUrl =
@@ -98,7 +109,7 @@ export class MinimaxProvider {
     return { taskPath, shotId, provider: 'minimax', success: true, outputPath };
   }
 
-  private async executeVideo(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
+  private async executeVideo(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
     const submitUrl = task._opsv.api_url;
     const statusUrl = task._opsv.api_status_url;
     const shotId = task._opsv.shotId;
@@ -114,7 +125,7 @@ export class MinimaxProvider {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        timeout: 120000,
+        timeout: modelConfig?.timeout?.submit || 120000,
       });
 
       taskId = submitRes.data?.task_id || submitRes.data?.data?.task_id;
@@ -129,14 +140,14 @@ export class MinimaxProvider {
     }
 
     // Gradient polling
-    const maxDuration = 4 * 60 * 60 * 1000;
+    const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
     while (true) {
       const elapsed = getElapsedMs(taskPath);
       if (elapsed > maxDuration) {
         throw new Error(`Polling timeout for ${taskId} (4h exceeded)`);
       }
 
-      const interval = getPollIntervalMs(elapsed);
+      const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
       await sleep(interval);
 
       const statusRes = await axios.get(`${statusUrl}?task_id=${taskId}`, {

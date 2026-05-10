@@ -9,6 +9,7 @@ import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader, ApprovedRef } from './ApprovedRefReader';
 import { DesignRefReader, DesignRef } from './DesignRefReader';
 import { logger } from '../utils/logger';
+import { getProjectDir } from '../utils/configLoader';
 
 export interface Asset {
   id: string;
@@ -43,7 +44,7 @@ export class AssetManager {
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
-    this.videospecRoot = path.join(this.projectRoot, 'videospec');
+    this.videospecRoot = getProjectDir(this.projectRoot, 'videospec');
     this.approvedRefReader = new ApprovedRefReader(this.projectRoot);
     this.designRefReader = new DesignRefReader(this.projectRoot);
   }

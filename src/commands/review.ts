@@ -13,6 +13,7 @@ import { execSync } from 'child_process';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { parseOutputFilename } from '../executor/naming';
 import { logger } from '../utils/logger';
+import { getProjectDir } from '../utils/configLoader';
 
 export function registerReviewCommand(program: Command): void {
   program
@@ -26,7 +27,7 @@ export function registerReviewCommand(program: Command): void {
     .action(async (options: any) => {
       try {
         const projectRoot = process.cwd();
-        const queueRoot = path.join(projectRoot, 'opsv-queue');
+        const queueRoot = getProjectDir(projectRoot, 'queue');
 
         if (!fs.existsSync(queueRoot)) {
           console.error(chalk.red(`Queue directory not found: ${queueRoot}`));
@@ -193,7 +194,7 @@ export function registerReviewCommand(program: Command): void {
             // Read circle manifest to get target for source document lookup
             const circleDir = path.join(queueRoot, circle);
             const circleManifestPath = path.join(circleDir, '_manifest.json');
-            let targetRoot = path.join(projectRoot, 'videospec');
+            let targetRoot = getProjectDir(projectRoot, 'videospec');
 
             if (fs.existsSync(circleManifestPath)) {
               const manifest = JSON.parse(fs.readFileSync(circleManifestPath, 'utf-8'));
@@ -432,7 +433,7 @@ interface DocumentInfo {
  */
 function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
   const docs: DocumentInfo[] = [];
-  const targetDir = path.join(projectRoot, 'videospec');
+  const targetDir = getProjectDir(projectRoot, 'videospec');
 
   if (!fs.existsSync(targetDir)) return docs;
 
@@ -505,7 +506,7 @@ function scanDocuments(projectRoot: string, queueRoot: string): DocumentInfo[] {
 }
 
 function findDocument(projectRoot: string, circle: string, docId: string): DocumentInfo | null {
-  const docs = scanDocuments(projectRoot, path.join(projectRoot, 'opsv-queue'));
+  const docs = scanDocuments(projectRoot, getProjectDir(projectRoot, 'queue'));
   const doc = docs.find((d) => d.circle === circle && d.docId === docId);
   if (!doc) return null;
 
@@ -529,7 +530,7 @@ function scanDocumentsFromManifest(
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
   const assetsMap: Record<string, any> = manifest.assets || {};
-  const targetRoot = path.resolve(projectRoot, manifest.target || 'videospec');
+  const targetRoot = path.resolve(projectRoot, manifest.target || getProjectDir(projectRoot, 'videospec'));
 
   const docs: DocumentInfo[] = [];
 

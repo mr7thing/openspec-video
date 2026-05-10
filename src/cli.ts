@@ -37,8 +37,15 @@ if (fs.existsSync(rootEnvPath)) {
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../package.json');
-const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.1' };
-const VERSION = pkg.version;
+let VERSION = '0.8.1';
+try {
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    VERSION = pkg.version || VERSION;
+  }
+} catch {
+  // fallback to default version
+}
 
 const program = new Command();
 program

@@ -76,8 +76,22 @@ export function cleanupLog(taskPath: string): void {
   }
 }
 
+export interface PollingInterval {
+  thresholdMinutes: number;
+  intervalSeconds: number;
+}
+
 // Gradient polling interval based on elapsed time since submission
-export function getPollIntervalMs(elapsedMs: number): number {
+export function getPollIntervalMs(elapsedMs: number, intervals?: PollingInterval[]): number {
+  if (intervals && intervals.length > 0) {
+    for (const { thresholdMinutes, intervalSeconds } of intervals) {
+      if (elapsedMs < thresholdMinutes * 60 * 1000) {
+        return intervalSeconds * 1000;
+      }
+    }
+    return intervals[intervals.length - 1].intervalSeconds * 1000;
+  }
+  // Default intervals
   if (elapsedMs < 5 * 60 * 1000) return 10_000;       // 0-5min: 10s
   if (elapsedMs < 10 * 60 * 1000) return 30_000;      // 5-10min: 30s
   if (elapsedMs < 30 * 60 * 1000) return 60_000;      // 10-30min: 60s

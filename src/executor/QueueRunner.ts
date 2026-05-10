@@ -177,7 +177,7 @@ export class QueueRunner {
     const executing = new Set<Promise<void>>();
 
     for (const { task, path: taskPath } of entries) {
-      const promise = this.runTask(task, taskPath, provider, results).then(() => {
+      const promise = this.runTask(task, taskPath, provider, results).finally(() => {
         executing.delete(promise);
       });
       executing.add(promise);

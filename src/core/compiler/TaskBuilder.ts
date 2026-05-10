@@ -46,7 +46,7 @@ export class TaskBuilder {
     this.projectRoot = projectRoot;
   }
 
-  compileToDir(
+  async compileToDir(
     jobs: Job[],
     modelKey: string,
     outputDir: string,
@@ -54,7 +54,7 @@ export class TaskBuilder {
     workflowPath?: string,
     workflowDir?: string,
     forceApiMapping?: boolean
-  ): TaskJson[] {
+  ): Promise<TaskJson[]> {
     const modelConfig = this.configLoader.getModelConfig(modelKey);
     if (!modelConfig) {
       throw new Error(`Model '${modelKey}' not found in api_config.yaml`);
@@ -81,7 +81,7 @@ export class TaskBuilder {
         referenceAudios: job.reference_audios,
         refCount: job.reference_images?.length || 0,
         nodeMapping: forceApiMapping
-          ? (modelConfig.node_mappings && Object.keys(modelConfig.node_mappings).length > 0 ? modelConfig.node_mappings : undefined)
+          ? (modelConfig.node_mappings && Object.keys(modelConfig.node_mappings).length > 0 ? modelConfig.node_mappings : {})
           : (job.node_mapping && Object.keys(job.node_mapping).length > 0 ? job.node_mapping : modelConfig.node_mappings),
       };
 
@@ -90,7 +90,7 @@ export class TaskBuilder {
 
       if (!dryRun) {
         const filePath = path.join(outputDir, `${job.id}.json`);
-        FileUtils.writeJson(filePath, taskJson);
+        await FileUtils.writeJson(filePath, taskJson);
         logger.info(`Compiled: ${job.id} → ${filePath}`);
       }
     }

@@ -119,6 +119,8 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       '1:1': '1024x1024',
       '16:9': '1920x1080',
       '9:16': '1080x1920',
+      '4:3': '1024x768',
+      '3:4': '768x1024',
     };
     return sizeMap[aspect] || '1024x1024';
   }

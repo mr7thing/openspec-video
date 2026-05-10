@@ -17,6 +17,7 @@ import {
   StatusEnum,
 } from '../types/FrontmatterSchema';
 import { logger } from '../utils/logger';
+import { getProjectDir } from '../utils/configLoader';
 
 export function registerValidateCommand(program: Command, version: string): void {
   program
@@ -26,7 +27,7 @@ export function registerValidateCommand(program: Command, version: string): void
     .action(async (options: any) => {
       try {
         const projectRoot = path.resolve(options.dir);
-        const videospecDir = path.join(projectRoot, 'videospec');
+        const videospecDir = getProjectDir(projectRoot, 'videospec');
 
         if (!fs.existsSync(videospecDir)) {
           console.error(chalk.red(`Videospec directory not found: ${videospecDir}`));

@@ -5,6 +5,7 @@
 
 import axios from 'axios';
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { TaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
@@ -31,14 +32,15 @@ export class VolcengineProvider {
 
     // modelKey is the api_config key (e.g. volc.seadream5), use it directly
     const apiKey = configLoader.getResolvedApiKey(modelKey);
+    const modelConfig = configLoader.getModelConfig(modelKey);
 
     const isImage = task._opsv.type === 'imagen';
 
     try {
       if (isImage) {
-        return await this.executeImage(task, taskPath, apiKey);
+        return await this.executeImage(task, taskPath, apiKey, modelConfig);
       }
-      return await this.executeVideo(task, taskPath, apiKey);
+      return await this.executeVideo(task, taskPath, apiKey, modelConfig);
     } catch (err: any) {
       return {
         taskPath,
@@ -54,9 +56,18 @@ export class VolcengineProvider {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
     // Local file path — convert to base64 data URI
-    const data = fs.readFileSync(value);
+    const data = await readFile(value);
     const ext = path.extname(value).slice(1) || 'png';
-    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      jfif: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+      bmp: 'image/bmp',
+      gif: 'image/gif',
+    };
+    const mime = mimeMap[ext.toLowerCase()] || `image/${ext}`;
     return `data:${mime};base64,${data.toString('base64')}`;
   }
 
@@ -80,7 +91,7 @@ export class VolcengineProvider {
     );
   }
 
-  private async executeImage(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
+  private async executeImage(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
     const apiUrl = task._opsv.api_url;
     const shotId = task._opsv.shotId;
 
@@ -99,7 +110,7 @@ export class VolcengineProvider {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: 300000,
+      timeout: modelConfig?.timeout?.submit || 300000,
     });
 
     // Handle multi-image response (sequential_image_generation)
@@ -141,7 +152,7 @@ export class VolcengineProvider {
     };
   }
 
-  private async executeVideo(task: TaskJson, taskPath: string, apiKey: string): Promise<ProviderResult> {
+  private async executeVideo(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
     const submitUrl = task._opsv.api_url;
     const statusUrl = task._opsv.api_status_url || submitUrl;
     const shotId = task._opsv.shotId;
@@ -173,7 +184,7 @@ export class VolcengineProvider {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        timeout: 120000,
+        timeout: modelConfig?.timeout?.status || 120000,
       });
 
       requestId =
@@ -192,14 +203,14 @@ export class VolcengineProvider {
     }
 
     // Gradient polling
-    const maxDuration = 4 * 60 * 60 * 1000; // 4h max
+    const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000; // 4h default
     while (true) {
       const elapsed = getElapsedMs(taskPath);
       if (elapsed > maxDuration) {
         throw new Error(`Polling timeout for ${requestId} (4h exceeded)`);
       }
 
-      const interval = getPollIntervalMs(elapsed);
+      const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
       await sleep(interval);
 
       const statusRes = await axios.get(`${statusUrl}/${requestId}`, {

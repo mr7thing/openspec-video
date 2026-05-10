@@ -9,6 +9,8 @@ import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
 import { generateRandomSeed } from '../../utils/randomSeed';
+import { ConfigLoader } from '../../utils/configLoader';
+import { resolveProjectRoot } from '../../utils/projectResolver';
 import {
   appendLog,
   getResumeTaskId,
@@ -27,6 +29,10 @@ export class ComfyUILocalProvider {
     apiUrl = apiUrl.replace(/\/$/, '');
     const shotId = task._opsv.shotId;
 
+    const configLoader = ConfigLoader.getInstance();
+    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
+    const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
+
     let promptId = getResumeTaskId(taskPath);
 
     try {
@@ -38,7 +44,7 @@ export class ComfyUILocalProvider {
         this.resolveRandomInWorkflow(payload);
 
         const response = await axios.post(`${apiUrl}/prompt`, { prompt: payload }, {
-          timeout: 30000,
+          timeout: modelConfig?.timeout?.submit || 30000,
         });
 
         promptId = response.data?.prompt_id;
@@ -53,19 +59,21 @@ export class ComfyUILocalProvider {
       }
 
       // Gradient polling
-      const maxDuration = 4 * 60 * 60 * 1000;
+      const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
           throw new Error(`Polling timeout for promptId=${promptId} (4h exceeded)`);
         }
 
-        const interval = getPollIntervalMs(elapsed);
+        const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
         await sleep(interval);
 
         const statusRes = await this.withRetry(
-          () => axios.get(`${apiUrl}/history/${promptId}`, { timeout: 30000 }),
-          `history query for ${promptId}`
+          () => axios.get(`${apiUrl}/history/${promptId}`, { timeout: modelConfig?.timeout?.status || 30000 }),
+          `history query for ${promptId}`,
+          modelConfig?.retry?.max_retries,
+          modelConfig?.retry?.delay_cap
         );
 
         const entry = statusRes.data?.[promptId];
@@ -144,16 +152,18 @@ export class ComfyUILocalProvider {
   /**
    * Retry an async operation with exponential backoff.
    */
-  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> {
+  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries?: number, delayCap?: number): Promise<T> {
+    const retries = maxRetries ?? 3;
+    const cap = delayCap ?? 30000;
     let lastErr: any;
-    for (let i = 0; i < maxRetries; i++) {
+    for (let i = 0; i < retries; i++) {
       try {
         return await fn();
       } catch (err: any) {
         lastErr = err;
-        if (i < maxRetries - 1) {
-          const delay = Math.min(1000 * Math.pow(2, i), 30000);
-          logger.warn(`[ComfyUI] ${label} failed (attempt ${i + 1}/${maxRetries}): ${err.message}. Retrying in ${delay}ms...`);
+        if (i < retries - 1) {
+          const delay = Math.min(1000 * Math.pow(2, i), cap);
+          logger.warn(`[ComfyUI] ${label} failed (attempt ${i + 1}/${retries}): ${err.message}. Retrying in ${delay}ms...`);
           await sleep(delay);
         }
       }

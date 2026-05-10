@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ApprovedRefReader } from './ApprovedRefReader';
+import { getProjectDir } from '../utils/configLoader';
 
 export interface RefResult {
   type: 'asset' | 'frame';
@@ -23,7 +24,7 @@ export class RefResolver {
 
   async parseAll(markdown: string): Promise<RefResult[]> {
     const results: RefResult[] = [];
-    const refRegex = /(?:\()?@([a-zA-Z0-9_:]+)(?:\))?\s+([^\n@]*)/g;
+    const refRegex = /(?:\()?@([a-zA-Z0-9_:.\-]+)(?:\))?\s+([^\n@]*)/g;
 
     let match;
     while ((match = refRegex.exec(markdown)) !== null) {
@@ -95,11 +96,17 @@ export class RefResolver {
   private resolveFrame(identifier: string, label: string): RefResult {
     const framePart = identifier.slice(6);
     const lastUnderscoreIdx = framePart.lastIndexOf('_');
+    if (lastUnderscoreIdx <= 0) {
+      throw new Error(`Invalid FRAME identifier "${identifier}": expected FRAME:<shotId>_<frameType>`);
+    }
     const shotId = framePart.slice(0, lastUnderscoreIdx);
     const frameType = framePart.slice(lastUnderscoreIdx + 1);
+    if (!shotId || !frameType) {
+      throw new Error(`Invalid FRAME identifier "${identifier}": shotId and frameType must not be empty`);
+    }
 
     // Search .circleN/ directories for the frame file
-    const queueRoot = path.join(this.projectRoot, 'opsv-queue');
+    const queueRoot = getProjectDir(this.projectRoot, 'queue');
     let framePath: string | undefined;
 
     if (fs.existsSync(queueRoot)) {
@@ -135,7 +142,7 @@ export class RefResolver {
 
   private findAssetDoc(assetId: string): string | null {
     const prefixes = ['@', ''];
-    const videospecDir = path.join(this.projectRoot, 'videospec');
+    const videospecDir = getProjectDir(this.projectRoot, 'videospec');
 
     if (!fs.existsSync(videospecDir)) return null;
 

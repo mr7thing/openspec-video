@@ -8,6 +8,32 @@ import yaml from 'js-yaml';
 import { logger } from './logger';
 import { ErrorFactory } from '../errors/OpsVError';
 
+export function getProjectDir(projectRoot: string, name: 'videospec' | 'queue'): string {
+  try {
+    const loader = ConfigLoader.getInstance();
+    loader.loadConfig(projectRoot);
+    const settings = loader.getSettings();
+    if (name === 'videospec') {
+      return path.join(projectRoot, settings?.dirs?.videospec || 'videospec');
+    }
+    return path.join(projectRoot, settings?.dirs?.queue || 'opsv-queue');
+  } catch {
+    return path.join(projectRoot, name === 'videospec' ? 'videospec' : 'opsv-queue');
+  }
+}
+
+export interface TimeoutConfig {
+  submit?: number;
+  status?: number;
+  download?: number;
+  health?: number;
+}
+
+export interface RetryConfig {
+  max_retries?: number;
+  delay_cap?: number;
+}
+
 export interface ModelConfig {
   provider: string;
   type?: 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
@@ -36,14 +62,34 @@ export interface ModelConfig {
   concurrency?: number;
   workflowId?: string;
   node_mappings?: Record<string, { nodeId: string; fieldName: string }>;
+  timeout?: TimeoutConfig;
+  max_poll_duration?: number;
+  retry?: RetryConfig;
+}
+
+export interface PollingSettings {
+  intervals?: Array<{ thresholdMinutes: number; intervalSeconds: number }>;
+  maxDurationHours?: number;
+}
+
+export interface DirSettings {
+  videospec?: string;
+  queue?: string;
+}
+
+export interface GlobalSettings {
+  dirs?: DirSettings;
+  polling?: PollingSettings;
 }
 
 export interface ApiConfig {
   models: Record<string, ModelConfig>;
+  settings?: GlobalSettings;
 }
 
 export class ConfigLoader {
-  private static instance: ConfigLoader;
+  private static instance: ConfigLoader | null = null;
+  private static lock = false;
   private config: ApiConfig;
 
   private constructor() {
@@ -52,9 +98,12 @@ export class ConfigLoader {
 
   static getInstance(): ConfigLoader {
     if (!ConfigLoader.instance) {
-      ConfigLoader.instance = new ConfigLoader();
+      if (!ConfigLoader.lock) {
+        ConfigLoader.lock = true;
+        ConfigLoader.instance = new ConfigLoader();
+      }
     }
-    return ConfigLoader.instance;
+    return ConfigLoader.instance!;
   }
 
   loadConfig(projectRoot: string): ApiConfig {
@@ -68,7 +117,7 @@ export class ConfigLoader {
 
     try {
       const raw = fs.readFileSync(configPath, 'utf8');
-      this.config = yaml.load(raw) as ApiConfig;
+      this.config = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as ApiConfig;
       return this.config;
     } catch (e: any) {
       logger.error(`Failed to load api_config.yaml`, { error: e.message });
@@ -79,6 +128,10 @@ export class ConfigLoader {
 
   getModelConfig(modelName: string): ModelConfig | undefined {
     return this.config.models?.[modelName];
+  }
+
+  getSettings(): GlobalSettings | undefined {
+    return this.config.settings;
   }
 
   getResolvedApiKey(targetModel: string): string {
@@ -101,14 +154,13 @@ export class ConfigLoader {
 
     for (const envVar of fallback) {
       if (process.env[envVar]) {
-        logger.debug(`Using fallback API key from ${envVar} for model ${targetModel}`);
+        logger.debug(`Using fallback API key for model ${targetModel}`);
         return process.env[envVar]!;
       }
     }
 
-    const allEnvs = [...required, ...fallback].join(' or ');
     throw ErrorFactory.compilationFailed(
-      `Missing API Key for model '${targetModel}'. Please set ${allEnvs} in .env`
+      `Missing API Key for model '${targetModel}'. Please set the required environment variable in .env`
     );
   }
 }

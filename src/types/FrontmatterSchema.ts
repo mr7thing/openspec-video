@@ -15,6 +15,12 @@ export type AssetCategory = z.infer<typeof AssetCategoryEnum>;
 export const StatusEnum = z.enum(['drafting', 'syncing', 'approved']);
 export type Status = z.infer<typeof StatusEnum>;
 
+export const NodeMappingSchema = z.record(z.object({
+  nodeId: z.string(),
+  fieldName: z.string(),
+}));
+export type NodeMapping = z.infer<typeof NodeMappingSchema>;
+
 export const BaseFrontmatterSchema = z.object({
   category: AssetCategoryEnum,
   status: StatusEnum,
@@ -27,10 +33,7 @@ export const BaseFrontmatterSchema = z.object({
   workflow: z.string().optional(),              // Deprecated: use workflow_id or workflow_path
   workflow_id: z.string().optional(),            // RunningHub workflowId
   workflow_path: z.string().optional(),          // ComfyUI Local JSON filename
-  node_mapping: z.record(z.object({
-    nodeId: z.string(),
-    fieldName: z.string(),
-  })).optional(),
+  node_mapping: NodeMappingSchema.optional(),
 });
 export type BaseFrontmatter = z.infer<typeof BaseFrontmatterSchema>;
 

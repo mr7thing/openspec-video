@@ -13,6 +13,33 @@
 #   在 model 下添加 concurrency 可指定该 provider 的单 provider 内并发数
 #   CLI: opsv run --concurrency 3 <dir> 可覆盖 api_config 中的设置
 #   默认串行 (concurrency=1)，仅对支持并发的 API 建议调高
+#
+# 超时 / 轮询 / 重试配置化 (v0.8.22+):
+#   在 model 下可添加:
+#     timeout:
+#       submit: 120000      # 任务提交超时 (ms)
+#       status: 30000       # 状态查询超时 (ms)
+#       download: 30000     # 下载超时 (ms)
+#       health: 5000        # 健康检查超时 (ms)
+#     max_poll_duration: 14400000   # 最大轮询时长 (ms), 默认 4h
+#     retry:
+#       max_retries: 3
+#       delay_cap: 30000    # 重试延迟上限 (ms)
+#   在顶层可添加 settings:
+#     settings:
+#       dirs:
+#         videospec: videospec
+#         queue: opsv-queue
+#       polling:
+#         intervals:
+#           - thresholdMinutes: 5
+#             intervalSeconds: 10
+#           - thresholdMinutes: 10
+#             intervalSeconds: 30
+#           - thresholdMinutes: 30
+#             intervalSeconds: 60
+#           - thresholdMinutes: 60
+#             intervalSeconds: 300
 
 models:
   # ==========================================

@@ -61,7 +61,7 @@ export class OpsVError extends Error {
     this.context = context;
     this.timestamp = new Date();
     Object.setPrototypeOf(this, OpsVError.prototype);
-    if (context.cause?.stack) {
+    if (context.cause?.stack && !this.stack?.includes(context.cause.stack)) {
       this.stack = `${this.stack}\nCaused by: ${context.cause.stack}`;
     }
   }
@@ -73,14 +73,13 @@ export class OpsVError extends Error {
       message: this.message,
       context: this.context,
       timestamp: this.timestamp.toISOString(),
-      stack: this.stack
     };
   }
 
   toUserMessage(): string {
     const base = `[${this.code}] ${this.message}`;
     if (this.context.filePath) {
-      return `${base}\n  位置: ${this.context.filePath}${this.context.position ? `:${this.context.position}` : ''}`;
+      return `${base}\n  Location: ${this.context.filePath}${this.context.position ? `:${this.context.position}` : ''}`;
     }
     return base;
   }

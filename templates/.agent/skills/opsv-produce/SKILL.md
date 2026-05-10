@@ -52,7 +52,7 @@ opsv webapp --model webapp.gemini
    - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs`
    - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs`
 6. Build `Job` objects with prompt, references, frame_ref
-7. Call `TaskBuilder.compileToDir()` → provider-specific `TaskJson`
+7. Call `await TaskBuilder.compileToDir()` → provider-specific `TaskJson` (async since v0.8.22)
 8. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
 
 **Syncing Gate**: `syncing` assets block downstream compilation. If an asset's `@ref` points to a `syncing` asset, compilation is skipped with a warning.

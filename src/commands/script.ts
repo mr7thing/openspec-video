@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { FileUtils } from '../utils/FileUtils';
 import { logger } from '../utils/logger';
+import { getProjectDir } from '../utils/configLoader';
 
 export function registerScriptCommand(program: Command): void {
   program
@@ -91,7 +92,7 @@ export function registerScriptCommand(program: Command): void {
         }
 
         const targetBasename = path.basename(path.resolve(options.dir));
-        const outputPath = options.output || path.join(projectRoot, 'opsv-queue', targetBasename, '_script.json');
+        const outputPath = options.output || path.join(getProjectDir(projectRoot, 'queue'), targetBasename, '_script.json');
         await FileUtils.writeJson(outputPath, summary);
 
         console.log(chalk.green(`Script summary written to ${outputPath}`));

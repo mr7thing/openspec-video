@@ -11,6 +11,8 @@ import { ProviderResult } from '../QueueRunner';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
+import { ConfigLoader } from '../../utils/configLoader';
+import { resolveProjectRoot } from '../../utils/projectResolver';
 import {
   appendLog,
   getResumeTaskId,
@@ -28,11 +30,15 @@ export class WebappProvider {
     const statusUrl = task._opsv.api_status_url;
     const shotId = task._opsv.shotId;
 
+    const configLoader = ConfigLoader.getInstance();
+    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
+    const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
+
     try {
       // 1. Health check
       try {
         const baseUrl = submitUrl.replace(/\/generate$/, '');
-        await axios.get(`${baseUrl}/health`, { timeout: 5000 });
+        await axios.get(`${baseUrl}/health`, { timeout: modelConfig?.timeout?.health || 5000 });
       } catch {
         throw new Error(
           `Webapp extension not running on ${submitUrl.replace(/\/generate$/, '')}. ` +
@@ -55,7 +61,7 @@ export class WebappProvider {
 
         const submitRes = await axios.post(submitUrl, payload, {
           headers: { 'Content-Type': 'application/json' },
-          timeout: 30000,
+          timeout: modelConfig?.timeout?.submit || 30000,
         });
 
         taskId = submitRes.data?.task_id;
@@ -70,19 +76,19 @@ export class WebappProvider {
       }
 
       // 4. Gradient polling
-      const maxDuration = 8 * 60 * 60 * 1000; // 8 hours max
+      const maxDuration = modelConfig?.max_poll_duration || 8 * 60 * 60 * 1000; // 8h default
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
           throw new Error(`Polling timeout for ${taskId} (8h exceeded)`);
         }
 
-        const interval = getPollIntervalMs(elapsed);
+        const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
         await sleep(interval);
 
         const statusRes = await axios.get(`${statusUrl}`, {
           params: { task_id: taskId },
-          timeout: 10000,
+          timeout: modelConfig?.timeout?.status || 10000,
         });
 
         const status = statusRes.data?.status;

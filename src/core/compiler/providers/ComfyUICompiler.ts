@@ -9,6 +9,15 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { TaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 
+interface ComfyUIWorkflowNode {
+  inputs?: Record<string, any>;
+  [key: string]: any;
+}
+
+interface ComfyUIWorkflow {
+  [nodeId: string]: ComfyUIWorkflowNode;
+}
+
 export class ComfyUICompiler implements ProviderCompiler {
   readonly provider = 'comfyui';
 
@@ -52,7 +61,7 @@ export class ComfyUICompiler implements ProviderCompiler {
     }
 
     // 2. Load workflow
-    let workflow: Record<string, any>;
+    let workflow: ComfyUIWorkflow;
     try {
       workflow = JSON.parse(fs.readFileSync(workflowFile, 'utf-8'));
     } catch (parseErr: any) {
@@ -171,9 +180,10 @@ export class ComfyUICompiler implements ProviderCompiler {
       return path.join(dir, under[under.length - 1].file);
     }
 
-    // Best over (leave empty slots)
+    // Best over (leave empty slots) — pick the one with n closest to refCount
     const over = candidates.filter(c => c.n > refCount);
     if (over.length > 0) {
+      over.sort((a, b) => a.n - b.n);
       logger.warn(`Asset "${assetId}" has ${refCount} ref images, using workflow with ${over[0].n} slots (empty slots will use defaults)`);
       return path.join(dir, over[0].file);
     }

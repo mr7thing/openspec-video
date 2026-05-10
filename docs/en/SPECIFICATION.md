@@ -204,7 +204,7 @@ Rules:
    - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → used for `@assetId:variant` resolution
    - **`DesignRefReader`**: reads `## Design References` from **current document** → used as `reference_images`
 7. Builds `Job` objects from frontmatter
-8. `TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler`
+8. `await TaskBuilder.compileToDir()` calls provider-specific `ProviderCompiler` (async since v0.8.22)
 9. Writes `TaskJson` to `{circleDir}/{provider.model}_NNN/shotId.json`
 
 ## Execution Flow

@@ -47,6 +47,7 @@ export class RunningHubProvider {
     if (!statusUrl) throw new Error('RunningHubProvider: api_status_url is required in task._opsv');
     const shotId = task._opsv.shotId;
     const workflowId = task._opsv.workflowId;
+    const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
 
     // Derive base URL for upload & workflow fetch
     const baseUrl = this.deriveBaseUrl(submitUrl);
@@ -73,7 +74,7 @@ export class RunningHubProvider {
                   continue;
                 }
                 if (fs.existsSync(val)) {
-                  const fileName = await this.uploadFile(val, apiKey, baseUrl);
+                  const fileName = await this.uploadFile(val, apiKey, baseUrl, modelConfig);
                   item.fieldValue = fileName;
                 } else if (
                   val.includes('/') || val.includes('\\') ||
@@ -95,7 +96,7 @@ export class RunningHubProvider {
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 120000,
+          timeout: modelConfig?.timeout?.submit || 120000,
           transformResponse: [(data) => this.parseBigIntResponse(data)],
         });
 
@@ -117,14 +118,14 @@ export class RunningHubProvider {
       }
 
       // Gradient polling
-      const maxDuration = 4 * 60 * 60 * 1000;
+      const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
           throw new Error(`Polling timeout for ${taskId} (4h exceeded)`);
         }
 
-        const interval = getPollIntervalMs(elapsed);
+        const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
         await sleep(interval);
 
         // Query task status (POST /task/openapi/status)
@@ -135,11 +136,13 @@ export class RunningHubProvider {
             { apiKey, taskId },
             {
               headers: { Authorization: `Bearer ${apiKey}` },
-              timeout: 30000,
+              timeout: modelConfig?.timeout?.status || 30000,
               transformResponse: [(data) => this.parseBigIntResponse(data)],
             }
           ),
-          `status query for ${taskId}`
+          `status query for ${taskId}`,
+          modelConfig?.retry?.max_retries,
+          modelConfig?.retry?.delay_cap
         );
 
         if (statusRes.data?.code !== 0) {
@@ -158,11 +161,13 @@ export class RunningHubProvider {
               { apiKey, taskId },
               {
                 headers: { Authorization: `Bearer ${apiKey}` },
-                timeout: 30000,
+                timeout: modelConfig?.timeout?.status || 30000,
                 transformResponse: [(data) => this.parseBigIntResponse(data)],
               }
             ),
-            `result query for ${taskId}`
+            `result query for ${taskId}`,
+            modelConfig?.retry?.max_retries,
+            modelConfig?.retry?.delay_cap
           );
 
           if (resultRes.data?.code !== 0) {
@@ -196,7 +201,7 @@ export class RunningHubProvider {
           // Download original ComfyUI workflow JSON
           if (workflowId) {
             try {
-              const workflowPath = await this.fetchWorkflowJson(workflowId, apiKey, baseUrl, taskPath);
+              const workflowPath = await this.fetchWorkflowJson(workflowId, apiKey, baseUrl, taskPath, modelConfig);
               if (workflowPath) {
                 outputPaths.push(workflowPath);
               }
@@ -238,7 +243,7 @@ export class RunningHubProvider {
   // --------------------------------------------------------------------------
   // Upload a local file to RunningHub and return the server fileName
   // --------------------------------------------------------------------------
-  private async uploadFile(filePath: string, apiKey: string, baseUrl: string): Promise<string> {
+  private async uploadFile(filePath: string, apiKey: string, baseUrl: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<string> {
     const uploadUrl = `${baseUrl}/openapi/v2/media/upload/binary`;
 
     const form = new FormData();
@@ -249,7 +254,7 @@ export class RunningHubProvider {
         ...form.getHeaders(),
         'apiKey': apiKey,
       },
-      timeout: 120000,
+      timeout: modelConfig?.timeout?.submit || 120000,
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
       transformResponse: [(data) => this.parseBigIntResponse(data)],
@@ -277,7 +282,8 @@ export class RunningHubProvider {
     workflowId: string,
     apiKey: string,
     baseUrl: string,
-    taskPath: string
+    taskPath: string,
+    modelConfig?: import('../../utils/configLoader').ModelConfig
   ): Promise<string | null> {
     const url = `${baseUrl}/api/openapi/getJsonApiFormat`;
 
@@ -286,7 +292,7 @@ export class RunningHubProvider {
       { apiKey, workflowId },
       {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 30000,
+        timeout: modelConfig?.timeout?.download || 30000,
         transformResponse: [(data) => this.parseBigIntResponse(data)],
       }
     );
@@ -345,16 +351,18 @@ export class RunningHubProvider {
   // --------------------------------------------------------------------------
   // Retry an async operation with exponential backoff
   // --------------------------------------------------------------------------
-  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> {
+  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries?: number, delayCap?: number): Promise<T> {
+    const retries = maxRetries ?? 3;
+    const cap = delayCap ?? 30000;
     let lastErr: any;
-    for (let i = 0; i < maxRetries; i++) {
+    for (let i = 0; i < retries; i++) {
       try {
         return await fn();
       } catch (err: any) {
         lastErr = err;
-        if (i < maxRetries - 1) {
-          const delay = Math.min(1000 * Math.pow(2, i), 30000);
-          logger.warn(`[RunningHub] ${label} failed (attempt ${i + 1}/${maxRetries}): ${err.message}. Retrying in ${delay}ms...`);
+        if (i < retries - 1) {
+          const delay = Math.min(1000 * Math.pow(2, i), cap);
+          logger.warn(`[RunningHub] ${label} failed (attempt ${i + 1}/${retries}): ${err.message}. Retrying in ${delay}ms...`);
           await sleep(delay);
         }
       }
