@@ -127,3 +127,21 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 - Initial compilation: `@hero.json` → output `@hero_1.png`
 - Modified re-compile: `@hero_2.json` → output `@hero_2_1.png`
 - Review approve: if output matches `id_N.ext` pattern (original) → set `approved` directly. If output matches `id_N_N.ext` pattern (modified) → set `syncing` and record the modified task JSON path so the agent can align frontmatter fields with the modified task.
+
+---
+
+## 12. Document Is the Single Source of Truth: Manifest Declares, Document Owns
+
+**Principle**: The `.md` document is the sole authority for asset identity and attributes. The manifest (`_manifest.json`) declares which assets exist and discovers their outputs — it never overrides or infers document-level properties.
+
+**Why**: In v0.8, the global review mode (`opsv review` without `--circle`) built a flat `assetInfoMap` by merging all circle manifests, where later-scanned circles silently overwrote earlier ones. When the same `docId` appeared in multiple circles (e.g., `shot_01_frame_02` in `short_frames.circle1`, `shotframes2.circle1`, and `shotframev4.circle1`), only the last circle's `category` and `status` survived. 75 docIds lost their true attributes, and the UI collapsed all documents into a single category.
+
+Simultaneously, the output index was built by reverse-engineering `docId` from output filenames using a greedy regex `(_\d+)+`. For `shot_01_frame_02_1.png`, this extracted `shot_01_frame` instead of `shot_01_frame_02` — because the regex consumed both `_02` and `_1` as numeric suffixes, producing a phantom docId that matched no real document.
+
+Both failures share the same root cause: **deriving document identity from generated artifacts instead of from the documents themselves**.
+
+**How it applies**:
+- **docId comes from manifest**: `opsv review` reads `_manifest.json` to discover which assets exist. The manifest's `assets` keys are the authoritative docId list — never reverse-engineered from filenames.
+- **Attributes come from frontmatter**: `category`, `status`, and all descriptive fields are read from the source `.md` document's YAML frontmatter. The manifest's `assets[id].category` and `assets[id].status` are convenience snapshots, not overrides.
+- **Outputs are matched by docId**: Given a docId from the manifest, review scans all circle directories for output files whose names start with that docId. The docId prefix is the matching key — no regex deconstruction of the filename.
+- **Naming follows the document**: All generated artifacts (task JSONs, output files) are named from the document's `@id`. `@hero.md` → `@hero.json` → `@hero_1.png`. The document name is the origin; everything downstream derives from it.

@@ -1,7 +1,7 @@
 // ============================================================================
 // OpsV v0.8 — opsv review
-// Supports --circle mode: manifest-driven review with zero hardcoded paths
-// Legacy mode (no --circle) preserves original behavior (deprecated)
+// Supports --circle mode: manifest-driven review
+// Global mode (no --circle): document frontmatter is the single source of truth
 // ============================================================================
 
 import { Command } from 'commander';
@@ -12,7 +12,7 @@ import chalk from 'chalk';
 import express from 'express';
 import { execSync } from 'child_process';
 import { ManifestReader } from '../core/ManifestReader';
-import { ManifestReviewStrategy, LegacyReviewStrategy } from '../core/ReviewStrategy';
+import { ManifestReviewStrategy, GlobalReviewStrategy } from '../core/ReviewStrategy';
 import { ApproveService } from '../core/ApproveService';
 import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
@@ -57,8 +57,8 @@ export function registerReviewCommand(program: Command): void {
     .description('Start visual review server')
     .option('--port <number>', 'Server port', '3100')
     .option('--circle [path]', 'Run in manifest-driven mode. Auto-discovers latest manifest if no path given. Accepts circle dir or manifest file path.')
-    .option('--latest', 'Show only latest circle outputs (legacy mode)')
-    .option('--all', 'Show all circle outputs (legacy mode)')
+    .option('--latest', 'Show only latest circle outputs (global mode)')
+    .option('--all', 'Show all circle outputs (global mode)')
     .option('--ttl <seconds>', 'Auto-shutdown after idle seconds (default: 900)', '900')
     .action(async (options: any) => {
       try {
@@ -98,7 +98,7 @@ export function registerReviewCommand(program: Command): void {
 
         const strategy = circleMode && manifestInfo
           ? new ManifestReviewStrategy(manifestInfo, manifestReader, projectRoot)
-          : new LegacyReviewStrategy(projectRoot, queueRoot, opts, manifestReader);
+          : new GlobalReviewStrategy(projectRoot, queueRoot, opts, manifestReader);
 
         const app = express();
 
@@ -124,9 +124,15 @@ export function registerReviewCommand(program: Command): void {
           res.json(strategy.listCircleAssets(req.params.name));
         });
 
-        // Serve output files
-        app.get('/api/files/:circle/:provider/:file', (req, res) => {
-          const filePath = resolveWithin(queueRoot, req.params.circle, req.params.provider, req.params.file);
+        // Serve output files — wildcard path supports nested provider dirs
+        app.get('/api/files/*filePath', (req, res) => {
+          const raw: string[] | string = (req.params as any).filePath;
+          if (!raw) {
+            res.status(400).send('Bad request');
+            return;
+          }
+          const segments = Array.isArray(raw) ? raw : raw.split('/');
+          const filePath = resolveWithin(queueRoot, ...segments);
           if (!filePath) {
             res.status(403).send('Forbidden');
             return;
@@ -169,7 +175,7 @@ export function registerReviewCommand(program: Command): void {
               <ul>
                 <li>GET /api/circles</li>
                 <li>GET /api/circles/:name/assets</li>
-                <li>GET /api/files/:circle/:provider/:file</li>
+                <li>GET /api/files/*</li>
                 <li>POST /api/approve/:circle/:assetId</li>
               </ul>
               </body></html>

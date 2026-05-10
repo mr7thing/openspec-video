@@ -1,13 +1,22 @@
 ---
 name: opsv
-description: OpsV v0.8.23 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.24 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.23)
+# OpsV 框架规范 (v0.8.24)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
 ## 核心概念
+
+### 文档唯一真相原则
+
+**文档 `.md` 是资产属性的唯一权威来源。** Manifest 声明资产存在并发现其产出，但绝不覆盖或推断文档级属性。
+
+- **docId 来自 manifest**：`opsv review` 从 `_manifest.json` 的 `assets` 键获取 docId 列表，不从输出文件名反推
+- **属性来自 frontmatter**：`category`、`status` 等描述字段从源文档 YAML frontmatter 读取，manifest 中的值仅为快照
+- **产出按 docId 匹配**：用 docId 前缀在 circle 目录中匹配输出文件，不做文件名反解
+- **命名源自文档**：所有产物命名由文档 `@id` 派生：`@hero.md` → `@hero.json` → `@hero_1.png`
 
 ### Circle 架构
 生产管线按依赖层级划分为 Circle，每一 Circle 对应一批可并行执行的渲染任务：

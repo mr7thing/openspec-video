@@ -3,6 +3,13 @@
 ## Overview
 Visual review of generated outputs. Serves a web UI with API endpoints for browsing circle outputs and approving assets.
 
+## Document Is the Single Source of Truth
+
+- **docId comes from manifest**: The `assets` keys in `_manifest.json` define which documents exist in the review. Output filenames are never reverse-engineered to derive docId.
+- **Attributes come from frontmatter**: `category`, `status` and all descriptive fields are read from the source `.md` document's YAML frontmatter. Manifest values are snapshots, not overrides.
+- **Outputs are matched by docId**: Given a docId, review scans circle directories for output files whose names start with that docId prefix.
+- **Naming follows the document**: `@hero.md` → `@hero.json` → `@hero_1.png`. The document name is the origin; everything downstream derives from it.
+
 ## Command
 ```bash
 opsv review --port 3100

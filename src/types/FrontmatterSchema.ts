@@ -12,7 +12,7 @@ export const AssetCategoryEnum = z.enum([
 ]);
 export type AssetCategory = z.infer<typeof AssetCategoryEnum>;
 
-export const StatusEnum = z.enum(['drafting', 'syncing', 'approved']);
+export const StatusEnum = z.enum(['drafting', 'syncing', 'approved', 'draft', 'draft-review']);
 export type Status = z.infer<typeof StatusEnum>;
 
 export const NodeMappingSchema = z.record(z.object({
