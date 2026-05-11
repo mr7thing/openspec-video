@@ -2,7 +2,7 @@
 
 从文档校验到物理渲染的完整运维与审查协议。涵盖 Guardian-Agent 与 Runner-Agent 的全部操作规程。
 
-> 当前版本：v0.8.25 (ComfyUI Unified Compilation + Per-Task Workflow)
+> 当前版本：v0.8.26 (迭代任务命名 + 审查状态重构)
 
 ---
 

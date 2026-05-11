@@ -107,10 +107,11 @@ export class ApproveService {
     const targetRoot = this.resolveTargetRoot(req.circle);
     const sourceDocPath = AssetManager.findAssetFilePathUnder(targetRoot, req.assetId);
 
-    if (sourceDocPath) {
-      this.applyReviewToDocument(sourceDocPath, reviewEntry, newStatus);
+    if (!sourceDocPath) {
+      throw new Error(`Document not found: ${req.assetId} in target ${targetRoot}`);
     }
 
+    this.applyReviewToDocument(sourceDocPath, reviewEntry, newStatus);
     this.updateManifestStatus(req.circle, req.assetId, newStatus);
 
     const note = newStatus === 'syncing'

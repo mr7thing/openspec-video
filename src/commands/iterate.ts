@@ -69,7 +69,7 @@ async function iterateFile(filePath: string): Promise<void> {
 
   const base = resolveTaskBase(filename);
   const nextSeq = findNextTaskSeq(dir, base);
-  const destName = `${base}_${nextSeq}.json`;
+  const destName = `${base}_m${nextSeq}.json`;
   const destPath = path.join(dir, destName);
 
   cloneTaskJson(filePath, destPath);
@@ -133,9 +133,10 @@ async function iterateDirectory(dirPath: string): Promise<void> {
 
 function resolveTaskBase(filename: string): string {
   const name = filename.replace(/\.json$/, '');
-  // Strip trailing _N where N >= 1 (always trace back to the original base)
-  const match = name.match(/^(.*)_(\d+)$/);
-  if (match && parseInt(match[2], 10) >= 1) {
+  // Strip trailing _mN (modified task marker, e.g. _m1, _m2)
+  // Only strip if it's exactly the _mN pattern used for iterated tasks
+  const match = name.match(/^(.*)_m(\d+)$/);
+  if (match) {
     return match[1];
   }
   return name;
@@ -153,7 +154,7 @@ function resolveDirBase(dirName: string): string {
 function findNextTaskSeq(dir: string, base: string): number {
   if (!fs.existsSync(dir)) return 1;
   const entries = fs.readdirSync(dir);
-  const pattern = new RegExp(`^${escapeRegex(base)}_(\\d+)\\.json$`);
+  const pattern = new RegExp(`^${escapeRegex(base)}_m(\\d+)\\.json$`);
   let maxN = 0;
   for (const e of entries) {
     const m = e.match(pattern);

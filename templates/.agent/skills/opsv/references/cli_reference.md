@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.8.25 (ComfyUI Unified Compilation + Per-Task Workflow)
+> 当前版本：v0.8.26 (迭代任务命名 + 审查状态重构)
 
 ## 命令总览
 

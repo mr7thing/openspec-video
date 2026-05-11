@@ -121,12 +121,13 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 **Principle**: Task and output filenames encode whether a task has been modified, enabling deterministic review logic without any external state.
 
-**Why**: In v0.7, when a user modified a compiled task JSON and re-ran it, the review system had no way to know whether the approved output matched the original frontmatter or the modified task. The CLI would either blindly overwrite `prompt_en` (causing conflicts with agent edits) or skip alignment entirely (leaving stale descriptions). Encoding modification history in the filename makes the distinction trivial: `id_1.ext` = original, `id_2_1.ext` = modified.
+**Why**: In v0.7, when a user modified a compiled task JSON and re-ran it, the review system had no way to know whether the approved output matched the original frontmatter or the modified task. The CLI would either blindly overwrite `prompt_en` (causing conflicts with agent edits) or skip alignment entirely (leaving stale descriptions). Encoding modification history in the filename makes the distinction trivial: `id_1.ext` = original, `id_m1_1.ext` = modified.
 
 **How it applies**:
 - Initial compilation: `@hero.json` → output `@hero_1.png`
-- Modified re-compile: `@hero_2.json` → output `@hero_2_1.png`
-- Review approve: if output matches `id_N.ext` pattern (original) → set `approved` directly. If output matches `id_N_N.ext` pattern (modified) → set `syncing` and record the modified task JSON path so the agent can align frontmatter fields with the modified task.
+- Iterated (modified) re-compile: `@hero_m1.json` → output `@hero_m1_1.png`
+- Review approve: if output matches `id_1.ext` pattern (original) → set `approved` directly. If output matches `id_m{n}_1.ext` pattern (modified) → set `syncing` and record the modified task JSON path so the agent can align frontmatter fields with the modified task.
+- Iteration marker `_m{n}` uses letter `m` to distinguish from numeric asset ID suffixes. `shot_01_frame_04_1.png` is clearly an original task output (asset ID ends in `_04`, not `_m4`).
 
 ---
 
@@ -145,3 +146,18 @@ Both failures share the same root cause: **deriving document identity from gener
 - **Attributes come from frontmatter**: `category`, `status`, and all descriptive fields are read from the source `.md` document's YAML frontmatter. The manifest's `assets[id].category` and `assets[id].status` are convenience snapshots, not overrides.
 - **Outputs are matched by docId**: Given a docId from the manifest, review scans all circle directories for output files whose names start with that docId. The docId prefix is the matching key — no regex deconstruction of the filename.
 - **Naming follows the document**: All generated artifacts (task JSONs, output files) are named from the document's `@id`. `@hero.md` → `@hero.json` → `@hero_1.png`. The document name is the origin; everything downstream derives from it.
+
+---
+
+## 13. No Backward Compatibility: Data Migrates or Dies
+
+**Principle**: When the naming scheme or data format changes, old data is not migrated or adapted. It is simply ignored or deleted. The system assumes a clean slate on upgrade.
+
+**Why**: In v0.8, the iteration naming scheme changed from `id_2.json` (numeric suffix) to `id_m1.json` (lettered `_mN` suffix). Attempting to maintain dual compatibility — detecting `id_2.json` as "also a modified task" — would infect every code path with conditional logic. The `shot_01_frame_04` problem (asset IDs ending in `_04` being misidentified as iteration 4) shows how fragile backward-compatibility shims become. Every compatibility layer is a future bug waiting to surface.
+
+**How it applies**:
+- **Naming changes break silently**: If a file doesn't match the current pattern, it is silently skipped. `id_2.json` from v0.8.25 is not treated as a modified task in v0.8.26 — it is simply ignored.
+- **Iteration marker is `_mN`**: `opsv iterate` creates `id_m{n}.json`. Old `_N.json` files are dead data.
+- **Output detection is strict**: `id_1.ext` = original task output. `id_m1_1.ext` = modified task output. Any other pattern is not recognized as a reviewable artifact.
+- **No migration tools**: When format changes occur, documentation states the old format is deprecated. No CLI command converts old data to new format.
+- **Agent responsibility**: When upgrading, agents should delete or archive old `opsv-queue/` directories rather than trying to "fix" them.

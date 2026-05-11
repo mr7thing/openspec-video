@@ -3,13 +3,13 @@
 // ============================================================================
 //
 // Task JSON naming:
-//   id.json       → original task    → output: id_1.ext
-//   id_2.json     → modified task    → output: id_2_1.ext
-//   id_3.json     → further modified → output: id_3_1.ext
+//   id.json          → original task        → output: id_1.ext
+//   id_m1.json       → 1st iteration        → output: id_m1_1.ext
+//   id_m2.json       → 2nd iteration        → output: id_m2_1.ext
 //
 // Review detection from output filename:
-//   id_1.ext      → base=id   → matches id.json (original)  → direct approved
-//   id_2_1.ext    → base=id_2 → matches id_2.json (modified)→ syncing + record task path
+//   id_1.ext         → base=id              → original task  → direct approved
+//   id_m1_1.ext      → base=id_m1           → modified task  → syncing + record task path
 // ============================================================================
 
 import path from 'path';
@@ -25,8 +25,9 @@ export function deriveOutputBase(taskPath: string): string {
 
 export function isModifiedTask(taskPath: string): boolean {
   const filename = path.basename(taskPath, '.json');
-  const match = filename.match(/_(\d+)$/);
-  return match !== null && parseInt(match[1]) >= 2;
+  // Modified task: base_mN.json (e.g. shot_01_m1.json)
+  const match = filename.match(/^(.+)_m(\d+)$/);
+  return match !== null && parseInt(match[2], 10) >= 1;
 }
 
 export function outputFilename(taskPath: string, index: number, ext: string): string {
@@ -62,8 +63,11 @@ export function resolveNextOutputIndex(taskPath: string, ext: string): number {
 }
 
 /**
- * From an output filename (e.g. "@hero_1.png" or "@hero_2_1.png"),
+ * From an output filename (e.g. "shot_01_1.png" or "shot_01_m1_1.png"),
  * determine the corresponding task JSON base name and whether it's a modified task.
+ *
+ * Original task: id.json → id_1.png → taskBase=id, isModified=false
+ * Modified task: id_m1.json → id_m1_1.png → taskBase=id_m1, isModified=true
  */
 export function parseOutputFilename(outputFile: string): {
   taskBase: string;
@@ -71,19 +75,26 @@ export function parseOutputFilename(outputFile: string): {
   taskJsonName: string;
 } {
   const name = path.basename(outputFile);
-  // Pattern: base_N.ext or base_N_N.ext
-  // The task JSON name = everything before the last _N.ext
-  const match = name.match(/^(.+)_(\d+)\.\w+$/);
-  if (!match) {
-    return { taskBase: name.replace(/\.\w+$/, ''), isModified: false, taskJsonName: name.replace(/\.\w+$/, '') };
+  // Pattern: base_mN_N.ext (modified task output, e.g. shot_01_m1_1.png)
+  // The base ends with _mN and the output index is the final _N
+  const modifiedMatch = name.match(/^(.+)_m(\d+)_(\d+)\.\w+$/);
+  if (modifiedMatch) {
+    const base = modifiedMatch[1]; // e.g. "shot_01" from "shot_01_m1_1.png"
+    return { taskBase: base, isModified: true, taskJsonName: `${base}_m${modifiedMatch[2]}.json` };
   }
 
-  const base = match[1];
-  const isModified = isModifiedTaskBase(base);
-  return { taskBase: base, isModified, taskJsonName: `${base}.json` };
-}
+  // Pattern: base_N.ext (original task output, e.g. shot_01_frame_04_1.png)
+  // Only match if base does NOT end with _mN
+  const originalMatch = name.match(/^(.+)_(\d+)\.\w+$/);
+  if (originalMatch) {
+    const base = originalMatch[1];
+    // Check if base ends with _mN (if so, it's not an original task pattern)
+    if (/_m\d+$/.test(base)) {
+      return { taskBase: base, isModified: true, taskJsonName: `${base}.json` };
+    }
+    return { taskBase: base, isModified: false, taskJsonName: `${base}.json` };
+  }
 
-function isModifiedTaskBase(base: string): boolean {
-  const match = base.match(/_(\d+)$/);
-  return match !== null && parseInt(match[1]) >= 2;
+  // Fallback: no pattern matched
+  return { taskBase: name.replace(/\.\w+$/, ''), isModified: false, taskJsonName: name.replace(/\.\w+$/, '') };
 }
