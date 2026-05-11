@@ -188,10 +188,12 @@ opsv imagen --model volcengine.seadream-5.0-lite --no-skip-approved
 ```
 
 ### 步骤 4：审查与引用 (Review)
-- 调用 `opsv review` 启动 Web UI（默认端口 3456）。
-- Review 服务启动时自动执行 `git add .` + `git commit -m "[review] {ts} — started"`（git commit checkpoint）。
-- 审阅期间 approve/draft 的修改由 Review 服务缓存在内存，不做 git commit。
-- Review 结束时（任意原因关闭、超时、idle 超时、Ctrl+C、manual）自动执行 `git add .` + `git commit -m "[review done] {ts} ({reason})"`（reason: idle-timeout / ttl-expired / sigint / manual）。
+- 调用 `opsv review` 启动 Web UI（默认端口 3100）。
+- **两种模式**：
+  - 全局模式（默认）：扫描所有 Circle，文档 frontmatter 是 `category`/`status` 唯一来源
+  - Manifest 模式（`--circle`）：聚焦单个 Circle 的 manifest
+- **文档唯一真相原则**：docId 来自 manifest，属性来自 frontmatter，输出按 docId 匹配（递归扫描嵌套目录），不从输出文件名反推 docId
+- Review 服务启动时自动执行 `git add -A` + `git commit`（pre-review checkpoint）。
 - **Approve 状态判断**（由生成物文件名自动决定）：
   - `id_1.ext` → 原始任务 → 直接 `approved`
   - `id_2_1.ext` → 修改任务 → `syncing`（Agent 需对齐后才可改为 `approved`）

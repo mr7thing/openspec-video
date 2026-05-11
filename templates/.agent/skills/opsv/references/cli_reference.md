@@ -273,22 +273,31 @@ opsv animate --model volcengine.seedance-2.0
 ```
 
 ### opsv review
-启动基于 Express 的本地 Web Review UI（默认端口 3456）。
+启动基于 Express 的本地 Web Review UI（默认端口 3100）。两种模式：
+
+- **全局模式**（默认，无 `--circle`）：扫描所有文档和所有 Circle。文档 frontmatter 是 `category`/`status` 的唯一来源，manifest 仅用于发现资产和输出文件。
+- **Manifest 模式**（`--circle`）：聚焦单个 Circle 的 manifest，资产和输出限于该 Circle。
 
 **参数**:
-- `--circle [path]`：启用基于 manifest 的 Review 模式。
-  - 无 path 时自动发现最新 manifest。
-  - 可传入 Circle 目录或 manifest 文件路径。
-  - 适用于从 `opsv circle create/refresh` 生成的 `_manifest.json` 进行审阅。
+- `--port <number>`：服务端口（默认 3100）
+- `--circle [path]`：启用 manifest 驱动模式。无 path 时自动发现最新 manifest；可传入 Circle 目录或 manifest 文件路径
+- `--latest`：仅显示最新 Circle 的输出（全局模式）
+- `--all`：显示所有 Circle 的输出（全局模式）
+- `--ttl <seconds>`：空闲自动关闭秒数（默认 900）
 
-**功能**:
-- **视觉反馈**: 实时对比多模型生成结果。
-- **Approve 条件判断**（根据生成物文件名自动决定）：
-  - `id_1.ext`（如 `@hero_1.png`）→ 原始任务 → 直接 `approved`
-  - `id_2_1.ext`（如 `@hero_2_1.png`）→ 修改任务 → `syncing` + review 记录追加 `modified_task` 路径
-- **CLI 非冲突原则**：Review approve 绝不修改 `prompt_en` 等内容字段，仅追加 review 记录 + 设置状态。
-- `syncing` 资产需 Agent 检查 review 记录中的 `modified_task`，对齐文档描述字段后改为 `approved`。
-- Review 后刷新 circle：`opsv circle refresh`；有变化 → 继续当前 Circle；全部 approve → 可晋升下一环。
+**文档唯一真相原则**:
+- docId 来自 manifest 的 `assets` 键，不从输出文件名反推
+- `category`、`status` 等属性来自源文档 YAML frontmatter，manifest 仅为快照
+- 输出文件按 docId 前缀匹配，递归扫描 provider 目录（支持嵌套子目录）
+- 所有产物命名由文档 `@id` 派生
+
+**Approve 条件判断**（根据生成物文件名自动决定）：
+- `id_1.ext`（如 `@hero_1.png`）→ 原始任务 → 直接 `approved`
+- `id_2_1.ext`（如 `@hero_2_1.png`）→ 修改任务 → `syncing` + review 记录追加 `modified_task` 路径
+
+**CLI 非冲突原则**：Review approve 绝不修改 `prompt_en` 等内容字段，仅追加 review 记录 + 设置状态。
+`syncing` 资产需 Agent 检查 review 记录中的 `modified_task`，对齐文档描述字段后改为 `approved`。
+Review 后刷新 circle：`opsv circle refresh`；有变化 → 继续当前 Circle；全部 approve → 可晋升下一环。
 
 ---
 

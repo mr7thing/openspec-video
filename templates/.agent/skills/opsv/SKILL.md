@@ -276,15 +276,20 @@ opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
 opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/   # 迭代整个目录
 
 # 审阅
-opsv review
-#    → 启动时自动 git commit checkpoint: "[review] {ts} — started"
-#    → 关闭时自动 git commit: "[review done] {ts} ({reason})"
+opsv review                              # 全局模式：文档为唯一真相，扫描所有 Circle
+opsv review --circle                     # Manifest 模式：聚焦单个 Circle
+opsv review --circle videospec.circle1   # 指定 Circle 目录
+opsv review --latest                     # 仅最新 Circle
+opsv review --port 3100 --ttl 300        # 自定义端口与空闲超时
+#    → 全局模式：category/status 来自文档 frontmatter，manifest 仅用于发现 docId 和输出
+#    → Manifest 模式：从 manifest 获取 docId，递归扫描 provider 目录（含嵌套子目录）
+#    → 启动时自动 git commit checkpoint
 #    → Approve 后（根据生成物文件名自动判断）：
 #      - 原始任务生成物 (id_1.ext) → 直接 approved
 #      - 修改任务生成物 (id_2_1.ext) → syncing + 记录 modified_task 路径
 #    → CLI 绝不修改 prompt_en 等内容字段
 #    → syncing 状态的资产：Agent 需对齐 visual_detailed/visual_brief/refs 后改为 approved
-#    → 全部 approved 后 opsv circle refresh 自动更新 _manifest.json（位于 .circleN/ 目录内）
+#    → 全部 approved 后 opsv circle refresh 自动更新 _manifest.json
 
 # 聚合展示
 opsv script
