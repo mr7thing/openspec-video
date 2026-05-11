@@ -453,7 +453,7 @@
 
         let documents = [];
         let filteredDocuments = [];
-        let selectedOutputs = new Set(); // "circle|provider|filename"
+        let selectedOutputs = new Set(); // "filePath" (full relative path under queueRoot)
         let currentDoc = null;
         let pendingMedia = null;
 
@@ -664,17 +664,18 @@
                         <div class="output-group-title">${circle} <span>— ${outputs.length} file(s)</span></div>
                         <div class="media-grid">
                             ${outputs.map(out => {
-                                const key = `${out.circle}|${out.provider}|${out.filename}`;
+                                const key = out.path;
                                 const selected = selectedOutputs.has(key);
                                 const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(out.filename);
                                 const isVid = /\.(mp4|webm|mov|avi)$/i.test(out.filename);
                                 const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(out.filename);
-                                const src = `${API}/api/files/${out.circle}/${out.provider}/${out.filename}`;
+                                const src = `${API}/api/files/${out.path}`;
+                                const safeKey = out.path.replace(/'/g, "\\'");
 
                                 return `
                                     <div class="media-card ${selected ? 'selected' : ''}"
-                                         onclick="toggleSelection('${out.circle}', '${out.provider}', '${out.filename.replace(/\\/g, '\\\\')}')"
-                                         ondblclick="openPreview('${out.circle}', '${out.provider}', '${out.filename.replace(/\\/g, '\\\\')}')">
+                                         onclick="toggleSelection('${safeKey}')"
+                                         ondblclick="openPreview('${safeKey}')">
                                         <div class="selected-badge">✓</div>
                                         ${isImg ? `<img src="${src}" loading="lazy" alt="${out.filename}">` : ''}
                                         ${isVid ? `<video src="${src}" muted></video>` : ''}
@@ -694,12 +695,11 @@
             pane.innerHTML = html;
         }
 
-        function toggleSelection(circle, provider, filename) {
-            const key = `${circle}|${provider}|${filename}`;
-            if (selectedOutputs.has(key)) {
-                selectedOutputs.delete(key);
+        function toggleSelection(filePath) {
+            if (selectedOutputs.has(filePath)) {
+                selectedOutputs.delete(filePath);
             } else {
-                selectedOutputs.add(key);
+                selectedOutputs.add(filePath);
             }
             updateSelectionUI();
         }
@@ -715,22 +715,21 @@
                 card.classList.remove('selected');
             });
             for (const key of selectedOutputs) {
-                const [circle, provider, filename] = key.split('|');
-                // Find matching card - simplified selector
                 document.querySelectorAll('.media-card').forEach(card => {
                     const onclick = card.getAttribute('onclick') || '';
-                    if (onclick.includes(circle) && onclick.includes(provider) && onclick.includes(filename)) {
+                    if (onclick.includes(key)) {
                         card.classList.add('selected');
                     }
                 });
             }
         }
 
-        function openPreview(circle, provider, filename) {
+        function openPreview(filePath) {
+            const filename = filePath.split('/').pop();
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(filename);
             const isVid = /\.(mp4|webm|mov|avi)$/i.test(filename);
             const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(filename);
-            const src = `${API}/api/files/${circle}/${provider}/${filename}`;
+            const src = `${API}/api/files/${filePath}`;
 
             const content = document.getElementById('previewContent');
             if (isImg) {
@@ -748,7 +747,7 @@
             }
 
             document.getElementById('previewName').textContent = filename;
-            pendingMedia = { circle, provider, filename };
+            pendingMedia = filePath;
             document.getElementById('previewModal').classList.add('active');
         }
 
@@ -758,9 +757,8 @@
 
         function selectCurrentMedia() {
             if (pendingMedia) {
-                const key = `${pendingMedia.circle}|${pendingMedia.provider}|${pendingMedia.filename}`;
-                if (!selectedOutputs.has(key)) {
-                    selectedOutputs.add(key);
+                if (!selectedOutputs.has(pendingMedia)) {
+                    selectedOutputs.add(pendingMedia);
                     updateSelectionUI();
                 }
                 closePreview();
@@ -770,14 +768,14 @@
         function openReviewModal(mode) {
             if (selectedOutputs.size === 0) return;
 
-            const first = Array.from(selectedOutputs)[0].split('|');
-            const [circle, provider, filename] = first;
-            const src = `${API}/api/files/${circle}/${provider}/${filename}`;
+            const firstPath = Array.from(selectedOutputs)[0];
+            const filename = firstPath.split('/').pop();
+            const src = `${API}/api/files/${firstPath}`;
 
             document.getElementById('reviewMediaPreview').style.display = 'flex';
             document.getElementById('reviewMediaThumb').src = src;
             document.getElementById('reviewMediaName').textContent = filename;
-            document.getElementById('reviewMediaProvider').textContent = `${circle} / ${provider}`;
+            document.getElementById('reviewMediaProvider').textContent = firstPath;
             document.getElementById('reviewNote').value = '';
 
             if (mode === 'approved') {
@@ -805,10 +803,22 @@
             const note = document.getElementById('reviewNote').value.trim();
             const results = [];
 
-            for (const key of selectedOutputs) {
-                const [circle, provider, filename] = key.split('|');
-                // Extract docId from filename (e.g. "hero_01.png" -> "hero")
-                const docId = filename.replace(/(_\d+)+(\.[^.]+)$/, '');
+            // Collect all output objects from rendered documents for lookup
+            const outputLookup = {};
+            for (const doc of documents) {
+                for (const out of doc.outputs) {
+                    outputLookup[out.path] = out;
+                }
+            }
+
+            for (const filePath of selectedOutputs) {
+                const filename = filePath.split('/').pop();
+                // circle is the first path segment (e.g. "shotframev4.circle1")
+                const circle = filePath.split('/')[0];
+                const out = outputLookup[filePath] || {};
+                // Extract docId: remove last _N.ext only (e.g. "hero_2_1.png" -> "hero_2")
+                const docIdMatch = filename.match(/^(.+)_(\d+)\.\w+$/);
+                const docId = docIdMatch ? docIdMatch[1] : filename.replace(/\.\w+$/, '');
 
                 try {
                     const res = await fetch(`${API}/api/approve/${circle}/${docId}`, {
@@ -816,6 +826,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             outputFile: filename,
+                            taskJsonPath: out.taskJsonPath || undefined,
                             note: note || undefined
                         })
                     });

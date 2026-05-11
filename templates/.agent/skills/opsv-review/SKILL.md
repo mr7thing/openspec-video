@@ -1,7 +1,7 @@
 # opsv-review Skill
 
 ## Overview
-Visual review of generated outputs. Serves a web UI with API endpoints for browsing circle outputs and approving assets. Two modes:
+OpsV Review v0.8.25 — Visual review of generated outputs.
 
 - **Global mode** (default, no `--circle`): scans all documents and all circles. Document frontmatter is the single source of truth for `category`/`status`. Manifest is used only to discover which assets exist and find their output files.
 - **Manifest-driven mode** (`--circle`): focuses on a single circle's manifest. Assets and outputs are scoped to that circle.
