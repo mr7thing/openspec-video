@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.3 Asset Manager
+// OpsV Asset Manager
 // Reads assets from videospec/ and _manifest.json per .circleN/
 // ============================================================================
 
@@ -102,7 +102,7 @@ export class AssetManager {
         ? path.basename(data.target)
         : undefined;
 
-      // v0.8.2+: assets from merged manifest (includes category)
+      // assets from merged manifest (includes category)
       if (data.assets) {
         const assets: CircleAssetEntry[] = Object.entries(data.assets).map(([id, info]: [string, any]) => ({
           id,

@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Provider Compiler Interface
+// OpsV Provider Compiler Interface
 // ============================================================================
 
 import { Job, TaskJson } from '../../types/Job';

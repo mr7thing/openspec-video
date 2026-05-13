@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Approve Service
+// OpsV Approve Service
 // Decomposed approve flow from review.ts into testable steps
 // ============================================================================
 

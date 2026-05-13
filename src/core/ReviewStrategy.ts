@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Review Strategy
+// OpsV Review Strategy
 // Strategy pattern for dual-mode review: manifest-driven (--circle) and global
 // ============================================================================
 

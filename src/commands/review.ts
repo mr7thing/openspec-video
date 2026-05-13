@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 — opsv review
+// OpsV opsv review
 // Supports --circle mode: manifest-driven review
 // Global mode (no --circle): document frontmatter is the single source of truth
 // ============================================================================

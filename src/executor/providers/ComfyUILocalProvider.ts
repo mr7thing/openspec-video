@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 ComfyUI Local Executor Provider
+// OpsV ComfyUI Local Executor Provider
 // ============================================================================
 
 import axios from 'axios';

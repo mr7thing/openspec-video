@@ -156,7 +156,7 @@ Both failures share the same root cause: **deriving document identity from gener
 **Why**: In v0.8, the iteration naming scheme changed from `id_2.json` (numeric suffix) to `id_m1.json` (lettered `_mN` suffix). Attempting to maintain dual compatibility — detecting `id_2.json` as "also a modified task" — would infect every code path with conditional logic. The `shot_01_frame_04` problem (asset IDs ending in `_04` being misidentified as iteration 4) shows how fragile backward-compatibility shims become. Every compatibility layer is a future bug waiting to surface.
 
 **How it applies**:
-- **Naming changes break silently**: If a file doesn't match the current pattern, it is silently skipped. `id_2.json` from v0.8.25 is not treated as a modified task in v0.8.26 — it is simply ignored.
+- **Naming changes break silently**: If a file doesn't match the current pattern, it is silently skipped. `id_2.json` from v0.8.25 is not treated as a modified task in v0.8.27 — it is simply ignored.
 - **Iteration marker is `_mN`**: `opsv iterate` creates `id_m{n}.json`. Old `_N.json` files are dead data.
 - **Output detection is strict**: `id_1.ext` = original task output. `id_m1_1.ext` = modified task output. Any other pattern is not recognized as a reviewable artifact.
 - **No migration tools**: When format changes occur, documentation states the old format is deprecated. No CLI command converts old data to new format.

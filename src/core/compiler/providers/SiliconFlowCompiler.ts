@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 SiliconFlow Provider Compiler
+// OpsV SiliconFlow Provider Compiler
 // Covers: wan (video), qwenimg (image)
 // ============================================================================
 

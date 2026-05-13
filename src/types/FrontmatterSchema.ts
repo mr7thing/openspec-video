@@ -1,18 +1,15 @@
 import { z } from 'zod';
 
 // ============================================================================
-// OpsV v0.8 Frontmatter Schema
+// OpsV Frontmatter Schema
 // ============================================================================
 
 // Document category — organizational classification, NOT generation type.
 // Generation type (imagen/video/audio/comfy/webapp) comes from api_config.yaml via --model.
-export const AssetCategoryEnum = z.enum([
-  'character', 'prop', 'costume', 'scene',
-  'shot-design', 'shot-production', 'project'
-]);
-export type AssetCategory = z.infer<typeof AssetCategoryEnum>;
+export const AssetCategoryEnum = z.string();
+export type AssetCategory = string;
 
-export const StatusEnum = z.enum(['drafting', 'syncing', 'approved', 'draft', 'draft-review']);
+export const StatusEnum = z.enum(['drafting', 'syncing', 'approved']);
 export type Status = z.infer<typeof StatusEnum>;
 
 export const NodeMappingSchema = z.record(z.object({
@@ -22,11 +19,11 @@ export const NodeMappingSchema = z.record(z.object({
 export type NodeMapping = z.infer<typeof NodeMappingSchema>;
 
 export const BaseFrontmatterSchema = z.object({
-  category: AssetCategoryEnum,
+  category: z.string(),
   status: StatusEnum,
   visual_brief: z.string().optional(),
   visual_detailed: z.string().optional(),
-  prompt_en: z.string().optional(),
+  prompt_en: z.string(),
   negative_prompt: z.string().optional(),
   refs: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),

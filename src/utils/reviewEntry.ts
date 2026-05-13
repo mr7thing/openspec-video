@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Review Entry Formatting
+// OpsV Review Entry Formatting
 // ============================================================================
 
 import { ReviewEntry } from '../types/ManifestSchema';

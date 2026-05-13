@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Webapp Executor Provider
+// OpsV Webapp Executor Provider
 // HTTP submit-poll for browser automation via Chrome extension
 // ============================================================================
 

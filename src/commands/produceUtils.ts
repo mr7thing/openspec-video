@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.8 — Produce Command Utilities
+// OpsV Produce Command Utilities
 // ============================================================================
 
 import path from 'path';
@@ -11,6 +11,8 @@ import { RefResolver } from '../core/RefResolver';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { Job } from '../types/Job';
 import { resolveProjectRoot } from '../utils/projectResolver';
+import { getProjectDir } from '../utils/configLoader';
+import { buildAssetDocIndex } from '../core/AssetDocIndex';
 
 export interface ProduceCommandOptions {
   model: string;
@@ -88,6 +90,12 @@ export async function buildProduceContext(projectRoot: string) {
   const approvedRefReader = new ApprovedRefReader(projectRoot);
   const designRefReader = new DesignRefReader(projectRoot);
   const refResolver = new RefResolver(projectRoot, approvedRefReader);
+
+  // Build shared asset index for ref resolution
+  const videospecDir = getProjectDir(projectRoot, 'videospec');
+  const assetIndex = buildAssetDocIndex(videospecDir);
+  approvedRefReader.setAssetIndex(assetIndex);
+  (refResolver as any).assetIndex = assetIndex;
 
   return { assetManager, approvedRefReader, designRefReader, refResolver };
 }

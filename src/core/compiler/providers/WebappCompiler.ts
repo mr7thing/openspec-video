@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Webapp Provider Compiler
+// OpsV Webapp Provider Compiler
 // Browser automation: gemini, wan, jimeng, etc.
 // ============================================================================
 

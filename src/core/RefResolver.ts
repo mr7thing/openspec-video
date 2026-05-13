@@ -1,11 +1,12 @@
 // ============================================================================
-// OpsV v0.8 @ Ref Resolver
+// OpsV @ Ref Resolver
 // ============================================================================
 
 import fs from 'fs';
 import path from 'path';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { getProjectDir } from '../utils/configLoader';
+import { AssetDocIndex, buildAssetDocIndex, AssetDocEntry } from './AssetDocIndex';
 
 export interface RefResult {
   type: 'asset' | 'frame';
@@ -17,10 +18,20 @@ export interface RefResult {
 }
 
 export class RefResolver {
+  private assetIndex: AssetDocIndex | null = null;
+
   constructor(
     private projectRoot: string,
     private approvedRefReader: ApprovedRefReader
   ) {}
+
+  private getAssetIndex(): AssetDocIndex {
+    if (!this.assetIndex) {
+      const videospecDir = getProjectDir(this.projectRoot, 'videospec');
+      this.assetIndex = buildAssetDocIndex(videospecDir);
+    }
+    return this.assetIndex;
+  }
 
   async parseAll(markdown: string): Promise<RefResult[]> {
     const results: RefResult[] = [];
@@ -141,20 +152,7 @@ export class RefResolver {
   }
 
   private findAssetDoc(assetId: string): string | null {
-    const prefixes = ['@', ''];
-    const videospecDir = getProjectDir(this.projectRoot, 'videospec');
-
-    if (!fs.existsSync(videospecDir)) return null;
-
-    const entries = fs.readdirSync(videospecDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        for (const prefix of prefixes) {
-          const p = path.join(videospecDir, entry.name, `${prefix}${assetId}.md`);
-          if (fs.existsSync(p)) return p;
-        }
-      }
-    }
-    return null;
+    const entry = this.getAssetIndex().entries.get(assetId);
+    return entry ? entry.filePath : null;
   }
 }

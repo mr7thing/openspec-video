@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.2 — opsv circle (create + refresh)
+// OpsV opsv circle (create + refresh)
 // Flat .circleN directory naming + merged _manifest.json
 // ============================================================================
 

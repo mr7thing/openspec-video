@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.3 Design References Reader
+// OpsV Design References Reader
 // Reads ## Design References section (internal references, own document)
 // ============================================================================
 

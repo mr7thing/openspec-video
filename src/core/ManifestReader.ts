@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Manifest Reader
+// OpsV Manifest Reader
 // Unified read/cache/validate/resolve for _manifest.json
 // ============================================================================
 

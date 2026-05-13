@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Minimax Provider Compiler
+// OpsV Minimax Provider Compiler
 // Covers: minimax image generation
 // ============================================================================
 

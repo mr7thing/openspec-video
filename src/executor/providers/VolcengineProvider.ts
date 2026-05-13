@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Volcengine Executor Provider
+// OpsV Volcengine Executor Provider
 // Handles: seadream (image), seedance2 (video)
 // ============================================================================
 

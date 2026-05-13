@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Manifest & Review Schema
+// OpsV Manifest & Review Schema
 // Aligned with DependencyGraph.Manifest interface
 // ============================================================================
 

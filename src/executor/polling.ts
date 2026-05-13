@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Gradient Polling + JSONL Log Checkpoint
+// OpsV Gradient Polling + JSONL Log Checkpoint
 // ============================================================================
 //
 // Gradient intervals:

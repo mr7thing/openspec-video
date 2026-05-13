@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.9 — opsv comfy-node-mapping
+// OpsV opsv comfy-node-mapping
 // Analyzes a ComfyUI API workflow JSON and extracts opsv- prefixed nodes
 // into a node_mappings object ready for api_config.yaml
 // ============================================================================

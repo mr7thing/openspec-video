@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 — opsv iterate
+// OpsV opsv iterate
 // Clone a task JSON (file mode) or an entire model queue dir (directory mode)
 // ============================================================================
 

@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.2 Dependency Graph
+// OpsV Dependency Graph
 // Circle-centric: builds layers → {basename}.circle{N}/ flat dirs + _manifest.json
 // ============================================================================
 
@@ -200,7 +200,7 @@ export class DependencyGraph {
     return deps ? [...deps] : [];
   }
 
-  // --- v0.8.2: flat .circleN directory + merged _manifest.json ---
+  // --- flat .circleN directory + merged _manifest.json ---
 
   static resolveTargetBasename(dirPath: string): string {
     return path.basename(path.resolve(dirPath));
@@ -320,12 +320,12 @@ export class DependencyGraph {
 
   // Deprecated: kept for transition, no longer used by commands
   writeCircleAssets(_queueRoot: string, _circles: CircleDefinition[]): void {
-    throw new Error('writeCircleAssets is deprecated in v0.8.2. Use writeCircleDir() instead.');
+    throw new Error('writeCircleAssets is deprecated. Use writeCircleDir() instead.');
   }
 
   // Deprecated: kept for transition, no longer used by commands
   writeManifest(_queueRoot: string, _circles: CircleDefinition[]): void {
-    throw new Error('writeManifest is deprecated in v0.8.2. Use writeCircleDir() instead.');
+    throw new Error('writeManifest is deprecated. Use writeCircleDir() instead.');
   }
 
   private getAssetStatus(id: string): string {

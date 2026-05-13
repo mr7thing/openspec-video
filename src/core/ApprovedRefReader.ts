@@ -1,11 +1,12 @@
 // ============================================================================
-// OpsV v0.8 Approved References Reader
+// OpsV Approved References Reader
 // ============================================================================
 
 import path from 'path';
 import fs from 'fs';
 import { FileUtils } from '../utils/FileUtils';
 import { getProjectDir } from '../utils/configLoader';
+import { AssetDocIndex, buildAssetDocIndex, AssetDocEntry } from './AssetDocIndex';
 
 export interface ApprovedRef {
   variant: string;
@@ -13,7 +14,24 @@ export interface ApprovedRef {
 }
 
 export class ApprovedRefReader {
-  constructor(private projectRoot: string) {}
+  private projectRoot: string;
+  private assetIndex: AssetDocIndex | null = null;
+
+  constructor(projectRoot: string) {
+    this.projectRoot = projectRoot;
+  }
+
+  setAssetIndex(index: AssetDocIndex): void {
+    this.assetIndex = index;
+  }
+
+  private getAssetIndex(): AssetDocIndex {
+    if (!this.assetIndex) {
+      const videospecDir = getProjectDir(this.projectRoot, 'videospec');
+      this.assetIndex = buildAssetDocIndex(videospecDir);
+    }
+    return this.assetIndex;
+  }
 
   async getVariant(docPath: string, variant: string): Promise<string | null> {
     const refs = await this.parseApprovedRefs(docPath);
@@ -89,20 +107,7 @@ export class ApprovedRefReader {
   }
 
   private async findDocPath(assetId: string): Promise<string | null> {
-    const prefixes = ['@', ''];
-    const videospecDir = getProjectDir(this.projectRoot, 'videospec');
-
-    if (!fs.existsSync(videospecDir)) return null;
-
-    const entries = fs.readdirSync(videospecDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        for (const prefix of prefixes) {
-          const p = path.join(videospecDir, entry.name, `${prefix}${assetId}.md`);
-          if (await FileUtils.exists(p)) return p;
-        }
-      }
-    }
-    return null;
+    const entry = this.getAssetIndex().entries.get(assetId);
+    return entry ? entry.filePath : null;
   }
 }

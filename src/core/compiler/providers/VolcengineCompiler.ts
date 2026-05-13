@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 Volcengine Provider Compiler
+// OpsV Volcengine Provider Compiler
 // Covers: seadream (image), seedance2 (video)
 // ============================================================================
 

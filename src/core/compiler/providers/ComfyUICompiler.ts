@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8.4 ComfyUI Compiler
+// OpsV ComfyUI Compiler
 // Workflow auto-matching by ref(N) pattern + _opsv_workflow validation
 // ============================================================================
 

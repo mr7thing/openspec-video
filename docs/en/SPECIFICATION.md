@@ -1,4 +1,4 @@
-# OpsV v0.8.8 Specification
+# OpsV Specification
 
 ## Overview
 
@@ -76,7 +76,7 @@ The `_manifest.json` is the **single source of truth** for asset state:
 
 ```json
 {
-  "version": "0.8.8",
+  "version": "0.8.27",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [...],
@@ -101,7 +101,7 @@ drafting -> syncing -> approved
 
 Review approve sets status based on output filename pattern:
 - `id_1.ext` (original task) → directly `approved`
-- `id_N_N.ext` (modified task) → `syncing` + review record includes `modified_task` path; agent aligns fields then sets `approved`
+- `id_m{n}_1.ext` (iterated task) → `syncing` + review record includes `modified_task` path; agent aligns fields then sets `approved`
 
 CLI never modifies `prompt_en` or other content fields during review — only appends review records and sets status.
 
@@ -156,20 +156,44 @@ Circles represent dependency layers determined by topological sort. Circle names
 | `endcircle` | Final layer contains `shotlist.md` | Final video shot outputs (batch video generation) |
 
 `opsv circle create` builds the graph and creates a new circle directory (`basename.circleN`). The `--name` parameter sets the basename; `--dir` scopes creation to a specific directory. Each `circle create` increments the circle batch number (`.circle1`, `.circle2`, etc.).
-`opsv circle refresh` rebuilds the graph and diffs against existing state.
+
+### Directory Scanning Rules
+
+**`--dir` accepts a single path only** — multiple directories are not supported.
+
+Scanning depth is **one level** under `--dir`:
+
+```
+--dir videospec/
+├── *.md                     ← scanned
+├── elements/
+│   ├── *.md                ← scanned
+│   └── nested/             ← NOT scanned (too deep)
+└── scenes/
+    ├── *.md                ← scanned
+    └── subdir/             ← NOT scanned
+```
+
+Rule: `opsv circle create --dir videospec` scans `videospec/*.md` and `videospec/*/*.md` (one level only). Deeper nesting like `videospec/elements/characters/hero.md` is ignored.
+
+**Workaround for multiple source directories**: place all assets under a common root (`videospec/`) with subdirectories for organization. One circle command scans the entire tree.
+
+**`opsv circle refresh`** rebuilds the graph using the same `--dir` used in `create`. To scan a different directory structure, create a new circle batch with `circle create --dir <path>`.
 
 ## Task JSON & Output Naming Convention
 
 | Scenario | Task JSON | Output | Review Result |
 |----------|-----------|--------|---------------|
 | Initial compile | `@hero.json` | `@hero_1.png` | Original → directly `approved` |
-| Modified re-compile | `@hero_2.json` | `@hero_2_1.png` | Modified → `syncing`, agent must align |
+| Modified (iterated) | `@hero_m1.json` | `@hero_m1_1.png` | Modified → `syncing`, agent must align |
 
 Rules:
 - Initial: `id.json` → output `id_1.ext`
-- Modified tasks increment sequence: `id_2.json`, `id_3.json`...
-- Modified task outputs: `id_N_1.ext` (extra `_1` level, N≥2)
-- Agent iteration: `opsv iterate @hero.json` → edit generated `@hero_2.json` → `opsv run @hero_2.json` → output `@hero_2_1.png`
+- Iterated tasks use `_m{N}` marker: `id_m1.json`, `id_m2.json`...
+- Iterated outputs: `id_m{n}_1.ext` (the `_m` prefix distinguishes from numeric asset IDs like `shot_01_frame_04`)
+- Agent iteration: `opsv iterate @hero.json` → edit generated `@hero_m1.json` → `opsv run @hero_m1.json` → output `@hero_m1_1.png`
+
+**No backward compatibility**: old `_N` naming (e.g. `@hero_2.json`) is ignored by v0.8.27+. Old output files are dead data.
 
 ## @ Reference Syntax
 

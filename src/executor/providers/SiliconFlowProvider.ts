@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.8 SiliconFlow Executor Provider
+// OpsV SiliconFlow Executor Provider
 // Handles: wan (video), qwenimg (image)
 // ============================================================================
 

@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV v0.9 RunningHub Provider Compiler
+// OpsV RunningHub Provider Compiler
 // Unified parameter mapping: reads nodeMapping from frontmatter or api_config
 // ============================================================================
 
