@@ -28,7 +28,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
 
     const payload: Record<string, any> = {
       model: modelConfig.model,
-      prompt: job.prompt_en || job.payload.prompt,
+      prompt: job.prompt || job.payload.prompt,
       image_size: this.resolveSize(job.payload.global_settings, modelConfig),
       batch_size: 1,
     };
@@ -68,7 +68,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
 
     const payload: Record<string, any> = {
       model: modelConfig.model,
-      prompt: job.prompt_en || job.payload.prompt,
+      prompt: job.prompt || job.payload.prompt,
     };
 
     if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {

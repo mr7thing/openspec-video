@@ -295,7 +295,7 @@ opsv animate --model volcengine.seedance-2.0
 - `id_1.ext`（如 `@hero_1.png`）→ 原始任务 → 直接 `approved`
 - `id_2_1.ext`（如 `@hero_2_1.png`）→ 修改任务 → `syncing` + review 记录追加 `modified_task` 路径
 
-**CLI 非冲突原则**：Review approve 绝不修改 `prompt_en` 等内容字段，仅追加 review 记录 + 设置状态。
+**CLI 非冲突原则**：Review approve 绝不修改 `prompt` 等内容字段，仅追加 review 记录 + 设置状态。
 `syncing` 资产需 Agent 检查 review 记录中的 `modified_task`，对齐文档描述字段后改为 `approved`。
 Review 后刷新 circle：`opsv circle refresh`；有变化 → 继续当前 Circle；全部 approve → 可晋升下一环。
 

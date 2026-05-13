@@ -144,7 +144,7 @@ async function buildComfyJob(
   const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt_en || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+  const prompt = frontmatter.prompt || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
 
   // Collect reference images
   let referenceImages: string[] = [];
@@ -183,7 +183,7 @@ async function buildComfyJob(
   return {
     id: asset.id,
     type: 'comfy' as const,
-    prompt_en: prompt,
+    prompt: prompt,
     workflow: frontmatter.workflow,
     workflow_id: frontmatter.workflow_id,
     workflow_path: frontmatter.workflow_path,

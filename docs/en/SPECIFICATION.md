@@ -103,7 +103,7 @@ Review approve sets status based on output filename pattern:
 - `id_1.ext` (original task) → directly `approved`
 - `id_m{n}_1.ext` (iterated task) → `syncing` + review record includes `modified_task` path; agent aligns fields then sets `approved`
 
-CLI never modifies `prompt_en` or other content fields during review — only appends review records and sets status.
+CLI never modifies `prompt` or other content fields during review — only appends review records and sets status.
 
 ## Frontmatter Schema
 
@@ -113,7 +113,7 @@ category: character | prop | costume | scene | shot-design | shot-production | p
 status: drafting | syncing | approved
 visual_brief: "Brief description for prompt generation"
 visual_detailed: "Detailed description for video prompt"
-prompt_en: "English prompt for AI generation"
+prompt: "Prompt for AI generation"
 refs: ["@hero:portrait", "@villain"]
 reviews: ["2026-01-15 Approved by director"]
 ```
@@ -263,7 +263,7 @@ Rules:
 - `draft` status removed; only `drafting`, `syncing`, `approved`
 - `type` frontmatter field renamed to `category` (document management classification, NOT generation type)
 - Generation type is determined solely by `--model` (from `api_config.yaml`), not by document category
-- Review approve no longer modifies `prompt_en` or content fields — CLI only appends review records + sets status
+- Review approve no longer modifies `prompt` or content fields — CLI only appends review records + sets status
 - Review approve sets `approved` for original task outputs, `syncing` for modified task outputs
 - Model queue directories use `_NNN` sequence suffixes for traceability (e.g. `volcengine.seadream_001`, `volcengine.seadream_002`)
 - Output naming convention: `id_1.ext` (original), `id_N_1.ext` (modified, N≥2)

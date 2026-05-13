@@ -28,7 +28,7 @@ export class VolcengineCompiler implements ProviderCompiler {
 
     const payload: Record<string, any> = {
       model: modelConfig.model,
-      prompt: job.prompt_en || job.payload.prompt,
+      prompt: job.prompt || job.payload.prompt,
       size: this.resolveSize(job.payload.global_settings, modelConfig),
     };
 
@@ -80,7 +80,7 @@ export class VolcengineCompiler implements ProviderCompiler {
       content: [
         {
           type: 'text',
-          text: job.prompt_en || job.payload.prompt,
+          text: job.prompt || job.payload.prompt,
         },
       ],
     };

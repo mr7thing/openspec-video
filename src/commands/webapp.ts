@@ -113,7 +113,7 @@ async function buildWebappJob(
   const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt_en || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+  const prompt = frontmatter.prompt || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
 
   let referenceImages: string[] = [];
   if (frontmatter.refs && frontmatter.refs.length > 0) {
@@ -143,7 +143,7 @@ async function buildWebappJob(
   return {
     id: asset.id,
     type: 'webapp',
-    prompt_en: prompt,
+    prompt: prompt,
     payload: {
       prompt,
       global_settings: {

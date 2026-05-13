@@ -118,7 +118,7 @@ async function buildVideoJob(
   const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt_en || frontmatter.visual_detailed || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+  const prompt = frontmatter.prompt || frontmatter.visual_detailed || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
 
   let frameRef: FrameRef | undefined;
   if (frontmatter.frame_ref) {
@@ -185,7 +185,7 @@ async function buildVideoJob(
   return {
     id: asset.id,
     type: 'video',
-    prompt_en: prompt,
+    prompt: prompt,
     payload: {
       prompt,
       global_settings: {

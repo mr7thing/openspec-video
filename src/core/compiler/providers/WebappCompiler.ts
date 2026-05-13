@@ -18,7 +18,7 @@ export class WebappCompiler implements ProviderCompiler {
     const payload: Record<string, any> = {
       task_id: job.id,
       target_url: defaults.target_url || '',
-      prompt: job.prompt_en || job.payload.prompt,
+      prompt: job.prompt || job.payload.prompt,
       typing_speed: defaults.typing_speed || 'human',
       watermark_removal: defaults.watermark_removal ?? true,
       upload_method: defaults.upload_method || 'drag-drop',

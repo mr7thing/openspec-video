@@ -6,7 +6,7 @@ visual_brief: >
 visual_detailed: >
   一柄黑色铸铁质感的残破长剑，剑身布满不规则的炽热红色裂隙。
   注：本资产 ID 自动映射为 "broken_sword"。
-prompt_en: >
+prompt: >
   A broken black iron sword with glowing red magma-like cracks, 8k texture.
 refs: []
 reviews: []

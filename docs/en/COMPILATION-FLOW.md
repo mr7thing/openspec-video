@@ -7,12 +7,12 @@
 ## Prompt Resolution (Priority)
 
 ```typescript
-const prompt = frontmatter.prompt_en
+const prompt = frontmatter.prompt
   || frontmatter.visual_brief
   || FrontmatterParser.extractFirstParagraph(body);
 ```
 
-1. `prompt_en` — explicit English prompt field
+1. `prompt` — explicit English prompt field
 2. `visual_brief` — structured brief field
 3. Body first paragraph — auto-extracted from markdown body
 
@@ -56,10 +56,10 @@ opsv imagen --model volcengine.seadream
   │
   ├─ buildImageJob()  [per asset]
   │     ├─ reads @assetId.md
-  │     ├─ extracts prompt (prompt_en > visual_brief > body首段)
+  │     ├─ extracts prompt (prompt > visual_brief > body首段)
   │     ├─ RefResolver.parseAll() → Approved References from referenced docs
   │     ├─ DesignRefReader.getAll() → Design References from own doc
-  │     └─ returns Job { id, type, prompt_en, payload, reference_images }
+  │     └─ returns Job { id, type, prompt, payload, reference_images }
   │
   └─ TaskBuilder.compileToDir()
         ├─ selects ProviderCompiler (volcengine/siliconflow/minimax/runninghub/comfyui/webapp)
@@ -73,7 +73,7 @@ opsv imagen --model volcengine.seadream
 {
   id: "shot_01_frame_04",
   type: "imagen",
-  prompt_en: "洞穴内部，摇曳火把...",
+  prompt: "洞穴内部，摇曳火把...",
   payload: {
     prompt: "洞穴内部，摇曳火把...",
     global_settings: {

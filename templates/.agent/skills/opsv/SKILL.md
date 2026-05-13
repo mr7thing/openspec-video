@@ -71,7 +71,7 @@ OpsV 区分两种参考图来源，分别对应文档的两个不同区域：
 1. 追加 review 记录（时间戳 + approve 意见 + 如有修改则记录 task JSON 路径）
 2. 根据生成物文件名模式设置状态（`approved` 或 `syncing`）
 
-**绝不修改 `prompt_en`、`visual_detailed`、`visual_brief` 等内容字段**，所有字段对齐由 Agent 完成。
+**绝不修改 `prompt`、`visual_detailed`、`visual_brief` 等内容字段**，所有字段对齐由 Agent 完成。
 
 **一致性铁律**:
 - `status: approved` 的文档**必须**包含至少一张有效的 `## Approved References` 参考图（`![variant](path)` 格式）
@@ -224,7 +224,7 @@ category: shot-production
 - 每个 shot 是独立 `.md` 文件，拥有自己的 frontmatter
 - frontmatter 必填字段：`category`、`status`
 - Shot 特定字段：`duration`、`first_frame`、`last_frame`、`frame_ref`
-- Prompt 取值优先级：`prompt_en` → `visual_detailed` → `visual_brief` → body 第一段
+- Prompt 取值优先级：`prompt` → `visual_detailed` → `visual_brief` → body 第一段
 - `refs` 数组中的 `@assetId` 或 `@assetId:variant` 引用会在 body 中解析
 - `@FRAME:shotId_type` 只用于 body 的 `refs` 数组，不用于 frontmatter 字段
 - ComfyUI / RunningHub 工作流支持 `seed: random`（自动替换为随机自然数）
@@ -287,7 +287,7 @@ opsv review --port 3100 --ttl 300        # 自定义端口与空闲超时
 #    → Approve 后（根据生成物文件名自动判断）：
 #      - 原始任务生成物 (id_1.ext) → 直接 approved
 #      - 修改任务生成物 (id_2_1.ext) → syncing + 记录 modified_task 路径
-#    → CLI 绝不修改 prompt_en 等内容字段
+#    → CLI 绝不修改 prompt 等内容字段
 #    → syncing 状态的资产：Agent 需对齐 visual_detailed/visual_brief/refs 后改为 approved
 #    → 全部 approved 后 opsv circle refresh 自动更新 _manifest.json
 

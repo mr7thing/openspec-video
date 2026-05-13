@@ -5,7 +5,7 @@ visual_brief: >
   视觉描述简述。
 visual_detailed: >
   视觉详细特征描述。
-prompt_en: >
+prompt: >
   Core Prompt.
 refs: []                             # 按需添加依赖资产
 reviews: []

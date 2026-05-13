@@ -231,7 +231,7 @@ drafting → draft → syncing → approved
 
 ### 核心原则：drafting → draft → syncing → approved
 
-`opsv review` 的 Approve 操作触发回写，将 `prompt_en` 覆盖为实际生成参数，`status` 设为 `syncing`。Agent **必须**根据 `prompt_en` 完成 `visual_detailed`/`visual_brief`/`refs` 对齐后，方可将 `status` 改为 `approved`。
+`opsv review` 的 Approve 操作触发回写，将 `prompt` 覆盖为实际生成参数，`status` 设为 `syncing`。Agent **必须**根据 `prompt` 完成 `visual_detailed`/`visual_brief`/`refs` 对齐后，方可将 `status` 改为 `approved`。
 
 **`syncing` 资产阻断下游 Circle**——其他分镜/视频任务无法引用未对齐的资产，确保生成一致性。
 
@@ -239,7 +239,7 @@ drafting → draft → syncing → approved
 
 | 动作 | 内容 | 覆盖策略 |
 |------|------|---------|
-| 覆盖 `prompt_en` | 从 task JSON 的 `prompt` 或 `content[].text` 提取 | 始终覆盖 |
+| 覆盖 `prompt` | 从 task JSON 的 `prompt` 或 `content[].text` 提取 | 始终覆盖 |
 | 同步 `## Design References` | 从 task JSON 的 `image`/`content[].image_url` 提取参考图链接 | 替换该区域 |
 | 添加 review 条目 | 指向 task JSON 路径 + 模型 + 尺寸 | 始终追加 |
 | `status → syncing` | 标记为待同步 | 始终设置 |
@@ -249,8 +249,8 @@ drafting → draft → syncing → approved
 
 Agent 看到 `syncing` 后**必须执行**：
 
-1. **读取 `prompt_en`** — 确认实际发送给 API 的提示词
-2. **翻译 `prompt_en` → `visual_detailed`** — 将英文提示词翻译为中文描述，可补充生成参数备注
+1. **读取 `prompt`** — 确认实际发送给 API 的提示词
+2. **翻译 `prompt` → `visual_detailed`** — 将英文提示词翻译为中文描述，可补充生成参数备注
 3. **简化 `visual_detailed` → `visual_brief`** — 提炼核心视觉特征（<=120字）
 4. **对齐 `refs`** — 检查 `refs` 是否与 `## Design References` 中的参考图一致
 5. **`status: approved`** — 所有字段对齐后手动修改
@@ -262,7 +262,7 @@ Agent 看到 `syncing` 后**必须执行**：
 |--------|------|------|
 | `syncing` 字段缺失 | `visual_detailed`/`visual_brief` 为空，或 `refs` 与 Design References 不一致 | error（提示需对齐） |
 | `syncing` 字段已填充 | 所有字段已填充，提醒确认后改为 approved | warning |
-| `prompt_en` 与 `visual_detailed` 不一致 | approved 状态但 visual_detailed 过短或未反映 prompt_en | warning |
+| `prompt` 与 `visual_detailed` 不一致 | approved 状态但 visual_detailed 过短或未反映 prompt | warning |
 | `status` 与 `Approved References` 矛盾 | 有 approved 图但 status 非 approved/syncing | error |
 
 ### 完整迭代流程
@@ -270,8 +270,8 @@ Agent 看到 `syncing` 后**必须执行**：
 ```
 1. opsv imagen --model <m>                          # 编译图像任务为可执行 .json
 2. opsv run <task_paths...>                         # 执行渲染
-3. opsv review                                      # 审阅 → Approve 时自动: prompt_en覆盖 + Design References同步 + status→syncing
-4. Agent 根据 prompt_en 对齐 visual_detailed/visual_brief/refs，status→approved
+3. opsv review                                      # 审阅 → Approve 时自动: prompt覆盖 + Design References同步 + status→syncing
+4. Agent 根据 prompt 对齐 visual_detailed/visual_brief/refs，status→approved
 5. opsv validate                                    # 验证对齐一致性
 6. opsv circle refresh                              # 刷新 Circle 状态（syncing 不解锁下游）
 ```
@@ -287,7 +287,7 @@ Agent 看到 `syncing` 后**必须执行**：
 
 1. **定位问题**：查看 `draft_ref` 和 `reviews` 记录了解驳回原因
 2. **修改方案**（二选一）：
-   - **方案A**：修改源 `.md` 的 `visual_detailed` / `prompt_en` → 重新 `opsv imagen --model <m>` → `opsv run`
+   - **方案A**：修改源 `.md` 的 `visual_detailed` / `prompt` → 重新 `opsv imagen --model <m>` → `opsv run`
    - **方案B**：使用 `opsv iterate` 克隆 task JSON 后修改并执行（快速迭代）
 3. **快速迭代示例**：
    ```bash

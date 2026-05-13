@@ -54,10 +54,10 @@ Review approve 根据**生成物文件名**自动判断状态：
 2. **修改任务生成物**（`id_N_N.ext` 模式，如 `@hero_2_1.png`）：
    - CLI 设 `status: syncing`（不直接 approved）
    - 追加 review 记录（时间戳 + approve 意见 + `modified_task: <task JSON 路径>`）
-   - Agent 必须检查 review 记录中的 `modified_task` 路径，将 `visual_detailed`、`visual_brief`、`prompt_en`、`refs` 与修改后 task JSON 对齐
+   - Agent 必须检查 review 记录中的 `modified_task` 路径，将 `visual_detailed`、`visual_brief`、`prompt`、`refs` 与修改后 task JSON 对齐
    - 对齐完成后 Agent 设 `status: approved`
 
-**CLI 非冲突原则**：Review approve 绝不修改 `prompt_en` 等内容字段，仅追加 review 记录 + 设置状态。
+**CLI 非冲突原则**：Review approve 绝不修改 `prompt` 等内容字段，仅追加 review 记录 + 设置状态。
 
 **一致性约束**: `status: approved` 与 `## Approved References` 必须严格一致。`opsv validate` 会校验：
 - `approved` 状态必须有至少一张 Approved References

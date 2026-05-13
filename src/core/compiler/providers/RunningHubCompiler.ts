@@ -55,7 +55,7 @@ export class RunningHubCompiler implements ProviderCompiler {
       let value: any = undefined;
 
       if (key === 'prompt') {
-        value = job.prompt_en || job.payload.prompt;
+        value = job.prompt || job.payload.prompt;
       } else if (key === 'negative_prompt') {
         value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
       } else if (/^image\d+$/.test(key)) {

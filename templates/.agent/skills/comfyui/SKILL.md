@@ -74,7 +74,7 @@ resolveTarget() → 扫描 opsv-queue/*.circle*/ → 取最新 {basename}.circle
 
 `buildComfyJob(asset, paramOverrides)` 对每个待编译资产：
 
-- `prompt = frontmatter.prompt_en || visual_brief || 首段文本`
+- `prompt = frontmatter.prompt || visual_brief || 首段文本`
 - `negative_prompt = frontmatter.negative_prompt`（通过 `node_mapping.negative_prompt` 注入）
 - `type = 'comfy'`（硬编码，不由文档 category 决定）
 - `--param` 的 JSON 合并到 `payload.extra`

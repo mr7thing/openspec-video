@@ -27,7 +27,7 @@ export class MinimaxCompiler implements ProviderCompiler {
 
     const payload: Record<string, any> = {
       model: modelConfig.model,
-      prompt: job.prompt_en || job.payload.prompt,
+      prompt: job.prompt || job.payload.prompt,
       aspect_ratio: job.payload.global_settings?.aspect_ratio || modelConfig.defaults?.aspect_ratio || '1:1',
     };
 
@@ -57,7 +57,7 @@ export class MinimaxCompiler implements ProviderCompiler {
 
     const payload: Record<string, any> = {
       model: modelConfig.model,
-      prompt: job.prompt_en || job.payload.prompt,
+      prompt: job.prompt || job.payload.prompt,
     };
 
     // Resolution: frontmatter > api_config.defaults

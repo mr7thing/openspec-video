@@ -52,7 +52,7 @@ Review approve uses `parseOutputFilename()` to detect whether the approved outpu
 3. **Update** `_manifest.json` status (including `assets` field)
 
 ### What CLI Never Does
-- Never modifies `prompt_en`, `visual_detailed`, `visual_brief`, `refs`, or any content field
+- Never modifies `prompt`, `visual_detailed`, `visual_brief`, `refs`, or any content field
 - Never writes to `## Approved References` (that's the agent's job after syncing)
 - Never infers docId from output filenames (docId always comes from manifest)
 
@@ -60,7 +60,7 @@ Review approve uses `parseOutputFilename()` to detect whether the approved outpu
 When an asset is in `syncing` state, the agent must:
 1. Read the review record to find the `modified_task` path
 2. Load the modified task JSON
-3. Align `visual_detailed`, `visual_brief`, `prompt_en`, `refs` in the source `.md` with the modified task JSON
+3. Align `visual_detailed`, `visual_brief`, `prompt`, `refs` in the source `.md` with the modified task JSON
 4. Write approved output to `## Approved References`
 5. Set `status: approved`
 6. Run `opsv circle refresh` to update `_manifest.json` in the `.circleN/` directory

@@ -28,7 +28,7 @@ export interface PromptPayload {
 export interface Job {
   id: string;
   type: JobType;
-  prompt_en?: string;
+  prompt?: string;
   payload: PromptPayload;
   reference_images?: string[];
   reference_videos?: string[];

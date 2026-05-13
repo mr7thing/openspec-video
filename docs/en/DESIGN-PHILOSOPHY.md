@@ -12,7 +12,7 @@ OpsV is not just a CLI tool — it is a **coordination protocol** between humans
 
 **Why**: In v0.5–v0.6, prompt text was scattered across `jobs.json`, `PromptSchema.ts`, and inline defaults. When a user edited the markdown, the CLI would still use stale cached values. Making frontmatter the sole authority eliminates this divergence permanently.
 
-**How it applies**: Every `imagen`/`animate`/`comfy` compilation reads frontmatter fields (`visual_brief`, `prompt_en`, `refs`, `frame_ref`) and builds the Job object from them. The CLI never writes back to these fields.
+**How it applies**: Every `imagen`/`animate`/`comfy` compilation reads frontmatter fields (`visual_brief`, `prompt`, `refs`, `frame_ref`) and builds the Job object from them. The CLI never writes back to these fields.
 
 ---
 
@@ -23,13 +23,13 @@ OpsV is not just a CLI tool — it is a **coordination protocol** between humans
 - **Non-destructive**: Never overwrites user-authored content
 - **Conflict-free**: Never modifies fields that an agent might also be editing
 
-**Why**: In v0.7, the review `approve` action automatically overwrote `prompt_en` with the task JSON's prompt and synced Design References. This created race conditions: if an agent was simultaneously editing `visual_detailed` based on the same review, the CLI's write would clobber the agent's work. The result was lost edits and confused state.
+**Why**: In v0.7, the review `approve` action automatically overwrote `prompt` with the task JSON's prompt and synced Design References. This created race conditions: if an agent was simultaneously editing `visual_detailed` based on the same review, the CLI's write would clobber the agent's work. The result was lost edits and confused state.
 
 **How it applies**: The `opsv review` approve endpoint now only does two things:
 1. Appends a review record (timestamped, additive — never conflicts)
 2. Sets `status` to `syncing` (a deterministic state transition)
 
-All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is the agent's responsibility after seeing `syncing`. The CLI never touches these fields.
+All field alignment (`prompt`, `visual_detailed`, `visual_brief`, `refs`) is the agent's responsibility after seeing `syncing`. The CLI never touches these fields.
 
 **Reference architecture** (v0.8.3): Two distinct reference types prevent confusion between input and output image flows:
 - `## Design References` (input-side): design reference images bundled with the document, read by `DesignRefReader` as `Asset.designRefs`, used as `reference_images` during compilation
@@ -93,7 +93,7 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 **Why**: In v0.5–v0.6, an approved image might have been generated with a different prompt than what's in the frontmatter. When a downstream video task referenced this asset via `@hero`, it used the frontmatter's `visual_brief` — which might not match the actual generated image. The `syncing` gate forces alignment before propagation.
 
-**How it applies**: `opsv circle refresh` reports `syncing` assets as blocked. Produce commands skip `syncing` assets. The agent must verify that `visual_detailed`, `visual_brief`, `prompt_en`, and `refs` all reflect the actual generation result before setting `status: approved`. Produce commands read references from two sources: `approvedRefs` (from `## Approved References` of referenced documents) and `designRefs` (from `## Design References` of the own document).
+**How it applies**: `opsv circle refresh` reports `syncing` assets as blocked. Produce commands skip `syncing` assets. The agent must verify that `visual_detailed`, `visual_brief`, `prompt`, and `refs` all reflect the actual generation result before setting `status: approved`. Produce commands read references from two sources: `approvedRefs` (from `## Approved References` of referenced documents) and `designRefs` (from `## Design References` of the own document).
 
 ---
 
@@ -121,7 +121,7 @@ All field alignment (`prompt_en`, `visual_detailed`, `visual_brief`, `refs`) is 
 
 **Principle**: Task and output filenames encode whether a task has been modified, enabling deterministic review logic without any external state.
 
-**Why**: In v0.7, when a user modified a compiled task JSON and re-ran it, the review system had no way to know whether the approved output matched the original frontmatter or the modified task. The CLI would either blindly overwrite `prompt_en` (causing conflicts with agent edits) or skip alignment entirely (leaving stale descriptions). Encoding modification history in the filename makes the distinction trivial: `id_1.ext` = original, `id_m1_1.ext` = modified.
+**Why**: In v0.7, when a user modified a compiled task JSON and re-ran it, the review system had no way to know whether the approved output matched the original frontmatter or the modified task. The CLI would either blindly overwrite `prompt` (causing conflicts with agent edits) or skip alignment entirely (leaving stale descriptions). Encoding modification history in the filename makes the distinction trivial: `id_1.ext` = original, `id_m1_1.ext` = modified.
 
 **How it applies**:
 - Initial compilation: `@hero.json` → output `@hero_1.png`
