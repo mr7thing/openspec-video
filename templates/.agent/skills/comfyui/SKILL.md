@@ -49,11 +49,11 @@ opsv comfy --model comfyui.sdxl --param '{"input-style":"anime","input-steps":30
 opsv comfy --model comfyui.sdxl --dry-run
 
 # 执行
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero.json
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/@hero.json
 
 # 重试失败任务
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/ --retry
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/ --retry
 ```
 
 ---
@@ -143,7 +143,7 @@ node_mappings:
 ### 5. 产出
 
 ```
-opsv-queue/videospec.circle1/comfyui.sdxl_001/
+opsv-queue/videospec_circle1/comfyui.sdxl_001/
   @hero.json              ← 编译后的 TaskJson（含完整 workflow + _opsv 元数据）
   scene_forest.json
 ```
@@ -259,14 +259,14 @@ runninghub.default:
 
 ```bash
 # 克隆任务（自动清除 compiledAt，确保会被执行）
-opsv iterate opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero.json
+opsv iterate opsv-queue/videospec_circle1/comfyui.sdxl_001/@hero.json
 # → 生成 @hero_2.json
 # 编辑 @hero_2.json（修改 workflow 节点参数、seed 等）
-opsv run opsv-queue/videospec.circle1/comfyui.sdxl_001/@hero_2.json
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/@hero_2.json
 # → 生成 @hero_2_1.png
 
 # 克隆整个目录进行批量迭代
-opsv iterate opsv-queue/videospec.circle1/comfyui.sdxl_001/
+opsv iterate opsv-queue/videospec_circle1/comfyui.sdxl_001/
 # → 生成 comfyui.sdxl_001_it_001/（目录下所有 task JSON 被复制，名称不变）
 
 # Review approve 后：

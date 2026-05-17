@@ -205,13 +205,13 @@
 
 12. **Circle 目录扁平化：`{basename}.circle{N}/`**
     - 旧：`opsv-queue/videospec/zerocircle/volcengine.seadream/@hero.json`（4 层嵌套）
-    - 新：`opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json`
+    - 新：`opsv-queue/videospec_circle1/volcengine.seadream_001/@hero.json`
     - 不再有 `zerocircle/`、`firstcircle/`、`endcircle/` 子目录
     - 同一 `.circleN/` 下所有 layer 的任务共存于 `provider.model/` 扁平目录
     - layer 分层信息只记录在 `_manifest.json` 中
 
 13. **批次递增管理**
-    - `.circle1`、`.circle2`、`.circle3`... — 每次 `circle create` 递增
+    - `_circle1`、`_circle2`、`_circle3`... — 每次 `circle create` 递增
     - 历史批次保留，不再覆盖
     - `DependencyGraph.detectCircleN()` 扫描已有目录确定下一个 N
 

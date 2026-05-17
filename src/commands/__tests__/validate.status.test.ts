@@ -34,7 +34,7 @@ describe('validate status vs manifest consistency', () => {
     // queue dir = tmpDir/opsv-queue
     const videospecDir = path.join(tmpDir, 'videospec');
     fs.mkdirSync(videospecDir, { recursive: true });
-    const queueDir = path.join(tmpDir, 'opsv-queue', '.circle1');
+    const queueDir = path.join(tmpDir, 'opsv-queue', 'videospec_circle1');
     fs.mkdirSync(queueDir, { recursive: true });
 
     // Document: status=drafting, in subdirectory (not root level)
@@ -63,7 +63,7 @@ describe('validate status vs manifest consistency', () => {
   it('passes when manifest status matches frontmatter status', () => {
     const videospecDir = path.join(tmpDir, 'videospec');
     fs.mkdirSync(videospecDir, { recursive: true });
-    const queueDir = path.join(tmpDir, 'opsv-queue', '.circle1');
+    const queueDir = path.join(tmpDir, 'opsv-queue', 'videospec_circle1');
     fs.mkdirSync(queueDir, { recursive: true });
 
     writeFile('videospec/shot.md', `---\ncategory: shot-design\nasset_id: shot\nstatus: approved\n---\n\n# Shot`);
@@ -93,7 +93,7 @@ describe('validate status vs manifest consistency', () => {
     // videospecDir = tmpDir/videospec, no subdirs
     const videospecDir = path.join(tmpDir, 'videospec');
     fs.mkdirSync(videospecDir, { recursive: true });
-    const queueDir = path.join(tmpDir, 'opsv-queue', '.circle1');
+    const queueDir = path.join(tmpDir, 'opsv-queue', 'videospec_circle1');
     fs.mkdirSync(queueDir, { recursive: true });
 
     writeFile('videospec/project.md', `---\ncategory: project\nasset_id: project\nstatus: approved\n---\n\n# Project`);

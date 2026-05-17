@@ -72,7 +72,7 @@ describe('DependencyGraph', () => {
         expect(typeof c.name).toBe('string');
         expect(c.name.length).toBeGreaterThan(0);
       }
-      // index 14 beyond ordinals → circle.14
+      // index 14 beyond ordinals → circle_14
       expect(circles[14].name).toBe('circle.14');
       expect(circles[14].index).toBe(14);
     });

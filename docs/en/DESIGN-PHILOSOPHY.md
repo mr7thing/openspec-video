@@ -43,7 +43,7 @@ All field alignment (`prompt`, `visual_detailed`, `visual_brief`, `refs`) is the
 
 **Why**: In v0.5–v0.6, `opsv imagen` mixed five responsibilities: document parsing, dependency scheduling, prompt assembly, task construction, and persistence. Changing one aspect broke others. The coupling made it impossible to compile without executing, or to re-execute without recompiling.
 
-**How it applies**: `opsv imagen --model volcengine.seadream` compiles task `.json` files to disk. `opsv run opsv-queue/videospec.circle1/` executes them. You can inspect, modify, or delete compiled tasks before execution. You can re-run without recompiling.
+**How it applies**: `opsv imagen --model volcengine.seadream` compiles task `.json` files to disk. `opsv run opsv-queue/videospec_circle1/` executes them. You can inspect, modify, or delete compiled tasks before execution. You can re-run without recompiling.
 
 ---
 
@@ -135,7 +135,7 @@ All field alignment (`prompt`, `visual_detailed`, `visual_brief`, `refs`) is the
 
 **Principle**: The `.md` document is the sole authority for asset identity and attributes. The manifest (`_manifest.json`) declares which assets exist and discovers their outputs — it never overrides or infers document-level properties.
 
-**Why**: In v0.8, the global review mode (`opsv review` without `--circle`) built a flat `assetInfoMap` by merging all circle manifests, where later-scanned circles silently overwrote earlier ones. When the same `docId` appeared in multiple circles (e.g., `shot_01_frame_02` in `short_frames.circle1`, `shotframes2.circle1`, and `shotframev4.circle1`), only the last circle's `category` and `status` survived. 75 docIds lost their true attributes, and the UI collapsed all documents into a single category.
+**Why**: In v0.8, the global review mode (`opsv review` without `--circle`) built a flat `assetInfoMap` by merging all circle manifests, where later-scanned circles silently overwrote earlier ones. When the same `docId` appeared in multiple circles (e.g., `shot_01_frame_02` in `short_frames_circle1`, `shotframes2_circle1`, and `shotframev4_circle1`), only the last circle's `category` and `status` survived. 75 docIds lost their true attributes, and the UI collapsed all documents into a single category.
 
 Simultaneously, the output index was built by reverse-engineering `docId` from output filenames using a greedy regex `(_\d+)+`. For `shot_01_frame_02_1.png`, this extracted `shot_01_frame` instead of `shot_01_frame_02` — because the regex consumed both `_02` and `_1` as numeric suffixes, producing a phantom docId that matched no real document.
 

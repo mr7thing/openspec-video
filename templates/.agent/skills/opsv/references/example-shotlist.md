@@ -3,7 +3,7 @@ category: shot-production
 status: drafting
 title: Shot 01 — 英雄发现发光核心
 duration: "5s"
-first_frame: "../../opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01_1.png"
+first_frame: "../../opsv-queue/videospec_circle1/volcengine.seadream_001/shot_01_1.png"
 refs:
   - scene_lab
   - hero
@@ -24,4 +24,4 @@ visual_detailed: |
 
 **[Review 审查区]**
 > 这里供机器回填视频草案，供导演审查推翻。
-<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec.circle2/volcengine.seedance_001/shot_01_1.mp4) -->
+<!-- opsv review 将在此植入： [✅ 视频草案 1](../../opsv-queue/videospec_circle2/volcengine.seedance_001/shot_01_1.mp4) -->

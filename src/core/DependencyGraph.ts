@@ -1,6 +1,6 @@
 // ============================================================================
 // OpsV Dependency Graph
-// Circle-centric: builds layers → {basename}.circle{N}/ flat dirs + _manifest.json
+// Circle-centric: builds layers → {basename}_circle{N}/ flat dirs + _manifest.json
 // ============================================================================
 
 import fs from 'fs';
@@ -201,7 +201,7 @@ export class DependencyGraph {
   static detectCircleN(queueRoot: string, basename: string): number {
     if (!fs.existsSync(queueRoot)) return 1;
     const entries = fs.readdirSync(queueRoot);
-    const pattern = new RegExp(`^${escapeRegex(basename)}\\.circle(\\d+)$`);
+    const pattern = new RegExp(`^${escapeRegex(basename)}_circle(\\d+)$`);
     let maxN = 0;
     for (const e of entries) {
       const m = e.match(pattern);
@@ -213,7 +213,7 @@ export class DependencyGraph {
   static findLatestCircleN(queueRoot: string, basename: string): number {
     if (!fs.existsSync(queueRoot)) return 0;
     const entries = fs.readdirSync(queueRoot);
-    const pattern = new RegExp(`^${escapeRegex(basename)}\\.circle(\\d+)$`);
+    const pattern = new RegExp(`^${escapeRegex(basename)}_circle(\\d+)$`);
     let maxN = 0;
     for (const e of entries) {
       const m = e.match(pattern);
@@ -225,7 +225,7 @@ export class DependencyGraph {
   static checkNameConflict(queueRoot: string, basename: string, dirPath: string): string | null {
     if (!fs.existsSync(queueRoot)) return null;
     const entries = fs.readdirSync(queueRoot);
-    const pattern = new RegExp(`^${escapeRegex(basename)}\\.circle(\\d+)$`);
+    const pattern = new RegExp(`^${escapeRegex(basename)}_circle(\\d+)$`);
 
     const resolvedDir = path.resolve(dirPath);
 
@@ -257,7 +257,7 @@ export class DependencyGraph {
     targetDir: string,
     existingAssets?: Record<string, { status: string; index: number; category?: string }>
   ): string {
-    const circleDirName = `${basename}.circle${circleN}`;
+    const circleDirName = `${basename}_circle${circleN}`;
     const circleDir = path.join(queueRoot, circleDirName);
 
     if (!fs.existsSync(circleDir)) {

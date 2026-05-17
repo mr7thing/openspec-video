@@ -15,7 +15,7 @@ export function registerCircleCommands(program: Command): void {
 
   circle
     .command('create')
-    .description('Build dependency graph, create {name}.circle{N}/ directory with _manifest.json')
+    .description('Build dependency graph, create {name}_circle{N}/ directory with _manifest.json')
     .option('--dir <path>', 'Target directory (e.g. videospec, elements/role)', 'videospec')
     .option('--name <name>', 'Override target basename (default: last segment of --dir)')
     .option('--skip-middle-circle', 'Skip generating middle circles')
@@ -54,7 +54,7 @@ export function registerCircleCommands(program: Command): void {
         // Determine next circleN
         const circleN = DependencyGraph.detectCircleN(queueRoot, basename);
 
-        console.log(chalk.cyan(`Creating ${basename}.circle${circleN}/...`));
+        console.log(chalk.cyan(`Creating ${basename}_circle${circleN}/...`));
         const circleDir = graph.writeCircleDir(queueRoot, basename, circleN, circles, options.dir);
 
         for (const c of circles) {
@@ -86,7 +86,7 @@ export function registerCircleCommands(program: Command): void {
           process.exit(1);
         }
 
-        const circleDirName = `${basename}.circle${latestN}`;
+        const circleDirName = `${basename}_circle${latestN}`;
         const circleDir = path.join(queueRoot, circleDirName);
         const manifestPath = path.join(circleDir, '_manifest.json');
 

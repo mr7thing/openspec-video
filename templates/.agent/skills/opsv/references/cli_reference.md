@@ -28,14 +28,14 @@
 ### opsv imagen
 编译 Markdown 文档为图像生成任务，带 `--model` 参数时**直接编译**产出可执行 `.json`，不再生成 `imagen_jobs.json` 中间层。
 
-**产出目录**：`opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json` 等
+**产出目录**：`opsv-queue/videospec_circle1/volcengine.seadream_001/shot_01.json` 等
 
 ```bash
 # 基本用法（必须指定 --model）
 opsv imagen --model volcengine.seadream-5.0-lite
 
 # 指定 manifest 路径
-opsv imagen --model volcengine.seadream --manifest opsv-queue/videospec.circle1/_manifest.json
+opsv imagen --model volcengine.seadream --manifest opsv-queue/videospec_circle1/_manifest.json
 
 # 运行特定资产
 opsv imagen --model volcengine.seadream --file hero
@@ -73,7 +73,7 @@ opsv imagen --model volcengine.seadream --status-skip none
 opsv animate --model volcengine.seedance-2.0
 
 # 指定 manifest 路径
-opsv animate --model volcengine.seedance --manifest opsv-queue/videospec.circle1/_manifest.json
+opsv animate --model volcengine.seedance --manifest opsv-queue/videospec_circle1/_manifest.json
 
 # 运行特定资产
 opsv animate --model volcengine.seedance --file shot_01
@@ -149,7 +149,7 @@ opsv audio --model <provider.model>
 
 ```bash
 opsv webapp --model webapp.gemini
-opsv webapp --model webapp.jimeng --manifest opsv-queue/videospec.circle1/_manifest.json
+opsv webapp --model webapp.jimeng --manifest opsv-queue/videospec_circle1/_manifest.json
 opsv webapp --model webapp.wan --dry-run
 ```
 
@@ -161,21 +161,21 @@ opsv webapp --model webapp.wan --dry-run
 
 ```bash
 # 执行单个任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/shot_01.json
 
 # 执行整个 Provider 目录下所有任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/
 
 # 执行多个路径
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json \
-       opsv-queue/videospec.circle1/volcengine.seadream_001/shot_02.json
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/shot_01.json \
+       opsv-queue/videospec_circle1/volcengine.seadream_001/shot_02.json
 
 # 重试失败任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --retry
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/ --retry
 
 # 设置并发数（覆盖 api_config 中的配置）
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ --concurrency 3
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ -c 3
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/ --concurrency 3
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/ -c 3
 ```
 
 **行为**：
@@ -204,14 +204,14 @@ models:
 **Agent 迭代操作（必须使用 `opsv iterate`）**：
 ```bash
 # 克隆任务（序号递增）
-opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
+opsv iterate opsv-queue/videospec_circle1/volcengine.seadream_001/@hero.json
 # → 生成 @hero_2.json（自动删除 compiledAt，确保会被执行）
 # 编辑 @hero_2.json（修改 prompt、seed 等字段）
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/@hero_2.json
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/@hero_2.json
 # → 生成 @hero_2_1.png（id_N_1.ext 模式，Review 后为 syncing 状态）
 
 # 克隆整个目录（目录内任务保持原始名称）
-opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/
+opsv iterate opsv-queue/videospec_circle1/volcengine.seadream_001/
 # → 生成 volcengine.seadream_001_it_001/（目录下所有 task JSON 被复制）
 ```
 
@@ -305,14 +305,14 @@ Review 后刷新 circle：`opsv circle refresh`；有变化 → 继续当前 Cir
 
 ```
 opsv-queue/                                    # 渲染产物目录
-├── videospec.circle1/                        # Circle 目录（basename.circleN 格式）
+├── videospec_circle1/                        # Circle 目录（basename.circleN 格式）
 │   ├── _manifest.json                        # 该 Circle 资产清单 + 状态快照（含 assets 字段）
 │   └── volcengine.seadream/                  # Provider.Model 扁平目录
 │       ├── @hero.json                        # 初始编译的任务
 │       ├── @hero_1.png                       # 初始编译的产出
 │       ├── @hero_2.json                      # 修改后的任务（序号递增）
 │       └── @hero_2_1.png                     # 修改任务的产出（id_N_1.ext 模式）
-└── videospec.circle2/                        # 后续 Circle（批次号递增）
+└── videospec_circle2/                        # 后续 Circle（批次号递增）
     ├── _manifest.json
     └── volcengine.seedance/
         ├── shot_01.json

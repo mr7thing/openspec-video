@@ -51,6 +51,21 @@ function setupTtlShutdown(server: http.Server, ttl: number): void {
   server.on('request', resetTimer);
 }
 
+function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.json': 'application/json',
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
 export function registerReviewCommand(program: Command): void {
   program
     .command('review')
@@ -138,7 +153,13 @@ export function registerReviewCommand(program: Command): void {
             return;
           }
           if (fs.existsSync(filePath)) {
-            res.sendFile(filePath);
+            const stat = fs.statSync(filePath);
+            const mimeType = getMimeType(filePath);
+            res.writeHead(200, {
+              'Content-Type': mimeType,
+              'Content-Length': stat.size,
+            });
+            fs.createReadStream(filePath).pipe(res);
           } else {
             res.status(404).send('File not found');
           }

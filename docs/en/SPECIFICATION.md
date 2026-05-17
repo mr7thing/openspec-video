@@ -56,12 +56,12 @@ project/
     api_config.yaml                <- Provider/model configuration
     .env                           <- API keys
   opsv-queue/
-    videospec.circle1/             <- Build output (basename.circleN)
+    videospec_circle1/             <- Build output (basename.circleN)
       _manifest.json               <- Circle manifest: id, status, layer, category
       volcengine.seadream_001/     <- provider.model + sequence
         @hero.json                 <- Compiled task
         @hero_1.png                <- Output
-    role.circle2/                  <- Next circle batch
+    role_circle2/                  <- Next circle batch
       _manifest.json
       volcengine.seedance2_001/
         shot_01.json
@@ -155,7 +155,7 @@ Circles represent dependency layers determined by topological sort. Circle names
 | `thirdcircle` | Layer 4 (when ≥5 layers) | Middle layers |
 | `endcircle` | Final layer contains `shotlist.md` | Final video shot outputs (batch video generation) |
 
-`opsv circle create` builds the graph and creates a new circle directory (`basename.circleN`). The `--name` parameter sets the basename; `--dir` scopes creation to a specific directory. Each `circle create` increments the circle batch number (`.circle1`, `.circle2`, etc.).
+`opsv circle create` builds the graph and creates a new circle directory (`basename.circleN`). The `--name` parameter sets the basename; `--dir` scopes creation to a specific directory. Each `circle create` increments the circle batch number (`_circle1`, `_circle2`, etc.).
 
 ### Directory Scanning Rules
 
@@ -270,7 +270,7 @@ Rules:
 
 ## Breaking Changes from v0.8.1
 
-- Circle directories renamed: `zerocircle/`, `firstcircle/`, `endcircle/` → `basename.circleN/` (e.g., `videospec.circle1/`, `role.circle2/`). Each `opsv circle create` produces a new `.circleN` batch.
+- Circle directories renamed: `zerocircle/`, `firstcircle/`, `endcircle/` → `basename.circleN/` (e.g., `videospec_circle1/`, `role_circle2/`). Each `opsv circle create` produces a new `.circleN` batch.
 - `_assets.json` eliminated; its contents merged into `_manifest.json` with an `assets` field. `_manifest.json` now lives inside each `.circleN/` directory, not at the `opsv-queue/videospec/` level.
 - `opsv circle create` gains `--name` parameter to set the circle directory basename.
 - `--dir` on `circle create` now scopes creation to a specific directory rather than the whole videospec.

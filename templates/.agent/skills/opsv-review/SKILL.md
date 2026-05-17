@@ -19,8 +19,8 @@ opsv review                              # Global mode: all circles, docs as sou
 opsv review --port 3100 --ttl 300        # Custom port and idle timeout
 opsv review --latest                     # Global mode: only latest circle
 opsv review --circle                     # Manifest-driven: auto-discover latest manifest
-opsv review --circle videospec.circle1   # Manifest-driven: explicit circle directory
-opsv review --circle opsv-queue/videospec.circle1/_manifest.json  # Explicit manifest path
+opsv review --circle videospec_circle1   # Manifest-driven: explicit circle directory
+opsv review --circle opsv-queue/videospec_circle1/_manifest.json  # Explicit manifest path
 ```
 
 ## API Endpoints

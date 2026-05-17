@@ -26,9 +26,9 @@ cd my-project
 opsv circle create
 
 # 2. Compile and execute image tasks
-cd opsv-queue/videospec.circle1
+cd opsv-queue/videospec_circle1
 opsv imagen --model volc.seadream5
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/
 
 # 3. Review and approve outputs
 opsv review
@@ -75,7 +75,7 @@ videospec/
   scenes/            # Scene compositions (reference elements)
   shots/             # Shot specifications (reference scenes/elements)
 opsv-queue/
-  {target}.circle1/  # Circle directory (incremental, never overwritten)
+  {target}_circle1/  # Circle directory (incremental, never overwritten)
     _manifest.json   # Circle manifest: layer index + all assets
     {provider}_{seq}/ # Model queue directory (incremental per compile)
       @assetId.json  # Task JSONs
@@ -88,7 +88,7 @@ A **circle** is a dependency layer produced by topological sort of the asset gra
 
 - `circle create` scans `elements/`、`scenes/`、`shots/` by default
 - `circle refresh` rebuilds the graph and updates manifest (does not overwrite existing circle dirs)
-- Circles are named `{target}.circle{N}` (e.g. `videospec.circle1`)
+- Circles are named `{target}.circle{N}` (e.g. `videospec_circle1`)
 - Zero-dependency assets land in `zerocircle` (index 0)
 
 ### Incremental Preservation Principle
@@ -108,11 +108,11 @@ All four share the same execution model:
 
 ```bash
 # Enter circle directory and compile
-cd opsv-queue/videospec.circle1
+cd opsv-queue/videospec_circle1
 opsv imagen --model volc.seadream5
 
 # Or specify manifest explicitly
-opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec.circle1/_manifest.json
+opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec_circle1/_manifest.json
 
 # Target specific asset
 opsv imagen --model volc.seadream5 --file hero
@@ -253,20 +253,20 @@ models:
 
 ```bash
 opsv circle create
-cd opsv-queue/videospec.circle1
+cd opsv-queue/videospec_circle1
 opsv comfy --model comfylocal.myworkflow
-opsv run opsv-queue/videospec.circle1/comfylocal.myworkflow_001/
+opsv run opsv-queue/videospec_circle1/comfylocal.myworkflow_001/
 ```
 
 ### Step 4: Iterate (preserve previous, clone new)
 
 ```bash
 # Clone a single task JSON
-opsv iterate opsv-queue/videospec.circle1/comfylocal.myworkflow_001/@hero.json
+opsv iterate opsv-queue/videospec_circle1/comfylocal.myworkflow_001/@hero.json
 # → @hero_m1.json (same dir, next seq)
 
 # Clone an entire model queue directory
-opsv iterate opsv-queue/videospec.circle1/comfylocal.myworkflow_001/
+opsv iterate opsv-queue/videospec_circle1/comfylocal.myworkflow_001/
 # → comfylocal.myworkflow_001_1/ (new dir, all task JSONs cloned)
 ```
 
@@ -282,11 +282,11 @@ Produce commands (`imagen`, `animate`, `comfy`, `webapp`) run inside a circle di
 
 ```bash
 # Enter circle directory and run
-cd opsv-queue/videospec.circle1
+cd opsv-queue/videospec_circle1
 opsv imagen --model volc.seadream5
 
 # Or specify manifest path
-opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec.circle1/_manifest.json
+opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec_circle1/_manifest.json
 ```
 
 ---
@@ -299,12 +299,12 @@ Tasks are organized into **Circles** (dependency layers via topological sort):
 
 ```
 opsv-queue/
-  videospec.circle1/              # Circle directory (incremental, never overwritten)
+  videospec_circle1/              # Circle directory (incremental, never overwritten)
     _manifest.json                # Circle manifest: circles[], assets{}
     volc.seadream5_001/          # Model queue dir (incremental per compile)
       @hero.json
       @hero_1.png
-  videospec.circle2/              # Next circle, previous preserved
+  videospec_circle2/              # Next circle, previous preserved
     _manifest.json
     volc.seedance2_001/
       shot_01.json

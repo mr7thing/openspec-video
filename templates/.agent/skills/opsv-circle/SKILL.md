@@ -21,7 +21,7 @@ Scans the specified `--dir` directory (e.g. `videospec/elements/` and `videospec
 - `## Design References` — Input-side: design reference images bundled with the document, read by `DesignRefReader` as `reference_images` during compilation
 
 Circle names:
-- Each `opsv circle create` increments the batch number: `.circle1/`, `.circle2/`, `.circle3/`
+- Each `opsv circle create` increments the batch number: `_circle1/`, `_circle2/`, `_circle3/`
 - Circle names: `zerocircle` (index 0), `firstcircle` (index 1), `secondcircle` (index 2), etc.
 - `end_circle` only when `shotlist.md` exists in the final layer
 - `--name` overrides the basename (default: derived from `--dir` path)

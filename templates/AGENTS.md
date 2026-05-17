@@ -29,10 +29,10 @@
 <resource_navigation>
 1. **本能寻检**：优先查阅 `.agent/skills/` 确定已有技能。
 2. **命名规范**：
-   - `opsv-queue/{basename}.circle1/{provider.model}_NNN/` — 基础资产层
-   - `opsv-queue/{basename}.circle2/{provider.model}_NNN/` — 分镜图片层
+   - `opsv-queue/{basename}_circle1/{provider.model}_NNN/` — 基础资产层
+   - `opsv-queue/{basename}_circle2/{provider.model}_NNN/` — 分镜图片层
    - `opsv-queue/{basename}.circle{N}/{provider.model}/` — 通用层级
-   - Circle 目录命名：`{basename}.circle1`, `{basename}.circle2` ... `{basename}.circleN`（批次号递增）
+   - Circle 目录命名：`{basename}_circle1`, `{basename}_circle2` ... `{basename}.circleN`（批次号递增）
    - Layer 语义（ZeroCircle, FirstCircle, EndCircle）存储在 `_manifest.json` 中，不再作为目录名
    - 任务文件：`@hero.json`, `shot_01.json`；生成物：`@hero_1.png`, `shot_01_1.mp4`
 </resource_navigation>
@@ -60,7 +60,7 @@ opsv imagen --model volcengine.seadream
 # 可选：--circle 指定环，--dry-run 预览不落盘
 
 # 5. 执行编译后的任务
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/@hero.json
 # 可选：--retry 重试失败，--dry-run 预览
 
 # 6. 审阅（Approve 后方可进入下一 Circle）
@@ -72,7 +72,7 @@ opsv animate --model volcengine.seedance2
 # 可选：--circle 指定环，--dry-run 预览
 
 # 8. 执行视频任务
-opsv run opsv-queue/videospec.circle2/volcengine.seedance2_001/shot_01.json
+opsv run opsv-queue/videospec_circle2/volcengine.seedance2_001/shot_01.json
 ```
 
 ### ComfyUI 工作流（v0.8.22+）
@@ -85,7 +85,7 @@ opsv comfy --model comfylocal.klein9b --workflow ref2
 opsv comfy --model comfylocal.klein9b --workflow-dir workflows/sdxl/
 
 # 执行
-opsv run opsv-queue/videospec.circle2/comfylocal.klein9b_001/shot_02.json
+opsv run opsv-queue/videospec_circle2/comfylocal.klein9b_001/shot_02.json
 ```
 
 **RunningHub**（云端，v2 API，需 node_mapping）：workflow 和 node_mapping 配置在 frontmatter 中。
@@ -99,7 +99,7 @@ opsv comfy-node-mapping my_workflow.json -o mappings.json
 #    支持 seed: random（自动替换为随机自然数）
 # 5. 编译并执行
 opsv comfy --model runninghub.default --dry-run
-opsv run opsv-queue/videospec.circle2/runninghub.default_001/
+opsv run opsv-queue/videospec_circle2/runninghub.default_001/
 # 强制使用 api_config 的 mapping
 opsv comfy --model runninghub.default --force-api-mapping
 ```
@@ -154,12 +154,12 @@ opsv app --model browser.chrome
 
 ```
 opsv-queue/
-  videospec.circle1/
+  videospec_circle1/
     _manifest.json              # 含 assets 字段（替代 _assets.json）
     volcengine.seadream_001/
       @hero.json
       @hero_1.png
-  videospec.circle2/
+  videospec_circle2/
     _manifest.json
     volcengine.seedance2_001/
       shot_01.json
@@ -292,10 +292,10 @@ Agent 看到 `syncing` 后**必须执行**：
 3. **快速迭代示例**：
    ```bash
    # 克隆任务（必须使用 opsv iterate，自动清除 compiledAt）
-   opsv iterate opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01.json
+   opsv iterate opsv-queue/videospec_circle2/volcengine.seadream_001/shot_01.json
    # → 生成 shot_01_2.json（序号自动递增）
    # 编辑 shot_01_2.json → 执行 → Approve → 对齐 syncing
-   opsv run opsv-queue/videospec.circle2/volcengine.seadream_001/shot_01_2.json
+   opsv run opsv-queue/videospec_circle2/volcengine.seadream_001/shot_01_2.json
    opsv review
    ```
 4. **迭代文件命名规范**：`{jobId}_{N}.json`，N 从 2 递增。严禁手动 `cp`，必须使用 `opsv iterate`

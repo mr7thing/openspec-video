@@ -23,8 +23,8 @@ OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架
 
 | Circle | 职责 | 产出 |
 |--------|------|------|
-| **zerocircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec.circle1/volcengine.seadream_001/` |
-| **firstcircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec.circle2/volcengine.seadream_001/` |
+| **zerocircle** | 基础静态资产（角色、场景、道具） | `opsv-queue/videospec_circle1/volcengine.seadream_001/` |
+| **firstcircle** | 基于 approved 资产的分镜图像 | `opsv-queue/videospec_circle2/volcengine.seadream_001/` |
 | **secondcircle** | 中间层级（按需扩展） | ... |
 | **endcircle** | 末端动态视频（仅当 shotlist.md 存在） | `opsv-queue/videospec.circleN/volcengine.seedance/` |
 
@@ -112,7 +112,7 @@ videospec/                         # 创意资产根目录
                                     # _manifest.json 现位于各 .circleN/ 目录内
 
 opsv-queue/                         # 渲染产物目录
-└── videospec.circle1/             # 按 basename.circleN 组织
+└── videospec_circle1/             # 按 basename.circleN 组织
     ├── _manifest.json             # 该 Circle 资产清单 + 状态快照（含 assets 字段）
     └── volcengine.seadream/       # Provider.Model 扁平目录
         ├── @hero.json             # 初始编译的任务
@@ -120,15 +120,15 @@ opsv-queue/                         # 渲染产物目录
         ├── @hero_2.json           # 修改后的任务（序号递增）
         └── @hero_2_1.png          # 修改任务的产出（多一层_N）
 
-videospec.circle2/                 # 后续 Circle（批次号递增）
+videospec_circle2/                 # 后续 Circle（批次号递增）
     ├── _manifest.json
     └── volcengine.seedance/
 ```
 
 ### 命名规则
 
-- **Circle 目录**：统一格式 `{basename}.circle{N}/`，如 `videospec.circle1/`、`videospec.circle2/`。Layer 语义（ZeroCircle、FirstCircle、EndCircle）存储在 `_manifest.json` 中，不再作为目录名
-- **多剧集**：每个剧集独立建图，如 `episode_2.circle1/`
+- **Circle 目录**：统一格式 `{basename}.circle{N}/`，如 `videospec_circle1/`、`videospec_circle2/`。Layer 语义（ZeroCircle、FirstCircle、EndCircle）存储在 `_manifest.json` 中，不再作为目录名
+- **多剧集**：每个剧集独立建图，如 `episode_2_circle1/`
 - **Graph 名**：由 `opsv circle create --dir <path>` 的路径名决定，`--name` 可覆盖 basename
 - **Provider 目录**：扁平 `provider.model/` 格式，直接位于 Circle 目录下，无 queue_N 子目录
 - **Shot 文件**：`shot_*.md` 的 ID 绑定到文件名，修改文件名 = 删除重建
@@ -264,19 +264,19 @@ opsv webapp --model <provider.model>
 opsv audio --model <provider.model>
 
 # 按路径执行渲染
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/shot_01.json
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/   # 执行目录下所有任务
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/shot_01.json
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/   # 执行目录下所有任务
 opsv run <path1> <path2> ...                                      # 多路径
-opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/ -c 3  # 并发执行
+opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/ -c 3  # 并发执行
 
 # 迭代（修改任务后重跑）
-opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/@hero.json
-opsv iterate opsv-queue/videospec.circle1/volcengine.seadream_001/   # 迭代整个目录
+opsv iterate opsv-queue/videospec_circle1/volcengine.seadream_001/@hero.json
+opsv iterate opsv-queue/videospec_circle1/volcengine.seadream_001/   # 迭代整个目录
 
 # 审阅
 opsv review                              # 全局模式：文档为唯一真相，扫描所有 Circle
 opsv review --circle                     # Manifest 模式：聚焦单个 Circle
-opsv review --circle videospec.circle1   # 指定 Circle 目录
+opsv review --circle videospec_circle1   # 指定 Circle 目录
 opsv review --latest                     # 仅最新 Circle
 opsv review --port 3100 --ttl 300        # 自定义端口与空闲超时
 #    → 全局模式：category/status 来自文档 frontmatter，manifest 仅用于发现 docId 和输出
