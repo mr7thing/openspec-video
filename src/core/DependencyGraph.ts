@@ -324,23 +324,49 @@ export class DependencyGraph {
     return this.statusMap.get(id) || 'drafting';
   }
 
+  private static readonly DEFAULT_SCAN_SUBDIRS = ['elements', 'scenes', 'shots'];
+
+  /**
+   * Build dependency graph from a project directory.
+   *
+   * Two scan modes:
+   * - Default (targetDir='videospec'): Scans elements/, scenes/, shots/ under videospec/ as one graph.
+   * - Explicit --dir: Scans that exact directory only, no recursion.
+   */
   static buildFromDir(projectRoot: string, targetDir: string): DependencyGraph {
     const graph = new DependencyGraph();
     const documents: ParsedDocument[] = [];
 
     const resolvedTarget = path.resolve(projectRoot, targetDir);
+    const videospecRoot = path.resolve(projectRoot, 'videospec');
+    const isDefaultMode = targetDir === 'videospec';
 
-    if (!fs.existsSync(resolvedTarget)) {
-      logger.warn(`Target directory not found: ${resolvedTarget}`);
-      graph.build(documents);
-      return graph;
+    // Determine which directories to scan
+    let scanDirs: string[] = [];
+
+    if (isDefaultMode) {
+      // Default: scan elements/, scenes/, shots/ under videospec/
+      const videospecExists = fs.existsSync(videospecRoot);
+      if (videospecExists) {
+        scanDirs = fs.readdirSync(videospecRoot, { withFileTypes: true })
+          .filter((e) => e.isDirectory())
+          .map((e) => e.name)
+          .filter((name) => this.DEFAULT_SCAN_SUBDIRS.includes(name))
+          .map((name) => path.join(videospecRoot, name));
+      }
+    } else {
+      // Explicit --dir: scan exactly that directory, no recursion
+      if (fs.existsSync(resolvedTarget) && fs.statSync(resolvedTarget).isDirectory()) {
+        scanDirs = [resolvedTarget];
+      }
     }
 
-    // Scan target directory for .md files
-    if (fs.statSync(resolvedTarget).isDirectory()) {
-      const files = fs.readdirSync(resolvedTarget).filter((f) => f.endsWith('.md'));
+    // Scan collected directories for .md files
+    for (const dirPath of scanDirs) {
+      if (!fs.existsSync(dirPath)) continue;
+      const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
       for (const file of files) {
-        const filePath = path.join(resolvedTarget, file);
+        const filePath = path.join(dirPath, file);
         try {
           const content = fs.readFileSync(filePath, 'utf-8');
           const { frontmatter } = FrontmatterParser.parseRaw(content);
@@ -352,7 +378,7 @@ export class DependencyGraph {
       }
     }
 
-    // Resolve upstream dependencies: scan all subdirectories relative to resolvedTarget
+    // Resolve upstream dependencies: scan same search roots
     const targetAssetIds = new Set(documents.map((d) => d.id));
     const targetRefs = new Set<string>();
 
@@ -370,13 +396,13 @@ export class DependencyGraph {
     }
 
     // Pull in upstream assets that are not yet approved
-    // Search all subdirectories under resolvedTarget
-    if (targetRefs.size > 0 && fs.existsSync(resolvedTarget)) {
-      const entries = fs.readdirSync(resolvedTarget, { withFileTypes: true });
+    // Always search all subdirectories of videospecRoot (elements, scenes, shots, or any custom subdir)
+    if (targetRefs.size > 0 && fs.existsSync(videospecRoot)) {
+      const entries = fs.readdirSync(videospecRoot, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
 
-        const dirPath = path.join(resolvedTarget, entry.name);
+        const dirPath = path.join(videospecRoot, entry.name);
         const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
         for (const file of files) {
           const id = file.replace(/^@/, '').replace(/\.md$/, '');
@@ -386,7 +412,6 @@ export class DependencyGraph {
           try {
             const content = fs.readFileSync(filePath, 'utf-8');
             const { frontmatter } = FrontmatterParser.parseRaw(content);
-            // Only pull upstream if not approved
             if (frontmatter.status !== 'approved') {
               documents.push({ id, filePath, frontmatter });
               targetAssetIds.add(id);

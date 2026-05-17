@@ -48,6 +48,7 @@ export function registerInitCommand(program: Command, version: string): void {
         const dirs = [
           path.join(targetDir, 'videospec', 'elements'),
           path.join(targetDir, 'videospec', 'scenes'),
+          path.join(targetDir, 'videospec', 'shots'),
           path.join(targetDir, 'opsv-queue'),
           path.join(targetDir, '.opsv'),
         ];
