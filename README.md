@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.28
+# OpenSpec-Video (OpsV) v0.8.29
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -8,6 +8,8 @@
 
 OpsV is a **spec-driven** cinematic AI automation framework. You write narrative specifications in Markdown with YAML frontmatter; OpsV builds dependency graphs, compiles provider-specific tasks, executes them, and manages the review loop.
 
+All project assets live under `videospec/`. OpsV never modifies content fields — it only reads specs and produces task artifacts.
+
 ---
 
 ## Quick Start
@@ -16,52 +18,119 @@ OpsV is a **spec-driven** cinematic AI automation framework. You write narrative
 # Install
 npm install -g videospec
 
-# Initialize project (in current directory)
-opsv init
-
-# Or create a named subdirectory
+# Initialize project
 opsv init my-project
 cd my-project
 
-# 1. Build dependency graph and create circle directories
+# 1. Build dependency graph → create circle directories
 opsv circle create
 
-# 2. Enter circle directory and compile image tasks
+# 2. Compile and execute image tasks
 cd opsv-queue/videospec.circle1
 opsv imagen --model volc.seadream5
-
-# 3. Execute compiled tasks
 opsv run opsv-queue/videospec.circle1/volcengine.seadream_001/
 
-# 4. Review and approve
+# 3. Review and approve outputs
 opsv review
 
-# 5. Compile video tasks (only on circles with shot assets)
-opsv animate --model volc.seedance2
-
-# 6. Execute video tasks
-opsv run opsv-queue/videospec.circle2/volcengine.seedance2_001/
+# 4. Advance to next circle
+opsv circle refresh
 ```
 
 ---
 
-## Command Tree (10 commands)
+## Command Tree (11 commands)
 
 ```
 opsv
-├── init [name]                   # Project scaffold
-├── validate [-d]                 # Document validation
+├── init [name]                      # Project scaffold + git init
+├── validate [-d]                     # Document validation
 ├── circle
-│   ├── create [--dir] [--name] [--skip-middle-circle]
-│   └── refresh [--dir]           # Rebuild graph, diff, update manifest
-├── imagen --model <m>            # Compile image tasks
-├── animate --model <m>           # Compile video tasks
-├── comfy --model <m>             # Compile ComfyUI tasks
-├── audio --model <m>             # [planned]
-├── webapp --model <m>            # Browser automation
-├── run                           # Execute tasks in current circle
-└── review                        # Review and approve outputs
+│   ├── create [--dir] [--name]      # Build graph, create circle directories
+│   └── refresh [--dir]              # Rebuild graph, diff manifest, update
+├── imagen --model <m>               # Compile image tasks (Volc/Minimax/SiliconFlow)
+├── animate --model <m>              # Compile video tasks
+├── comfy --model <m>                # Compile ComfyUI workflow tasks
+├── audio --model <m>                # [planned]
+├── webapp --model <m>               # Browser automation via Gemini
+├── run <paths...>                   # Execute compiled task .json files
+├── review                           # Visual review server
+└── iterate <path>                   # Clone task JSON or model queue dir
 ```
+
+**Stand-alone utility:**
+```
+opsv comfy-node-mapping <workflow-file>   # Analyze ComfyUI JSON → node_mappings for api_config
+```
+
+---
+
+## Core Concepts
+
+### Videospec Directory Structure
+
+```
+videospec/
+  elements/          # Characters, props, locations (approved upstream assets)
+  scenes/            # Scene compositions (reference elements)
+  shots/             # Shot specifications (reference scenes/elements)
+opsv-queue/
+  {target}.circle1/  # Circle directory (incremental, never overwritten)
+    _manifest.json   # Circle manifest: layer index + all assets
+    {provider}_{seq}/ # Model queue directory (incremental per compile)
+      @assetId.json  # Task JSONs
+      @assetId_1.png
+```
+
+### Circle
+
+A **circle** is a dependency layer produced by topological sort of the asset graph.
+
+- `circle create` scans `elements/`、`scenes/`、`shots/` by default
+- `circle refresh` rebuilds the graph and updates manifest (does not overwrite existing circle dirs)
+- Circles are named `{target}.circle{N}` (e.g. `videospec.circle1`)
+- Zero-dependency assets land in `zerocircle` (index 0)
+
+### Incremental Preservation Principle
+
+**All task outputs in `opsv-queue/` are append-only. OpsV never deletes them.**
+
+- `circle create` creates a **new** circle directory. Existing circles are preserved.
+- `imagen` / `animate` / `comfy` compile into a **new** model queue directory (e.g. `volc.seadream_002/`). Prior compilations are never touched.
+- `iterate` clones task JSONs or model queue dirs with `_m{N}` / `_{seq}` suffixes, preserving the originals.
+- `run` executes tasks but does not delete outputs.
+
+This means every version of every asset is always reachable. Delete manually only when you are certain.
+
+### Produce Commands (imagen / animate / comfy / webapp)
+
+All four share the same execution model:
+
+```bash
+# Enter circle directory and compile
+cd opsv-queue/videospec.circle1
+opsv imagen --model volc.seadream5
+
+# Or specify manifest explicitly
+opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec.circle1/_manifest.json
+
+# Target specific asset
+opsv imagen --model volc.seadream5 --file hero
+
+# Filter by category
+opsv imagen --model volc.seadream5 --category character
+
+# Dry run (show tasks without writing)
+opsv imagen --model volc.seadream5 --dry-run
+```
+
+| Option | Description |
+|--------|-------------|
+| `--manifest <path>` | Path to _manifest.json (or directory containing it) |
+| `--file <id>` | Run specific asset by id from manifest |
+| `--category <cat>` | Filter assets by category (from frontmatter) |
+| `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved; use "none" to skip nothing) |
+| `--dry-run` | Show compiled tasks without writing files |
 
 ---
 
@@ -70,12 +139,9 @@ opsv
 `--model` 参数使用 `api_config.yaml` 中定义的**模型别名**（key），不是 API 模型名。所有配置从 `api_config.yaml` 读取，代码无硬编码。
 
 ```bash
-# 使用 api_config 中的别名
-opsv imagen --model volc.seadream5    # 不是 "doubao-seedream-5-0-260128"
-opsv animate --model volc.seedance2   # 不是 "doubao-seedance-2-0-260128"
-opsv imagen --model minimax.img01     # 不是 "image-01"
-opsv imagen --model siliconflow.qimg  # Qwen-Image T2I
-opsv imagen --model siliconflow.edit2509  # Qwen-Image-Edit I2I
+opsv imagen --model volc.seadream5       # 不是 "doubao-seedream-5-0-260128"
+opsv animate --model volc.seedance2      # 不是 "doubao-seedance-2-0-260128"
+opsv imagen --model minimax.img01        # 不是 "image-01"
 ```
 
 ### 可用模型别名
@@ -99,6 +165,117 @@ opsv imagen --model siliconflow.edit2509  # Qwen-Image-Edit I2I
 
 ---
 
+## Workflow: Node Mapping → Compile → Iterate
+
+### Workflow File Convention
+
+Each workflow has **two files** living side by side:
+
+```
+workflows/
+  my_workflow.json              # ComfyUI API workflow JSON (editable)
+  my_workflow.opsv-workflow.json  # OpsV metadata: workflowId + node_mappings (generated)
+```
+
+**`.opsv-workflow.json` 结构：**
+
+```json
+{
+  "workflowId": "rh_abc123",       // RunningHub ID (null if local-only)
+  "workflowPath": "workflows/my_workflow.json",  // local path (null if cloud-only)
+  "nodeMappings": {
+    "prompt": { "nodeId": "3", "fieldName": "text" },
+    "image":  { "nodeId": "5", "fieldName": "image" }
+  },
+  "opsvVersion": "0.8.29"
+}
+```
+
+**约定：**
+- `opsv-workflow.json` 由 `opsv comfy-node-mapping` 自动生成，不要手动编辑
+- `workflow.json` 是你的工作区，可以在 ComfyUI/RunningHub 中任意修改
+- 在 `opsv-workflow.json` 中可以同时设置 `workflowId` + `workflowPath`（同时支持本地和云端）
+- 只有你需要 opsv 控制的节点才需要在 ComfyUI 中用 `opsv-` 前缀命名（输入/输出相关）
+
+### Step 1: Extract node mappings
+
+Design your workflow in ComfyUI, name nodes with prefix `opsv-` (right-click → Title), then:
+
+```bash
+# Print to stdout (copy-paste or redirect yourself)
+opsv comfy-node-mapping workflows/my_workflow.json
+
+# Write directly to .opsv-workflow.json
+opsv comfy-node-mapping workflows/my_workflow.json -o workflows/my_workflow.opsv-workflow.json
+
+# Cloud workflow (RunningHub) → embed workflow-id
+opsv comfy-node-mapping workflows/my_workflow.json --workflow-id rh_abc123 -o workflows/my_workflow.opsv-workflow.json
+```
+
+**输出格式（`.opsv-workflow.json`）：**
+
+```json
+{
+  "workflowId": "rh_abc123",       // RunningHub ID (null if local-only)
+  "workflowPath": "workflows/my_workflow.json",
+  "nodeMappings": {
+    "prompt": { "nodeId": "3", "fieldName": "text" },
+    "image":  { "nodeId": "5", "fieldName": "image" }
+  },
+  "opsvVersion": "0.8.29"
+}
+```
+
+**约定：**
+- `workflowId` + `workflowPath` 可以同时存在（同时支持本地和云端执行）
+- `opsv-workflow.json` 由命令生成，不要手动编辑（重新跑命令即可覆盖）
+
+### Step 2: Configure api_config.yaml
+
+Add the model to `.opsv/api_config.yaml`, pointing to the `.opsv-workflow.json`:
+
+```yaml
+models:
+  comfylocal.myworkflow:
+    type: comfy
+    provider: comfylocal
+    templateDir: workflows/
+    workflowFile: workflows/my_workflow.opsv-workflow.json
+
+  runninghub.cloudflow:
+    type: comfy
+    provider: runninghub
+    templateDir: workflows/
+    workflowFile: workflows/cloud_workflow.opsv-workflow.json
+```
+
+### Step 3: Compile and run
+
+```bash
+opsv circle create
+cd opsv-queue/videospec.circle1
+opsv comfy --model comfylocal.myworkflow
+opsv run opsv-queue/videospec.circle1/comfylocal.myworkflow_001/
+```
+
+### Step 4: Iterate (preserve previous, clone new)
+
+```bash
+# Clone a single task JSON
+opsv iterate opsv-queue/videospec.circle1/comfylocal.myworkflow_001/@hero.json
+# → @hero_m1.json (same dir, next seq)
+
+# Clone an entire model queue directory
+opsv iterate opsv-queue/videospec.circle1/comfylocal.myworkflow_001/
+# → comfylocal.myworkflow_001_1/ (new dir, all task JSONs cloned)
+```
+
+`iterate` 两种模式：
+- **文件模式**：`@hero.json` → `@hero_m1.json`（同一目录，找最大 `_mN` 后缀递增）
+- **目录模式**：`model_001/` → `model_001_1/`（复制所有 task JSON，去掉 `_opsv.compiledAt`）
+
+---
+
 ## Circle Workflow
 
 Produce commands (`imagen`, `animate`, `comfy`, `webapp`) run inside a circle directory or with `--manifest`:
@@ -110,25 +287,7 @@ opsv imagen --model volc.seadream5
 
 # Or specify manifest path
 opsv imagen --model volc.seadream5 --manifest opsv-queue/videospec.circle1/_manifest.json
-
-# Run specific asset by id
-opsv imagen --model volc.seadream5 --file hero
-
-# Filter by category
-opsv imagen --model volc.seadream5 --category character
-
-# Skip specific statuses (default: approved)
-opsv imagen --model volc.seadream5 --status-skip approved,drafting
 ```
-
-### Produce Command Options
-
-| Option | Description |
-|--------|-------------|
-| `--manifest <path>` | Path to _manifest.json (or directory containing it) |
-| `--file <id>` | Run specific asset by id from manifest |
-| `--category <cat>` | Filter assets by category (from frontmatter) |
-| `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
 
 ---
 
@@ -140,12 +299,12 @@ Tasks are organized into **Circles** (dependency layers via topological sort):
 
 ```
 opsv-queue/
-  videospec.circle1/            # Circle directory (basename.circleN)
-    _manifest.json              # Circle manifest: circles[], assets{}
-    volc.seadream5_001/         # api_config model alias + sequence
+  videospec.circle1/              # Circle directory (incremental, never overwritten)
+    _manifest.json                # Circle manifest: circles[], assets{}
+    volc.seadream5_001/          # Model queue dir (incremental per compile)
       @hero.json
       @hero_1.png
-  role.circle2/                # Terminal circle (contains shots)
+  videospec.circle2/              # Next circle, previous preserved
     _manifest.json
     volc.seedance2_001/
       shot_01.json
@@ -156,7 +315,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.28",
+  "version": "0.8.29",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -195,9 +354,10 @@ See [Design Philosophy](./docs/en/DESIGN-PHILOSOPHY.md) for the full rationale.
 3. **Physical State Machine**: Task state = file existence.
 4. **CLI Does Only Deterministic Actions**: CLI never modifies content fields.
 5. **By-Provider Parallelism**: Same provider serial, different providers parallel.
-6. **Model Queue Versioning**: Each compile creates a new model queue directory with a `_NNN` suffix (e.g. `volc.seadream_001`), preserving prior compilations for traceability and A/B adjustment.
+6. **Incremental Preservation**: Queue outputs are never deleted. `circle create` creates new circles; produce commands create new model queue dirs; `iterate` clones rather than modifies.
 7. **Manifest-First**: Produce commands read from manifest only, never scan directories.
 8. **Circle-Bound Execution**: Produce commands run within or reference a specific circle.
+9. **Model Queue Versioning**: Each compile creates a new model queue directory with a `_NNN` suffix (e.g. `volc.seadream_001`), preserving prior compilations for traceability and A/B adjustment.
 
 ---
 
@@ -250,4 +410,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.8.28 | 2026-05-18*
+> *OpsV v0.8.29 | 2026-05-18*
