@@ -225,7 +225,7 @@ models:
   # ComfyUI Local
   # ==========================================
   comfylocal.workflow:
-    provider: comfyuilocal
+    provider: comfylocal
     type: comfy
     model: workflow
     api_url: http://127.0.0.1:8188/

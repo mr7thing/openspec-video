@@ -96,7 +96,7 @@ opsv imagen --model volcengine.seadream
 | siliconflow | SiliconFlowCompiler |
 | minimax | MinimaxCompiler |
 | runninghub | RunningHubCompiler |
-| comfyui / comfylocal | ComfyUICompiler |
+| comfylocal | ComfyUICompiler |
 | webapp | WebappCompiler |
 
 ## Output Naming

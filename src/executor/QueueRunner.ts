@@ -41,8 +41,6 @@ export class QueueRunner {
     this.providers.set('siliconflow', new SiliconFlowProvider());
     this.providers.set('minimax', new MinimaxProvider());
     this.providers.set('runninghub', new RunningHubProvider());
-    this.providers.set('comfyui', new ComfyUILocalProvider());
-    this.providers.set('comfyuilocal', new ComfyUILocalProvider());
     this.providers.set('comfylocal', new ComfyUILocalProvider());
     this.providers.set('webapp', new WebappProvider());
   }

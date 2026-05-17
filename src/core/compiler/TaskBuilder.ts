@@ -22,8 +22,6 @@ const COMPILERS: Record<string, ProviderCompiler> = {
   siliconflow: new SiliconFlowCompiler(),
   minimax: new MinimaxCompiler(),
   runninghub: new RunningHubCompiler(),
-  comfyui: new ComfyUICompiler(),
-  comfyuilocal: new ComfyUICompiler(),
   comfylocal: new ComfyUICompiler(),
   webapp: new WebappCompiler(),
 };

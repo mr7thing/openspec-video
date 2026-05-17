@@ -20,7 +20,7 @@ import {
 } from '../polling';
 
 export class ComfyUILocalProvider {
-  name = 'comfyuilocal';
+  name = 'comfylocal';
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
     let apiUrl = task._opsv.api_url;
