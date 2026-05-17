@@ -84,7 +84,7 @@ export class ManifestReader {
 
     const entries = fs.readdirSync(queueRoot, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && /\.circle\d+$/.test(entry.name)) {
+      if (entry.isDirectory() && /_circle\d+$/.test(entry.name)) {
         const mp = path.join(queueRoot, entry.name, '_manifest.json');
         if (fs.existsSync(mp)) {
           const data = this.read(mp);

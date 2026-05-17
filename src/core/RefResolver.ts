@@ -121,7 +121,7 @@ export class RefResolver {
     let framePath: string | undefined;
 
     if (fs.existsSync(queueRoot)) {
-      const circleDirs = fs.readdirSync(queueRoot).filter((d) => d.includes('.circle'));
+      const circleDirs = fs.readdirSync(queueRoot).filter((d) => /_circle\d+$/.test(d));
       for (const circleDir of circleDirs) {
         const circlePath = path.join(queueRoot, circleDir);
         if (!fs.statSync(circlePath).isDirectory()) continue;

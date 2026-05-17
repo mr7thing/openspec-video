@@ -238,7 +238,7 @@ export class GlobalReviewStrategy implements ReviewStrategy {
 
     const entries = fs.readdirSync(this.queueRoot).filter(d => {
       const fullPath = path.join(this.queueRoot, d);
-      return fs.statSync(fullPath).isDirectory() && /\.circle\d+$/.test(d);
+      return fs.statSync(fullPath).isDirectory() && /_circle\d+$/.test(d);
     });
 
     for (const name of entries) {
@@ -267,7 +267,7 @@ export class GlobalReviewStrategy implements ReviewStrategy {
     // 1. Collect all docIds from manifests (manifest declares what assets exist)
     const allDocIds = new Set<string>();
     if (fs.existsSync(this.queueRoot)) {
-      const circleDirs = fs.readdirSync(this.queueRoot).filter(d => /\.circle\d+$/.test(d));
+      const circleDirs = fs.readdirSync(this.queueRoot).filter(d => /_circle\d+$/.test(d));
       for (const circleDir of circleDirs) {
         const manifestPath = path.join(this.queueRoot, circleDir, '_manifest.json');
         if (fs.existsSync(manifestPath)) {
@@ -284,7 +284,7 @@ export class GlobalReviewStrategy implements ReviewStrategy {
     //    docId is the source of truth — output files are matched by docId prefix
     const outputIndex: Record<string, DocumentOutput[]> = {};
     if (fs.existsSync(this.queueRoot)) {
-      const circleDirs = fs.readdirSync(this.queueRoot).filter(d => /\.circle\d+$/.test(d));
+      const circleDirs = fs.readdirSync(this.queueRoot).filter(d => /_circle\d+$/.test(d));
       for (const circleDir of circleDirs) {
         const circlePath = path.join(this.queueRoot, circleDir);
         for (const docId of allDocIds) {
@@ -366,7 +366,7 @@ export class GlobalReviewStrategy implements ReviewStrategy {
     // Collect outputs from all circles (recursive scan)
     const outputs: DocumentOutput[] = [];
     if (fs.existsSync(this.queueRoot)) {
-      const circleDirs = fs.readdirSync(this.queueRoot).filter(d => /\.circle\d+$/.test(d));
+      const circleDirs = fs.readdirSync(this.queueRoot).filter(d => /_circle\d+$/.test(d));
       for (const circleDir of circleDirs) {
         const circlePath = path.join(this.queueRoot, circleDir);
         const circleOutputs = scanOutputsRecursive(circlePath, circleDir, docId);
