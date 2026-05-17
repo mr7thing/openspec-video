@@ -18,7 +18,6 @@ import { registerAudioCommand } from './commands/audio';
 import { registerWebappCommand } from './commands/webapp';
 import { registerRunCommand } from './commands/run';
 import { registerReviewCommand } from './commands/review';
-import { registerScriptCommand } from './commands/script';
 import { registerIterateCommand } from './commands/iterate';
 import { resolveProjectRoot } from './utils/projectResolver';
 
@@ -65,7 +64,6 @@ registerAudioCommand(program);
 registerWebappCommand(program);
 registerRunCommand(program);
 registerReviewCommand(program);
-registerScriptCommand(program);
 registerIterateCommand(program);
 
 program.parse(process.argv);

@@ -135,8 +135,8 @@ export class ManifestReviewStrategy implements ReviewStrategy {
     const { manifest, circleName } = this.manifestInfo;
     const assets = manifest.assets || {};
     const assetCount = Object.keys(assets).length;
-    const layers = new Set(Object.values(assets).map(a => a.layer)).size;
-    return [{ name: circleName, target: manifest.target || '', assetCount, layers }];
+    const indices = new Set(Object.values(assets).map(a => a.index)).size;
+    return [{ name: circleName, target: manifest.target || '', assetCount, indexCount: indices }];
   }
 
   listDocuments(): DocumentInfo[] {
@@ -204,7 +204,7 @@ export class ManifestReviewStrategy implements ReviewStrategy {
 
     const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
       const outputs = scanOutputPathsRecursive(circleDir, id);
-      return { id, status: info.status, layer: info.layer, category: info.category, outputs };
+      return { id, status: info.status, index: info.index, category: info.category, outputs };
     });
 
     return { circle: circleName, assets: enriched };
@@ -247,8 +247,8 @@ export class GlobalReviewStrategy implements ReviewStrategy {
         const manifest = this.manifestReader.read(manifestPath);
         const assets = manifest.assets || {};
         const assetCount = Object.keys(assets).length;
-        const layers = new Set(Object.values(assets).map(a => a.layer)).size;
-        circles.push({ name, target: manifest.target || '', assetCount, layers });
+        const indices = new Set(Object.values(assets).map(a => a.index)).size;
+        circles.push({ name, target: manifest.target || '', assetCount, indexCount: indices });
       }
     }
 
@@ -394,7 +394,7 @@ export class GlobalReviewStrategy implements ReviewStrategy {
 
     const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
       const outputs = scanOutputPathsRecursive(circleDir, id);
-      return { id, status: info.status, layer: info.layer, category: info.category, outputs };
+      return { id, status: info.status, index: info.index, category: info.category, outputs };
     });
 
     return { circle: circleName, assets: enriched };

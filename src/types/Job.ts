@@ -11,14 +11,14 @@ export interface FrameRef {
   last: string | null;
 }
 
-export interface GlobalSettings {
+export interface VideoSettings {
   aspect_ratio: string;
   quality: string;
 }
 
 export interface PromptPayload {
   prompt?: string;
-  global_settings: GlobalSettings;
+  global_settings: VideoSettings;
   camera?: { type: string; motion: string };
   duration?: string;
   frame_ref?: FrameRef;

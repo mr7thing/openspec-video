@@ -20,10 +20,10 @@ Scans the specified `--dir` directory (e.g. `videospec/elements/` and `videospec
 - `## Approved References` — Output-side: approved images written by `opsv review`, read by `ApprovedRefReader` when other documents reference this one via `@assetId:variant`
 - `## Design References` — Input-side: design reference images bundled with the document, read by `DesignRefReader` as `reference_images` during compilation
 
-Circle directory naming:
+Circle names:
 - Each `opsv circle create` increments the batch number: `.circle1/`, `.circle2/`, `.circle3/`
-- Circle names: `zerocircle` (layer 1), `firstcircle` (layer 2), `secondcircle` (layer 3), etc.
-- `endcircle` only when `shotlist.md` exists in the final layer
+- Circle names: `zerocircle` (index 0), `firstcircle` (index 1), `secondcircle` (index 2), etc.
+- `end_circle` only when `shotlist.md` exists in the final layer
 - `--name` overrides the basename (default: derived from `--dir` path)
 
 ### Refresh Circles
@@ -33,7 +33,7 @@ opsv circle refresh --dir videospec
 
 Rebuilds the graph, diffs against existing `_manifest.json` `assets` field, and updates per-circle manifests. Reports new/removed assets.
 
-**Layer topology detection** (v0.8.8): If any asset's layer assignment changes, `refresh` exits with error and prompts user to run `circle create` for a new batch.
+**Circle index topology detection** (v0.8.8): If any asset's circle index assignment changes, `refresh` exits with error and prompts user to run `circle create` for a new batch.
 
 ## Key Files
 - `src/commands/circle.ts` — Command handler

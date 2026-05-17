@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.21
+# OpenSpec-Video (OpsV) v0.8.28
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -45,7 +45,7 @@ opsv run opsv-queue/videospec.circle2/volcengine.seedance2_001/
 
 ---
 
-## Command Tree (11 commands)
+## Command Tree (10 commands)
 
 ```
 opsv
@@ -60,8 +60,7 @@ opsv
 ├── audio --model <m>             # [planned]
 ├── webapp --model <m>            # Browser automation
 ├── run                           # Execute tasks in current circle
-├── review                        # Review and approve outputs
-└── script [-d] [-o] [--dry-run]
+└── review                        # Review and approve outputs
 ```
 
 ---
@@ -157,16 +156,16 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.20",
+  "version": "0.8.28",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
-    { "circle": "zerocircle", "layer": 1, "assetIds": ["hero", "villain"] },
-    { "circle": "endcircle", "layer": 2, "assetIds": ["shot_01"] }
+    { "circle": "zerocircle", "index": 0, "assetIds": ["hero", "villain"] },
+    { "circle": "firstcircle", "index": 1, "assetIds": ["shot_01"] }
   ],
   "assets": {
-    "hero": { "status": "approved", "layer": 1, "category": "character" },
-    "shot_01": { "status": "drafting", "layer": 2, "category": "shot-production" }
+    "hero": { "status": "approved", "index": 0, "category": "character" },
+    "shot_01": { "status": "drafting", "index": 1, "category": "shot-production" }
   }
 }
 ```
@@ -251,4 +250,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.8.21 | 2026-05-08*
+> *OpsV v0.8.28 | 2026-05-18*

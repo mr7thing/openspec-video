@@ -24,10 +24,19 @@ export function deriveOutputBase(taskPath: string): string {
 }
 
 export function isModifiedTask(taskPath: string): boolean {
+  return parseIterationSuffix(taskPath) !== null;
+}
+
+/**
+ * Extracts the iteration suffix from a modified task path.
+ * e.g. "/path/shot_01_m1.json" → { base: "shot_01", iteration: 1 }
+ * Returns null if the path is not a modified task.
+ */
+export function parseIterationSuffix(taskPath: string): { base: string; iteration: number } | null {
   const filename = path.basename(taskPath, '.json');
-  // Modified task: base_mN.json (e.g. shot_01_m1.json)
   const match = filename.match(/^(.+)_m(\d+)$/);
-  return match !== null && parseInt(match[2], 10) >= 1;
+  if (!match) return null;
+  return { base: match[1], iteration: parseInt(match[2], 10) };
 }
 
 export function outputFilename(taskPath: string, index: number, ext: string): string {

@@ -77,14 +77,14 @@ export interface DirSettings {
   queue?: string;
 }
 
-export interface GlobalSettings {
+export interface ProjectSettings {
   dirs?: DirSettings;
   polling?: PollingSettings;
 }
 
 export interface ApiConfig {
   models: Record<string, ModelConfig>;
-  settings?: GlobalSettings;
+  settings?: ProjectSettings;
 }
 
 export class ConfigLoader {
@@ -130,7 +130,7 @@ export class ConfigLoader {
     return this.config.models?.[modelName];
   }
 
-  getSettings(): GlobalSettings | undefined {
+  getSettings(): ProjectSettings | undefined {
     return this.config.settings;
   }
 

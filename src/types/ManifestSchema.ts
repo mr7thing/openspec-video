@@ -8,14 +8,14 @@ import { StatusEnum } from './FrontmatterSchema';
 
 export const ManifestAssetEntrySchema = z.object({
   status: StatusEnum,
-  layer: z.number(),
-  category: z.string().optional(),
+  index: z.number(),
+  category: z.string(),
 });
 export type ManifestAssetEntry = z.infer<typeof ManifestAssetEntrySchema>;
 
 export const ManifestCircleEntrySchema = z.object({
   circle: z.string(),
-  layer: z.number(),
+  index: z.number(),
   assetIds: z.array(z.string()),
   status: z.record(StatusEnum).optional(),
 });
@@ -78,7 +78,7 @@ export interface CircleSummary {
   name: string;
   target: string;
   assetCount: number;
-  layers: number;
+  indexCount: number;
 }
 
 export interface CircleAssetsResult {
@@ -86,7 +86,7 @@ export interface CircleAssetsResult {
   assets: Array<{
     id: string;
     status: string;
-    layer: number;
+    index: number;
     category?: string;
     outputs: string[];
   }>;

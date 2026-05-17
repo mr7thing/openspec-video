@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
+import { parseIterationSuffix } from '../executor/naming';
 
 export function registerIterateCommand(program: Command): void {
   program
@@ -134,12 +135,8 @@ async function iterateDirectory(dirPath: string): Promise<void> {
 function resolveTaskBase(filename: string): string {
   const name = filename.replace(/\.json$/, '');
   // Strip trailing _mN (modified task marker, e.g. _m1, _m2)
-  // Only strip if it's exactly the _mN pattern used for iterated tasks
-  const match = name.match(/^(.*)_m(\d+)$/);
-  if (match) {
-    return match[1];
-  }
-  return name;
+  const parsed = parseIterationSuffix(name);
+  return parsed ? parsed.base : name;
 }
 
 function resolveDirBase(dirName: string): string {

@@ -32,13 +32,13 @@ export interface DependencyAnalysis {
 
 export interface CircleDefinition {
   name: string;
-  layer: number;
+  index: number;
   assetIds: string[];
 }
 
 export interface ManifestEntry {
   circle: string;
-  layer: number;
+  index: number;
   assetIds: string[];
   status: Record<string, string>;
 }
@@ -48,12 +48,14 @@ export interface Manifest {
   target: string;
   generatedAt: string;
   circles: ManifestEntry[];
-  assets: Record<string, { status: string; layer: number; category?: string }>;
+  assets: Record<string, { status: string; index: number; category?: string }>;
 }
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+const ORDINALS = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'eighthcircle', 'ninthcircle'];
 
 export class DependencyGraph {
   private graph: Map<string, Set<string>> = new Map();
@@ -124,34 +126,24 @@ export class DependencyGraph {
     return { batches, cycles };
   }
 
-  getCircles(documents?: ParsedDocument[]): CircleDefinition[] {
+  getCircles(_documents?: ParsedDocument[]): CircleDefinition[] {
     const { batches } = this.topologicalSort();
     const circles: CircleDefinition[] = [];
 
-    // Check if final batch contains shotlist.md
-    const docs = documents || this.documents;
     const lastBatchHasShotList = (batch: string[]): boolean => batch.includes('shotlist');
 
-    const ordinals = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'eighthcircle', 'ninthcircle'];
-
-    for (const [layerIdx, batch] of batches.entries()) {
-      const layer = layerIdx + 1;
-      let name: string;
-      const isLastLayer = layerIdx === batches.length - 1;
+    for (const [index, batch] of batches.entries()) {
+      const isLastLayer = index === batches.length - 1;
       const hasShotList = lastBatchHasShotList(batch);
-      const totalLayers = batches.length;
 
-      if (layer === 1) {
-        name = 'zerocircle';
-      } else if (isLastLayer && hasShotList) {
-        name = 'endcircle';
-      } else if (totalLayers === 2) {
-        name = 'firstcircle';
+      let name: string;
+      if (isLastLayer && hasShotList) {
+        name = 'end_circle';
       } else {
-        name = ordinals[layerIdx] || `circle${layer - 1}`;
+        name = ORDINALS[index] ?? `circle.${index}`;
       }
 
-      circles.push({ name, layer, assetIds: batch });
+      circles.push({ name, index, assetIds: batch });
     }
 
     return circles;
@@ -263,7 +255,7 @@ export class DependencyGraph {
     circleN: number,
     circles: CircleDefinition[],
     targetDir: string,
-    existingAssets?: Record<string, { status: string; layer: number; category?: string }>
+    existingAssets?: Record<string, { status: string; index: number; category?: string }>
   ): string {
     const circleDirName = `${basename}.circle${circleN}`;
     const circleDir = path.join(queueRoot, circleDirName);
@@ -272,7 +264,7 @@ export class DependencyGraph {
       fs.mkdirSync(circleDir, { recursive: true });
     }
 
-    const assets: Record<string, { status: string; layer: number; category?: string }> = {};
+    const assets: Record<string, { status: string; index: number; category?: string }> = {};
     const circlesData: ManifestEntry[] = [];
 
     for (const circle of circles) {
@@ -291,12 +283,12 @@ export class DependencyGraph {
 
         const c = this.categoryMap.get(id) || existingAsset?.category;
         status[id] = s;
-        assets[id] = { status: s, layer: circle.layer, ...(c && { category: c }) };
+        assets[id] = { status: s, index: circle.index, ...(c && { category: c }) };
       }
 
       circlesData.push({
         circle: circle.name,
-        layer: circle.layer,
+        index: circle.index,
         assetIds: circle.assetIds,
         status,
       });

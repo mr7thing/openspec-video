@@ -58,7 +58,7 @@ export function registerCircleCommands(program: Command): void {
         const circleDir = graph.writeCircleDir(queueRoot, basename, circleN, circles, options.dir);
 
         for (const c of circles) {
-          console.log(chalk.green(`  Layer ${c.layer} (${c.name}): ${c.assetIds.join(', ')}`));
+          console.log(chalk.green(`  Index ${c.index} (${c.name}): ${c.assetIds.join(', ')}`));
         }
 
         console.log(chalk.green(`\nManifest written to ${path.join(circleDir, '_manifest.json')}`));
@@ -91,7 +91,7 @@ export function registerCircleCommands(program: Command): void {
         const manifestPath = path.join(circleDir, '_manifest.json');
 
         // Read existing manifest to preserve status (as fallback)
-        let existingAssets: Record<string, { status: string; layer: number; category?: string }> = {};
+        let existingAssets: Record<string, { status: string; index: number; category?: string }> = {};
         if (fs.existsSync(manifestPath)) {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
           if (manifest.assets) {
@@ -104,32 +104,32 @@ export function registerCircleCommands(program: Command): void {
         const circles = graph.getCircles();
 
         // Build new assets map with layer info
-        const newAssets: Record<string, { status: string; layer: number; category?: string }> = {};
+        const newAssets: Record<string, { status: string; index: number; category?: string }> = {};
         for (const circle of circles) {
           for (const id of circle.assetIds) {
             const existing = existingAssets[id];
             newAssets[id] = {
               status: existing?.status || 'drafting',
-              layer: circle.layer,
+              index: circle.index,
               category: existing?.category,
             };
           }
         }
 
-        // Detect layer topology changes
-        const layerChanged: string[] = [];
+        // Detect index topology changes
+        const indexChanged: string[] = [];
         for (const id of Object.keys(newAssets)) {
-          const oldLayer = existingAssets[id]?.layer;
-          const newLayer = newAssets[id]?.layer;
-          if (oldLayer !== undefined && newLayer !== undefined && oldLayer !== newLayer) {
-            layerChanged.push(`${id}: ${oldLayer} → ${newLayer}`);
+          const oldIndex = existingAssets[id]?.index;
+          const newIndex = newAssets[id]?.index;
+          if (oldIndex !== undefined && newIndex !== undefined && oldIndex !== newIndex) {
+            indexChanged.push(`${id}: ${oldIndex} → ${newIndex}`);
           }
         }
 
-        if (layerChanged.length > 0) {
-          console.error(chalk.red('Layer topology changed. Run "opsv circle create" to create a new circle batch.'));
+        if (indexChanged.length > 0) {
+          console.error(chalk.red('Index topology changed. Run "opsv circle create" to create a new circle batch.'));
           console.error(chalk.yellow('  Changed assets:'));
-          for (const change of layerChanged) {
+          for (const change of indexChanged) {
             console.error(chalk.yellow(`    ${change}`));
           }
           process.exit(1);

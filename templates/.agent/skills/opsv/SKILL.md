@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8.27 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.8.28 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.27)
+# OpsV 框架规范 (v0.8.28)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -101,10 +101,9 @@ videospec/                         # 创意资产根目录
 ├── stories/story.md              # 故事大纲
 ├── elements/@role_hero.md        # 角色定义（@id 全局引用）
 ├── scenes/@scene_bar.md          # 场景定义
-└── shots/
+├── shots/
     ├── shot_01.md                # 分镜数据源（v0.8）
     ├── shot_02.md
-    ├── Script.md                 # 聚合展示（由 opsv script 生成）
     └── shotlist.md               # 视频工程图纸（末环，独立不进依赖图）
 
 .opsv/                              # OpsV 内部状态
@@ -174,7 +173,6 @@ refs:
 - `id` 绑定文件名，改名 = 删除重建
 - `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法
 - `refs` 参与拓扑排序，决定 Circle 分层
-- `Script.md` 由 `opsv script` 从 shot_*.md 聚合生成（带来源标注）
 - `shotlist.md` 是末环，独立处理，不进依赖图
 
 ## Agent 角色速查
@@ -290,9 +288,6 @@ opsv review --port 3100 --ttl 300        # 自定义端口与空闲超时
 #    → CLI 绝不修改 prompt 等内容字段
 #    → syncing 状态的资产：Agent 需对齐 visual_detailed/visual_brief/refs 后改为 approved
 #    → 全部 approved 后 opsv circle refresh 自动更新 _manifest.json
-
-# 聚合展示
-opsv script
 ```
 
 ## 导航索引

@@ -23,7 +23,7 @@ export const BaseFrontmatterSchema = z.object({
   status: StatusEnum,
   visual_brief: z.string().optional(),
   visual_detailed: z.string().optional(),
-  prompt: z.string(),
+  prompt: z.string().optional(),
   negative_prompt: z.string().optional(),
   refs: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),
