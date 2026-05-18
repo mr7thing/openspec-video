@@ -22,6 +22,7 @@ import {
   sleep,
 } from '../polling';
 import { generateRandomSeed } from '../../utils/randomSeed';
+import { ExecutionError, ConfigError, InfrastructureError, OpsVErrorCode } from '../../errors/OpsVError';
 
 export class RunningHubProvider {
   name = 'runninghub';
@@ -37,14 +38,14 @@ export class RunningHubProvider {
       // Only fall back to env for missing-key errors; rethrow config problems
       const envKey = process.env.RUNNINGHUB_API_KEY || '';
       if (!envKey) {
-        throw new Error(`RunningHub API key not found: ${err.message}`);
+        throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, `RunningHub API key not found: ${err.message}`, { modelKey: task._opsv.modelKey });
       }
       apiKey = envKey;
     }
 
     const submitUrl = task._opsv.api_url;
     const statusUrl = task._opsv.api_status_url;
-    if (!statusUrl) throw new Error('RunningHubProvider: api_status_url is required in task._opsv');
+    if (!statusUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_PROVIDER_NOT_FOUND, 'RunningHubProvider: api_status_url is required in task._opsv');
     const shotId = task._opsv.shotId;
     const workflowId = task._opsv.workflowId;
     const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
@@ -81,7 +82,7 @@ export class RunningHubProvider {
                   /\.(png|jpg|jpeg|webp|gif|bmp|mp4|mov|avi|mkv|wav|mp3|ogg|flac)$/i.test(val)
                 ) {
                   // Looks like a file path but doesn't exist
-                  throw new Error(`Reference file not found: ${val} (node ${item.nodeId}.${item.fieldName})`);
+                  throw new InfrastructureError(OpsVErrorCode.INFRA_FILE_NOT_FOUND, `Reference file not found: ${val} (node ${item.nodeId}.${item.fieldName})`);
                 }
                 // Otherwise silently skip (likely a text value like prompt)
               }
@@ -103,12 +104,12 @@ export class RunningHubProvider {
         // Response: { code: 0, msg: 'success', data: { taskId, taskStatus, clientId, promptTips } }
         if (submitRes.data?.code !== 0) {
           const msg = submitRes.data?.msg || JSON.stringify(submitRes.data);
-          throw new Error(`RunningHub task creation failed: ${msg}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `RunningHub task creation failed: ${msg}`);
         }
 
         taskId = submitRes.data?.data?.taskId;
         if (!taskId) {
-          throw new Error(`No taskId in submit response: ${JSON.stringify(submitRes.data)}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No taskId in submit response: ${JSON.stringify(submitRes.data)}`);
         }
 
         appendLog(taskPath, { event: 'submitted', task_id: taskId });
@@ -122,7 +123,7 @@ export class RunningHubProvider {
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
-          throw new Error(`Polling timeout for ${taskId} (4h exceeded)`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${taskId} (4h exceeded)`);
         }
 
         const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
@@ -147,7 +148,7 @@ export class RunningHubProvider {
 
         if (statusRes.data?.code !== 0) {
           const msg = statusRes.data?.msg || JSON.stringify(statusRes.data);
-          throw new Error(`RunningHub status query failed: ${msg}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_STATUS_QUERY_FAILED, `RunningHub status query failed: ${msg}`);
         }
 
         const status = statusRes.data?.data;
@@ -172,7 +173,7 @@ export class RunningHubProvider {
 
           if (resultRes.data?.code !== 0) {
             const msg = resultRes.data?.msg || JSON.stringify(resultRes.data);
-            throw new Error(`RunningHub result query failed: ${msg}`);
+            throw new ExecutionError(OpsVErrorCode.EXECUTION_RESULT_QUERY_FAILED, `RunningHub result query failed: ${msg}`);
           }
 
           const outputPaths: string[] = [];
@@ -195,7 +196,7 @@ export class RunningHubProvider {
           }
 
           if (outputPaths.length === 0) {
-            throw new Error('Completed but no output URL found');
+            throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no output URL found');
           }
 
           // Download original ComfyUI workflow JSON
@@ -224,7 +225,7 @@ export class RunningHubProvider {
         if (status === 'FAILED') {
           const reason = statusRes.data?.msg || JSON.stringify(statusRes.data);
           appendLog(taskPath, { event: 'failed', task_id: taskId, error: reason });
-          throw new Error(`Task failed: ${reason}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Task failed: ${reason}`);
         }
 
         appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: taskId });
@@ -261,14 +262,12 @@ export class RunningHubProvider {
     });
 
     if (response.data?.code !== 0) {
-      throw new Error(
-        `RunningHub file upload failed for ${filePath}: ${response.data?.msg || JSON.stringify(response.data)}`
-      );
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_UPLOAD_FAILED, `RunningHub file upload failed for ${filePath}: ${response.data?.msg || JSON.stringify(response.data)}`);
     }
 
     const fileName = response.data?.data?.fileName;
     if (!fileName) {
-      throw new Error(`No fileName in upload response for ${filePath}: ${JSON.stringify(response.data)}`);
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_UPLOAD_FAILED, `No fileName in upload response for ${filePath}: ${JSON.stringify(response.data)}`);
     }
 
     logger.info(`[RunningHub] Uploaded ${path.basename(filePath)} → ${fileName}`);
@@ -298,12 +297,12 @@ export class RunningHubProvider {
     );
 
     if (res.data?.code !== 0) {
-      throw new Error(`getJsonApiFormat failed: ${res.data?.msg || JSON.stringify(res.data)}`);
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_RESULT_QUERY_FAILED, `getJsonApiFormat failed: ${res.data?.msg || JSON.stringify(res.data)}`);
     }
 
     const promptStr = res.data?.data?.prompt;
     if (!promptStr) {
-      throw new Error('No prompt field in getJsonApiFormat response');
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_RESULT_QUERY_FAILED, 'No prompt field in getJsonApiFormat response');
     }
 
     // prompt is a JSON string inside the response

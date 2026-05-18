@@ -22,6 +22,8 @@ import {
   sleep,
 } from '../polling';
 
+import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
+
 export class VolcengineProvider {
   name = 'volcengine';
 
@@ -75,20 +77,14 @@ export class VolcengineProvider {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
     // Video files are typically too large for base64; require HTTP URL
-    throw new Error(
-      `Local video paths are not supported for API submission. ` +
-      `Please upload the video to a URL or use a TOS/S3 link: ${value}`
-    );
+    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local video paths are not supported for API submission. Please upload the video to a URL or use a TOS/S3 link: ${value}`);
   }
 
   private async resolveAudioField(value: string): Promise<string> {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
     // Audio files are typically too large for base64; require HTTP URL
-    throw new Error(
-      `Local audio paths are not supported for API submission. ` +
-      `Please upload the audio to a URL or use a TOS/S3 link: ${value}`
-    );
+    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local audio paths are not supported for API submission. Please upload the audio to a URL or use a TOS/S3 link: ${value}`);
   }
 
   private async executeImage(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
@@ -130,7 +126,7 @@ export class VolcengineProvider {
     }
 
     if (imageUrls.length === 0) {
-      throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
     // Download all images with sequential indices (auto-increment from existing)
@@ -193,7 +189,7 @@ export class VolcengineProvider {
         submitRes.data?.task_id;
 
       if (!requestId) {
-        throw new Error(`No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
       }
 
       appendLog(taskPath, { event: 'submitted', task_id: requestId });
@@ -207,7 +203,7 @@ export class VolcengineProvider {
     while (true) {
       const elapsed = getElapsedMs(taskPath);
       if (elapsed > maxDuration) {
-        throw new Error(`Polling timeout for ${requestId} (4h exceeded)`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${requestId} (4h exceeded)`);
       }
 
       const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
@@ -224,7 +220,7 @@ export class VolcengineProvider {
           statusRes.data?.content?.video_url ||
           statusRes.data?.video_url ||
           statusRes.data?.data?.video_url;
-        if (!videoUrl) throw new Error('Completed but no video_url found');
+        if (!videoUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no video_url found');
 
         const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
         await downloadFile(videoUrl, outputPath);
@@ -236,7 +232,7 @@ export class VolcengineProvider {
       if (status === 'failed') {
         const reason = statusRes.data?.error_message || 'Unknown error';
         appendLog(taskPath, { event: 'failed', task_id: requestId, error: reason });
-        throw new Error(`Video generation failed: ${reason}`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Video generation failed: ${reason}`);
       }
 
       appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: requestId });

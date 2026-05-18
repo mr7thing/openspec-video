@@ -8,6 +8,7 @@ import path from 'path';
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { TaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
+import { CompilationError, ConfigError, InfrastructureError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 interface ComfyUIWorkflowNode {
   inputs?: Record<string, any>;
@@ -25,7 +26,7 @@ export class ComfyUICompiler implements ProviderCompiler {
     const { job, modelConfig, workflowPath, workflowDir, refCount, projectRoot } = ctx;
 
     // Validate required config
-    if (!modelConfig.api_url) throw new Error('ComfyUICompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'ComfyUICompiler: api_url is required in api_config.yaml');
 
     // Helper: resolve workflow directory relative to projectRoot if needed
     const resolveWorkflowDir = (dir: string): string => {
@@ -43,7 +44,7 @@ export class ComfyUICompiler implements ProviderCompiler {
       } else {
         const dir = workflowDir || modelConfig.defaults?.templateDir;
         if (!dir) {
-          throw new Error(`Cannot resolve --workflow "${workflowPath}": no workflow directory specified`);
+          throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, `Cannot resolve --workflow "${workflowPath}": no workflow directory specified`);
         }
         workflowFile = path.join(resolveWorkflowDir(dir), workflowPath);
       }
@@ -51,13 +52,13 @@ export class ComfyUICompiler implements ProviderCompiler {
       // Auto-match by ref(N) pattern
       const dir = workflowDir || modelConfig.defaults?.templateDir;
       if (!dir) {
-        throw new Error('No workflow directory specified. Use --workflow-dir or set defaults.templateDir in api_config.yaml');
+        throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, 'No workflow directory specified. Use --workflow-dir or set defaults.templateDir in api_config.yaml');
       }
       workflowFile = this.resolveWorkflow(resolveWorkflowDir(dir), refCount || 0, job.id);
     }
 
     if (!fs.existsSync(workflowFile)) {
-      throw new Error(`Workflow file not found: ${workflowFile}`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, `Workflow file not found: ${workflowFile}`);
     }
 
     // 2. Load workflow
@@ -65,7 +66,7 @@ export class ComfyUICompiler implements ProviderCompiler {
     try {
       workflow = JSON.parse(fs.readFileSync(workflowFile, 'utf-8'));
     } catch (parseErr: any) {
-      throw new Error(`Failed to parse workflow JSON ${workflowFile}: ${parseErr.message}`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_PARSE_FAILED, `Failed to parse workflow JSON ${workflowFile}: ${parseErr.message}`);
     }
 
     // 3. Optional _opsv_workflow metadata (legacy, ignored in unified mode)
@@ -73,7 +74,7 @@ export class ComfyUICompiler implements ProviderCompiler {
 
     // 4. Build parameter map — unified mode only
     if (!ctx.nodeMapping || Object.keys(ctx.nodeMapping).length === 0) {
-      throw new Error(
+      throw new CompilationError(OpsVErrorCode.COMPILATION_NODE_MAPPING_MISSING,
         'ComfyUICompiler: node_mapping is required. ' +
         'Use "opsv comfy-node-mapping <workflow.json>" to generate it, ' +
         'then add it to frontmatter or api_config.yaml.'
@@ -148,7 +149,7 @@ export class ComfyUICompiler implements ProviderCompiler {
 
   private resolveWorkflow(dir: string, refCount: number, assetId: string): string {
     if (!fs.existsSync(dir)) {
-      throw new Error(`Workflow directory not found: ${dir}`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, `Workflow directory not found: ${dir}`);
     }
 
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.json') && !f.startsWith('_'));
@@ -161,7 +162,7 @@ export class ComfyUICompiler implements ProviderCompiler {
     }
 
     if (candidates.length === 0) {
-      throw new Error(
+      throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND,
         `No workflow files with ref(N) pattern found in ${dir}. ` +
         'Files must be named like ref0.json, ref1.json, ref2.json...'
       );
@@ -188,7 +189,7 @@ export class ComfyUICompiler implements ProviderCompiler {
       return path.join(dir, over[0].file);
     }
 
-    throw new Error(`No matching workflow for refCount=${refCount} in ${dir}`);
+    throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, `No matching workflow for refCount=${refCount} in ${dir}`);
   }
 
   // Unified injection: use explicit nodeMapping (frontmatter or api_config)

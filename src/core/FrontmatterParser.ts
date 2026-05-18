@@ -8,6 +8,8 @@ import { BaseFrontmatterSchema } from '../types/FrontmatterSchema';
 import { ReviewEntry } from '../types/ManifestSchema';
 import { formatReviewEntry } from '../utils/reviewEntry';
 
+import { ValidationError, CompilationError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
+
 export class FrontmatterParser {
   static parse<T extends z.ZodType>(
     content: string,
@@ -19,11 +21,11 @@ export class FrontmatterParser {
     try {
       parsed = yaml.load(rawYaml);
     } catch (e) {
-      throw new Error(`YAML parse failed: ${(e as Error).message}`);
+      throw new ValidationError(OpsVErrorCode.VALIDATION_YAML_PARSE_FAILED, `YAML parse failed: ${(e as Error).message}`);
     }
 
     if (!parsed || typeof parsed !== 'object') {
-      throw new Error('Frontmatter is empty or malformed');
+      throw new ValidationError(OpsVErrorCode.VALIDATION_FRONTMATTER_MALFORMED, 'Frontmatter is empty or malformed');
     }
 
     const targetSchema = schema || BaseFrontmatterSchema;
@@ -32,7 +34,7 @@ export class FrontmatterParser {
       const errors = result.error.errors
         .map((e) => `  ${e.path.join('.')}: ${e.message}`)
         .join('\n');
-      throw new Error(`Frontmatter validation failed:\n${errors}`);
+      throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, `Frontmatter validation failed:\n${errors}`);
     }
 
     return { frontmatter: result.data, body };
@@ -96,7 +98,7 @@ export class FrontmatterParser {
   private static split(content: string): { rawYaml: string; body: string } {
     const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
     if (!match) {
-      throw new Error('Document missing YAML frontmatter (--- delimiter required)');
+      throw new ValidationError(OpsVErrorCode.VALIDATION_FRONTMATTER_MISSING, 'Document missing YAML frontmatter (--- delimiter required)');
     }
     return { rawYaml: match[1], body: match[2] };
   }

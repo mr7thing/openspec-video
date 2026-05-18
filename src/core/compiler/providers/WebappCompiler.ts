@@ -5,14 +5,15 @@
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { TaskJson } from '../../../types/Job';
+import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 export class WebappCompiler implements ProviderCompiler {
   readonly provider = 'webapp';
 
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    if (!modelConfig.api_url) throw new Error('WebappCompiler: api_url is required in api_config.yaml');
-    if (!modelConfig.api_status_url) throw new Error('WebappCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'WebappCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'WebappCompiler: api_status_url is required in api_config.yaml');
     const defaults = modelConfig.defaults || {};
 
     const payload: Record<string, any> = {

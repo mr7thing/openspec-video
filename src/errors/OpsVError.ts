@@ -1,158 +1,141 @@
 // ============================================================================
-// OpsV Error Hierarchy
+// OpsV Error Type System
+// Based on DESIGN.md Section 7: Error Taxonomy
+//
+// Code Range | Layer          | Examples
+// -----------|----------------|----------
+// E1xxx      | Asset/Document | parse failed, missing field, image not found
+// E2xxx      | Config         | missing API key, invalid model config
+// E3xxx      | Compilation    | invalid ref, circular dependency
+// E4xxx      | Execution      | API error, timeout, download failed
+// E5xxx      | Infrastructure | file not found, network, WebSocket
+// E6xxx      | Validation     | schema mismatch, type error
+// E7xxx      | Scheduling     | circle not found, dependency not ready
 // ============================================================================
 
 export enum OpsVErrorCode {
+  // E1xxx — Asset/Document: parse failed, missing field, image not found
   ASSET_NOT_FOUND = 'E1001',
-  ASSET_INVALID_FRONTMATTER = 'E1002',
-  ASSET_MISSING_REQUIRED_FIELD = 'E1003',
+  ASSET_PARSE_ERROR = 'E1002',
+  ASSET_MISSING_FIELD = 'E1003',
   ASSET_IMAGE_NOT_FOUND = 'E1004',
-  ASSET_PARSE_FAILED = 'E1005',
 
-  CONFIG_NOT_FOUND = 'E2001',
-  CONFIG_INVALID_FORMAT = 'E2002',
-  CONFIG_MISSING_REQUIRED_FIELD = 'E2003',
+  // E2xxx — Config: missing API key, invalid model config
+  CONFIG_KEY_NOT_FOUND = 'E2001',
+  CONFIG_INVALID_MODEL = 'E2002',
+  CONFIG_MISSING_FIELD = 'E2003',
 
-  COMPILATION_FAILED = 'E3001',
-  COMPILATION_INVALID_ASSET_REF = 'E3002',
-  COMPILATION_DEPENDENCY_MISSING = 'E3003',
-  COMPILATION_INVALID_SHOT_FORMAT = 'E3004',
+  // E3xxx — Compilation: invalid ref, circular dependency
+  COMPILATION_INVALID_REF = 'E3001',
+  COMPILATION_CIRCULAR_DEP = 'E3002',
+  COMPILATION_FAILED = 'E3003',
 
+  // E4xxx — Execution: API error, timeout, download failed
   EXECUTION_API_ERROR = 'E4001',
   EXECUTION_TIMEOUT = 'E4002',
   EXECUTION_DOWNLOAD_FAILED = 'E4003',
   EXECUTION_PROVIDER_NOT_FOUND = 'E4004',
-  EXECUTION_FRAME_EXTRACTION_FAILED = 'E4005',
+  EXECUTION_SUBMIT_FAILED = 'E4005',
+  EXECUTION_STATUS_QUERY_FAILED = 'E4006',
+  EXECUTION_RESULT_QUERY_FAILED = 'E4007',
+  EXECUTION_UPLOAD_FAILED = 'E4008',
+  EXECUTION_OUTPUT_NOT_FOUND = 'E4009',
+  EXECUTION_TASK_FAILED = 'E4010',
 
-  NETWORK_ERROR = 'E5001',
-  FILE_NOT_FOUND = 'E5002',
-  FILE_PERMISSION_DENIED = 'E5003',
-  WEBSOCKET_ERROR = 'E5004',
+  // E5xxx — Infrastructure: file not found, network, WebSocket
+  INFRA_FILE_NOT_FOUND = 'E5001',
+  INFRA_NETWORK_ERROR = 'E5002',
+  INFRA_PATH_FORBIDDEN = 'E5003',
 
-  VALIDATION_ERROR = 'E6001',
-  VALIDATION_SCHEMA_FAILED = 'E6002',
-  VALIDATION_TYPE_MISMATCH = 'E6003',
+  // E6xxx — Validation: schema mismatch, type error
+  VALIDATION_SCHEMA_MISMATCH = 'E6001',
+  VALIDATION_TYPE_ERROR = 'E6002',
+  VALIDATION_YAML_PARSE_FAILED = 'E6003',
+  VALIDATION_FRONTMATTER_MISSING = 'E6004',
+  VALIDATION_FRONTMATTER_MALFORMED = 'E6005',
 
+  // E7xxx — Scheduling: circle not found, dependency not ready
   SCHEDULING_CIRCLE_NOT_FOUND = 'E7001',
-  SCHEDULING_DEPENDENCY_NOT_READY = 'E7002',
-  SCHEDULING_MANIFEST_OUTDATED = 'E7003',
-
-  UNKNOWN_ERROR = 'E9999'
+  SCHEDULING_DEP_NOT_READY = 'E7002',
 }
 
-export interface ErrorContext {
-  filePath?: string;
-  position?: string;
-  assetId?: string;
-  jobId?: string;
-  metadata?: Record<string, unknown>;
-  cause?: Error;
-}
-
+/** Base OpsV error with code + message */
 export class OpsVError extends Error {
-  public readonly code: OpsVErrorCode;
-  public readonly context: ErrorContext;
-  public readonly timestamp: Date;
-
-  constructor(code: OpsVErrorCode, message: string, context: ErrorContext = {}) {
+  constructor(
+    public readonly code: OpsVErrorCode,
+    message: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = 'OpsVError';
-    this.code = code;
-    this.context = context;
-    this.timestamp = new Date();
-    Object.setPrototypeOf(this, OpsVError.prototype);
-    if (context.cause?.stack && !this.stack?.includes(context.cause.stack)) {
-      this.stack = `${this.stack}\nCaused by: ${context.cause.stack}`;
-    }
   }
 
-  toJSON(): object {
+  toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
-      context: this.context,
-      timestamp: this.timestamp.toISOString(),
+      details: this.details,
     };
-  }
-
-  toUserMessage(): string {
-    const base = `[${this.code}] ${this.message}`;
-    if (this.context.filePath) {
-      return `${base}\n  Location: ${this.context.filePath}${this.context.position ? `:${this.context.position}` : ''}`;
-    }
-    return base;
   }
 }
 
+// ---------------------------------------------------------------------------
+// Error subclasses by layer (convenience aliases for common patterns)
+// ---------------------------------------------------------------------------
+
 export class AssetError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, context: ErrorContext = {}) {
-    super(code, message, context);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
     this.name = 'AssetError';
-    Object.setPrototypeOf(this, AssetError.prototype);
   }
 }
 
 export class ConfigError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, context: ErrorContext = {}) {
-    super(code, message, context);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
     this.name = 'ConfigError';
-    Object.setPrototypeOf(this, ConfigError.prototype);
   }
 }
 
 export class CompilationError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, context: ErrorContext = {}) {
-    super(code, message, context);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
     this.name = 'CompilationError';
-    Object.setPrototypeOf(this, CompilationError.prototype);
   }
 }
 
 export class ExecutionError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, context: ErrorContext = {}) {
-    super(code, message, context);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
     this.name = 'ExecutionError';
-    Object.setPrototypeOf(this, ExecutionError.prototype);
+  }
+}
+
+export class InfrastructureError extends OpsVError {
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
+    this.name = 'InfrastructureError';
   }
 }
 
 export class ValidationError extends OpsVError {
-  public readonly schemaErrors: string[];
-
-  constructor(message: string, schemaErrors: string[] = [], context: ErrorContext = {}) {
-    super(OpsVErrorCode.VALIDATION_SCHEMA_FAILED, message, context);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
     this.name = 'ValidationError';
-    this.schemaErrors = schemaErrors;
-    Object.setPrototypeOf(this, ValidationError.prototype);
   }
 }
 
 export class SchedulingError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, context: ErrorContext = {}) {
-    super(code, message, context);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
+    super(code, message, details);
     this.name = 'SchedulingError';
-    Object.setPrototypeOf(this, SchedulingError.prototype);
   }
 }
 
+// Convenience factory for common error patterns
 export const ErrorFactory = {
-  assetNotFound(assetId: string, filePath?: string): AssetError {
-    return new AssetError(OpsVErrorCode.ASSET_NOT_FOUND, `资产未找到: ${assetId}`, { assetId, filePath });
+  compilationFailed(msg: string): never {
+    throw new CompilationError(OpsVErrorCode.COMPILATION_FAILED, msg);
   },
-  configNotFound(configPath: string): ConfigError {
-    return new ConfigError(OpsVErrorCode.CONFIG_NOT_FOUND, `配置文件未找到: ${configPath}`, { filePath: configPath });
-  },
-  compilationFailed(reason: string, context: ErrorContext = {}): CompilationError {
-    return new CompilationError(OpsVErrorCode.COMPILATION_FAILED, `编译失败: ${reason}`, context);
-  },
-  apiError(provider: string, message: string, jobId?: string): ExecutionError {
-    return new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `[${provider}] API 错误: ${message}`, { jobId, metadata: { provider } });
-  },
-  dependencyNotReady(assetId: string, blockedBy: string[]): SchedulingError {
-    return new SchedulingError(OpsVErrorCode.SCHEDULING_DEPENDENCY_NOT_READY, `依赖未就绪: ${assetId} 被阻塞于 ${blockedBy.join(', ')}`, { assetId, metadata: { blockedBy } });
-  },
-  manifestOutdated(manifestAge: string): SchedulingError {
-    return new SchedulingError(OpsVErrorCode.SCHEDULING_MANIFEST_OUTDATED, `manifest 可能过期 (最后刷新: ${manifestAge})，建议先执行 opsv circle refresh`, {});
-  },
-};
+} as const;

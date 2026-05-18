@@ -7,6 +7,7 @@ import path from 'path';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { getProjectDir } from '../utils/configLoader';
 import { AssetDocIndex, buildAssetDocIndex, AssetDocEntry } from './AssetDocIndex';
+import { CompilationError, OpsVErrorCode } from '../errors/OpsVError';
 
 export interface RefResult {
   type: 'asset' | 'frame';
@@ -108,12 +109,12 @@ export class RefResolver {
     const framePart = identifier.slice(6);
     const lastUnderscoreIdx = framePart.lastIndexOf('_');
     if (lastUnderscoreIdx <= 0) {
-      throw new Error(`Invalid FRAME identifier "${identifier}": expected FRAME:<shotId>_<frameType>`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Invalid FRAME identifier "${identifier}": expected FRAME:<shotId>_<frameType>`);
     }
     const shotId = framePart.slice(0, lastUnderscoreIdx);
     const frameType = framePart.slice(lastUnderscoreIdx + 1);
     if (!shotId || !frameType) {
-      throw new Error(`Invalid FRAME identifier "${identifier}": shotId and frameType must not be empty`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Invalid FRAME identifier "${identifier}": shotId and frameType must not be empty`);
     }
 
     // Search .circleN/ directories for the frame file

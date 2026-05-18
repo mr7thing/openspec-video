@@ -13,6 +13,7 @@ import { resolveWithin, sanitizePathComponent } from '../utils/pathSecurity';
 import { parseOutputFilename } from '../executor/naming';
 import { getProjectDir } from '../utils/configLoader';
 import { formatReviewEntry } from '../utils/reviewEntry';
+import { ValidationError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 
 export interface ApproveRequest {
   circle: string;
@@ -36,7 +37,7 @@ export class ApproveService {
 
   validateRequest(req: ApproveRequest): void {
     if (!sanitizePathComponent(req.circle) || !sanitizePathComponent(req.assetId)) {
-      throw new Error('Invalid circle or assetId');
+      throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Invalid circle or assetId');
     }
   }
 
@@ -58,7 +59,7 @@ export class ApproveService {
 
   resolveTargetRoot(circle: string): string {
     const circleDir = resolveWithin(this.queueRoot, circle);
-    if (!circleDir) throw new Error('Forbidden');
+    if (!circleDir) throw new InfrastructureError(OpsVErrorCode.INFRA_PATH_FORBIDDEN, 'Forbidden');
 
     const circleManifestPath = path.join(circleDir, '_manifest.json');
     let targetRoot = getProjectDir(this.projectRoot, 'videospec');
@@ -108,7 +109,7 @@ export class ApproveService {
     const sourceDocPath = AssetManager.findAssetFilePathUnder(targetRoot, req.assetId);
 
     if (!sourceDocPath) {
-      throw new Error(`Document not found: ${req.assetId} in target ${targetRoot}`);
+      throw new InfrastructureError(OpsVErrorCode.INFRA_FILE_NOT_FOUND, `Document not found: ${req.assetId} in target ${targetRoot}`);
     }
 
     this.applyReviewToDocument(sourceDocPath, reviewEntry, newStatus);

@@ -17,6 +17,8 @@ import { ComfyUICompiler } from './providers/ComfyUICompiler';
 import { WebappCompiler } from './providers/WebappCompiler';
 import { logger } from '../../utils/logger';
 
+import { CompilationError, ConfigError, OpsVErrorCode } from '../../errors/OpsVError';
+
 const COMPILERS: Record<string, ProviderCompiler> = {
   volcengine: new VolcengineCompiler(),
   siliconflow: new SiliconFlowCompiler(),
@@ -29,7 +31,7 @@ const COMPILERS: Record<string, ProviderCompiler> = {
 function getCompiler(provider: string): ProviderCompiler {
   const compiler = COMPILERS[provider];
   if (!compiler) {
-    throw new Error(`Unknown provider: ${provider}. Available: ${Object.keys(COMPILERS).join(', ')}`);
+    throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Unknown provider: ${provider}. Available: ${Object.keys(COMPILERS).join(', ')}`);
   }
   return compiler;
 }
@@ -55,7 +57,7 @@ export class TaskBuilder {
   ): Promise<TaskJson[]> {
     const modelConfig = this.configLoader.getModelConfig(modelKey);
     if (!modelConfig) {
-      throw new Error(`Model '${modelKey}' not found in api_config.yaml`);
+      throw new ConfigError(OpsVErrorCode.CONFIG_INVALID_MODEL, `Model '${modelKey}' not found in api_config.yaml`);
     }
 
     const apiKey = this.configLoader.getResolvedApiKey(modelKey);
@@ -103,7 +105,7 @@ export class TaskBuilder {
   static parseModelKey(modelKey: string): { provider: string; model: string } {
     const dotIdx = modelKey.indexOf('.');
     if (dotIdx <= 0) {
-      throw new Error(`Invalid model key '${modelKey}'. Expected format: provider.model`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Invalid model key '${modelKey}'. Expected format: provider.model`);
     }
     return {
       provider: modelKey.slice(0, dotIdx),

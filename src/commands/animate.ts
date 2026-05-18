@@ -14,6 +14,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job, FrameRef } from '../types/Job';
 import { logger } from '../utils/logger';
+import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -112,7 +113,7 @@ async function buildVideoJob(
 ): Promise<Job> {
   const filePath = asset.filePath;
   if (!filePath) {
-    throw new Error(`File path not found for asset: ${asset.id}`);
+    throw new InfrastructureError(OpsVErrorCode.INFRA_FILE_NOT_FOUND, `File path not found for asset: ${asset.id}`);
   }
 
   const content = fs.readFileSync(filePath, 'utf-8');

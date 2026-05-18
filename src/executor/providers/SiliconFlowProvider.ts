@@ -22,6 +22,8 @@ import {
   sleep,
 } from '../polling';
 
+import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
+
 export class SiliconFlowProvider {
   name = 'siliconflow';
 
@@ -83,7 +85,7 @@ export class SiliconFlowProvider {
       response.data?.url;
 
     if (!imageUrl) {
-      throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
     const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'png'), 'png');
@@ -140,7 +142,7 @@ export class SiliconFlowProvider {
 
       requestId = submitRes.data?.requestId || submitRes.data?.data?.requestId;
       if (!requestId) {
-        throw new Error(`No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
       }
 
       appendLog(taskPath, { event: 'submitted', task_id: requestId });
@@ -154,7 +156,7 @@ export class SiliconFlowProvider {
     while (true) {
       const elapsed = getElapsedMs(taskPath);
       if (elapsed > maxDuration) {
-        throw new Error(`Polling timeout for ${requestId} (4h exceeded)`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${requestId} (4h exceeded)`);
       }
 
       const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
@@ -175,7 +177,7 @@ export class SiliconFlowProvider {
 
       if (status === 'Succeed' || status === 'succeeded') {
         const videoUrl = statusRes.data?.results?.videos?.[0]?.url || statusRes.data?.data?.video_url;
-        if (!videoUrl) throw new Error('Completed but no video_url found');
+        if (!videoUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no video_url found');
 
         const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
         await downloadFile(videoUrl, outputPath);
@@ -187,7 +189,7 @@ export class SiliconFlowProvider {
       if (status === 'Failed' || status === 'failed') {
         const reason = JSON.stringify(statusRes.data);
         appendLog(taskPath, { event: 'failed', task_id: requestId, error: reason });
-        throw new Error(`Video generation failed: ${reason}`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Video generation failed: ${reason}`);
       }
 
       appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: requestId });

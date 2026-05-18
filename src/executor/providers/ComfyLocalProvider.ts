@@ -11,6 +11,7 @@ import { logger } from '../../utils/logger';
 import { generateRandomSeed } from '../../utils/randomSeed';
 import { ConfigLoader } from '../../utils/configLoader';
 import { resolveProjectRoot } from '../../utils/projectResolver';
+import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
 import {
   appendLog,
   getResumeTaskId,
@@ -19,12 +20,12 @@ import {
   sleep,
 } from '../polling';
 
-export class ComfyUILocalProvider {
+export class ComfyLocalProvider {
   name = 'comfylocal';
 
   async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
     let apiUrl = task._opsv.api_url;
-    if (!apiUrl) throw new Error('ComfyUILocalProvider: api_url is required in task._opsv');
+    if (!apiUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_PROVIDER_NOT_FOUND, 'ComfyLocalProvider: api_url is required in task._opsv');
     // Normalize: strip trailing slash to avoid double slashes in URL construction
     apiUrl = apiUrl.replace(/\/$/, '');
     const shotId = task._opsv.shotId;
@@ -49,7 +50,7 @@ export class ComfyUILocalProvider {
 
         promptId = response.data?.prompt_id;
         if (!promptId) {
-          throw new Error(`No prompt_id in response: ${JSON.stringify(response.data)}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No prompt_id in response: ${JSON.stringify(response.data)}`, { jobId: promptId });
         }
 
         appendLog(taskPath, { event: 'submitted', task_id: promptId });
@@ -63,7 +64,7 @@ export class ComfyUILocalProvider {
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
-          throw new Error(`Polling timeout for promptId=${promptId} (4h exceeded)`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for promptId=${promptId} (4h exceeded)`);
         }
 
         const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
@@ -83,7 +84,7 @@ export class ComfyUILocalProvider {
         if (statusStr === 'error') {
           const errorInfo = entry?.status?.messages?.map((m: any) => m?.[1]).join('; ') || 'ComfyUI execution error';
           appendLog(taskPath, { event: 'failed', task_id: promptId, error: errorInfo });
-          throw new Error(`ComfyUI execution failed: ${errorInfo}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `ComfyUI execution failed: ${errorInfo}`, { jobId: promptId });
         }
 
         const outputs = entry?.outputs;
@@ -132,7 +133,7 @@ export class ComfyUILocalProvider {
           }
 
           // outputs exists but no valid files — likely a node error or empty workflow
-          throw new Error('ComfyUI completed but no output files found in history');
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `ComfyUI completed but no output files found in history`, { jobId: promptId });
         }
 
         appendLog(taskPath, { event: 'polling', status: statusStr || 'waiting', task_id: promptId });

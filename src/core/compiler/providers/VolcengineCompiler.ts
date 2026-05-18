@@ -6,6 +6,7 @@
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { TaskJson } from '../../../types/Job';
 import { ModelConfig } from '../../../utils/configLoader';
+import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 export class VolcengineCompiler implements ProviderCompiler {
   readonly provider = 'volcengine';
@@ -23,8 +24,8 @@ export class VolcengineCompiler implements ProviderCompiler {
 
   private compileImageTask(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    if (!modelConfig.api_url) throw new Error('VolcengineCompiler: api_url is required in api_config.yaml');
-    if (!modelConfig.model) throw new Error('VolcengineCompiler: model is required in api_config.yaml');
+    if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
       model: modelConfig.model,
@@ -71,9 +72,9 @@ export class VolcengineCompiler implements ProviderCompiler {
 
   private compileVideoTask(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
-    if (!modelConfig.api_url) throw new Error('VolcengineCompiler: api_url is required in api_config.yaml');
-    if (!modelConfig.api_status_url) throw new Error('VolcengineCompiler: api_status_url is required in api_config.yaml');
-    if (!modelConfig.model) throw new Error('VolcengineCompiler: model is required in api_config.yaml');
+    if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: model is required in api_config.yaml');
 
     const payload: Record<string, any> = {
       model: modelConfig.model,

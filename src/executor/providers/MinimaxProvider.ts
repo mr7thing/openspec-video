@@ -21,6 +21,8 @@ import {
   sleep,
 } from '../polling';
 
+import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
+
 export class MinimaxProvider {
   name = 'minimax';
 
@@ -100,7 +102,7 @@ export class MinimaxProvider {
       response.data?.url;
 
     if (!imageUrl) {
-      throw new Error(`No image URL in response: ${JSON.stringify(response.data)}`);
+      throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(response.data)}`);
     }
 
     const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'png'), 'png');
@@ -130,7 +132,7 @@ export class MinimaxProvider {
 
       taskId = submitRes.data?.task_id || submitRes.data?.data?.task_id;
       if (!taskId) {
-        throw new Error(`No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
       }
 
       appendLog(taskPath, { event: 'submitted', task_id: taskId });
@@ -144,7 +146,7 @@ export class MinimaxProvider {
     while (true) {
       const elapsed = getElapsedMs(taskPath);
       if (elapsed > maxDuration) {
-        throw new Error(`Polling timeout for ${taskId} (4h exceeded)`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${taskId} (4h exceeded)`);
       }
 
       const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
@@ -158,7 +160,7 @@ export class MinimaxProvider {
 
       if (status === 'Success' || status === 'succeeded') {
         const videoUrl = statusRes.data?.data?.video_url || statusRes.data?.file_url;
-        if (!videoUrl) throw new Error('Completed but no video_url found');
+        if (!videoUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no video_url found');
 
         const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
         await downloadFile(videoUrl, outputPath);
@@ -170,7 +172,7 @@ export class MinimaxProvider {
       if (status === 'Fail' || status === 'failed') {
         const reason = JSON.stringify(statusRes.data);
         appendLog(taskPath, { event: 'failed', task_id: taskId, error: reason });
-        throw new Error(`Video generation failed: ${reason}`);
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Video generation failed: ${reason}`);
       }
 
       appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: taskId });

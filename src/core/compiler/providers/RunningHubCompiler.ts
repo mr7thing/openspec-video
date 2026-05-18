@@ -6,6 +6,7 @@
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { TaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
+import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 export class RunningHubCompiler implements ProviderCompiler {
   readonly provider = 'runninghub';
@@ -13,13 +14,13 @@ export class RunningHubCompiler implements ProviderCompiler {
   compile(ctx: CompileContext): TaskJson {
     const { job, modelConfig } = ctx;
 
-    if (!modelConfig.api_url) throw new Error('RunningHubCompiler: api_url is required in api_config.yaml');
-    if (!modelConfig.api_status_url) throw new Error('RunningHubCompiler: api_status_url is required in api_config.yaml');
+    if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'RunningHubCompiler: api_url is required in api_config.yaml');
+    if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'RunningHubCompiler: api_status_url is required in api_config.yaml');
 
     // workflowId 来源：frontmatter.workflow_id > api_config.workflowId
     const workflowId = ctx.workflowPath || modelConfig.workflowId;
     if (!workflowId) {
-      throw new Error(
+      throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND,
         'RunningHubCompiler: workflowId is required. ' +
         'Set it in frontmatter (workflow: "...") or in api_config.yaml (workflowId: "...").'
       );
@@ -29,7 +30,7 @@ export class RunningHubCompiler implements ProviderCompiler {
     const mappings = ctx.nodeMapping || modelConfig.node_mappings || {};
 
     if (Object.keys(mappings).length === 0) {
-      throw new Error(
+      throw new CompilationError(OpsVErrorCode.COMPILATION_NODE_MAPPING_MISSING,
         'RunningHubCompiler: node_mapping is required. ' +
         'Set it in frontmatter (node_mapping: { ... }) or in api_config.yaml (node_mappings: { ... }). ' +
         'Use "opsv comfy-node-mapping <workflow.json>" to generate it.'

@@ -13,6 +13,7 @@ import { Job } from '../types/Job';
 import { resolveProjectRoot } from '../utils/projectResolver';
 import { getProjectDir } from '../utils/configLoader';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
+import { CompilationError, OpsVErrorCode } from '../errors/OpsVError';
 
 export interface ProduceCommandOptions {
   model: string;
@@ -74,7 +75,7 @@ export function filterAssets(
   if (file) {
     filtered = filtered.filter((a) => a.id === file);
     if (filtered.length === 0) {
-      throw new Error(`Asset "${file}" not found in manifest`);
+      throw new CompilationError(OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND, `Asset "${file}" not found in manifest`);
     }
   }
 

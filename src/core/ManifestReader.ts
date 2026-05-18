@@ -9,6 +9,7 @@ import { CircleManifestSchema, CircleManifest, ManifestInfo } from '../types/Man
 import { getProjectDir } from '../utils/configLoader';
 import { resolveWithin, sanitizePathComponent } from '../utils/pathSecurity';
 import { logger } from '../utils/logger';
+import { CompilationError, OpsVErrorCode } from '../errors/OpsVError';
 
 export class ManifestReader {
   private cache: Map<string, CircleManifest> = new Map();
@@ -112,7 +113,7 @@ export class ManifestReader {
         ? path.join(manifestOption, '_manifest.json')
         : manifestOption;
       if (!fs.existsSync(manifestPath)) {
-        throw new Error(`Manifest not found: ${manifestPath}`);
+        throw new CompilationError(OpsVErrorCode.INFRA_FILE_NOT_FOUND, `Manifest not found: ${manifestPath}`);
       }
       return manifestPath;
     }
@@ -129,8 +130,6 @@ export class ManifestReader {
       return parentManifest;
     }
 
-    throw new Error(
-      `No _manifest.json found. Run inside a circle directory or use --manifest <path>.`
-    );
+    throw new CompilationError(OpsVErrorCode.INFRA_FILE_NOT_FOUND, `No _manifest.json found. Run inside a circle directory or use --manifest <path>.`);
   }
 }

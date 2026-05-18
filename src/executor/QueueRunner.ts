@@ -12,7 +12,7 @@ import { VolcengineProvider } from './providers/VolcengineProvider';
 import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
 import { MinimaxProvider } from './providers/MinimaxProvider';
 import { RunningHubProvider } from './providers/RunningHubProvider';
-import { ComfyUILocalProvider } from './providers/ComfyUILocalProvider';
+import { ComfyLocalProvider } from './providers/ComfyLocalProvider';
 import { WebappProvider } from './providers/WebappProvider';
 import { isTaskCompleted, getResumeTaskId } from './polling';
 import { ConfigLoader } from '../utils/configLoader';
@@ -41,7 +41,7 @@ export class QueueRunner {
     this.providers.set('siliconflow', new SiliconFlowProvider());
     this.providers.set('minimax', new MinimaxProvider());
     this.providers.set('runninghub', new RunningHubProvider());
-    this.providers.set('comfylocal', new ComfyUILocalProvider());
+    this.providers.set('comfylocal', new ComfyLocalProvider());
     this.providers.set('webapp', new WebappProvider());
   }
 

@@ -17,6 +17,8 @@ import { logger } from '../utils/logger';
 import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
+import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
+
 export function registerImagenCommand(program: Command): void {
   program
     .command('imagen')
@@ -106,7 +108,7 @@ async function buildImageJob(
 ): Promise<Job> {
   const filePath = asset.filePath;
   if (!filePath) {
-    throw new Error(`File path not found for asset: ${asset.id}`);
+    throw new InfrastructureError(OpsVErrorCode.INFRA_FILE_NOT_FOUND, `File path not found for asset: ${asset.id}`);
   }
 
   const content = fs.readFileSync(filePath, 'utf-8');

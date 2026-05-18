@@ -22,6 +22,8 @@ import {
   PollLogEntry,
 } from '../polling';
 
+import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
+
 export class WebappProvider {
   name = 'webapp';
 
@@ -40,10 +42,7 @@ export class WebappProvider {
         const baseUrl = submitUrl.replace(/\/generate$/, '');
         await axios.get(`${baseUrl}/health`, { timeout: modelConfig?.timeout?.health || 5000 });
       } catch {
-        throw new Error(
-          `Webapp extension not running on ${submitUrl.replace(/\/generate$/, '')}. ` +
-          `Start the Chrome extension and its native messaging host.`
-        );
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Webapp extension not running on ${submitUrl.replace(/\/generate$/, '')}. Start the Chrome extension and its native messaging host.`);
       }
 
       // 2. Check for resume from .log
@@ -66,7 +65,7 @@ export class WebappProvider {
 
         taskId = submitRes.data?.task_id;
         if (!taskId) {
-          throw new Error(`No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No task_id in submit response: ${JSON.stringify(submitRes.data)}`);
         }
 
         appendLog(taskPath, { event: 'submitted', task_id: taskId });
@@ -80,7 +79,7 @@ export class WebappProvider {
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
-          throw new Error(`Polling timeout for ${taskId} (8h exceeded)`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${taskId} (8h exceeded)`);
         }
 
         const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
@@ -123,7 +122,7 @@ export class WebappProvider {
                 fs.copyFileSync(expectedPath, outputPath);
               }
             } else {
-              throw new Error('Succeeded but no output data found');
+              throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Succeeded but no output data found');
             }
           }
 
@@ -134,7 +133,7 @@ export class WebappProvider {
         if (status === 'failed') {
           const reason = statusRes.data?.error || 'Unknown error';
           appendLog(taskPath, { event: 'failed', task_id: taskId, error: reason });
-          throw new Error(`Webapp generation failed: ${reason}`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Webapp generation failed: ${reason}`);
         }
 
         appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: taskId });
