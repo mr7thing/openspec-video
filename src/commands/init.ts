@@ -71,7 +71,7 @@ resolution: "1920x1080"
 Describe your project vision here.
 `;
 
-        fs.writeFileSync(path.join(targetDir, 'videospec', 'elements', 'project.md'), projectMd);
+        fs.writeFileSync(path.join(targetDir, 'videospec', 'project.md'), projectMd);
 
         // Copy template files from templates/ directory
         copyTemplateFile(
