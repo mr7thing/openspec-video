@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
-import { TaskJson } from '../../../types/Job';
+import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { CompilationError, ConfigError, InfrastructureError, OpsVErrorCode } from '../../../errors/OpsVError';
 
@@ -22,7 +22,7 @@ interface ComfyUIWorkflow {
 export class ComfyUICompiler implements ProviderCompiler {
   readonly provider = 'comfyui';
 
-  compile(ctx: CompileContext): TaskJson {
+  compile(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig, workflowPath, workflowDir, refCount, projectRoot } = ctx;
 
     // Validate required config
@@ -133,7 +133,7 @@ export class ComfyUICompiler implements ProviderCompiler {
     this.injectByNodeMapping(workflow, parameters, ctx.nodeMapping);
 
     return {
-      ...workflow,
+      payload: workflow,
       _opsv: {
         provider: modelConfig.provider || 'comfyui',
         modelKey: ctx.modelKey,

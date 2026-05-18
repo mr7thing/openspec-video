@@ -5,7 +5,7 @@
 
 import path from 'path';
 
-const ILLEGAL_COMPONENT_RE = /[\/\\]/;
+const ILLEGAL_COMPONENT_RE = /[\/\\\x00]/;
 
 /**
  * Sanitize a single path component (filename or directory name).

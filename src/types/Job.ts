@@ -1,8 +1,8 @@
-import { z } from 'zod';
-
 // ============================================================================
 // OpsV Job Type
 // ============================================================================
+
+import { z } from 'zod';
 
 export type JobType = 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
 
@@ -35,9 +35,9 @@ export interface Job {
   reference_audios?: string[];
   output_path?: string;
   seed?: number;
-  workflow?: string;                            // Deprecated: use workflow_id or workflow_path
-  workflow_id?: string;                          // RunningHub workflowId
-  workflow_path?: string;                        // ComfyUI Local JSON filename
+  workflow?: string;
+  workflow_id?: string;
+  workflow_path?: string;
   node_mapping?: Record<string, { nodeId: string; fieldName: string }>;
   _meta?: JobMeta;
 }
@@ -48,18 +48,23 @@ export interface JobMeta {
   batch?: number;
 }
 
-export interface TaskJson {
-  [key: string]: any;
-  _opsv: {
-    provider: string;
-    modelKey: string;
-    type: JobType;
-    shotId: string;
-    api_url: string;
-    api_status_url?: string;
-    references?: string[];
-    workflowId?: string;
-    workflowFile?: string;
-    compiledAt: string;
-  };
+export interface TaskMeta {
+  provider: string;
+  modelKey: string;
+  type: JobType;
+  shotId: string;
+  api_url: string;
+  api_status_url?: string;
+  references?: string[];
+  workflowId?: string;
+  workflowFile?: string;
+  compiledAt: string;
 }
+
+export interface BaseTaskJson<TPayload = unknown> {
+  payload: TPayload;
+  _opsv: TaskMeta;
+}
+
+// Legacy alias for gradual migration (tests will use BaseTaskJson)
+export type TaskJson = BaseTaskJson<Record<string, unknown>>;

@@ -5,8 +5,8 @@
 
 import path from 'path';
 import fs from 'fs';
-import { Job, TaskJson } from '../../types/Job';
-import { ModelConfig, ConfigLoader } from '../../utils/configLoader';
+import { Job, BaseTaskJson } from '../../types/Job';
+import { ModelConfig } from '../../utils/configLoader';
 import { FileUtils } from '../../utils/FileUtils';
 import { ProviderCompiler, CompileContext } from './ProviderCompiler';
 import { VolcengineCompiler } from './providers/VolcengineCompiler';
@@ -16,34 +16,24 @@ import { RunningHubCompiler } from './providers/RunningHubCompiler';
 import { ComfyUICompiler } from './providers/ComfyUICompiler';
 import { WebappCompiler } from './providers/WebappCompiler';
 import { logger } from '../../utils/logger';
-
 import { CompilationError, ConfigError, OpsVErrorCode } from '../../errors/OpsVError';
+import { Container } from '../../container/Container';
+import { OpsVContext } from '../../container/OpsVContext';
 
-const COMPILERS: Record<string, ProviderCompiler> = {
-  volcengine: new VolcengineCompiler(),
-  siliconflow: new SiliconFlowCompiler(),
-  minimax: new MinimaxCompiler(),
-  runninghub: new RunningHubCompiler(),
-  comfylocal: new ComfyUICompiler(),
-  webapp: new WebappCompiler(),
+const COMPILERS: Record<string, new () => ProviderCompiler> = {
+  volcengine: VolcengineCompiler,
+  siliconflow: SiliconFlowCompiler,
+  minimax: MinimaxCompiler,
+  runninghub: RunningHubCompiler,
+  comfylocal: ComfyUICompiler,
+  webapp: WebappCompiler,
 };
 
-function getCompiler(provider: string): ProviderCompiler {
-  const compiler = COMPILERS[provider];
-  if (!compiler) {
-    throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Unknown provider: ${provider}. Available: ${Object.keys(COMPILERS).join(', ')}`);
-  }
-  return compiler;
-}
-
 export class TaskBuilder {
-  private configLoader: ConfigLoader;
-  private projectRoot: string;
+  private ctx: OpsVContext;
 
-  constructor(projectRoot: string) {
-    this.configLoader = ConfigLoader.getInstance();
-    this.configLoader.loadConfig(projectRoot);
-    this.projectRoot = projectRoot;
+  constructor(ctx: OpsVContext) {
+    this.ctx = ctx;
   }
 
   async compileToDir(
@@ -54,16 +44,16 @@ export class TaskBuilder {
     workflowPath?: string,
     workflowDir?: string,
     forceApiMapping?: boolean
-  ): Promise<TaskJson[]> {
-    const modelConfig = this.configLoader.getModelConfig(modelKey);
+  ): Promise<BaseTaskJson<unknown>[]> {
+    const modelConfig = this.ctx.configLoader.getModelConfig(modelKey);
     if (!modelConfig) {
       throw new ConfigError(OpsVErrorCode.CONFIG_INVALID_MODEL, `Model '${modelKey}' not found in api_config.yaml`);
     }
 
-    const apiKey = this.configLoader.getResolvedApiKey(modelKey);
-    const compiler = getCompiler(modelConfig.provider);
+    const apiKey = this.ctx.configLoader.getResolvedApiKey(modelKey);
+    const compiler = this.resolveCompiler(modelConfig.provider);
 
-    const results: TaskJson[] = [];
+    const results: BaseTaskJson<unknown>[] = [];
 
     for (const job of jobs) {
       const ctx: CompileContext = {
@@ -72,7 +62,7 @@ export class TaskBuilder {
         modelConfig,
         apiKey,
         outputDir,
-        projectRoot: this.projectRoot,
+        projectRoot: this.ctx.projectRoot,
         workflowPath: workflowPath || job.workflow_path || job.workflow_id || job.workflow,
         forceApiMapping,
         workflowDir,
@@ -98,8 +88,12 @@ export class TaskBuilder {
     return results;
   }
 
-  static getCompiler(provider: string): ProviderCompiler {
-    return getCompiler(provider);
+  private resolveCompiler(provider: string): ProviderCompiler {
+    const ctor = COMPILERS[provider];
+    if (!ctor) {
+      throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Unknown provider: ${provider}. Available: ${Object.keys(COMPILERS).join(', ')}`);
+    }
+    return new ctor();
   }
 
   static parseModelKey(modelKey: string): { provider: string; model: string } {

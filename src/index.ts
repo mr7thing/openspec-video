@@ -5,11 +5,15 @@
 // Types
 export { AssetCategoryEnum, StatusEnum, BaseFrontmatterSchema, ProjectFrontmatterSchema, ShotDesignFrontmatterSchema, ShotProductionFrontmatterSchema } from './types/FrontmatterSchema';
 export type { AssetCategory, Status, BaseFrontmatter, ProjectFrontmatter, ShotDesignFrontmatter, ShotProductionFrontmatter } from './types/FrontmatterSchema';
-export type { JobType, FrameRef, VideoSettings, PromptPayload, Job, JobMeta, TaskJson } from './types/Job';
+export type { JobType, FrameRef, VideoSettings, PromptPayload, Job, JobMeta, TaskMeta, BaseTaskJson, TaskJson } from './types/Job';
 
 // Errors
 export { OpsVErrorCode, OpsVError, AssetError, ConfigError, CompilationError, ExecutionError, ValidationError, SchedulingError, ErrorFactory } from './errors/OpsVError';
 export type { ErrorContext } from './errors/OpsVError';
+
+// Container
+export { Container, ProviderExecutor } from './container/Container';
+export { OpsVContext } from './container/OpsVContext';
 
 // Utils
 export { logger, initializeLogger, setLogLevel, LogLevel } from './utils/logger';

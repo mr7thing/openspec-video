@@ -2,7 +2,7 @@
 // OpsV Provider Compiler Interface
 // ============================================================================
 
-import { Job, TaskJson } from '../../types/Job';
+import { Job, BaseTaskJson } from '../../types/Job';
 import { ModelConfig } from '../../utils/configLoader';
 
 export interface CompileContext {
@@ -24,6 +24,5 @@ export interface CompileContext {
 
 export interface ProviderCompiler {
   readonly provider: string;
-
-  compile(ctx: CompileContext): TaskJson;
+  compile(ctx: CompileContext): BaseTaskJson<unknown>;
 }

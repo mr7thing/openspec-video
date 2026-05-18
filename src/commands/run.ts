@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { QueueRunner } from '../executor/QueueRunner';
 import { logger } from '../utils/logger';
+import { container, ctx } from '../cli';
 
 export function registerRunCommand(program: Command): void {
   program
@@ -16,7 +17,7 @@ export function registerRunCommand(program: Command): void {
     .option('-c, --concurrency <number>', 'Max concurrent tasks per provider (overrides api_config)', (v) => parseInt(v, 10))
     .action(async (paths: string[], options: any) => {
       try {
-        const runner = new QueueRunner();
+        const runner = new QueueRunner(container, ctx);
         const results = await runner.runPaths(paths, {
           retry: options.retry || false,
           dryRun: options.dryRun || false,

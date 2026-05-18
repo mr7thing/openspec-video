@@ -7,6 +7,8 @@ import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
 import dotenv from 'dotenv';
+import { Container } from './container/Container';
+import { OpsVContext } from './container/OpsVContext';
 import { registerInitCommand } from './commands/init';
 import { registerValidateCommand } from './commands/validate';
 import { registerCircleCommands } from './commands/circle';
@@ -36,7 +38,7 @@ if (fs.existsSync(rootEnvPath)) {
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../package.json');
-let VERSION = '0.8.1';
+let VERSION = '0.9.0';
 try {
   if (fs.existsSync(pkgPath)) {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -45,6 +47,25 @@ try {
 } catch {
   // fallback to default version
 }
+
+// Bootstrap Context and Container
+export const ctx = OpsVContext.create(process.cwd());
+export const container = new Container();
+
+// Register executor providers
+import { VolcengineProvider } from './executor/providers/VolcengineProvider';
+import { SiliconFlowProvider } from './executor/providers/SiliconFlowProvider';
+import { MinimaxProvider } from './executor/providers/MinimaxProvider';
+import { RunningHubProvider } from './executor/providers/RunningHubProvider';
+import { ComfyLocalProvider } from './executor/providers/ComfyLocalProvider';
+import { WebappProvider } from './executor/providers/WebappProvider';
+
+container.registerExecutor('volcengine', VolcengineProvider);
+container.registerExecutor('siliconflow', SiliconFlowProvider);
+container.registerExecutor('minimax', MinimaxProvider);
+container.registerExecutor('runninghub', RunningHubProvider);
+container.registerExecutor('comfylocal', ComfyLocalProvider);
+container.registerExecutor('webapp', WebappProvider);
 
 const program = new Command();
 program

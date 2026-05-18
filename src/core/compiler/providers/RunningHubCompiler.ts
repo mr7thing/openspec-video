@@ -4,14 +4,14 @@
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
-import { TaskJson } from '../../../types/Job';
+import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 export class RunningHubCompiler implements ProviderCompiler {
   readonly provider = 'runninghub';
 
-  compile(ctx: CompileContext): TaskJson {
+  compile(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
 
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'RunningHubCompiler: api_url is required in api_config.yaml');
@@ -113,7 +113,7 @@ export class RunningHubCompiler implements ProviderCompiler {
     }
 
     return {
-      ...payload,
+      payload,
       _opsv: {
         provider: modelConfig.provider || 'runninghub',
         modelKey: ctx.modelKey,

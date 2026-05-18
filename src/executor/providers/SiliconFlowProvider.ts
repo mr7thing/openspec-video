@@ -1,198 +1,58 @@
 // ============================================================================
 // OpsV SiliconFlow Executor Provider
-// Handles: wan (video), qwenimg (image)
 // ============================================================================
 
-import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import { readFile } from 'fs/promises';
-import { TaskJson } from '../../types/Job';
-import { ProviderResult } from '../QueueRunner';
-import { outputFilePath, resolveNextOutputIndex } from '../naming';
-import { ConfigLoader } from '../../utils/configLoader';
-import { downloadFile } from '../../utils/download';
-import { logger } from '../../utils/logger';
-import { resolveProjectRoot } from '../../utils/projectResolver';
-import {
-  appendLog,
-  getResumeTaskId,
-  getPollIntervalMs,
-  getElapsedMs,
-  sleep,
-} from '../polling';
+import { BaseTaskJson } from '../../types/Job';
+import { BaseApiProvider } from './BaseApiProvider';
 
-import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
+interface SfSubmitResponse {
+  id?: string;
+  data?: { id?: string; task_id?: string };
+  task_id?: string;
+}
 
-export class SiliconFlowProvider {
-  name = 'siliconflow';
+interface SfStatusResponse {
+  status?: string;
+  data?: { status?: string; video_url?: string; image_url?: string; url?: string };
+  error?: { message?: string };
+}
 
-  async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
-    const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
+export class SiliconFlowProvider extends BaseApiProvider<Record<string, unknown>, SfSubmitResponse, SfStatusResponse> {
+  readonly name = 'siliconflow';
 
-    const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
-    let apiKey: string;
-    try {
-      apiKey = configLoader.getResolvedApiKey(task._opsv.modelKey);
-    } catch {
-      apiKey = process.env.SILICONFLOW_API_KEY || '';
-    }
-
-    const isImage = task._opsv.type === 'imagen';
-
-    try {
-      if (isImage) {
-        return await this.executeImage(task, taskPath, apiKey, modelConfig);
-      }
-      return await this.executeVideo(task, taskPath, apiKey, modelConfig);
-    } catch (err: any) {
-      return {
-        taskPath,
-        shotId: task._opsv.shotId,
-        provider: 'siliconflow',
-        success: false,
-        error: err.message,
-      };
-    }
+  protected buildPayload(task: BaseTaskJson<Record<string, unknown>>): unknown {
+    return { ...task.payload };
   }
 
-  private async executeImage(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
-    const apiUrl = task._opsv.api_url;
-    const shotId = task._opsv.shotId;
-
-    const payload = { ...task };
-    delete (payload as any)._opsv;
-
-    // Convert local reference image paths to base64 data URIs
-    if (Array.isArray(payload.reference_images)) {
-      payload.reference_images = await Promise.all(
-        payload.reference_images.map((url: string) => this.resolveImageField(url))
-      );
-    }
-
-    const response = await axios.post(apiUrl, payload, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: modelConfig?.timeout?.submit || 120000,
-    });
-
-    const imageUrl =
-      response.data?.images?.[0]?.url ||
-      response.data?.data?.[0]?.url ||
-      response.data?.url;
-
-    if (!imageUrl) {
-      throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(response.data)}`);
-    }
-
-    const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'png'), 'png');
-    await downloadFile(imageUrl, outputPath);
-
-    return { taskPath, shotId, provider: 'siliconflow', success: true, outputPath };
+  protected parseTaskId(res: SfSubmitResponse): string | undefined {
+    return res.id || res.data?.id || res.data?.task_id || res.task_id;
   }
 
-  private async resolveImageField(value: string): Promise<string> {
-    if (!value) return value;
-    if (value.startsWith('http') || value.startsWith('data:')) return value;
-    // Local file path — convert to base64 data URI
-    const data = await readFile(value);
-    const ext = path.extname(value).slice(1) || 'png';
-    const mimeMap: Record<string, string> = {
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      jfif: 'image/jpeg',
-      png: 'image/png',
-      webp: 'image/webp',
-      bmp: 'image/bmp',
-      gif: 'image/gif',
-    };
-    const mime = mimeMap[ext.toLowerCase()] || `image/${ext}`;
-    return `data:${mime};base64,${data.toString('base64')}`;
+  protected buildStatusUrl(apiUrl: string, taskId: string): string {
+    return `${apiUrl}/${taskId}`;
   }
 
-  private async executeVideo(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
-    const submitUrl = task._opsv.api_url;
-    const statusUrl = task._opsv.api_status_url;
-    const shotId = task._opsv.shotId;
+  protected isComplete(res: SfStatusResponse): boolean {
+    const status = res.status || res.data?.status;
+    return status === 'succeeded' || status === 'completed' || status === 'success';
+  }
 
-    let requestId = getResumeTaskId(taskPath);
+  protected isFailed(res: SfStatusResponse): boolean {
+    const status = res.status || res.data?.status;
+    return status === 'failed' || status === 'error';
+  }
 
-    if (!requestId) {
-      const payload = { ...task };
-      delete (payload as any)._opsv;
+  protected extractError(res: SfStatusResponse): string {
+    return res.error?.message || res.data?.status || 'Unknown error';
+  }
 
-      // Convert local image paths to base64 data URIs for API submission
-      if (payload.image) {
-        payload.image = await this.resolveImageField(payload.image);
-      }
-      if (payload.tail_image) {
-        payload.tail_image = await this.resolveImageField(payload.tail_image);
-      }
+  protected extractOutputUrls(res: SfStatusResponse): string[] {
+    const d = res.data;
+    const url = d?.video_url || d?.image_url || d?.url;
+    return url ? [url] : [];
+  }
 
-      const submitRes = await axios.post(submitUrl, payload, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: modelConfig?.timeout?.submit || 120000,
-      });
-
-      requestId = submitRes.data?.requestId || submitRes.data?.data?.requestId;
-      if (!requestId) {
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
-      }
-
-      appendLog(taskPath, { event: 'submitted', task_id: requestId });
-      logger.info(`[SiliconFlow] Submitted ${shotId}, requestId=${requestId}`);
-    } else {
-      logger.info(`[SiliconFlow] Resuming ${shotId}, requestId=${requestId}`);
-    }
-
-    // Gradient polling
-    const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
-    while (true) {
-      const elapsed = getElapsedMs(taskPath);
-      if (elapsed > maxDuration) {
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${requestId} (4h exceeded)`);
-      }
-
-      const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
-      await sleep(interval);
-
-      const statusRes = await axios.post(
-        statusUrl!,
-        { requestId },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const status = statusRes.data?.status || statusRes.data?.data?.status;
-
-      if (status === 'Succeed' || status === 'succeeded') {
-        const videoUrl = statusRes.data?.results?.videos?.[0]?.url || statusRes.data?.data?.video_url;
-        if (!videoUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no video_url found');
-
-        const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
-        await downloadFile(videoUrl, outputPath);
-
-        appendLog(taskPath, { event: 'succeeded', task_id: requestId });
-        return { taskPath, shotId, provider: 'siliconflow', success: true, outputPath };
-      }
-
-      if (status === 'Failed' || status === 'failed') {
-        const reason = JSON.stringify(statusRes.data);
-        appendLog(taskPath, { event: 'failed', task_id: requestId, error: reason });
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Video generation failed: ${reason}`);
-      }
-
-      appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: requestId });
-    }
+  protected getOutputExtension(): string {
+    return 'mp4';
   }
 }

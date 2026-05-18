@@ -21,6 +21,8 @@ npm-debug.log*
 # audit/ fix note
 docs/audit
 
+.reports/*
+coverage/*
 
 # key
 

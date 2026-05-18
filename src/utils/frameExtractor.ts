@@ -6,7 +6,7 @@ import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
-import { OpsVErrorCode } from '../errors/OpsVError';
+import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 
 const execPromise = util.promisify(exec);
 
@@ -23,7 +23,8 @@ export class FrameExtractor {
       await execPromise(cmd);
       return outputPath;
     } catch (error: any) {
-      throw new Error(
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_FILE_NOT_FOUND,
         `Frame extraction failed: ${error.message}. Ensure ffmpeg is installed and in PATH.`
       );
     }
@@ -41,7 +42,8 @@ export class FrameExtractor {
       await execPromise(cmd);
       return outputPath;
     } catch (error: any) {
-      throw new Error(
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_FILE_NOT_FOUND,
         `Frame extraction failed: ${error.message}. Ensure ffmpeg is installed and in PATH.`
       );
     }

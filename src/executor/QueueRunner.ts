@@ -6,17 +6,11 @@
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
-import { TaskJson } from '../types/Job';
+import { BaseTaskJson } from '../types/Job';
 import { logger } from '../utils/logger';
-import { VolcengineProvider } from './providers/VolcengineProvider';
-import { SiliconFlowProvider } from './providers/SiliconFlowProvider';
-import { MinimaxProvider } from './providers/MinimaxProvider';
-import { RunningHubProvider } from './providers/RunningHubProvider';
-import { ComfyLocalProvider } from './providers/ComfyLocalProvider';
-import { WebappProvider } from './providers/WebappProvider';
 import { isTaskCompleted, getResumeTaskId } from './polling';
-import { ConfigLoader } from '../utils/configLoader';
-import { resolveProjectRoot } from '../utils/projectResolver';
+import { Container, ProviderExecutor } from '../container/Container';
+import { OpsVContext } from '../container/OpsVContext';
 
 export interface ProviderResult {
   taskPath: string;
@@ -28,24 +22,19 @@ export interface ProviderResult {
   error?: string;
 }
 
-interface ProviderHandler {
-  name: string;
-  execute(task: TaskJson, taskPath: string): Promise<ProviderResult>;
-}
-
 export class QueueRunner {
-  private providers: Map<string, ProviderHandler> = new Map();
+  private container: Container;
+  private ctx: OpsVContext;
 
-  constructor() {
-    this.providers.set('volcengine', new VolcengineProvider());
-    this.providers.set('siliconflow', new SiliconFlowProvider());
-    this.providers.set('minimax', new MinimaxProvider());
-    this.providers.set('runninghub', new RunningHubProvider());
-    this.providers.set('comfylocal', new ComfyLocalProvider());
-    this.providers.set('webapp', new WebappProvider());
+  constructor(container: Container, ctx: OpsVContext) {
+    this.container = container;
+    this.ctx = ctx;
   }
 
-  async runPaths(paths: string[], options: { retry?: boolean; dryRun?: boolean; concurrency?: number } = {}): Promise<ProviderResult[]> {
+  async runPaths(
+    paths: string[],
+    options: { retry?: boolean; dryRun?: boolean; concurrency?: number } = {}
+  ): Promise<ProviderResult[]> {
     const tasks = this.collectTasks(paths, options.retry);
 
     if (tasks.length === 0) {
@@ -66,7 +55,7 @@ export class QueueRunner {
     }
 
     // Group by provider for parallel-across, serial-within execution
-    const byProvider = new Map<string, Array<{ task: TaskJson; path: string }>>();
+    const byProvider = new Map<string, Array<{ task: BaseTaskJson<unknown>; path: string }>>();
     for (const entry of tasks) {
       const provider = entry.task._opsv.provider;
       if (!byProvider.has(provider)) byProvider.set(provider, []);
@@ -77,34 +66,43 @@ export class QueueRunner {
 
     const results: ProviderResult[] = [];
 
-    // Pre-load config for concurrency lookups
-    const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
-
-    // Run providers in parallel
-    const providerPromises = Array.from(byProvider.entries()).map(
-      async ([provider, entries]) => {
-        // Determine concurrency: CLI flag > model config > default 1
-        let concurrency = options.concurrency ?? 1;
-        if (!options.concurrency && entries.length > 0) {
-          const firstTask = entries[0].task;
-          const modelConfig = configLoader.getModelConfig(firstTask._opsv.modelKey);
-          if (modelConfig?.concurrency && modelConfig.concurrency > 1) {
-            concurrency = modelConfig.concurrency;
-          }
+    const providerPromises = Array.from(byProvider.entries()).map(async ([providerName, entries]) => {
+      let handler: ProviderExecutor;
+      try {
+        handler = this.container.resolveExecutor(providerName);
+      } catch (err: any) {
+        for (const { task, path: taskPath } of entries) {
+          results.push({
+            taskPath,
+            shotId: task._opsv.shotId,
+            provider: providerName,
+            success: false,
+            error: err.message,
+          });
         }
+        return;
+      }
 
-        if (concurrency > 1) {
-          console.log(chalk.cyan(`\n[${provider}] Running ${entries.length} tasks with concurrency ${concurrency}...`));
-          await this.runWithConcurrency(entries, concurrency, provider, results);
-        } else {
-          console.log(chalk.cyan(`\n[${provider}] Running ${entries.length} tasks sequentially...`));
-          for (const { task, path: taskPath } of entries) {
-            await this.runTask(task, taskPath, provider, results);
-          }
+      // Determine concurrency: CLI flag > model config > default 1
+      let concurrency = options.concurrency ?? 1;
+      if (!options.concurrency && entries.length > 0) {
+        const firstTask = entries[0].task;
+        const modelConfig = this.ctx.configLoader.getModelConfig(firstTask._opsv.modelKey);
+        if (modelConfig?.concurrency && modelConfig.concurrency > 1) {
+          concurrency = modelConfig.concurrency;
         }
       }
-    );
+
+      if (concurrency > 1) {
+        console.log(chalk.cyan(`\n[${providerName}] Running ${entries.length} tasks with concurrency ${concurrency}...`));
+        await this.runWithConcurrency(entries, concurrency, handler, results);
+      } else {
+        console.log(chalk.cyan(`\n[${providerName}] Running ${entries.length} tasks sequentially...`));
+        for (const { task, path: taskPath } of entries) {
+          await this.runTask(task, taskPath, handler, results);
+        }
+      }
+    });
 
     await Promise.all(providerPromises);
 
@@ -116,66 +114,52 @@ export class QueueRunner {
   }
 
   private async runTask(
-    task: TaskJson,
+    task: BaseTaskJson<unknown>,
     taskPath: string,
-    provider: string,
+    handler: ProviderExecutor,
     results: ProviderResult[]
   ): Promise<void> {
-    const handler = this.providers.get(provider);
-    if (!handler) {
-      results.push({
-        taskPath,
-        shotId: task._opsv.shotId,
-        provider,
-        success: false,
-        error: `Unknown provider: ${provider}`,
-      });
-      return;
-    }
-
     try {
-      console.log(chalk.cyan(`  [${provider}] Running ${task._opsv.shotId}...`));
-      const result = await handler.execute(task, taskPath);
+      console.log(chalk.cyan(`  [${handler.name}] Running ${task._opsv.shotId}...`));
+      const result = await handler.execute(task, taskPath, this.ctx);
       results.push(result);
 
       if (result.success) {
-        console.log(chalk.green(`  [${provider}] ${task._opsv.shotId} ✓`));
-        // Remove error log on success
+        console.log(chalk.green(`  [${handler.name}] ${task._opsv.shotId} ✓`));
         const errorLog = taskPath.replace(/\.json$/, '_error.log');
         if (fs.existsSync(errorLog)) {
           fs.unlinkSync(errorLog);
         }
       } else {
-        console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${result.error}`));
-        // Write error log for retry support
+        console.log(chalk.red(`  [${handler.name}] ${task._opsv.shotId} ✗: ${result.error}`));
         const errorLog = taskPath.replace(/\.json$/, '_error.log');
         fs.writeFileSync(errorLog, JSON.stringify({ error: result.error, timestamp: new Date().toISOString() }));
       }
     } catch (err: any) {
-      results.push({
+      const result: ProviderResult = {
         taskPath,
         shotId: task._opsv.shotId,
-        provider,
+        provider: handler.name,
         success: false,
         error: err.message,
-      });
-      console.log(chalk.red(`  [${provider}] ${task._opsv.shotId} ✗: ${err.message}`));
-      // Write error log for retry support
+      };
+      results.push(result);
+      console.log(chalk.red(`  [${handler.name}] ${task._opsv.shotId} ✗: ${err.message}`));
       const errorLog = taskPath.replace(/\.json$/, '_error.log');
       fs.writeFileSync(errorLog, JSON.stringify({ error: err.message, timestamp: new Date().toISOString() }));
     }
   }
 
   private async runWithConcurrency(
-    entries: Array<{ task: TaskJson; path: string }>,
+    entries: Array<{ task: BaseTaskJson<unknown>; path: string }>,
     concurrency: number,
-    provider: string,
+    handler: ProviderExecutor,
     results: ProviderResult[]
   ): Promise<void> {
     const executing = new Set<Promise<void>>();
 
     for (const { task, path: taskPath } of entries) {
-      const promise = this.runTask(task, taskPath, provider, results).finally(() => {
+      const promise = this.runTask(task, taskPath, handler, results).finally(() => {
         executing.delete(promise);
       });
       executing.add(promise);
@@ -188,8 +172,11 @@ export class QueueRunner {
     await Promise.all(executing);
   }
 
-  private collectTasks(paths: string[], retry?: boolean): Array<{ task: TaskJson; path: string }> {
-    const results: Array<{ task: TaskJson; path: string }> = [];
+  private collectTasks(
+    paths: string[],
+    retry?: boolean
+  ): Array<{ task: BaseTaskJson<unknown>; path: string }> {
+    const results: Array<{ task: BaseTaskJson<unknown>; path: string }> = [];
 
     for (const p of paths) {
       const resolved = path.resolve(p);
@@ -220,11 +207,13 @@ export class QueueRunner {
     return results;
   }
 
-  private collectFromDir(dir: string, results: Array<{ task: TaskJson; path: string }>, retry?: boolean): void {
+  private collectFromDir(
+    dir: string,
+    results: Array<{ task: BaseTaskJson<unknown>; path: string }>,
+    retry?: boolean
+  ): void {
     const entries = fs.readdirSync(dir);
-    const outputFiles = new Set(
-      entries.filter((e) => !e.endsWith('.json') && !e.endsWith('.log') && !e.startsWith('_'))
-    );
+    const outputFiles = new Set(entries.filter((e) => !e.endsWith('.json') && !e.endsWith('.log') && !e.startsWith('_')));
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry);
@@ -236,7 +225,6 @@ export class QueueRunner {
         try {
           const task = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
           if (task._opsv) {
-            // When retry=true, include tasks with _error.log even if output exists
             if (retry) {
               const base = entry.replace(/\.json$/, '');
               const errorLog = path.join(dir, `${base}_error.log`);
@@ -246,7 +234,6 @@ export class QueueRunner {
               continue;
             }
 
-            // Skip only if manifest says approved; otherwise re-run even if output exists
             const base = entry.replace(/\.json$/, '');
             const hasOutput = Array.from(outputFiles).some((f) => f.startsWith(base + '_'));
             if (hasOutput && !getResumeTaskId(fullPath) && this.shouldSkipTask(fullPath, task, dir)) {
@@ -261,11 +248,7 @@ export class QueueRunner {
     }
   }
 
-  /**
-   * Determine if a task should be skipped based on manifest status.
-   * Returns true only if the manifest exists and the asset status is 'approved'.
-   */
-  private shouldSkipTask(taskPath: string, task: TaskJson, startDir: string): boolean {
+  private shouldSkipTask(taskPath: string, task: BaseTaskJson<unknown>, startDir: string): boolean {
     const manifestAssets = this.findManifestAssets(startDir);
     if (!manifestAssets) return false;
     const shotId = task._opsv?.shotId;
@@ -273,9 +256,6 @@ export class QueueRunner {
     return manifestAssets[shotId]?.status === 'approved';
   }
 
-  /**
-   * Walk up from startDir looking for _manifest.json and return its assets map.
-   */
   private findManifestAssets(startDir: string): Record<string, { status: string }> | null {
     let current = startDir;
     while (current !== path.dirname(current)) {

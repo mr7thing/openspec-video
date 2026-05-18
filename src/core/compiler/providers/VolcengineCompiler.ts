@@ -4,14 +4,14 @@
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
-import { TaskJson } from '../../../types/Job';
+import { BaseTaskJson } from '../../../types/Job';
 import { ModelConfig } from '../../../utils/configLoader';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 export class VolcengineCompiler implements ProviderCompiler {
   readonly provider = 'volcengine';
 
-  compile(ctx: CompileContext): TaskJson {
+  compile(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig, apiKey } = ctx;
     const isImage = modelConfig.type === 'imagen';
 
@@ -22,7 +22,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     return this.compileVideoTask(ctx);
   }
 
-  private compileImageTask(ctx: CompileContext): TaskJson {
+  private compileImageTask(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: model is required in api_config.yaml');
@@ -57,7 +57,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     }
 
     return {
-      ...payload,
+      payload,
       _opsv: {
         provider: modelConfig.provider || 'volcengine',
         modelKey: ctx.modelKey,
@@ -70,7 +70,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     };
   }
 
-  private compileVideoTask(ctx: CompileContext): TaskJson {
+  private compileVideoTask(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_status_url is required in api_config.yaml');
@@ -137,7 +137,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     }
 
     return {
-      ...payload,
+      payload,
       _opsv: {
         provider: modelConfig.provider || 'volcengine',
         modelKey: ctx.modelKey,

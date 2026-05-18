@@ -7,17 +7,14 @@
 import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
-import http from 'http';
 import chalk from 'chalk';
-import express from 'express';
 import { execSync } from 'child_process';
 import { ManifestReader } from '../core/ManifestReader';
 import { ManifestReviewStrategy, GlobalReviewStrategy } from '../core/ReviewStrategy';
-import { ApproveService } from '../core/ApproveService';
 import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
-import { resolveWithin } from '../utils/pathSecurity';
+import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
 
 function autoCommitPendingChanges(projectRoot: string): void {
   try {
@@ -32,38 +29,6 @@ function autoCommitPendingChanges(projectRoot: string): void {
       // May fail if git not initialized or nothing to commit
     }
   }
-}
-
-function setupTtlShutdown(server: http.Server, ttl: number): void {
-  if (ttl <= 0) return;
-  let idleTimer: NodeJS.Timeout;
-
-  const resetTimer = () => {
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      console.log(chalk.yellow(`Idle for ${ttl}s, shutting down...`));
-      server.close();
-      process.exit(0);
-    }, ttl * 1000);
-  };
-
-  resetTimer();
-  server.on('request', resetTimer);
-}
-
-function getMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm',
-    '.json': 'application/json',
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
 }
 
 export function registerReviewCommand(program: Command): void {
@@ -115,94 +80,13 @@ export function registerReviewCommand(program: Command): void {
           ? new ManifestReviewStrategy(manifestInfo, manifestReader, projectRoot)
           : new GlobalReviewStrategy(projectRoot, queueRoot, opts, manifestReader);
 
-        const app = express();
-
-        // API: List documents
-        app.get('/api/documents', (_req, res) => {
-          res.json(strategy.listDocuments());
+        const app = createReviewApp({
+          projectRoot,
+          queueRoot,
+          opts,
+          strategy,
+          manifestReader,
         });
-
-        // API: Get document content
-        app.get('/api/documents/:circle/:docId', (req, res) => {
-          const doc = strategy.findDocument(req.params.circle, req.params.docId);
-          if (!doc) return res.status(404).json({ error: 'Document not found' });
-          res.json(doc);
-        });
-
-        // API: List circles
-        app.get('/api/circles', (_req, res) => {
-          res.json(strategy.listCircles());
-        });
-
-        // API: Get assets for a circle directory
-        app.get('/api/circles/:name/assets', (req, res) => {
-          res.json(strategy.listCircleAssets(req.params.name));
-        });
-
-        // Serve output files — wildcard path supports nested provider dirs
-        app.get('/api/files/*filePath', (req, res) => {
-          const raw: string[] | string = (req.params as any).filePath;
-          if (!raw) {
-            res.status(400).send('Bad request');
-            return;
-          }
-          const segments = Array.isArray(raw) ? raw : raw.split('/');
-          const filePath = resolveWithin(queueRoot, ...segments);
-          if (!filePath) {
-            res.status(403).send('Forbidden');
-            return;
-          }
-          if (fs.existsSync(filePath)) {
-            const stat = fs.statSync(filePath);
-            const mimeType = getMimeType(filePath);
-            res.writeHead(200, {
-              'Content-Type': mimeType,
-              'Content-Length': stat.size,
-            });
-            fs.createReadStream(filePath).pipe(res);
-          } else {
-            res.status(404).send('File not found');
-          }
-        });
-
-        // Approve endpoint
-        app.post('/api/approve/:circle/:assetId', express.json(), async (req, res) => {
-          try {
-            const approveService = new ApproveService(projectRoot, queueRoot, manifestReader);
-            const result = approveService.execute({
-              circle: req.params.circle,
-              assetId: req.params.assetId,
-              outputFile: req.body?.outputFile,
-              taskJsonPath: req.body?.taskJsonPath,
-            });
-            res.json(result);
-          } catch (err: any) {
-            const status = err.message === 'Invalid circle or assetId' ? 400
-              : err.message === 'Forbidden' ? 403 : 500;
-            res.status(status).json({ error: err.message });
-          }
-        });
-
-        // Serve static review UI from templates/review-ui/
-        const publicDir = path.join(__dirname, '..', '..', 'templates', 'review-ui');
-        if (fs.existsSync(publicDir)) {
-          app.use(express.static(publicDir));
-        } else {
-          app.get('/', (_req, res) => {
-            res.send(`
-              <html><body>
-              <h1>OpsV Review</h1>
-              <p>Review UI not built. Use the API endpoints:</p>
-              <ul>
-                <li>GET /api/circles</li>
-                <li>GET /api/circles/:name/assets</li>
-                <li>GET /api/files/*</li>
-                <li>POST /api/approve/:circle/:assetId</li>
-              </ul>
-              </body></html>
-            `);
-          });
-        }
 
         const server = app.listen(opts.port, () => {
           console.log(chalk.green(`Review server running at http://localhost:${opts.port}`));

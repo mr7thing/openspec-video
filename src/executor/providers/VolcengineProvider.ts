@@ -3,71 +3,61 @@
 // Handles: seadream (image), seedance2 (video)
 // ============================================================================
 
-import axios from 'axios';
-import fs from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { TaskJson } from '../../types/Job';
+import { BaseTaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
+import { BaseApiProvider } from './BaseApiProvider';
+import { OpsVContext } from '../../container/OpsVContext';
+import { HttpClient } from '../HttpClient';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
-import { ConfigLoader } from '../../utils/configLoader';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
-import { resolveProjectRoot } from '../../utils/projectResolver';
-import {
-  appendLog,
-  getResumeTaskId,
-  getPollIntervalMs,
-  getElapsedMs,
-  sleep,
-} from '../polling';
-
+import { appendLog, getResumeTaskId, getElapsedMs, getPollIntervalMs, sleep } from '../polling';
 import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
 
-export class VolcengineProvider {
-  name = 'volcengine';
+interface VolcImagePayload {
+  prompt?: string;
+  reference_images?: string[];
+  [key: string]: any;
+}
 
-  async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
-    const modelKey = task._opsv.modelKey;
-    const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
+interface VolcVideoPayload {
+  content?: Array<{
+    image_url?: { url: string };
+    video_url?: { url: string };
+    audio_url?: { url: string };
+  }>;
+  [key: string]: any;
+}
 
-    // modelKey is the api_config key (e.g. volc.seadream5), use it directly
-    const apiKey = configLoader.getResolvedApiKey(modelKey);
-    const modelConfig = configLoader.getModelConfig(modelKey);
+interface VolcSubmitResponse {
+  id?: string;
+  data?: { id?: string };
+  task_id?: string;
+}
 
-    const isImage = task._opsv.type === 'imagen';
+interface VolcStatusResponse {
+  status?: string;
+  data?: {
+    status?: string;
+    video_url?: string;
+  };
+  content?: { video_url?: string };
+  error_message?: string;
+}
 
-    try {
-      if (isImage) {
-        return await this.executeImage(task, taskPath, apiKey, modelConfig);
-      }
-      return await this.executeVideo(task, taskPath, apiKey, modelConfig);
-    } catch (err: any) {
-      return {
-        taskPath,
-        shotId: task._opsv.shotId,
-        provider: 'volcengine',
-        success: false,
-        error: err.message,
-      };
-    }
-  }
+export class VolcengineProvider extends BaseApiProvider<VolcImagePayload | VolcVideoPayload, VolcSubmitResponse, VolcStatusResponse> {
+  readonly name = 'volcengine';
 
   private async resolveImageField(value: string): Promise<string> {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
-    // Local file path — convert to base64 data URI
     const data = await readFile(value);
     const ext = path.extname(value).slice(1) || 'png';
     const mimeMap: Record<string, string> = {
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      jfif: 'image/jpeg',
-      png: 'image/png',
-      webp: 'image/webp',
-      bmp: 'image/bmp',
-      gif: 'image/gif',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', jfif: 'image/jpeg',
+      png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', gif: 'image/gif',
     };
     const mime = mimeMap[ext.toLowerCase()] || `image/${ext}`;
     return `data:${mime};base64,${data.toString('base64')}`;
@@ -76,166 +66,126 @@ export class VolcengineProvider {
   private async resolveVideoField(value: string): Promise<string> {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
-    // Video files are typically too large for base64; require HTTP URL
-    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local video paths are not supported for API submission. Please upload the video to a URL or use a TOS/S3 link: ${value}`);
+    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local video paths not supported: ${value}`);
   }
 
   private async resolveAudioField(value: string): Promise<string> {
     if (!value) return value;
     if (value.startsWith('http') || value.startsWith('data:')) return value;
-    // Audio files are typically too large for base64; require HTTP URL
-    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local audio paths are not supported for API submission. Please upload the audio to a URL or use a TOS/S3 link: ${value}`);
+    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local audio paths not supported: ${value}`);
   }
 
-  private async executeImage(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
-    const apiUrl = task._opsv.api_url;
-    const shotId = task._opsv.shotId;
+  protected buildPayload(task: BaseTaskJson<VolcImagePayload | VolcVideoPayload>): unknown {
+    const payload = { ...task.payload };
+    const meta = task._opsv;
 
-    const payload = { ...task };
-    delete (payload as any)._opsv;
-
-    // Convert local reference image paths to base64 data URIs
-    if (Array.isArray(payload.reference_images)) {
-      payload.reference_images = await Promise.all(
-        payload.reference_images.map((url: string) => this.resolveImageField(url))
-      );
+    if (meta.type === 'imagen' && Array.isArray((payload as VolcImagePayload).reference_images)) {
+      (payload as VolcImagePayload).reference_images = (payload as VolcImagePayload).reference_images!;
     }
 
-    const response = await axios.post(apiUrl, payload, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: modelConfig?.timeout?.submit || 300000,
-    });
-
-    // Handle multi-image response (sequential_image_generation)
-    const dataItems = response.data?.data;
-    let imageUrls: string[] = [];
-
-    if (Array.isArray(dataItems)) {
-      // Multi-image response: extract all URLs
-      imageUrls = dataItems.map((item: any) => item.url).filter(Boolean);
-    } else {
-      // Single image response
-      const imageUrl =
-        dataItems?.[0]?.url ||
-        dataItems?.url ||
-        response.data?.url;
-      if (imageUrl) imageUrls = [imageUrl];
+    if (meta.type === 'video' && Array.isArray((payload as VolcVideoPayload).content)) {
+      // resolution handled at compile time; executor receives pre-resolved URLs
     }
 
-    if (imageUrls.length === 0) {
-      throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(response.data)}`);
-    }
-
-    // Download all images with sequential indices (auto-increment from existing)
-    const outputPaths: string[] = [];
-    let nextIndex = resolveNextOutputIndex(taskPath, 'png');
-    for (let i = 0; i < imageUrls.length; i++) {
-      const outputPath = outputFilePath(taskPath, nextIndex + i, 'png');
-      await downloadFile(imageUrls[i], outputPath);
-      outputPaths.push(outputPath);
-    }
-
-    return {
-      taskPath,
-      shotId,
-      provider: 'volcengine',
-      success: true,
-      outputPath: outputPaths[0], // Primary output is the first image
-      outputPaths, // All output paths for multi-image
-    };
+    return payload;
   }
 
-  private async executeVideo(task: TaskJson, taskPath: string, apiKey: string, modelConfig?: import('../../utils/configLoader').ModelConfig): Promise<ProviderResult> {
-    const submitUrl = task._opsv.api_url;
-    const statusUrl = task._opsv.api_status_url || submitUrl;
-    const shotId = task._opsv.shotId;
+  protected parseTaskId(res: VolcSubmitResponse): string | undefined {
+    return res.id || res.data?.id || res.task_id;
+  }
 
-    // Check for resume from .log
-    let requestId = getResumeTaskId(taskPath);
+  protected buildStatusUrl(apiUrl: string, taskId: string): string {
+    return `${apiUrl}/${taskId}`;
+  }
 
-    if (!requestId) {
-      const payload = { ...task };
-      delete (payload as any)._opsv;
+  protected isComplete(res: VolcStatusResponse): boolean {
+    const status = res.status || res.data?.status;
+    return status === 'succeeded' || status === 'completed';
+  }
 
-      // Convert local media paths in content to appropriate formats
-      if (Array.isArray(payload.content)) {
-        for (const item of payload.content) {
-          if (item.image_url?.url) {
-            item.image_url.url = await this.resolveImageField(item.image_url.url);
-          }
-          if (item.video_url?.url) {
-            item.video_url.url = await this.resolveVideoField(item.video_url.url);
-          }
-          if (item.audio_url?.url) {
-            item.audio_url.url = await this.resolveAudioField(item.audio_url.url);
-          }
-        }
-      }
+  protected isFailed(res: VolcStatusResponse): boolean {
+    const status = res.status || res.data?.status;
+    return status === 'failed';
+  }
 
-      const submitRes = await axios.post(submitUrl, payload, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: modelConfig?.timeout?.status || 120000,
-      });
+  protected extractError(res: VolcStatusResponse): string {
+    return res.error_message || 'Unknown error';
+  }
 
-      requestId =
-        submitRes.data?.id ||
-        submitRes.data?.data?.id ||
-        submitRes.data?.task_id;
+  protected extractOutputUrls(res: VolcStatusResponse): string[] {
+    const url = res.content?.video_url || res.data?.video_url;
+    return url ? [url] : [];
+  }
 
-      if (!requestId) {
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_SUBMIT_FAILED, `No request ID in submit response: ${JSON.stringify(submitRes.data)}`);
-      }
+  protected getOutputExtension(): string {
+    return 'mp4';
+  }
 
-      appendLog(taskPath, { event: 'submitted', task_id: requestId });
-      logger.info(`[Volcengine] Submitted ${shotId}, requestId=${requestId}`);
-    } else {
-      logger.info(`[Volcengine] Resuming ${shotId}, requestId=${requestId}`);
+  // Override for image direct download (no polling)
+  async execute(task: BaseTaskJson<VolcImagePayload | VolcVideoPayload>, taskPath: string, ctx: OpsVContext): Promise<ProviderResult> {
+    if (task._opsv.type === 'imagen') {
+      return this.executeImage(task, taskPath, ctx);
     }
+    return super.execute(task, taskPath, ctx);
+  }
 
-    // Gradient polling
-    const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000; // 4h default
-    while (true) {
-      const elapsed = getElapsedMs(taskPath);
-      if (elapsed > maxDuration) {
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${requestId} (4h exceeded)`);
+  private async executeImage(task: BaseTaskJson<VolcImagePayload>, taskPath: string, ctx: OpsVContext): Promise<ProviderResult> {
+    const meta = task._opsv;
+    const shotId = meta.shotId;
+    const client = this.buildHttpClient(ctx, meta.modelKey);
+    const modelConfig = this.getModelConfig(ctx, meta.modelKey);
+
+    try {
+      const payload = { ...task.payload };
+
+      if (Array.isArray(payload.reference_images)) {
+        payload.reference_images = await Promise.all(
+          payload.reference_images.map((url: string) => this.resolveImageField(url))
+        );
       }
 
-      const interval = getPollIntervalMs(elapsed, ConfigLoader.getInstance().getSettings()?.polling?.intervals);
-      await sleep(interval);
-
-      const statusRes = await axios.get(`${statusUrl}/${requestId}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+      const data = await client.post<any>(meta.api_url, payload, {
+        timeout: modelConfig?.timeout?.submit || 300000,
       });
 
-      const status = statusRes.data?.status || statusRes.data?.data?.status;
+      const dataItems = data?.data;
+      let imageUrls: string[] = [];
 
-      if (status === 'succeeded' || status === 'completed') {
-        const videoUrl =
-          statusRes.data?.content?.video_url ||
-          statusRes.data?.video_url ||
-          statusRes.data?.data?.video_url;
-        if (!videoUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no video_url found');
-
-        const outputPath = outputFilePath(taskPath, resolveNextOutputIndex(taskPath, 'mp4'), 'mp4');
-        await downloadFile(videoUrl, outputPath);
-
-        appendLog(taskPath, { event: 'succeeded', task_id: requestId });
-        return { taskPath, shotId, provider: 'volcengine', success: true, outputPath };
+      if (Array.isArray(dataItems)) {
+        imageUrls = dataItems.map((item: any) => item.url).filter(Boolean);
+      } else {
+        const url = dataItems?.[0]?.url || dataItems?.url || data?.url;
+        if (url) imageUrls = [url];
       }
 
-      if (status === 'failed') {
-        const reason = statusRes.data?.error_message || 'Unknown error';
-        appendLog(taskPath, { event: 'failed', task_id: requestId, error: reason });
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `Video generation failed: ${reason}`);
+      if (imageUrls.length === 0) {
+        throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(data)}`);
       }
 
-      appendLog(taskPath, { event: 'polling', status: status || 'unknown', task_id: requestId });
+      const outputPaths: string[] = [];
+      let nextIndex = resolveNextOutputIndex(taskPath, 'png');
+      for (let i = 0; i < imageUrls.length; i++) {
+        const outputPath = outputFilePath(taskPath, nextIndex + i, 'png');
+        await downloadFile(imageUrls[i], outputPath);
+        outputPaths.push(outputPath);
+      }
+
+      return {
+        taskPath,
+        shotId,
+        provider: this.name,
+        success: true,
+        outputPath: outputPaths[0],
+        outputPaths,
+      };
+    } catch (err: any) {
+      return {
+        taskPath,
+        shotId,
+        provider: this.name,
+        success: false,
+        error: err.message,
+      };
     }
   }
 }

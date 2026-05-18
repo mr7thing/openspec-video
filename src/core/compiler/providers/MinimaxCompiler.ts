@@ -4,13 +4,13 @@
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
-import { TaskJson } from '../../../types/Job';
+import { BaseTaskJson } from '../../../types/Job';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 
 export class MinimaxCompiler implements ProviderCompiler {
   readonly provider = 'minimax';
 
-  compile(ctx: CompileContext): TaskJson {
+  compile(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
     const isImage = modelConfig.type === 'imagen';
 
@@ -21,7 +21,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     return this.compileVideoTask(ctx);
   }
 
-  private compileImageTask(ctx: CompileContext): TaskJson {
+  private compileImageTask(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: model is required in api_config.yaml');
@@ -37,7 +37,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     }
 
     return {
-      ...payload,
+      payload,
       _opsv: {
         provider: modelConfig.provider || 'minimax',
         modelKey: ctx.modelKey,
@@ -50,7 +50,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     };
   }
 
-  private compileVideoTask(ctx: CompileContext): TaskJson {
+  private compileVideoTask(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: api_status_url is required in api_config.yaml');
@@ -80,7 +80,7 @@ export class MinimaxCompiler implements ProviderCompiler {
     }
 
     return {
-      ...payload,
+      payload,
       _opsv: {
         provider: modelConfig.provider || 'minimax',
         modelKey: ctx.modelKey,

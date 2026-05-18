@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
+import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 
 export interface TunnelSession {
   sessionId: string;
@@ -19,10 +20,16 @@ export class CloudClient {
       return response.data;
     } catch (err: any) {
       if (err.response?.status === 402) {
-        throw new Error('OpsV Cloud quota exceeded. Please check your subscription plan.');
+        throw new InfrastructureError(
+          OpsVErrorCode.INFRA_NETWORK_ERROR,
+          'OpsV Cloud quota exceeded. Please check your subscription plan.'
+        );
       }
       logger.error(`Failed to create cloud session: ${err.message}`);
-      throw new Error(err.response?.data?.error || err.message);
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_NETWORK_ERROR,
+        err.response?.data?.error || err.message
+      );
     }
   }
 
@@ -34,7 +41,10 @@ export class CloudClient {
       return response.data;
     } catch (err: any) {
       logger.error(`Failed to refresh cloud session: ${err.message}`);
-      throw new Error(err.response?.data?.error || err.message);
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_NETWORK_ERROR,
+        err.response?.data?.error || err.message
+      );
     }
   }
 
@@ -45,7 +55,10 @@ export class CloudClient {
       });
     } catch (err: any) {
       logger.error(`Failed to close cloud session: ${err.message}`);
-      throw new Error(err.response?.data?.error || err.message);
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_NETWORK_ERROR,
+        err.response?.data?.error || err.message
+      );
     }
   }
 }

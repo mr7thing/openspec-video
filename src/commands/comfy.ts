@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { TaskBuilder } from '../core/compiler/TaskBuilder';
+import { OpsVContext } from '../container/OpsVContext';
 import { CircleAssetEntry } from '../core/AssetManager';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { RefResolver } from '../core/RefResolver';
@@ -109,7 +110,8 @@ export function registerComfyCommand(program: Command): void {
 
         // Output to circleDir/{model}_NNN/
         const outputDir = resolveModelQueueDir(circleDir, modelKey);
-        const builder = new TaskBuilder(projectRoot);
+        const ctx = OpsVContext.create(cwd);
+        const builder = new TaskBuilder(ctx);
 
         const results = await builder.compileToDir(
           jobs, modelKey, outputDir, options.dryRun,

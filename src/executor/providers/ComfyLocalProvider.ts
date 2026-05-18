@@ -2,91 +2,122 @@
 // OpsV ComfyUI Local Executor Provider
 // ============================================================================
 
-import axios from 'axios';
-import { TaskJson } from '../../types/Job';
+import { BaseTaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
+import { BaseApiProvider } from './BaseApiProvider';
+import { OpsVContext } from '../../container/OpsVContext';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
-import { generateRandomSeed } from '../../utils/randomSeed';
-import { ConfigLoader } from '../../utils/configLoader';
-import { resolveProjectRoot } from '../../utils/projectResolver';
+import { appendLog, getResumeTaskId, getElapsedMs, getPollIntervalMs, sleep } from '../polling';
 import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
-import {
-  appendLog,
-  getResumeTaskId,
-  getPollIntervalMs,
-  getElapsedMs,
-  sleep,
-} from '../polling';
 
-export class ComfyLocalProvider {
-  name = 'comfylocal';
+interface ComfyPayload extends Record<string, unknown> {
+  _opsv_workflow?: unknown;
+}
 
-  async execute(task: TaskJson, taskPath: string): Promise<ProviderResult> {
-    let apiUrl = task._opsv.api_url;
-    if (!apiUrl) throw new ExecutionError(OpsVErrorCode.EXECUTION_PROVIDER_NOT_FOUND, 'ComfyLocalProvider: api_url is required in task._opsv');
-    // Normalize: strip trailing slash to avoid double slashes in URL construction
+interface ComfySubmitResponse {
+  prompt_id?: string;
+}
+
+interface ComfyStatusEntry {
+  status?: { status_str?: string; messages?: any[][] };
+  outputs?: Record<string, Record<string, Array<{ filename: string; subfolder?: string; type?: string }>>>;
+}
+
+interface ComfyStatusResponse {
+  [promptId: string]: ComfyStatusEntry;
+}
+
+export class ComfyLocalProvider extends BaseApiProvider<ComfyPayload, ComfySubmitResponse, ComfyStatusResponse> {
+  readonly name = 'comfylocal';
+
+  protected buildPayload(task: BaseTaskJson<ComfyPayload>): unknown {
+    const payload = { ...task.payload };
+    delete (payload as any)._opsv_workflow;
+    this.resolveRandomInWorkflow(payload);
+    return payload;
+  }
+
+  protected parseTaskId(res: ComfySubmitResponse): string | undefined {
+    return res.prompt_id;
+  }
+
+  protected buildStatusUrl(apiUrl: string, taskId: string): string {
+    const base = apiUrl.replace(/\/$/, '');
+    return `${base}/history/${taskId}`;
+  }
+
+  protected isComplete(res: ComfyStatusResponse): boolean {
+    const entry = Object.values(res)[0];
+    return !!entry?.outputs;
+  }
+
+  protected isFailed(res: ComfyStatusResponse): boolean {
+    const entry = Object.values(res)[0];
+    return entry?.status?.status_str === 'error';
+  }
+
+  protected extractError(res: ComfyStatusResponse): string {
+    const entry = Object.values(res)[0];
+    return entry?.status?.messages?.map((m: any) => m?.[1]).join('; ') || 'ComfyUI execution error';
+  }
+
+  protected extractOutputUrls(res: ComfyStatusResponse): string[] {
+    return []; // ComfyLocal uses custom download logic
+  }
+
+  protected getOutputExtension(): string {
+    return 'png';
+  }
+
+  async execute(task: BaseTaskJson<ComfyPayload>, taskPath: string, ctx: OpsVContext): Promise<ProviderResult> {
+    const meta = task._opsv;
+    const shotId = meta.shotId;
+    const modelConfig = this.getModelConfig(ctx, meta.modelKey);
+    const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
+    let apiUrl = meta.api_url || '';
     apiUrl = apiUrl.replace(/\/$/, '');
-    const shotId = task._opsv.shotId;
 
-    const configLoader = ConfigLoader.getInstance();
-    configLoader.loadConfig(resolveProjectRoot(process.cwd()));
-    const modelConfig = configLoader.getModelConfig(task._opsv.modelKey);
-
-    let promptId = getResumeTaskId(taskPath);
+    let promptId: string | null = getResumeTaskId(taskPath);
+    const client = this.buildHttpClient(ctx, meta.modelKey);
 
     try {
       if (!promptId) {
-        const payload = { ...task };
-        delete (payload as any)._opsv;
-
-        // Resolve 'random' placeholders in workflow node inputs
-        this.resolveRandomInWorkflow(payload);
-
-        const response = await axios.post(`${apiUrl}/prompt`, { prompt: payload }, {
+        const payload = this.buildPayload(task);
+        const res = await client.post<ComfySubmitResponse>(`${apiUrl}/prompt`, { prompt: payload }, {
           timeout: modelConfig?.timeout?.submit || 30000,
         });
-
-        promptId = response.data?.prompt_id;
+        promptId = this.parseTaskId(res) || null;
         if (!promptId) {
-          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No prompt_id in response: ${JSON.stringify(response.data)}`, { jobId: promptId });
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No prompt_id in response: ${JSON.stringify(res)}`);
         }
-
         appendLog(taskPath, { event: 'submitted', task_id: promptId });
         logger.info(`[ComfyUI] Submitted ${shotId}, promptId=${promptId}`);
       } else {
         logger.info(`[ComfyUI] Resuming ${shotId}, promptId=${promptId}`);
       }
 
-      // Gradient polling
-      const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
       while (true) {
         const elapsed = getElapsedMs(taskPath);
         if (elapsed > maxDuration) {
-          throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for promptId=${promptId} (4h exceeded)`);
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${promptId}`);
         }
 
-        const interval = getPollIntervalMs(elapsed, configLoader.getSettings()?.polling?.intervals);
+        const interval = getPollIntervalMs(elapsed, ctx.configLoader.getSettings()?.polling?.intervals);
         await sleep(interval);
 
-        const statusRes = await this.withRetry(
-          () => axios.get(`${apiUrl}/history/${promptId}`, { timeout: modelConfig?.timeout?.status || 30000 }),
-          `history query for ${promptId}`,
-          modelConfig?.retry?.max_retries,
-          modelConfig?.retry?.delay_cap
-        );
+        const statusRes = await client.get<ComfyStatusResponse>(`${apiUrl}/history/${promptId}`, {
+          timeout: modelConfig?.timeout?.status || 30000,
+        });
 
-        const entry = statusRes.data?.[promptId];
-
-        // Check for ComfyUI execution errors
-        const statusStr = entry?.status?.status_str;
-        if (statusStr === 'error') {
-          const errorInfo = entry?.status?.messages?.map((m: any) => m?.[1]).join('; ') || 'ComfyUI execution error';
-          appendLog(taskPath, { event: 'failed', task_id: promptId, error: errorInfo });
-          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `ComfyUI execution failed: ${errorInfo}`, { jobId: promptId });
+        if (this.isFailed(statusRes)) {
+          const reason = this.extractError(statusRes);
+          appendLog(taskPath, { event: 'failed', task_id: promptId, error: reason });
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `ComfyUI execution failed: ${reason}`);
         }
 
+        const entry = Object.values(statusRes)[0];
         const outputs = entry?.outputs;
         if (outputs) {
           const outputPaths: string[] = [];
@@ -96,20 +127,15 @@ export class ComfyLocalProvider {
             const nodeOutput = outputs[nodeId];
             if (!nodeOutput || typeof nodeOutput !== 'object') continue;
 
-            // ComfyUI history outputs may contain images, gifs, audio, videos, etc.
-            // Each media type is an array of { filename, subfolder, type } objects.
             for (const mediaKey of Object.keys(nodeOutput)) {
               const mediaList = nodeOutput[mediaKey];
               if (!Array.isArray(mediaList)) continue;
 
               for (const media of mediaList) {
-                if (!media || !media.filename) continue;
+                if (!media?.filename) continue;
                 const fileUrl = `${apiUrl}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder || '')}&type=${encodeURIComponent(media.type || 'output')}`;
-
-                // Use the original file extension from ComfyUI output
                 const extMatch = media.filename.match(/\.([^.]+)$/);
                 const ext = extMatch ? extMatch[1] : 'png';
-
                 if (!(ext in extIndices)) {
                   extIndices[ext] = resolveNextOutputIndex(taskPath, ext);
                 }
@@ -122,61 +148,21 @@ export class ComfyLocalProvider {
 
           if (outputPaths.length > 0) {
             appendLog(taskPath, { event: 'succeeded', task_id: promptId, output: outputPaths.join(', ') });
-            return {
-              taskPath,
-              shotId,
-              provider: task._opsv.provider || 'comfyui',
-              success: true,
-              outputPath: outputPaths[0],
-              outputPaths,
-            };
+            return { taskPath, shotId, provider: this.name, success: true, outputPath: outputPaths[0], outputPaths };
           }
-
-          // outputs exists but no valid files — likely a node error or empty workflow
-          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `ComfyUI completed but no output files found in history`, { jobId: promptId });
+          throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, 'ComfyUI completed but no output files found');
         }
 
-        appendLog(taskPath, { event: 'polling', status: statusStr || 'waiting', task_id: promptId });
+        appendLog(taskPath, { event: 'polling', status: 'waiting', task_id: promptId });
       }
     } catch (err: any) {
       appendLog(taskPath, { event: 'failed', task_id: promptId || 'unknown', error: err.message });
-      return {
-        taskPath,
-        shotId,
-        provider: task._opsv.provider || 'comfyui',
-        success: false,
-        error: err.message,
-      };
+      return { taskPath, shotId, provider: this.name, success: false, error: err.message };
     }
   }
 
-  /**
-   * Retry an async operation with exponential backoff.
-   */
-  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries?: number, delayCap?: number): Promise<T> {
-    const retries = maxRetries ?? 3;
-    const cap = delayCap ?? 30000;
-    let lastErr: any;
-    for (let i = 0; i < retries; i++) {
-      try {
-        return await fn();
-      } catch (err: any) {
-        lastErr = err;
-        if (i < retries - 1) {
-          const delay = Math.min(1000 * Math.pow(2, i), cap);
-          logger.warn(`[ComfyUI] ${label} failed (attempt ${i + 1}/${retries}): ${err.message}. Retrying in ${delay}ms...`);
-          await sleep(delay);
-        }
-      }
-    }
-    throw lastErr;
-  }
-
-  /**
-   * Recursively resolve 'random' placeholders in workflow node inputs.
-   * Only touches node.inputs fields to avoid mutating prompt text.
-   */
   private resolveRandomInWorkflow(workflow: Record<string, any>): void {
+    const { generateRandomSeed } = require('../../utils/randomSeed');
     for (const nodeId in workflow) {
       if (nodeId === '_opsv_workflow') continue;
       const node = workflow[nodeId];

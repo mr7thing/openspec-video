@@ -96,7 +96,7 @@ export class FrontmatterParser {
   }
 
   private static split(content: string): { rawYaml: string; body: string } {
-    const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+    const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/m);
     if (!match) {
       throw new ValidationError(OpsVErrorCode.VALIDATION_FRONTMATTER_MISSING, 'Document missing YAML frontmatter (--- delimiter required)');
     }

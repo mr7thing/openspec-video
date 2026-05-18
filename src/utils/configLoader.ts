@@ -1,5 +1,6 @@
 // ============================================================================
 // OpsV Config Loader
+// Non-singleton. Instantiate once per OpsVContext.
 // ============================================================================
 
 import fs from 'fs';
@@ -10,7 +11,7 @@ import { ErrorFactory } from '../errors/OpsVError';
 
 export function getProjectDir(projectRoot: string, name: 'videospec' | 'queue'): string {
   try {
-    const loader = ConfigLoader.getInstance();
+    const loader = new ConfigLoader();
     loader.loadConfig(projectRoot);
     const settings = loader.getSettings();
     if (name === 'videospec') {
@@ -88,22 +89,10 @@ export interface ApiConfig {
 }
 
 export class ConfigLoader {
-  private static instance: ConfigLoader | null = null;
-  private static lock = false;
   private config: ApiConfig;
 
-  private constructor() {
+  constructor() {
     this.config = { models: {} };
-  }
-
-  static getInstance(): ConfigLoader {
-    if (!ConfigLoader.instance) {
-      if (!ConfigLoader.lock) {
-        ConfigLoader.lock = true;
-        ConfigLoader.instance = new ConfigLoader();
-      }
-    }
-    return ConfigLoader.instance!;
   }
 
   loadConfig(projectRoot: string): ApiConfig {
@@ -143,7 +132,6 @@ export class ConfigLoader {
     const required = modelConfig.required_env || [];
     const fallback = modelConfig.fallback_env || [];
 
-    // No API key required (e.g. local ComfyUI)
     if (required.length === 0 && fallback.length === 0) {
       return '';
     }
