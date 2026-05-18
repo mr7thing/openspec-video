@@ -29,6 +29,10 @@ export enum OpsVErrorCode {
   COMPILATION_INVALID_REF = 'E3001',
   COMPILATION_CIRCULAR_DEP = 'E3002',
   COMPILATION_FAILED = 'E3003',
+  COMPILATION_WORKFLOW_NOT_FOUND = 'E3010',
+  COMPILATION_WORKFLOW_PARSE_FAILED = 'E3011',
+  COMPILATION_NODE_MAPPING_MISSING = 'E3012',
+  COMPILATION_ASSET_NOT_FOUND = 'E3013',
 
   // E4xxx — Execution: API error, timeout, download failed
   EXECUTION_API_ERROR = 'E4001',
@@ -133,9 +137,19 @@ export class SchedulingError extends OpsVError {
   }
 }
 
+/** Extra context attached to an OpsV error */
+export interface ErrorContext {
+  phase?: string;
+  assetId?: string;
+  circle?: string;
+}
+
 // Convenience factory for common error patterns
 export const ErrorFactory = {
   compilationFailed(msg: string): never {
     throw new CompilationError(OpsVErrorCode.COMPILATION_FAILED, msg);
+  },
+  apiError(phase: string, message: string): never {
+    throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `[${phase}] ${message}`);
   },
 } as const;
