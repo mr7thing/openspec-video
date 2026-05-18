@@ -59,7 +59,7 @@ export function resolveNextOutputIndex(taskPath: string, ext: string): number {
   const pattern = new RegExp(`^${escapeRegex(base)}_(\\d+)\\.${escapeRegex(ext)}$`);
 
   let maxIndex = 0;
-  if (fs.existsSync(outputDir)) {
+  try {
     const entries = fs.readdirSync(outputDir);
     for (const entry of entries) {
       const match = entry.match(pattern);
@@ -67,6 +67,8 @@ export function resolveNextOutputIndex(taskPath: string, ext: string): number {
         maxIndex = Math.max(maxIndex, parseInt(match[1], 10));
       }
     }
+  } catch (err: any) {
+    if (err.code !== 'ENOENT') throw err;
   }
   return maxIndex + 1;
 }

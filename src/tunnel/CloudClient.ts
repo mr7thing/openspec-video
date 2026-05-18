@@ -9,13 +9,16 @@ export interface TunnelSession {
   sessionToken: string; // Token used for authenticating the WS tunnel connection
 }
 
+const CLOUD_TIMEOUT = 30000;
+
 export class CloudClient {
   constructor(private cloudUrl: string, private apiKey: string) {}
 
   async createSession(): Promise<TunnelSession> {
     try {
       const response = await axios.post(`${this.cloudUrl}/api/sessions`, {}, {
-        headers: { Authorization: `Bearer ${this.apiKey}` }
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+        timeout: CLOUD_TIMEOUT,
       });
       return response.data;
     } catch (err: any) {
@@ -36,7 +39,8 @@ export class CloudClient {
   async refreshSession(sessionId: string): Promise<{ jwt: string, reviewUrl: string }> {
     try {
       const response = await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/refresh`, {}, {
-        headers: { Authorization: `Bearer ${this.apiKey}` }
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+        timeout: CLOUD_TIMEOUT,
       });
       return response.data;
     } catch (err: any) {
@@ -51,7 +55,8 @@ export class CloudClient {
   async closeSession(sessionId: string): Promise<void> {
     try {
       await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/close`, {}, {
-        headers: { Authorization: `Bearer ${this.apiKey}` }
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+        timeout: CLOUD_TIMEOUT,
       });
     } catch (err: any) {
       logger.error(`Failed to close cloud session: ${err.message}`);

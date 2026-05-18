@@ -6,11 +6,20 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { logger } from './logger';
-import { ErrorFactory } from '../errors/OpsVError';
+import { ErrorFactory, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 
 export interface DownloadOptions {
   timeout?: number;
   headers?: Record<string, string>;
+}
+
+function validateUrlScheme(url: string): void {
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    throw new InfrastructureError(
+      OpsVErrorCode.INFRA_NETWORK_ERROR,
+      `URL must use http/https scheme: ${url}`
+    );
+  }
 }
 
 export async function downloadFile(
@@ -18,10 +27,10 @@ export async function downloadFile(
   outputFilePath: string,
   options: DownloadOptions = {}
 ): Promise<string> {
+  validateUrlScheme(url);
+
   const dir = path.dirname(outputFilePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  fs.mkdirSync(dir, { recursive: true });
 
   const tmpPath = outputFilePath + '.tmp';
 

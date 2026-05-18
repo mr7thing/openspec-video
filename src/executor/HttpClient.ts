@@ -5,7 +5,7 @@
 
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { logger } from '../utils/logger';
-import { ExecutionError, OpsVErrorCode } from '../errors/OpsVError';
+import { ExecutionError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 import { sleep } from './polling';
 
 export interface HttpClientOptions {
@@ -14,6 +14,15 @@ export interface HttpClientOptions {
   timeout?: number;
   maxRetries?: number;
   retryDelayCap?: number;
+}
+
+function validateUrlScheme(url: string): void {
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    throw new InfrastructureError(
+      OpsVErrorCode.INFRA_NETWORK_ERROR,
+      `URL must use http/https scheme: ${url}`
+    );
+  }
 }
 
 export class HttpClient {
@@ -40,6 +49,7 @@ export class HttpClient {
   }
 
   async post<T>(url: string, payload: unknown, config?: AxiosRequestConfig): Promise<T> {
+    validateUrlScheme(url);
     return this.withRetry(async () => {
       const response: AxiosResponse<T> = await axios.post(url, payload, {
         headers: this.buildHeaders(),
@@ -51,6 +61,7 @@ export class HttpClient {
   }
 
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    validateUrlScheme(url);
     return this.withRetry(async () => {
       const response: AxiosResponse<T> = await axios.get(url, {
         headers: this.buildHeaders(),

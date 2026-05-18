@@ -92,11 +92,11 @@ export class ApproveService {
 
     const manifest = this.manifestReader.read(manifestPath);
     if (manifest.assets && manifest.assets[assetId]) {
-      manifest.assets[assetId].status = newStatus as any;
+      manifest.assets[assetId].status = newStatus as 'drafting' | 'syncing' | 'approved';
     }
     for (const c of manifest.circles || []) {
       if (c.status && c.status[assetId]) {
-        c.status[assetId] = newStatus as any;
+        c.status[assetId] = newStatus as 'drafting' | 'syncing' | 'approved';
       }
     }
     this.manifestReader.write(manifestPath, manifest);

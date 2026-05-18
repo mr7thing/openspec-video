@@ -12,7 +12,12 @@ import { getProjectDir } from '../utils/configLoader';
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../../package.json');
-const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.8' };
+let pkg: { version: string };
+try {
+  pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.9.0' };
+} catch {
+  pkg = { version: '0.9.0' };
+}
 const MANIFEST_VERSION = pkg.version;
 
 export interface ParsedDocument {
@@ -241,8 +246,8 @@ export class DependencyGraph {
         if (manifest.target && path.resolve(manifest.target) !== resolvedDir) {
           return `Target name "${basename}" already used by a different directory (${manifest.target}). Use --name to specify a different name.`;
         }
-      } catch {
-        // Skip unreadable manifests
+      } catch (err: any) {
+        logger.warn(`Skipped unreadable manifest: ${manifestPath} — ${err.message}`);
       }
     }
 
@@ -260,9 +265,7 @@ export class DependencyGraph {
     const circleDirName = `${basename}_circle${circleN}`;
     const circleDir = path.join(queueRoot, circleDirName);
 
-    if (!fs.existsSync(circleDir)) {
-      fs.mkdirSync(circleDir, { recursive: true });
-    }
+    fs.mkdirSync(circleDir, { recursive: true });
 
     const assets: Record<string, { status: string; index: number; category?: string }> = {};
     const circlesData: ManifestEntry[] = [];

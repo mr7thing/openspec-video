@@ -150,15 +150,20 @@ export class TunnelClient {
     return Buffer.concat([lengthBuf, metaBuf]);
   }
 
-  private deserializeRequest(payload: Buffer): { method: string, path: string, headers: any, body: Buffer } {
+  private deserializeRequest(payload: Buffer): { method: string, path: string, headers: Record<string, string>, body: Buffer } {
     const metaLength = payload.readUInt32BE(0);
-    const meta = JSON.parse(payload.subarray(4, 4 + metaLength).toString('utf-8'));
+    let meta: Record<string, unknown>;
+    try {
+      meta = JSON.parse(payload.subarray(4, 4 + metaLength).toString('utf-8'));
+    } catch {
+      meta = {};
+    }
     const body = payload.subarray(4 + metaLength);
     return {
-      method: meta.method,
-      path: meta.path,
-      headers: meta.headers,
-      body
+      method: String(meta.method || 'GET'),
+      path: String(meta.path || '/'),
+      headers: (meta.headers || {}) as Record<string, string>,
+      body,
     };
   }
 }

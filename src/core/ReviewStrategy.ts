@@ -39,6 +39,7 @@ function collectOutputsFromDir(
   results: DocumentOutput[] | string[],
   isDocOutput: boolean,
 ): void {
+  if (!fs.existsSync(dirPath)) return;
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dirPath, entry.name);
@@ -142,7 +143,7 @@ export class ManifestReviewStrategy implements ReviewStrategy {
   listDocuments(): DocumentInfo[] {
     const { manifestInfo, projectRoot } = this;
     const { circleDir, circleName, manifest } = manifestInfo;
-    const assetsMap: Record<string, any> = manifest.assets || {};
+    const assetsMap: Record<string, { status?: string; index?: number; category?: string }> = manifest.assets || {};
     const targetRoot = path.resolve(projectRoot, manifest.target || getProjectDir(projectRoot, 'videospec'));
 
     const docs: DocumentInfo[] = [];
@@ -202,7 +203,7 @@ export class ManifestReviewStrategy implements ReviewStrategy {
     const { circleDir, manifest } = this.manifestInfo;
     const assetsMap: Record<string, any> = manifest.assets || {};
 
-    const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
+    const enriched = Object.entries(assetsMap).map(([id, info]) => {
       const outputs = scanOutputPathsRecursive(circleDir, id);
       return { id, status: info.status, index: info.index, category: info.category, outputs };
     });

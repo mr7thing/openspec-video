@@ -68,7 +68,7 @@ export function registerValidateCommand(program: Command, version: string): void
 
         for (const [assetId, entry] of entries) {
           // Only validate files in subdirectories (not root level)
-          if (entry.relativePath.split('/').length > 1) {
+          if (path.dirname(entry.relativePath) !== '.') {
             totalFiles++;
             try {
               const content = fs.readFileSync(entry.filePath, 'utf-8');
@@ -213,19 +213,19 @@ export function findStatusInconsistencies(
   const videospecDir = path.join(projectRoot, 'videospec');
 
   for (const manifestPath of manifestPaths) {
-    let manifest: any;
+    let manifest: Record<string, unknown>;
     try {
       manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
     } catch {
       continue;
     }
 
-    const assets = manifest.assets || {};
+    const assets = (manifest.assets || {}) as Record<string, unknown>;
     const manifestDir = path.dirname(manifestPath);
 
     for (const [assetId, assetInfo] of Object.entries(assets)) {
-      const info = assetInfo as any;
-      const manifestStatus = info.status;
+      const info = assetInfo as Record<string, unknown>;
+      const manifestStatus = info.status as string | undefined;
       if (!manifestStatus) continue;
 
       // Find the corresponding document file using recursive search
@@ -235,7 +235,7 @@ export function findStatusInconsistencies(
 
       // Skip root-level documents (same as validate command)
       const relPath = path.relative(videospecDir, docPath);
-      if (!relPath.includes('/')) continue;
+      if (path.dirname(relPath) === '.') continue;
 
       try {
         const content = fs.readFileSync(docPath, 'utf-8');

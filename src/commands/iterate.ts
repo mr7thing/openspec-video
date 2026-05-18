@@ -55,7 +55,7 @@ async function iterateFile(filePath: string): Promise<void> {
 
   // Validate it's a task JSON
   const content = fs.readFileSync(filePath, 'utf-8');
-  let task: any;
+  let task: Record<string, unknown>;
   try {
     task = JSON.parse(content);
   } catch {
@@ -178,10 +178,17 @@ function findNextDirSeq(parentDir: string, sourceName: string): number {
 }
 
 function cloneTaskJson(srcPath: string, destPath: string): void {
-  const task = JSON.parse(fs.readFileSync(srcPath, 'utf-8'));
-  if (task._opsv) {
-    delete task._opsv.compiledAt;
-    delete task._opsv.resumeTaskId;
+  let task: Record<string, unknown>;
+  try {
+    task = JSON.parse(fs.readFileSync(srcPath, 'utf-8'));
+  } catch (e: any) {
+    console.error(`Invalid JSON in ${srcPath}: ${e.message}`);
+    return;
+  }
+  if (task._opsv && typeof task._opsv === 'object') {
+    const meta = task._opsv as Record<string, unknown>;
+    delete meta.compiledAt;
+    delete meta.resumeTaskId;
   }
   fs.writeFileSync(destPath, JSON.stringify(task, null, 2));
 }

@@ -16,6 +16,9 @@ import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
 import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
 
+const DEFAULT_REVIEW_PORT = 3100;
+const DEFAULT_REVIEW_TTL = 900;
+
 function autoCommitPendingChanges(projectRoot: string): void {
   try {
     execSync('git add -A', { cwd: projectRoot, stdio: 'ignore' });
@@ -25,8 +28,8 @@ function autoCommitPendingChanges(projectRoot: string): void {
       const timestamp = new Date().toISOString();
       execSync(`git commit -m "pre-review checkpoint: ${timestamp}"`, { cwd: projectRoot, stdio: 'ignore' });
       console.log(chalk.green(`Changes committed before review (${timestamp})`));
-    } catch {
-      // May fail if git not initialized or nothing to commit
+    } catch (err: any) {
+      logger.debug(`autoCommit failed: ${err.message}`);
     }
   }
 }
@@ -35,11 +38,11 @@ export function registerReviewCommand(program: Command): void {
   program
     .command('review')
     .description('Start visual review server')
-    .option('--port <number>', 'Server port', '3100')
+    .option('--port <number>', 'Server port', `${DEFAULT_REVIEW_PORT}`)
     .option('--circle [path]', 'Run in manifest-driven mode. Auto-discovers latest manifest if no path given. Accepts circle dir or manifest file path.')
     .option('--latest', 'Show only latest circle outputs (global mode)')
     .option('--all', 'Show all circle outputs (global mode)')
-    .option('--ttl <seconds>', 'Auto-shutdown after idle seconds (default: 900)', '900')
+    .option('--ttl <seconds>', `Auto-shutdown after idle seconds (default: ${DEFAULT_REVIEW_TTL})`, `${DEFAULT_REVIEW_TTL}`)
     .action(async (options: any) => {
       try {
         const projectRoot = process.cwd();

@@ -106,8 +106,9 @@ opsv-queue/
         try {
           execSync('git init', { cwd: targetDir, stdio: 'ignore' });
           console.log(chalk.green('Git repository initialized'));
-        } catch {
+        } catch (err: any) {
           gitInitFailed = true;
+          logger.debug(`git init failed: ${err.message}`);
         }
 
         console.log(chalk.green(`\nProject initialized at ${targetDir}`));

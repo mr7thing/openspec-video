@@ -106,7 +106,8 @@ export class RefResolver {
   }
 
   private resolveFrame(identifier: string, label: string): RefResult {
-    const framePart = identifier.slice(6);
+    const FRAME_PREFIX = 'FRAME:';
+    const framePart = identifier.slice(FRAME_PREFIX.length);
     const lastUnderscoreIdx = framePart.lastIndexOf('_');
     if (lastUnderscoreIdx <= 0) {
       throw new CompilationError(OpsVErrorCode.COMPILATION_INVALID_REF, `Invalid FRAME identifier "${identifier}": expected FRAME:<shotId>_<frameType>`);
@@ -125,13 +126,18 @@ export class RefResolver {
       const circleDirs = fs.readdirSync(queueRoot).filter((d) => /_circle\d+$/.test(d));
       for (const circleDir of circleDirs) {
         const circlePath = path.join(queueRoot, circleDir);
-        if (!fs.statSync(circlePath).isDirectory()) continue;
+        let stats;
+        try { stats = fs.statSync(circlePath); } catch { continue; }
+        if (!stats.isDirectory()) continue;
 
         // Scan provider.model/ subdirectories for matching frame file
-        const providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_'));
+        let providerDirs: string[];
+        try { providerDirs = fs.readdirSync(circlePath).filter((d) => !d.startsWith('_')); } catch { continue; }
         for (const providerDir of providerDirs) {
           const providerPath = path.join(circlePath, providerDir);
-          if (!fs.statSync(providerPath).isDirectory()) continue;
+          let pstats;
+          try { pstats = fs.statSync(providerPath); } catch { continue; }
+          if (!pstats.isDirectory()) continue;
 
           const candidate = path.join(providerPath, `${shotId}_${frameType}.png`);
           if (fs.existsSync(candidate)) {
