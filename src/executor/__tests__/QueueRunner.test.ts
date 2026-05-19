@@ -127,4 +127,39 @@ describe('QueueRunner', () => {
     const results = await runner.runPaths([tmpDir]);
     expect(results).toHaveLength(0);
   });
+
+  it('respects concurrency limit', async () => {
+    let activeCount = 0;
+    let maxActive = 0;
+    const concurrency = 2;
+
+    class ConcurrencyTrackingExecutor implements ProviderExecutor {
+      readonly name = 'tracked';
+      async execute(task: BaseTaskJson<unknown>, taskPath: string, _ctx: OpsVContext): Promise<ProviderResult> {
+        activeCount++;
+        maxActive = Math.max(maxActive, activeCount);
+        await new Promise((r) => setTimeout(r, 50));
+        activeCount--;
+        return { taskPath, shotId: task._opsv.shotId, provider: 'tracked', success: true };
+      }
+    }
+
+    container.registerExecutor('tracked', ConcurrencyTrackingExecutor);
+
+    // Create 5 tasks for the tracked provider
+    for (let i = 0; i < 5; i++) {
+      const dir = path.join(tmpDir, 'tracked');
+      fs.mkdirSync(dir, { recursive: true });
+      const task: BaseTaskJson<unknown> = {
+        payload: {},
+        _opsv: { provider: 'tracked', modelKey: 'tracked.test', type: 'imagen', shotId: `shot${i}`, api_url: 'http://test', compiledAt: '2024-01-01T00:00:00Z' },
+      };
+      fs.writeFileSync(path.join(dir, `shot${i}.json`), JSON.stringify(task));
+    }
+
+    const results = await runner.runPaths([tmpDir], { concurrency });
+    expect(results).toHaveLength(5);
+    expect(results.every((r) => r.success)).toBe(true);
+    expect(maxActive).toBeLessThanOrEqual(concurrency);
+  });
 });

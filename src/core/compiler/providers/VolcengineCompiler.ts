@@ -5,8 +5,8 @@
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
-import { ModelConfig } from '../../../utils/configLoader';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
+import { resolveSize, resolveDuration } from '../shared/compilerUtils';
 
 export class VolcengineCompiler implements ProviderCompiler {
   readonly provider = 'volcengine';
@@ -30,7 +30,7 @@ export class VolcengineCompiler implements ProviderCompiler {
     const payload: Record<string, any> = {
       model: modelConfig.model,
       prompt: job.prompt || job.payload.prompt,
-      size: this.resolveSize(job.payload.global_settings, modelConfig),
+      size: resolveSize(job.payload.global_settings, modelConfig, 'size'),
     };
 
     // Support sequential image generation (组图)
@@ -87,11 +87,9 @@ export class VolcengineCompiler implements ProviderCompiler {
     };
 
     // Duration: frontmatter > api_config.defaults
-    const duration = job.payload.duration || modelConfig.defaults?.duration;
-    if (duration !== undefined && duration !== null) {
-      const durationStr = String(duration);
-      const durationNum = parseInt(durationStr, 10);
-      payload.duration = isNaN(durationNum) ? duration : durationNum;
+    const duration = resolveDuration(job, modelConfig);
+    if (duration !== undefined) {
+      payload.duration = duration;
     }
 
     if (job.payload.camera) {
@@ -149,27 +147,5 @@ export class VolcengineCompiler implements ProviderCompiler {
         compiledAt: new Date().toISOString(),
       },
     };
-  }
-
-  private resolveSize(globalSettings: any, modelConfig: ModelConfig): string {
-    // Priority: defaults.size > quality_map > aspect_ratio sizeMap > fallback
-    if (modelConfig.defaults?.size) {
-      return modelConfig.defaults.size;
-    }
-
-    const quality = globalSettings?.quality || 'standard';
-    if (modelConfig.quality_map && modelConfig.quality_map[quality]) {
-      return modelConfig.quality_map[quality];
-    }
-
-    const aspect = globalSettings?.aspect_ratio || '1:1';
-    const sizeMap: Record<string, string> = {
-      '1:1': '1024x1024',
-      '16:9': '1920x1080',
-      '9:16': '1080x1920',
-      '4:3': '1024x768',
-      '3:4': '768x1024',
-    };
-    return sizeMap[aspect] || '1024x1024';
   }
 }

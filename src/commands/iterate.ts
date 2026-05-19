@@ -9,6 +9,7 @@ import fs from 'fs';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
 import { parseIterationSuffix } from '../executor/naming';
+import { escapeRegex } from '../utils/string';
 
 export function registerIterateCommand(program: Command): void {
   program
@@ -191,8 +192,4 @@ function cloneTaskJson(srcPath: string, destPath: string): void {
     delete meta.resumeTaskId;
   }
   fs.writeFileSync(destPath, JSON.stringify(task, null, 2));
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

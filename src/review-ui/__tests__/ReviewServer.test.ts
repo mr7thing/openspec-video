@@ -57,13 +57,22 @@ describe('ReviewServer', () => {
     expect(res.body).toEqual({ circle: 'c1', assets: [] });
   });
 
-  it('POST /api/approve/:circle/:assetId approves', async () => {
+  it('POST /api/approve/:circle/:assetId rejects path traversal in body', async () => {
+    const res = await request(app)
+      .post('/api/approve/c1/hero')
+      .send({ outputFile: '../../etc/passwd' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain('path traversal');
+  });
+
+  it('POST /api/approve/:circle/:assetId fails without real FS', async () => {
     const res = await request(app)
       .post('/api/approve/c1/hero')
       .send({ outputFile: 'hero_1.png' });
 
-    // ApproveService needs real files; expect 500 in unit test without FS setup
-    expect([200, 500]).toContain(res.status);
+    // Without real manifest files on disk, should get 500 (not 200)
+    expect(res.status).toBe(500);
   });
 
   it('GET /api/files/* serves files with correct mime', async () => {

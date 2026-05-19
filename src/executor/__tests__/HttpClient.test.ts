@@ -90,4 +90,37 @@ describe('HttpClient', () => {
       expect.objectContaining({ responseType: 'stream', timeout: 30000 })
     );
   });
+
+  it('does not retry 4xx client errors', async () => {
+    const err400: any = new Error('Bad Request');
+    err400.response = { status: 400, data: {} };
+    mockedAxios.post.mockRejectedValue(err400);
+
+    const client = new HttpClient({ maxRetries: 3, retryDelayCap: 50 });
+    await expect(client.post('http://api/test', {})).rejects.toThrow(ExecutionError);
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1); // no retry
+  });
+
+  it('does not retry 401/403 errors', async () => {
+    const err403: any = new Error('Forbidden');
+    err403.response = { status: 403, data: {} };
+    mockedAxios.post.mockRejectedValue(err403);
+
+    const client = new HttpClient({ maxRetries: 3, retryDelayCap: 50 });
+    await expect(client.post('http://api/test', {})).rejects.toThrow(ExecutionError);
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries 5xx server errors', async () => {
+    const err500: any = new Error('Internal Server Error');
+    err500.response = { status: 500, data: {} };
+    mockedAxios.post
+      .mockRejectedValueOnce(err500)
+      .mockResolvedValueOnce({ data: { id: 'ok' } });
+
+    const client = new HttpClient({ maxRetries: 3, retryDelayCap: 50 });
+    const result = await client.post('http://api/test', {});
+    expect(result).toEqual({ id: 'ok' });
+    expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+  });
 });

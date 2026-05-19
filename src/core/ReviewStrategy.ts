@@ -10,6 +10,7 @@ import { AssetManager } from './AssetManager';
 import { FrontmatterParser } from './FrontmatterParser';
 import {
   ManifestInfo,
+  ManifestAssetEntry,
   DocumentInfo,
   DocumentOutput,
   CircleSummary,
@@ -201,7 +202,7 @@ export class ManifestReviewStrategy implements ReviewStrategy {
 
   listCircleAssets(circleName: string): CircleAssetsResult {
     const { circleDir, manifest } = this.manifestInfo;
-    const assetsMap: Record<string, any> = manifest.assets || {};
+    const assetsMap: Record<string, ManifestAssetEntry> = manifest.assets || {};
 
     const enriched = Object.entries(assetsMap).map(([id, info]) => {
       const outputs = scanOutputPathsRecursive(circleDir, id);
@@ -391,9 +392,9 @@ export class GlobalReviewStrategy implements ReviewStrategy {
     }
 
     const manifest = this.manifestReader.read(manifestPath);
-    const assetsMap: Record<string, any> = manifest.assets || {};
+    const assetsMap: Record<string, ManifestAssetEntry> = manifest.assets || {};
 
-    const enriched = Object.entries(assetsMap).map(([id, info]: [string, any]) => {
+    const enriched = Object.entries(assetsMap).map(([id, info]) => {
       const outputs = scanOutputPathsRecursive(circleDir, id);
       return { id, status: info.status, index: info.index, category: info.category, outputs };
     });

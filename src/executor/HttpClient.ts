@@ -82,6 +82,15 @@ export class HttpClient {
         return await fn();
       } catch (err: any) {
         lastErr = err;
+        // Don't retry 4xx client errors — they are not recoverable
+        const status = err.response?.status;
+        if (typeof status === 'number' && status >= 400 && status < 500) {
+          throw new ExecutionError(
+            OpsVErrorCode.EXECUTION_API_ERROR,
+            `${label} failed with client error ${status}: ${err.message}`,
+            { cause: err.message, status }
+          );
+        }
         if (i < maxRetries - 1) {
           const delay = Math.min(1000 * Math.pow(2, i), cap);
           logger.warn(`[HttpClient] ${label} failed (attempt ${i + 1}/${maxRetries}): ${err.message}. Retrying in ${delay}ms...`);

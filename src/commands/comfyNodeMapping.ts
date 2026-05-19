@@ -10,6 +10,16 @@ import path from 'path';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
 
+// Read version from package.json
+const pkgPath = path.join(__dirname, '../../package.json');
+let pkgVersion = '0.9.0';
+try {
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  pkgVersion = pkg.version || pkgVersion;
+} catch {
+  // fallback
+}
+
 interface NodeMapping {
   nodeId: string;
   fieldName: string;
@@ -96,7 +106,7 @@ export function registerComfyNodeMappingCommand(program: Command): void {
           workflowId: options.workflowId || null,
           workflowPath: path.relative(process.cwd(), filePath),
           nodeMappings,
-          opsvVersion: '0.8.29',
+          opsvVersion: pkgVersion,
         };
 
         const json = JSON.stringify(output, null, 2);

@@ -5,8 +5,8 @@
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
-import { ModelConfig } from '../../../utils/configLoader';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
+import { resolveSize } from '../shared/compilerUtils';
 
 export class SiliconFlowCompiler implements ProviderCompiler {
   readonly provider = 'siliconflow';
@@ -30,7 +30,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     const payload: Record<string, any> = {
       model: modelConfig.model,
       prompt: job.prompt || job.payload.prompt,
-      image_size: this.resolveSize(job.payload.global_settings, modelConfig),
+      image_size: resolveSize(job.payload.global_settings, modelConfig, 'image_size'),
       batch_size: 1,
     };
 
@@ -102,27 +102,5 @@ export class SiliconFlowCompiler implements ProviderCompiler {
         compiledAt: new Date().toISOString(),
       },
     };
-  }
-
-  private resolveSize(globalSettings: any, modelConfig: ModelConfig): string {
-    // Priority: defaults.image_size > quality_map > aspect_ratio sizeMap > fallback
-    if (modelConfig.defaults?.image_size) {
-      return modelConfig.defaults.image_size;
-    }
-
-    const quality = globalSettings?.quality || 'standard';
-    if (modelConfig.quality_map && modelConfig.quality_map[quality]) {
-      return modelConfig.quality_map[quality];
-    }
-
-    const aspect = globalSettings?.aspect_ratio || '1:1';
-    const sizeMap: Record<string, string> = {
-      '1:1': '1024x1024',
-      '16:9': '1920x1080',
-      '9:16': '1080x1920',
-      '4:3': '1024x768',
-      '3:4': '768x1024',
-    };
-    return sizeMap[aspect] || '1024x1024';
   }
 }

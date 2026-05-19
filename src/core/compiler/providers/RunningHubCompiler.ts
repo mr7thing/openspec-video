@@ -7,6 +7,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/OpsVError';
+import { resolveNodeMappingValue } from '../shared/compilerUtils';
 
 export class RunningHubCompiler implements ProviderCompiler {
   readonly provider = 'runninghub';
@@ -53,26 +54,7 @@ export class RunningHubCompiler implements ProviderCompiler {
     // Iterate node_mapping keys and resolve value by OpsV naming convention.
     // ------------------------------------------------------------------------
     for (const [key, mapping] of Object.entries(mappings)) {
-      let value: any = undefined;
-
-      if (key === 'prompt') {
-        value = job.prompt || job.payload.prompt;
-      } else if (key === 'negative_prompt') {
-        value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
-      } else if (/^image\d+$/.test(key)) {
-        const idx = parseInt(key.replace('image', ''), 10) - 1;
-        if (!isNaN(idx) && idx >= 0 && idx < cappedRefImages.length) {
-          value = cappedRefImages[idx];
-        }
-      } else if (key === 'first_frame') {
-        value = job.payload.frame_ref?.first;
-      } else if (key === 'last_frame') {
-        value = job.payload.frame_ref?.last;
-      } else if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') {
-        value = job.payload.extra[key];
-      } else if (modelConfig.defaults && key in modelConfig.defaults) {
-        value = modelConfig.defaults[key];
-      }
+      const value = resolveNodeMappingValue(key, job, cappedRefImages, modelConfig);
 
       if (value !== undefined && value !== null) {
         nodeInfoList.push({

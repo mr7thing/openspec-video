@@ -14,7 +14,8 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { resolveManifestPath, parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
+import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
 import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
@@ -39,7 +40,7 @@ export function registerComfyCommand(program: Command): void {
         const modelKey = options.model;
 
         // Resolve manifest path and project root
-        const manifestPath = resolveManifestPath(cwd, options.manifest);
+        const manifestPath = new ManifestReader().resolveForProduce(cwd, options.manifest);
         const projectRoot = resolveProjectRoot(cwd);
         const circleDir = path.dirname(manifestPath);
 

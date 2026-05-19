@@ -35,9 +35,13 @@ describe('ApproveService', () => {
   function writeManifest(circle: string, assets: Record<string, any>) {
     const dir = path.join(queueRoot, `${circle}`);
     fs.mkdirSync(dir, { recursive: true });
+    const fullAssets: Record<string, any> = {};
+    for (const [id, info] of Object.entries(assets)) {
+      fullAssets[id] = { category: 'element', ...info };
+    }
     fs.writeFileSync(
       path.join(dir, '_manifest.json'),
-      JSON.stringify({ version: '0.9.0', target: 'videospec', generatedAt: new Date().toISOString(), assets, circles: [] })
+      JSON.stringify({ version: '0.9.0', target: 'videospec', generatedAt: new Date().toISOString(), assets: fullAssets, circles: [] })
     );
   }
 

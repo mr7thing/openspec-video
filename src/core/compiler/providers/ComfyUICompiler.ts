@@ -9,6 +9,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { CompilationError, ConfigError, InfrastructureError, OpsVErrorCode } from '../../../errors/OpsVError';
+import { resolveNodeMappingValue } from '../shared/compilerUtils';
 
 interface ComfyUIWorkflowNode {
   inputs?: Record<string, any>;
@@ -92,26 +93,7 @@ export class ComfyUICompiler implements ProviderCompiler {
 
     // Iterate nodeMapping keys, resolve value by OpsV naming convention
     for (const key of Object.keys(ctx.nodeMapping)) {
-      let value: any = undefined;
-
-      if (key === 'prompt') {
-        value = job.prompt || job.payload.prompt;
-      } else if (key === 'negative_prompt') {
-        value = job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
-      } else if (/^image\d+$/.test(key)) {
-        const idx = parseInt(key.replace('image', ''), 10) - 1;
-        if (!isNaN(idx) && idx >= 0 && idx < refImages.length) {
-          value = refImages[idx];
-        }
-      } else if (key === 'first_frame') {
-        value = job.payload.frame_ref?.first;
-      } else if (key === 'last_frame') {
-        value = job.payload.frame_ref?.last;
-      } else if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') {
-        value = job.payload.extra[key];
-      } else if (modelConfig.defaults && key in modelConfig.defaults) {
-        value = modelConfig.defaults[key];
-      }
+      const value = resolveNodeMappingValue(key, job, refImages, modelConfig);
 
       if (value !== undefined && value !== null) {
         parameters[key] = value;

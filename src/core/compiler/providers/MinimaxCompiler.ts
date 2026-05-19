@@ -6,6 +6,7 @@
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
+import { resolveDuration } from '../shared/compilerUtils';
 
 export class MinimaxCompiler implements ProviderCompiler {
   readonly provider = 'minimax';
@@ -68,11 +69,9 @@ export class MinimaxCompiler implements ProviderCompiler {
     }
 
     // Duration: frontmatter > api_config.defaults
-    const duration = job.payload.duration || modelConfig.defaults?.duration;
-    if (duration !== undefined && duration !== null) {
-      const durationStr = String(duration);
-      const durationNum = parseInt(durationStr, 10);
-      payload.duration = isNaN(durationNum) ? duration : durationNum;
+    const duration = resolveDuration(job, modelConfig);
+    if (duration !== undefined) {
+      payload.duration = duration;
     }
 
     if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {

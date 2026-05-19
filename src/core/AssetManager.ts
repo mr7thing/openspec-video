@@ -52,7 +52,7 @@ export class AssetManager {
 
   async loadFromVideospec(): Promise<void> {
     this.assets.clear();
-    const dirs = ['elements', 'scenes'];
+    const dirs = ['elements', 'scenes', 'shots'];
 
     for (const dir of dirs) {
       const dirPath = path.join(this.videospecRoot, dir);

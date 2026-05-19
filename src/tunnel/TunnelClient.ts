@@ -155,7 +155,8 @@ export class TunnelClient {
     let meta: Record<string, unknown>;
     try {
       meta = JSON.parse(payload.subarray(4, 4 + metaLength).toString('utf-8'));
-    } catch {
+    } catch (parseErr: any) {
+      logger.warn('[TunnelClient] Failed to parse meta JSON:', parseErr?.message);
       meta = {};
     }
     const body = payload.subarray(4 + metaLength);

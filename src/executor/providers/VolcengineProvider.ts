@@ -76,18 +76,7 @@ export class VolcengineProvider extends BaseApiProvider<VolcImagePayload | VolcV
   }
 
   protected buildPayload(task: BaseTaskJson<VolcImagePayload | VolcVideoPayload>): unknown {
-    const payload = { ...task.payload };
-    const meta = task._opsv;
-
-    if (meta.type === 'imagen' && Array.isArray((payload as VolcImagePayload).reference_images)) {
-      (payload as VolcImagePayload).reference_images = (payload as VolcImagePayload).reference_images!;
-    }
-
-    if (meta.type === 'video' && Array.isArray((payload as VolcVideoPayload).content)) {
-      // resolution handled at compile time; executor receives pre-resolved URLs
-    }
-
-    return payload;
+    return { ...task.payload };
   }
 
   protected parseTaskId(res: VolcSubmitResponse): string | undefined {

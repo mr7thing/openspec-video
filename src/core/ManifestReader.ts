@@ -8,7 +8,6 @@ import path from 'path';
 import { CircleManifestSchema, CircleManifest, ManifestInfo } from '../types/ManifestSchema';
 import { getProjectDir } from '../utils/configLoader';
 import { resolveWithin, sanitizePathComponent } from '../utils/pathSecurity';
-import { logger } from '../utils/logger';
 import { CompilationError, OpsVErrorCode } from '../errors/OpsVError';
 
 export class ManifestReader {
@@ -22,10 +21,10 @@ export class ManifestReader {
     const result = CircleManifestSchema.safeParse(raw);
     if (!result.success) {
       const errors = result.error.errors.map(e => `  ${e.path.join('.')}: ${e.message}`).join('\n');
-      logger.warn(`Manifest validation warning for ${manifestPath}:\n${errors}`);
-      const fallback = raw as unknown as CircleManifest;
-      this.cache.set(manifestPath, fallback);
-      return fallback;
+      throw new CompilationError(
+        OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+        `Manifest validation failed for ${manifestPath}:\n${errors}`
+      );
     }
     this.cache.set(manifestPath, result.data);
     return result.data;

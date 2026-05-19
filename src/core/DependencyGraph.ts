@@ -9,6 +9,7 @@ import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
+import { escapeRegex } from '../utils/string';
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../../package.json');
@@ -54,10 +55,6 @@ export interface Manifest {
   generatedAt: string;
   circles: ManifestEntry[];
   assets: Record<string, { status: string; index: number; category?: string }>;
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 const ORDINALS = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'eighthcircle', 'ninthcircle'];
@@ -311,16 +308,6 @@ export class DependencyGraph {
     );
 
     return circleDir;
-  }
-
-  // Deprecated: kept for transition, no longer used by commands
-  writeCircleAssets(_queueRoot: string, _circles: CircleDefinition[]): void {
-    throw new Error('writeCircleAssets is deprecated. Use writeCircleDir() instead.');
-  }
-
-  // Deprecated: kept for transition, no longer used by commands
-  writeManifest(_queueRoot: string, _circles: CircleDefinition[]): void {
-    throw new Error('writeManifest is deprecated. Use writeCircleDir() instead.');
   }
 
   private getAssetStatus(id: string): string {

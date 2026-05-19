@@ -14,6 +14,7 @@ import { resolveProjectRoot } from '../utils/projectResolver';
 import { getProjectDir } from '../utils/configLoader';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
 import { CompilationError, OpsVErrorCode } from '../errors/OpsVError';
+import { escapeRegex } from '../utils/string';
 
 export interface ProduceCommandOptions {
   model: string;
@@ -22,10 +23,6 @@ export interface ProduceCommandOptions {
   statusSkip?: string;
   file?: string;
   dryRun?: boolean;
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -47,14 +44,6 @@ export function resolveModelQueueDir(circleDir: string, modelKey: string): strin
   const nextN = maxN + 1;
   const suffix = nextN.toString().padStart(3, '0');
   return path.join(circleDir, `${modelKey}_${suffix}`);
-}
-
-/**
- * @deprecated Use ManifestReader.resolveForProduce instead.
- */
-export function resolveManifestPath(cwd: string, manifestOption?: string): string {
-  const { ManifestReader } = require('../core/ManifestReader');
-  return new ManifestReader().resolveForProduce(cwd, manifestOption);
 }
 
 export function parseStatusSkip(statusSkipOption?: string): string[] {
@@ -96,7 +85,7 @@ export async function buildProduceContext(projectRoot: string) {
   const videospecDir = getProjectDir(projectRoot, 'videospec');
   const assetIndex = buildAssetDocIndex(videospecDir);
   approvedRefReader.setAssetIndex(assetIndex);
-  (refResolver as any).assetIndex = assetIndex;
+  refResolver.setAssetIndex(assetIndex);
 
   return { assetManager, approvedRefReader, designRefReader, refResolver };
 }

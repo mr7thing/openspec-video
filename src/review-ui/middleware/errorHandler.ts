@@ -27,11 +27,11 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  if (err.message === 'Invalid circle or assetId') {
+  if (err.message === 'Invalid circle or assetId' || (err as any).code === 'E7001') {
     res.status(400).json({ error: err.message });
     return;
   }
-  if (err.message === 'Forbidden') {
+  if (err.message === 'Forbidden' || (err as any).code === 'E5003') {
     res.status(403).json({ error: err.message });
     return;
   }

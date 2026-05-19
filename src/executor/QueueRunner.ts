@@ -156,20 +156,36 @@ export class QueueRunner {
     handler: ProviderExecutor,
     results: ProviderResult[]
   ): Promise<void> {
-    const executing = new Set<Promise<void>>();
+    let running = 0;
+    const waitQueue: (() => void)[] = [];
 
-    for (const { task, path: taskPath } of entries) {
-      const promise = this.runTask(task, taskPath, handler, results).finally(() => {
-        executing.delete(promise);
-      });
-      executing.add(promise);
-
-      if (executing.size >= concurrency) {
-        await Promise.race(executing);
+    const release = () => {
+      running--;
+      if (waitQueue.length > 0) {
+        waitQueue.shift()!();
       }
-    }
+    };
 
-    await Promise.all(executing);
+    const acquire = (): Promise<void> => {
+      if (running < concurrency) {
+        running++;
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        waitQueue.push(resolve);
+      });
+    };
+
+    const tasks = entries.map(async ({ task, path: taskPath }) => {
+      await acquire();
+      try {
+        await this.runTask(task, taskPath, handler, results);
+      } finally {
+        release();
+      }
+    });
+
+    await Promise.all(tasks);
   }
 
   private collectTasks(

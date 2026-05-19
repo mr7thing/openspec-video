@@ -26,6 +26,10 @@ export class RefResolver {
     private approvedRefReader: ApprovedRefReader
   ) {}
 
+  setAssetIndex(index: AssetDocIndex): void {
+    this.assetIndex = index;
+  }
+
   private getAssetIndex(): AssetDocIndex {
     if (!this.assetIndex) {
       const videospecDir = getProjectDir(this.projectRoot, 'videospec');
@@ -123,7 +127,13 @@ export class RefResolver {
     let framePath: string | undefined;
 
     if (fs.existsSync(queueRoot)) {
-      const circleDirs = fs.readdirSync(queueRoot).filter((d) => /_circle\d+$/.test(d));
+      const circleDirs = fs.readdirSync(queueRoot)
+        .filter((d) => /_circle\d+$/.test(d))
+        .sort((a, b) => {
+          const numA = parseInt(a.match(/_circle(\d+)$/)?.[1] || '0', 10);
+          const numB = parseInt(b.match(/_circle(\d+)$/)?.[1] || '0', 10);
+          return numB - numA; // descending: latest circle first
+        });
       for (const circleDir of circleDirs) {
         const circlePath = path.join(queueRoot, circleDir);
         let stats;

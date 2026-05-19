@@ -14,10 +14,7 @@
 
 import path from 'path';
 import fs from 'fs';
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import { escapeRegex } from '../utils/string';
 
 export function deriveOutputBase(taskPath: string): string {
   return path.basename(taskPath, '.json');
