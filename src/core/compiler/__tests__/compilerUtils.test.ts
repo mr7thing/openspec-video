@@ -1,4 +1,5 @@
-import { resolveNodeMappingValue, resolveSize, resolveDuration } from '../shared/compilerUtils';
+import { resolveSize, resolveDuration } from '../shared/compilerUtils';
+import { evaluateSource, evaluateInputs, InputEvalContext } from '../shared/InputEvaluator';
 import { Job } from '../../../types/Job';
 import { ModelConfig } from '../../../utils/configLoader';
 
@@ -19,36 +20,13 @@ const baseConfig: ModelConfig = {
   defaults: { negative_prompt: 'default_neg', seed: 42 },
 };
 
+const baseEvalCtx: InputEvalContext = {
+  job: baseJob,
+  modelConfig: baseConfig,
+  referenceImages: ['img_a.png', 'img_b.png'],
+};
+
 describe('compilerUtils', () => {
-  describe('resolveNodeMappingValue', () => {
-    it('resolves prompt', () => {
-      expect(resolveNodeMappingValue('prompt', baseJob, [], baseConfig)).toBe('a cat');
-    });
-
-    it('resolves negative_prompt from extra', () => {
-      expect(resolveNodeMappingValue('negative_prompt', baseJob, [], baseConfig)).toBe('blurry');
-    });
-
-    it('falls back to config default for negative_prompt', () => {
-      const job = { ...baseJob, payload: { ...baseJob.payload, extra: { media_refs: [] } } };
-      expect(resolveNodeMappingValue('negative_prompt', job, [], baseConfig)).toBe('default_neg');
-    });
-
-    it('resolves imageN from refImages', () => {
-      expect(resolveNodeMappingValue('image1', baseJob, ['img_a.png'], baseConfig)).toBe('img_a.png');
-      expect(resolveNodeMappingValue('image2', baseJob, ['img_a.png'], baseConfig)).toBeUndefined();
-    });
-
-    it('resolves extra fields', () => {
-      const job = { ...baseJob, payload: { ...baseJob.payload, extra: { media_refs: [], style: 'anime' } } };
-      expect(resolveNodeMappingValue('style', job, [], baseConfig)).toBe('anime');
-    });
-
-    it('falls back to model config defaults', () => {
-      expect(resolveNodeMappingValue('seed', baseJob, [], baseConfig)).toBe(42);
-    });
-  });
-
   describe('resolveSize', () => {
     it('returns defaults size when set', () => {
       const config = { ...baseConfig, defaults: { size: '512x512' } };
@@ -87,6 +65,58 @@ describe('compilerUtils', () => {
 
     it('returns undefined when no duration', () => {
       expect(resolveDuration(baseJob, baseConfig)).toBeUndefined();
+    });
+  });
+
+  describe('InputEvaluator (replaces resolveNodeMappingValue)', () => {
+    it('resolves prompt shorthand', () => {
+      expect(evaluateSource('prompt', baseEvalCtx)).toBe('a cat');
+    });
+
+    it('resolves negative_prompt shorthand', () => {
+      expect(evaluateSource('negative_prompt', baseEvalCtx)).toBe('blurry');
+    });
+
+    it('falls back to config default for negative_prompt', () => {
+      const ctx = { ...baseEvalCtx, job: { ...baseJob, payload: { ...baseJob.payload, extra: { media_refs: [] } } } };
+      expect(evaluateSource('negative_prompt', ctx)).toBe('default_neg');
+    });
+
+    it('resolves reference_images[N]', () => {
+      expect(evaluateSource('reference_images[0]', baseEvalCtx)).toBe('img_a.png');
+      expect(evaluateSource('reference_images[1]', baseEvalCtx)).toBe('img_b.png');
+      expect(evaluateSource('reference_images[5]', baseEvalCtx)).toBeUndefined();
+    });
+
+    it('resolves reference_images full array', () => {
+      expect(evaluateSource('reference_images', baseEvalCtx)).toEqual(['img_a.png', 'img_b.png']);
+    });
+
+    it('resolves default.X path', () => {
+      expect(evaluateSource('default.seed', baseEvalCtx)).toBe(42);
+    });
+
+    it('resolves first_frame / last_frame', () => {
+      const job: Job = { ...baseJob, payload: { ...baseJob.payload, frame_ref: { first: 'frame1.png', last: 'frame2.png' } } };
+      const ctx = { ...baseEvalCtx, job };
+      expect(evaluateSource('first_frame', ctx)).toBe('frame1.png');
+      expect(evaluateSource('last_frame', ctx)).toBe('frame2.png');
+    });
+
+    it('resolves job.payload.prompt path', () => {
+      expect(evaluateSource('job.payload.prompt', baseEvalCtx)).toBe('a cat');
+    });
+
+    it('evaluateInputs resolves full config', () => {
+      const inputs = {
+        prompt: { source: 'prompt' },
+        image1: { source: 'reference_images[0]' },
+        seed: { source: 'default.seed' },
+      };
+      const result = evaluateInputs(inputs, baseEvalCtx);
+      expect(result.prompt).toBe('a cat');
+      expect(result.image1).toBe('img_a.png');
+      expect(result.seed).toBe(42);
     });
   });
 });

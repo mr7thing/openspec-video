@@ -4,6 +4,7 @@
 
 import { Job, BaseTaskJson } from '../../types/Job';
 import { ModelConfig } from '../../utils/configLoader';
+import { ResolvedRef, TypedSectionRef } from '../../types/FrontmatterSchema';
 
 export interface CompileContext {
   job: Job;
@@ -20,6 +21,9 @@ export interface CompileContext {
   refCount?: number;
   nodeMapping?: Record<string, { nodeId: string; fieldName: string }>;
   forceApiMapping?: boolean;
+  resolvedRefs?: ResolvedRef[];
+  typedSectionRefs?: TypedSectionRef[];
+  groupedInputs?: Record<string, string[]>;
 }
 
 export interface ProviderCompiler {

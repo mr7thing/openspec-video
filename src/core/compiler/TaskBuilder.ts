@@ -19,6 +19,9 @@ import { logger } from '../../utils/logger';
 import { CompilationError, ConfigError, OpsVErrorCode } from '../../errors/OpsVError';
 import { Container } from '../../container/Container';
 import { OpsVContext } from '../../container/OpsVContext';
+import { parseRefs, parseTypedSections, resolveToInputs } from '../RefBinder';
+import { FrontmatterParser } from '../FrontmatterParser';
+import { RefEntry, ResolvedRef, TypedSectionRef } from '../../types/FrontmatterSchema';
 
 const COMPILERS: Record<string, new () => ProviderCompiler> = {
   volcengine: VolcengineCompiler,
@@ -56,6 +59,31 @@ export class TaskBuilder {
     const results: BaseTaskJson<unknown>[] = [];
 
     for (const job of jobs) {
+      // Resolve refs via RefBinder if job has frontmatter refs
+      let resolvedRefs: ResolvedRef[] | undefined;
+      let typedSectionRefs: TypedSectionRef[] | undefined;
+      let groupedInputs: Record<string, string[]> | undefined;
+
+      if (job._meta?.source && this.ctx.projectRoot) {
+        try {
+          const sourcePath = job._meta.source;
+          if (sourcePath && fs.existsSync(sourcePath)) {
+            const content = fs.readFileSync(sourcePath, 'utf-8');
+            const { frontmatter, body } = FrontmatterParser.parseRaw(content);
+            const rawRefs: RefEntry[] = frontmatter.refs || [];
+
+            if (rawRefs.length > 0) {
+              const binderCtx = { projectRoot: this.ctx.projectRoot };
+              resolvedRefs = parseRefs(rawRefs, binderCtx);
+              typedSectionRefs = parseTypedSections(body);
+              groupedInputs = resolveToInputs(resolvedRefs, typedSectionRefs, binderCtx);
+            }
+          }
+        } catch (err: any) {
+          logger.debug(`TaskBuilder: RefBinder skipped for ${job.id}: ${err.message}`);
+        }
+      }
+
       const ctx: CompileContext = {
         job,
         modelKey,
@@ -73,6 +101,9 @@ export class TaskBuilder {
         nodeMapping: forceApiMapping
           ? (modelConfig.node_mappings && Object.keys(modelConfig.node_mappings).length > 0 ? modelConfig.node_mappings : {})
           : (job.node_mapping && Object.keys(job.node_mapping).length > 0 ? job.node_mapping : modelConfig.node_mappings),
+        resolvedRefs,
+        typedSectionRefs,
+        groupedInputs,
       };
 
       const taskJson = compiler.compile(ctx);

@@ -7,6 +7,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 import { resolveDuration } from '../shared/compilerUtils';
+import { evaluateInputs, applyToPayload, InputEvalContext } from '../shared/InputEvaluator';
 
 export class MinimaxCompiler implements ProviderCompiler {
   readonly provider = 'minimax';
@@ -33,7 +34,13 @@ export class MinimaxCompiler implements ProviderCompiler {
       aspect_ratio: job.payload.global_settings?.aspect_ratio || modelConfig.defaults?.aspect_ratio || '1:1',
     };
 
-    if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
       payload.reference_image = ctx.referenceImages[0];
     }
 
@@ -74,7 +81,13 @@ export class MinimaxCompiler implements ProviderCompiler {
       payload.duration = duration;
     }
 
-    if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
       payload.first_frame_image = job.payload.frame_ref.first;
     }
 

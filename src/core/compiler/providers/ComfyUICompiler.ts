@@ -9,7 +9,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { CompilationError, ConfigError, InfrastructureError, OpsVErrorCode } from '../../../errors/OpsVError';
-import { resolveNodeMappingValue } from '../shared/compilerUtils';
+import { evaluateInputs, applyToNodeMapping, InputEvalContext } from '../shared/InputEvaluator';
 
 interface ComfyUIWorkflowNode {
   inputs?: Record<string, any>;
@@ -91,12 +91,24 @@ export class ComfyUICompiler implements ProviderCompiler {
       refImages = refImages.slice(0, modelConfig.max_reference_images);
     }
 
-    // Iterate nodeMapping keys, resolve value by OpsV naming convention
-    for (const key of Object.keys(ctx.nodeMapping)) {
-      const value = resolveNodeMappingValue(key, job, refImages, modelConfig);
+    // Resolve inputs via InputEvaluator (uses api_config inputs if defined)
+    const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: refImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+    const inputs = modelConfig.inputs;
 
-      if (value !== undefined && value !== null) {
-        parameters[key] = value;
+    if (inputs && Object.keys(inputs).length > 0) {
+      // New path: evaluate configured inputs, then apply to node mapping
+      const values = evaluateInputs(inputs, evalCtx);
+      Object.assign(parameters, values);
+    } else {
+      // Legacy path: resolve nodeMapping keys by naming convention
+      for (const key of Object.keys(ctx.nodeMapping)) {
+        // Inline fallback for keys not resolved by InputEvaluator
+        if (!(key in parameters)) {
+          const value = resolveLegacyValue(key, evalCtx);
+          if (value !== undefined && value !== null) {
+            parameters[key] = value;
+          }
+        }
       }
     }
 
@@ -180,21 +192,24 @@ export class ComfyUICompiler implements ProviderCompiler {
     params: Record<string, any>,
     nodeMapping: Record<string, { nodeId: string; fieldName: string }>
   ): void {
-    for (const [paramKey, value] of Object.entries(params)) {
-      const mapping = nodeMapping[paramKey];
-      if (!mapping) continue;
-
-      const node = workflow[mapping.nodeId];
-      if (!node) {
-        logger.warn(`ComfyUICompiler: nodeId "${mapping.nodeId}" not found in workflow for param "${paramKey}"`);
-        continue;
-      }
-      if (!node.inputs) {
-        logger.warn(`ComfyUICompiler: node "${mapping.nodeId}" has no inputs for param "${paramKey}"`);
-        continue;
-      }
-
-      node.inputs[mapping.fieldName] = value;
-    }
+    applyToNodeMapping(params, nodeMapping, workflow);
   }
+}
+
+// Legacy value resolution (fallback when no inputs config)
+function resolveLegacyValue(key: string, ctx: InputEvalContext): unknown {
+  const { job, modelConfig } = ctx;
+  if (key === 'prompt') return job.prompt || job.payload.prompt;
+  if (key === 'negative_prompt') return job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
+  if (/^image\d+$/.test(key)) {
+    const idx = parseInt(key.replace('image', ''), 10) - 1;
+    const imgs = ctx.referenceImages || [];
+    if (!isNaN(idx) && idx >= 0 && idx < imgs.length) return imgs[idx];
+    return undefined;
+  }
+  if (key === 'first_frame') return job.payload.frame_ref?.first;
+  if (key === 'last_frame') return job.payload.frame_ref?.last;
+  if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') return job.payload.extra[key];
+  if (modelConfig.defaults && key in modelConfig.defaults) return (modelConfig.defaults as any)[key];
+  return undefined;
 }

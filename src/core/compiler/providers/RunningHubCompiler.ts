@@ -7,7 +7,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/OpsVError';
-import { resolveNodeMappingValue } from '../shared/compilerUtils';
+import { evaluateInputs, buildNodeInfoList, InputEvalContext } from '../shared/InputEvaluator';
 
 export class RunningHubCompiler implements ProviderCompiler {
   readonly provider = 'runninghub';
@@ -50,18 +50,26 @@ export class RunningHubCompiler implements ProviderCompiler {
     }
 
     // ------------------------------------------------------------------------
-    // Map parameters via nodeMapping (unified logic for all comfy providers)
-    // Iterate node_mapping keys and resolve value by OpsV naming convention.
+    // Resolve inputs via InputEvaluator (uses api_config inputs if defined)
     // ------------------------------------------------------------------------
-    for (const [key, mapping] of Object.entries(mappings)) {
-      const value = resolveNodeMappingValue(key, job, cappedRefImages, modelConfig);
+    const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: cappedRefImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+    const inputs = modelConfig.inputs;
 
-      if (value !== undefined && value !== null) {
-        nodeInfoList.push({
-          nodeId: mapping.nodeId,
-          fieldName: mapping.fieldName,
-          fieldValue: value,
-        });
+    if (inputs && Object.keys(inputs).length > 0) {
+      const values = evaluateInputs(inputs, evalCtx);
+      const mapped = buildNodeInfoList(values, mappings);
+      nodeInfoList.push(...mapped);
+    } else {
+      // Legacy path: resolve nodeMapping keys by naming convention
+      for (const [key, mapping] of Object.entries(mappings)) {
+        const value = resolveLegacyValue(key, evalCtx);
+        if (value !== undefined && value !== null) {
+          nodeInfoList.push({
+            nodeId: mapping.nodeId,
+            fieldName: mapping.fieldName,
+            fieldValue: value,
+          });
+        }
       }
     }
 
@@ -109,4 +117,22 @@ export class RunningHubCompiler implements ProviderCompiler {
       },
     };
   }
+}
+
+// Legacy value resolution (fallback when no inputs config)
+function resolveLegacyValue(key: string, ctx: InputEvalContext): unknown {
+  const { job, modelConfig } = ctx;
+  if (key === 'prompt') return job.prompt || job.payload.prompt;
+  if (key === 'negative_prompt') return job.payload.extra?.negative_prompt || modelConfig.defaults?.negative_prompt;
+  if (/^image\d+$/.test(key)) {
+    const idx = parseInt(key.replace('image', ''), 10) - 1;
+    const imgs = ctx.referenceImages || [];
+    if (!isNaN(idx) && idx >= 0 && idx < imgs.length) return imgs[idx];
+    return undefined;
+  }
+  if (key === 'first_frame') return job.payload.frame_ref?.first;
+  if (key === 'last_frame') return job.payload.frame_ref?.last;
+  if (job.payload.extra && key in job.payload.extra && key !== 'media_refs') return job.payload.extra[key];
+  if (modelConfig.defaults && key in modelConfig.defaults) return (modelConfig.defaults as any)[key];
+  return undefined;
 }

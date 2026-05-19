@@ -35,6 +35,11 @@ export interface RetryConfig {
   delay_cap?: number;
 }
 
+export interface InputBinding {
+  source: string;
+  target?: string;
+}
+
 export interface ModelConfig {
   provider: string;
   type?: 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
@@ -63,6 +68,7 @@ export interface ModelConfig {
   concurrency?: number;
   workflowId?: string;
   node_mappings?: Record<string, { nodeId: string; fieldName: string }>;
+  inputs?: Record<string, InputBinding>;
   timeout?: TimeoutConfig;
   max_poll_duration?: number;
   retry?: RetryConfig;

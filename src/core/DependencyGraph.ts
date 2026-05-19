@@ -26,7 +26,7 @@ export interface ParsedDocument {
   filePath: string;
   frontmatter: {
     category?: string;
-    refs?: string[];
+    refs?: Array<{ id: string; type?: string }>;
     status?: string;
   };
 }
@@ -75,7 +75,7 @@ export class DependencyGraph {
 
       if (doc.frontmatter.refs) {
         for (const ref of doc.frontmatter.refs) {
-          let cleanId = ref.startsWith('@') ? ref.slice(1) : ref;
+          let cleanId = ref.id.startsWith('@') ? ref.id.slice(1) : ref.id;
           const colonIdx = cleanId.indexOf(':');
           if (colonIdx > 0) {
             cleanId = cleanId.slice(0, colonIdx);
@@ -375,7 +375,7 @@ export class DependencyGraph {
     for (const doc of documents) {
       if (doc.frontmatter.refs) {
         for (const ref of doc.frontmatter.refs) {
-          let cleanId = ref.startsWith('@') ? ref.slice(1) : ref;
+          let cleanId = ref.id.startsWith('@') ? ref.id.slice(1) : ref.id;
           const colonIdx = cleanId.indexOf(':');
           if (colonIdx > 0) cleanId = cleanId.slice(0, colonIdx);
           if (!targetAssetIds.has(cleanId)) {

@@ -7,6 +7,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 import { resolveSize } from '../shared/compilerUtils';
+import { evaluateInputs, applyToPayload, InputEvalContext } from '../shared/InputEvaluator';
 
 export class SiliconFlowCompiler implements ProviderCompiler {
   readonly provider = 'siliconflow';
@@ -43,7 +44,13 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       }
     }
 
-    if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
       payload.image = ctx.referenceImages[0];
     }
 
@@ -72,12 +79,21 @@ export class SiliconFlowCompiler implements ProviderCompiler {
       prompt: job.prompt || job.payload.prompt,
     };
 
-    if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
-      payload.image = job.payload.frame_ref.first;
-    }
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else {
+      // Legacy: hardcoded frame ref injection
+      if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
+        payload.image = job.payload.frame_ref.first;
+      }
 
-    if (job.payload.frame_ref?.last && modelConfig.supports_last_image) {
-      payload.tail_image = job.payload.frame_ref.last;
+      if (job.payload.frame_ref?.last && modelConfig.supports_last_image) {
+        payload.tail_image = job.payload.frame_ref.last;
+      }
     }
 
     // Merge defaults (image_size, seed, etc.)

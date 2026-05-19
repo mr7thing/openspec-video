@@ -93,6 +93,27 @@ models:
     max_reference_videos: 3
     supports_reference_audios: true
     max_reference_audios: 1
+    inputs:
+      # key 对齐 frontmatter ### <type> 子标题
+      # source = 数据来源快捷路径, target = API payload 注入位置
+      prompt:
+        source: prompt
+        target: content[0].text
+      first_frame:
+        source: first_frame
+        target: content[].image_url
+      last_frame:
+        source: last_frame
+        target: content[].image_url
+      image:
+        source: reference_images
+        target: content[].image_url
+      video:
+        source: reference_videos
+        target: content[].video_url
+      audio:
+        source: reference_audios
+        target: content[].audio_url
     defaults:
       ratio: "16:9"
       duration: 5
@@ -261,6 +282,17 @@ models:
     supports_first_image: true
     supports_reference_images: true
     max_reference_images: 4
+    inputs:
+      # inputs key 与 node_mappings key 对齐
+      # inputs 解析值，node_mappings 指定注入位置
+      prompt:
+        source: prompt
+      negative_prompt:
+        source: negative_prompt
+      seed:
+        source: default.seed
+      image1:
+        source: reference_images[0]
     node_mappings:
       # 提示词节点 (通常是 CLIPTextEncode 或 CR Prompt Text)
       prompt:

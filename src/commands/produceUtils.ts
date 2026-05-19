@@ -125,7 +125,7 @@ export function validateRefStatuses(
 
     if (frontmatter.refs && Array.isArray(frontmatter.refs)) {
       for (const ref of frontmatter.refs) {
-        let refId = ref.startsWith('@') ? ref.slice(1) : ref;
+        let refId = ref.id.startsWith('@') ? ref.id.slice(1) : ref.id;
         const colonIdx = refId.indexOf(':');
         if (colonIdx > 0) {
           refId = refId.slice(0, colonIdx);

@@ -140,12 +140,12 @@ async function buildVideoJob(
   let referenceImages: string[] = [];
   if (frontmatter.refs && frontmatter.refs.length > 0) {
     // Check if refs are direct paths (start with . or /) or @asset references
-    const directPaths = frontmatter.refs.filter((r: string) => r.startsWith('.') || r.startsWith('/'));
-    const assetRefs = frontmatter.refs.filter((r: string) => !r.startsWith('.') && !r.startsWith('/'));
+    const directPaths = frontmatter.refs.filter((r: any) => r.id.startsWith('.') || r.id.startsWith('/'));
+    const assetRefs = frontmatter.refs.filter((r: any) => !r.id.startsWith('.') && !r.id.startsWith('/'));
 
     // Resolve direct paths relative to the shotlist file
-    for (const refPath of directPaths) {
-      const resolved = resolveFrameRef(filePath, refPath);
+    for (const ref of directPaths) {
+      const resolved = resolveFrameRef(filePath, ref.id);
       if (resolved) referenceImages.push(resolved);
     }
 

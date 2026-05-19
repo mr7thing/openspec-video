@@ -18,6 +18,27 @@ export const NodeMappingSchema = z.record(z.object({
 }));
 export type NodeMapping = z.infer<typeof NodeMappingSchema>;
 
+export const RefEntrySchema = z.object({
+  id: z.string(),
+  type: z.string().optional(),
+});
+export type RefEntry = z.infer<typeof RefEntrySchema>;
+
+export interface ResolvedRef {
+  id: string;
+  variant?: string;
+  type: string;
+  docPath: string;
+  outputs: string[];
+}
+
+export interface TypedSectionRef {
+  type: string;
+  refId: string;
+  label: string;
+  variant?: string;
+}
+
 export const BaseFrontmatterSchema = z.object({
   category: z.string(),
   status: StatusEnum,
@@ -25,7 +46,7 @@ export const BaseFrontmatterSchema = z.object({
   visual_detailed: z.string().optional(),
   prompt: z.string().optional(),
   negative_prompt: z.string().optional(),
-  refs: z.array(z.string()).optional(),
+  refs: z.array(RefEntrySchema).optional(),
   reviews: z.array(z.string()).optional(),
   workflow: z.string().optional(),              // Deprecated: use workflow_id or workflow_path
   workflow_id: z.string().optional(),            // RunningHub workflowId

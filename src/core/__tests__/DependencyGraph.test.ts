@@ -1,7 +1,7 @@
 import { DependencyGraph, ParsedDocument } from '../DependencyGraph';
 
 function makeDoc(id: string, refs: string[] = []): ParsedDocument {
-  return { id, filePath: `/fake/${id}.md`, frontmatter: { refs } };
+  return { id, filePath: `/fake/${id}.md`, frontmatter: { refs: refs.map(r => ({ id: r })) } };
 }
 
 describe('DependencyGraph', () => {

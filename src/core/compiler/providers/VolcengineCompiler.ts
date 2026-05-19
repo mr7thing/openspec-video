@@ -7,6 +7,7 @@ import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
 import { resolveSize, resolveDuration } from '../shared/compilerUtils';
+import { evaluateInputs, applyToPayload, InputEvalContext } from '../shared/InputEvaluator';
 
 export class VolcengineCompiler implements ProviderCompiler {
   readonly provider = 'volcengine';
@@ -52,7 +53,13 @@ export class VolcengineCompiler implements ProviderCompiler {
       }
     }
 
-    if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
       payload.reference_images = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
     }
 
@@ -105,32 +112,41 @@ export class VolcengineCompiler implements ProviderCompiler {
       }
     }
 
-    if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
-      payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.first }, role: 'first_frame' });
-    }
-
-    if (job.payload.frame_ref?.last && modelConfig.supports_last_image) {
-      payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.last }, role: 'last_frame' });
-    }
-
-    if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
-      const refs = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
-      for (const url of refs) {
-        payload.content.push({ type: 'image_url', image_url: { url }, role: 'reference_image' });
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else {
+      // Legacy: hardcoded reference injection
+      if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
+        payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.first }, role: 'first_frame' });
       }
-    }
 
-    if (ctx.referenceVideos && ctx.referenceVideos.length > 0 && modelConfig.supports_reference_videos) {
-      const refs = ctx.referenceVideos.slice(0, modelConfig.max_reference_videos || 3);
-      for (const url of refs) {
-        payload.content.push({ type: 'video_url', video_url: { url }, role: 'reference_video' });
+      if (job.payload.frame_ref?.last && modelConfig.supports_last_image) {
+        payload.content.push({ type: 'image_url', image_url: { url: job.payload.frame_ref.last }, role: 'last_frame' });
       }
-    }
 
-    if (ctx.referenceAudios && ctx.referenceAudios.length > 0 && modelConfig.supports_reference_audios) {
-      const refs = ctx.referenceAudios.slice(0, modelConfig.max_reference_audios || 1);
-      for (const url of refs) {
-        payload.content.push({ type: 'audio_url', audio_url: { url }, role: 'reference_audio' });
+      if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
+        const refs = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
+        for (const url of refs) {
+          payload.content.push({ type: 'image_url', image_url: { url }, role: 'reference_image' });
+        }
+      }
+
+      if (ctx.referenceVideos && ctx.referenceVideos.length > 0 && modelConfig.supports_reference_videos) {
+        const refs = ctx.referenceVideos.slice(0, modelConfig.max_reference_videos || 3);
+        for (const url of refs) {
+          payload.content.push({ type: 'video_url', video_url: { url }, role: 'reference_video' });
+        }
+      }
+
+      if (ctx.referenceAudios && ctx.referenceAudios.length > 0 && modelConfig.supports_reference_audios) {
+        const refs = ctx.referenceAudios.slice(0, modelConfig.max_reference_audios || 1);
+        for (const url of refs) {
+          payload.content.push({ type: 'audio_url', audio_url: { url }, role: 'reference_audio' });
+        }
       }
     }
 

@@ -16,7 +16,7 @@ export interface Asset {
   id: string;
   category: string;
   status: string;
-  refs: string[];
+  refs: Array<{ id: string; type?: string }>;
   description: string;
   approvedRefs: ApprovedRef[];
   designRefs: DesignRef[];

@@ -92,7 +92,7 @@ export function registerValidateCommand(program: Command, version: string): void
             const content = fs.readFileSync(entry.filePath, 'utf-8');
             const { frontmatter } = FrontmatterParser.parseRaw(content);
 
-            const refsInFrontmatter = frontmatter.refs || [];
+            const refsInFrontmatter = (frontmatter.refs || []).map((r: any) => r.id || r);
             const refsInBody = extractRefsFromBody(content);
 
             const allRefs = [...refsInFrontmatter, ...refsInBody];
