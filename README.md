@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.8.29
+# OpenSpec-Video (OpsV) v0.9.0
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -187,7 +187,7 @@ workflows/
     "prompt": { "nodeId": "3", "fieldName": "text" },
     "image":  { "nodeId": "5", "fieldName": "image" }
   },
-  "opsvVersion": "0.8.29"
+  "opsvVersion": "0.9.0"
 }
 ```
 
@@ -222,7 +222,7 @@ opsv comfy-node-mapping workflows/my_workflow.json --workflow-id rh_abc123 -o wo
     "prompt": { "nodeId": "3", "fieldName": "text" },
     "image":  { "nodeId": "5", "fieldName": "image" }
   },
-  "opsvVersion": "0.8.29"
+  "opsvVersion": "0.9.0"
 }
 ```
 
@@ -315,7 +315,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.8.29",
+  "version": "0.9.0",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [
@@ -342,6 +342,56 @@ drafting → syncing → approved
 ### API Configuration
 
 All provider API URLs and models must be configured in `.opsv/api_config.yaml`. No hardcoded defaults.
+
+### Input Binding (v0.9.0)
+
+OpsV v0.9.0 introduces a unified input binding chain: **frontmatter refs → type classification → api_config inputs → API payload**.
+
+**Structured refs** in frontmatter (replaces string array):
+
+```yaml
+refs:
+  - id: "@hero"
+    type: image            # image / video / audio / bvh / mask / custom
+  - id: "@bgm"
+    type: audio
+  - id: "@style:night"     # variant reference
+    type: image
+```
+
+**Typed sections** in body (aligns with api_config `inputs` keys):
+
+```markdown
+### image
+[Hero design](#hero)         # internal ref → resolves to hero's image output
+[Style ref](#style:night)     # variant ref
+
+### audio
+[Background music](#bgm)
+```
+
+**api_config inputs** (configurable, zero-hardcode):
+
+```yaml
+volc.seedance2:
+  inputs:
+    prompt:
+      source: prompt
+      target: content[0].text
+    first_frame:
+      source: first_frame
+      target: content[].image_url
+    image:
+      source: reference_images
+      target: content[].image_url
+    audio:
+      source: reference_audios
+      target: content[].audio_url
+```
+
+**Source shortcuts**: `prompt`, `negative_prompt`, `first_frame`, `last_frame`, `reference_images[N]`, `reference_videos`, `reference_audios`, `job.payload.X`, `default.X`
+
+Compilers use `InputEvaluator` when `inputs` is configured, falling back to legacy naming convention for backward compatibility.
 
 ---
 
@@ -410,4 +460,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.8.29 | 2026-05-18*
+> *OpsV v0.9.0 | 2026-05-19*
