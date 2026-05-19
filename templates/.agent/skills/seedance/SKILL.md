@@ -276,7 +276,8 @@ duration: "5s"
 first_frame: null
 last_frame: null
 refs:
-  - "../../opsv-queue/.../参考图.png"
+  - id: "../../opsv-queue/.../参考图.png"
+    type: image
 ref_videos:
   - "https://.../参考视频.mp4"
 ref_audios:

@@ -6,13 +6,15 @@ visual_detailed: >
   画面中应有大量的留白，模拟宣纸的质感。
 status: drafting
 refs:
-  - "story.md#Act 1"
+  - id: "@story"
+    type: image
 reviews: []
 ---
 
 # Video Script - Episode 1
 
 > 规范指引：正文应具备完整的场景描写文法。支持两种引用：全局资产 (@id) 和 镜头局部参考 (![]())。
+> 类型化引用：### <type> 子标题对齐 api_config inputs key，[标题](#refid) 引用资产输出。
 
 ## Shot 1 (5s)
 那只脆弱的 蝴蝶 (@role_butterfly) 在一间 幽暗的室內 (@scene_cocoon) 中开始了破茧过程。

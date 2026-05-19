@@ -22,7 +22,8 @@ node_mapping:                          # 用 opsv comfy-node-mapping <workflow.j
     # 支持 seed: random（自动替换为随机自然数）
 # CLI: opsv comfy --model <key> --force-api-mapping  # 强制使用 api_config 的 mapping
 refs:
-  - role_hero
+  - id: "@role_hero"
+    type: image
 ---
 
 ## Vision

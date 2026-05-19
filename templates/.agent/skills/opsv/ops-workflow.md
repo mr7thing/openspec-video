@@ -263,7 +263,7 @@ opsv circle refresh
 **场景 A：依赖变更后的重新分层**
 
 ```bash
-# 导演修改了 scenes/classroom.md，新增 refs: ["@blackboard"]
+# 导演修改了 scenes/classroom.md，新增 refs: [{ id: "@blackboard", type: image }]
 opsv validate              # 1. 先校验文档语法
 opsv circle refresh        # 2. 刷新！确认 classroom 是否从 ZeroCircle 漂移到 FirstCircle
 # → 根据新分层决定是否需要重新编译任务列表

@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.8.28 核心框架 — Circle 架构、资产管线、任务编排与审查协议。
+description: OpsV v0.9.0 核心框架 — Circle 架构、资产管线、输入绑定、任务编排与审查协议。
 ---
 
-# OpsV 框架规范 (v0.8.28)
+# OpsV 框架规范 (v0.9.0)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -53,6 +53,72 @@ OpsV 区分两种参考图来源，分别对应文档的两个不同区域：
 
 - `Asset.approvedRefs`：存储从被引用文档 `## Approved References` 解析出的图像路径
 - `Asset.designRefs`：存储从自身文档 `## Design References` 解析出的图像路径（v0.8.3 新增）
+
+### 输入绑定体系 (v0.9.0)
+
+建立 **frontmatter refs → type 分类 → api_config inputs → API payload** 的完整链路，零硬编码扩展。
+
+**结构化 refs**（替代旧的字符串数组）：
+
+```yaml
+refs:
+  - id: "@hero"
+    type: image            # image / video / audio / bvh / mask / 自定义
+  - id: "@bgm"
+    type: audio
+  - id: "@style:night"     # variant 引用
+    type: image
+```
+
+**类型化子标题**（正文 `### <type>` 对齐 api_config inputs key）：
+
+```markdown
+### image
+[英雄设计稿](#hero)         # 内部引用 → 解析为 hero 的 image 输出
+[风格参考](#style:night)     # variant 引用
+
+### audio
+[背景音乐](#bgm)
+```
+
+- **`### <type>`** 子标题对齐 api_config `inputs` key（image/video/audio/bvh/mask 等，可自定义）
+- **`[标题](#refid)`** 标准内部引用语法，`#refid` 指向资产 id
+- **`@id:variant`** 延续现有 variant 语法
+- **简写 `@id`** 类型在 review 时确认后填入 refs
+- **RefBinder** 统一解析 frontmatter refs + typed sections → `Record<string, string[]>` 类型分组
+- **InputEvaluator** 根据 api_config `inputs` 配置求值 source 快捷路径，按 target 注入 API payload
+
+**api_config inputs 配置示例**：
+
+```yaml
+volc.seedance2:
+  inputs:
+    prompt:
+      source: prompt
+      target: content[0].text
+    first_frame:
+      source: first_frame
+      target: content[].image_url
+    image:
+      source: reference_images
+      target: content[].image_url
+    audio:
+      source: reference_audios
+      target: content[].audio_url
+
+runninghub.default:
+  inputs:
+    prompt:
+      source: prompt
+    image1:
+      source: reference_images[0]
+    seed:
+      source: default.seed
+```
+
+**source 快捷路径**：`prompt`、`negative_prompt`、`first_frame`、`last_frame`、`reference_images[N]`、`reference_videos`、`reference_audios`、`job.payload.X`、`default.X`
+
+**编译器行为**：若 api_config 配置了 `inputs`，使用 InputEvaluator 求值；否则回退到旧命名约定（向后兼容无 inputs 配置的旧模型）。
 
 ### 状态机
 每个可审阅对象拥有 `status` 字段：
@@ -161,18 +227,26 @@ first_frame: "@shot_01:first"
 last_frame: "@shot_01:last"
 duration: "5s"
 refs:
-  - "@role_hero"
-  - "@scene_forest"
+  - id: "@role_hero"
+    type: image
+  - id: "@scene_forest"
+    type: image
 ---
 
 ## Shot 01 - 开场森林
 
 角色走进阴暗的森林，镜头缓慢推进...
+
+### image
+[英雄角色](#role_hero)
+[森林场景](#scene_forest)
 ```
 
 - `id` 绑定文件名，改名 = 删除重建
 - `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法
-- `refs` 参与拓扑排序，决定 Circle 分层
+- `refs` 为结构化数组，参与拓扑排序，决定 Circle 分层
+- `### <type>` 子标题声明类型化参考区域
+- `[标题](#refid)` 引用资产输出，类型由所在 `### <type>` 决定
 - `shotlist.md` 是末环，独立处理，不进依赖图
 
 ## Agent 角色速查
@@ -199,8 +273,10 @@ duration: "5s"
 first_frame: "/path/to/shot_01_1.png"
 negative_prompt: "low quality, blurry"
 refs:
-  - scene_lab
-  - hero
+  - id: "@scene_lab"
+    type: image
+  - id: "@hero"
+    type: image
 visual_detailed: |
   场景描述文字...
 ---
@@ -223,7 +299,8 @@ category: shot-production
 - frontmatter 必填字段：`category`、`status`
 - Shot 特定字段：`duration`、`first_frame`、`last_frame`、`frame_ref`
 - Prompt 取值优先级：`prompt` → `visual_detailed` → `visual_brief` → body 第一段
-- `refs` 数组中的 `@assetId` 或 `@assetId:variant` 引用会在 body 中解析
+- `refs` 为结构化数组 `[{ id: "@assetId", type: "image" }]`，`type` 对齐 api_config inputs key
+- 正文 `### <type>` 子标题下的 `[标题](#refid)` 引用解析为类型化输入
 - `@FRAME:shotId_type` 只用于 body 的 `refs` 数组，不用于 frontmatter 字段
 - ComfyUI / RunningHub 工作流支持 `seed: random`（自动替换为随机自然数）
 
