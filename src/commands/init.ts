@@ -9,6 +9,10 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { logger } from '../utils/logger';
 
+interface InitCommandOptions {
+  dir?: string;
+}
+
 // Resolve templates directory relative to the compiled dist/ directory
 const PKG_ROOT = path.resolve(__dirname, '..');
 const TEMPLATES_DIR = path.join(PKG_ROOT, '..', 'templates');
@@ -18,7 +22,7 @@ export function registerInitCommand(program: Command, version: string): void {
     .command('init [name]')
     .description('Scaffold a new OpsV project')
     .option('--dir <path>', 'Target directory')
-    .action(async (name?: string, options?: any) => {
+    .action(async (name?: string, options?: InitCommandOptions) => {
       try {
         // No name → init in current directory; with name → create subdirectory
         const projectName = name || path.basename(process.cwd());

@@ -26,6 +26,6 @@ export class OpsVContext {
   }
 
   get config(): ApiConfig {
-    return this.configLoader['config'];
+    return this.configLoader.getConfig();
   }
 }

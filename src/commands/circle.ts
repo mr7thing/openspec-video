@@ -10,6 +10,17 @@ import chalk from 'chalk';
 import { DependencyGraph } from '../core/DependencyGraph';
 import { logger } from '../utils/logger';
 
+interface CircleCreateOptions {
+  dir: string;
+  name?: string;
+  skipMiddleCircle?: boolean;
+}
+
+interface CircleRefreshOptions {
+  dir: string;
+  name?: string;
+}
+
 export function registerCircleCommands(program: Command): void {
   const circle = program.command('circle').description('Circle lifecycle management');
 
@@ -19,7 +30,7 @@ export function registerCircleCommands(program: Command): void {
     .option('--dir <path>', 'Target directory (e.g. videospec, elements/role)', 'videospec')
     .option('--name <name>', 'Override target basename (default: last segment of --dir)')
     .option('--skip-middle-circle', 'Skip generating middle circles')
-    .action(async (options: any) => {
+    .action(async (options: CircleCreateOptions) => {
       try {
         const projectRoot = process.cwd();
         const queueRoot = path.join(projectRoot, 'opsv-queue');
@@ -73,7 +84,7 @@ export function registerCircleCommands(program: Command): void {
     .description('Rebuild graph, diff, update _manifest.json in target circle directory')
     .option('--dir <path>', 'Target directory (must match original --dir)', 'videospec')
     .option('--name <name>', 'Override target basename (default: last segment of --dir)')
-    .action(async (options: any) => {
+    .action(async (options: CircleRefreshOptions) => {
       try {
         const projectRoot = process.cwd();
         const queueRoot = path.join(projectRoot, 'opsv-queue');

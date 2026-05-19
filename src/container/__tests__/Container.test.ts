@@ -60,11 +60,19 @@ describe('Container', () => {
     expect(container.listExecutors()).toEqual(['x', 'y']);
   });
 
-  it('creates new instance on each resolve', () => {
+  it('returns cached singleton on repeated resolve', () => {
     container.registerCompiler('mock', MockCompiler);
     const a = container.resolveCompiler('mock');
     const b = container.resolveCompiler('mock');
-    expect(a).not.toBe(b);
+    expect(a).toBe(b); // same instance (singleton)
     expect(a).toBeInstanceOf(MockCompiler);
+  });
+
+  it('invalidates cache on re-registration', () => {
+    container.registerCompiler('mock', MockCompiler);
+    const a = container.resolveCompiler('mock');
+    container.registerCompiler('mock', MockCompiler);
+    const b = container.resolveCompiler('mock');
+    expect(a).not.toBe(b); // new instance after re-registration
   });
 });

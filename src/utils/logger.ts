@@ -27,8 +27,14 @@ export interface LoggerOptions {
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../../package.json');
-const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.8.8' };
-const LOG_VERSION = pkg.version;
+let LOG_VERSION = '0.9.0';
+try {
+  const raw = fs.readFileSync(pkgPath, 'utf8');
+  const parsed = JSON.parse(raw);
+  LOG_VERSION = parsed.version || LOG_VERSION;
+} catch {
+  // fallback
+}
 
 const defaultOptions: LoggerOptions = {
   level: (process.env.LOG_LEVEL as LogLevel) || LogLevel.INFO,

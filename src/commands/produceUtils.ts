@@ -25,6 +25,19 @@ export interface ProduceCommandOptions {
   dryRun?: boolean;
 }
 
+/** Shared by animate, imagen, webapp (same as ProduceCommandOptions + dryRun) */
+export interface ImageProduceCommandOptions extends ProduceCommandOptions {
+  dryRun?: boolean;
+}
+
+/** ComfyUI-specific (extends ImageProduceCommandOptions) */
+export interface ComfyCommandOptions extends ImageProduceCommandOptions {
+  workflow?: string;
+  workflowDir?: string;
+  param?: string;
+  forceApiMapping?: boolean;
+}
+
 /**
  * Resolve the next available model queue directory with a 3-digit sequence suffix.
  * E.g. given modelKey "volc.seadream", returns ".../volc.seadream_001" if none exists,

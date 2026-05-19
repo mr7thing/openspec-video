@@ -18,6 +18,7 @@ import {
 } from '../types/ManifestSchema';
 import { getProjectDir } from '../utils/configLoader';
 import { sanitizePathComponent } from '../utils/pathSecurity';
+import { logger } from '../utils/logger';
 
 export interface ReviewStrategy {
   listCircles(): CircleSummary[];
@@ -117,7 +118,8 @@ function readDocFrontmatter(docPath: string): { category: string; status: string
       category: frontmatter.category || 'other',
       status: frontmatter.status || 'drafting',
     };
-  } catch {
+  } catch (err: any) {
+    logger.warn(`Failed to read frontmatter from ${docPath}: ${err?.message}`);
     return { category: 'other', status: 'drafting' };
   }
 }

@@ -123,6 +123,10 @@ export class ConfigLoader {
     return this.config.settings;
   }
 
+  getConfig(): ApiConfig {
+    return this.config;
+  }
+
   getResolvedApiKey(targetModel: string): string {
     const modelConfig = this.getModelConfig(targetModel);
     if (!modelConfig) {

@@ -19,12 +19,16 @@ import { resolveProjectRoot } from '../utils/projectResolver';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
 import { AssetManager } from '../core/AssetManager';
 
+interface ValidateCommandOptions {
+  dir: string;
+}
+
 export function registerValidateCommand(program: Command, version: string): void {
   program
     .command('validate')
     .description('Validate project documents and frontmatter')
     .option('--dir <path>', 'Target directory to validate (default: videospec)', 'videospec')
-    .action(async (options: any) => {
+    .action(async (options: ValidateCommandOptions) => {
       try {
         const projectRoot = resolveProjectRoot(process.cwd());
         const targetDir = path.resolve(projectRoot, options.dir);

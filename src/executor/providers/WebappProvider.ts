@@ -40,8 +40,8 @@ export class WebappProvider implements ProviderExecutor {
         taskPath,
         shotId,
         provider: this.name,
-        success: true,
-        outputPath: taskPath.replace('.json', '_output.txt'),
+        success: false,
+        error: `Webapp provider is a placeholder — not yet implemented`,
       };
     } catch (err: any) {
       return {

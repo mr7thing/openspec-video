@@ -13,7 +13,7 @@ import { HttpClient } from '../HttpClient';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
-import { appendLog, getResumeTaskId, getElapsedMs, getPollIntervalMs, sleep } from '../polling';
+import { appendLog, getResumeTaskId, sleep } from '../polling';
 import { ExecutionError, OpsVErrorCode } from '../../errors/OpsVError';
 
 interface VolcImagePayload {
@@ -35,6 +35,12 @@ interface VolcSubmitResponse {
   id?: string;
   data?: { id?: string };
   task_id?: string;
+}
+
+interface VolcImageSubmitResponse {
+  id?: string;
+  data?: { id?: string } | Array<{ url?: string }>;
+  url?: string;
 }
 
 interface VolcStatusResponse {
@@ -106,75 +112,118 @@ export class VolcengineProvider extends BaseApiProvider<VolcImagePayload | VolcV
     return url ? [url] : [];
   }
 
-  protected getOutputExtension(): string {
+  protected getOutputExtension(task?: BaseTaskJson<VolcImagePayload | VolcVideoPayload>): string {
+    if (task?._opsv?.type === 'imagen') return 'png';
     return 'mp4';
   }
 
-  // Override for image direct download (no polling)
+  // Image tasks use submit→poll→download via BaseApiProvider
   async execute(task: BaseTaskJson<VolcImagePayload | VolcVideoPayload>, taskPath: string, ctx: OpsVContext): Promise<ProviderResult> {
-    if (task._opsv.type === 'imagen') {
-      return this.executeImage(task, taskPath, ctx);
-    }
-    return super.execute(task, taskPath, ctx);
-  }
-
-  private async executeImage(task: BaseTaskJson<VolcImagePayload>, taskPath: string, ctx: OpsVContext): Promise<ProviderResult> {
     const meta = task._opsv;
     const shotId = meta.shotId;
     const client = this.buildHttpClient(ctx, meta.modelKey);
     const modelConfig = this.getModelConfig(ctx, meta.modelKey);
 
     try {
-      const payload = { ...task.payload };
-
-      if (Array.isArray(payload.reference_images)) {
-        payload.reference_images = await Promise.all(
-          payload.reference_images.map((url: string) => this.resolveImageField(url))
-        );
+      // Resolve local image paths for imagen tasks
+      if (meta.type === 'imagen') {
+        const payload = { ...task.payload } as VolcImagePayload;
+        if (Array.isArray(payload.reference_images)) {
+          payload.reference_images = await Promise.all(
+            payload.reference_images.map((url: string) => this.resolveImageField(url))
+          );
+        }
+        // Replace task payload with resolved version
+        (task as any).payload = payload;
       }
 
-      const data = await client.post<any>(meta.api_url, payload, {
-        timeout: modelConfig?.timeout?.submit || 300000,
-      });
+      // Check if the image API returns results synchronously (no task ID)
+      if (meta.type === 'imagen') {
+        const payload = this.buildPayload(task);
+        const data = await client.post<VolcImageSubmitResponse>(meta.api_url, payload, {
+          timeout: modelConfig?.timeout?.submit || 300000,
+        });
 
-      const dataItems = data?.data;
-      let imageUrls: string[] = [];
+        const taskId = this.parseTaskId(data as VolcSubmitResponse);
 
-      if (Array.isArray(dataItems)) {
-        imageUrls = dataItems.map((item: any) => item.url).filter(Boolean);
-      } else {
-        const url = dataItems?.[0]?.url || dataItems?.url || data?.url;
-        if (url) imageUrls = [url];
+        // Synchronous response: image URLs returned directly in submit response
+        if (!taskId) {
+          const imgResult = this.extractImageUrls(data);
+          if (imgResult.length === 0) {
+            throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(data)}`);
+          }
+
+          const outputPaths: string[] = [];
+          let nextIndex = resolveNextOutputIndex(taskPath, 'png');
+          for (let i = 0; i < imgResult.length; i++) {
+            const outputPath = outputFilePath(taskPath, nextIndex + i, 'png');
+            await downloadFile(imgResult[i], outputPath);
+            outputPaths.push(outputPath);
+          }
+
+          return { taskPath, shotId, provider: this.name, success: true, outputPath: outputPaths[0], outputPaths };
+        }
+
+        // Async response: has task ID, fall through to polling
+        appendLog(taskPath, { event: 'submitted', task_id: taskId });
+        logger.info(`[${this.name}] Submitted ${shotId}, taskId=${taskId}`);
+
+        const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
+        const startTime = Date.now();
+
+        while (true) {
+          const elapsed = Date.now() - startTime;
+          if (elapsed > maxDuration) {
+            throw new ExecutionError(OpsVErrorCode.EXECUTION_TIMEOUT, `Polling timeout for ${taskId}`);
+          }
+          await sleep(Math.min(2000 + elapsed * 0.5, 15000));
+
+          const statusUrl = this.buildStatusUrl(meta.api_url, taskId);
+          const statusRes = await client.get<VolcStatusResponse>(statusUrl, {
+            timeout: modelConfig?.timeout?.status || 120000,
+          });
+
+          if (this.isFailed(statusRes)) {
+            throw new ExecutionError(OpsVErrorCode.EXECUTION_TASK_FAILED, `${this.name} task failed: ${this.extractError(statusRes)}`);
+          }
+          if (this.isComplete(statusRes)) {
+            const urls = this.extractOutputUrls(statusRes);
+            if (urls.length === 0) {
+              throw new ExecutionError(OpsVErrorCode.EXECUTION_OUTPUT_NOT_FOUND, 'Completed but no output URLs found');
+            }
+            const outputPaths: string[] = [];
+            let nextIndex = resolveNextOutputIndex(taskPath, 'png');
+            for (let i = 0; i < urls.length; i++) {
+              const outputPath = outputFilePath(taskPath, nextIndex + i, 'png');
+              await downloadFile(urls[i], outputPath);
+              outputPaths.push(outputPath);
+            }
+            appendLog(taskPath, { event: 'succeeded', task_id: taskId, output: outputPaths.join(', ') });
+            return { taskPath, shotId, provider: this.name, success: true, outputPath: outputPaths[0], outputPaths };
+          }
+          appendLog(taskPath, { event: 'polling', status: 'running', task_id: taskId });
+        }
       }
 
-      if (imageUrls.length === 0) {
-        throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `No image URL in response: ${JSON.stringify(data)}`);
-      }
-
-      const outputPaths: string[] = [];
-      let nextIndex = resolveNextOutputIndex(taskPath, 'png');
-      for (let i = 0; i < imageUrls.length; i++) {
-        const outputPath = outputFilePath(taskPath, nextIndex + i, 'png');
-        await downloadFile(imageUrls[i], outputPath);
-        outputPaths.push(outputPath);
-      }
-
-      return {
-        taskPath,
-        shotId,
-        provider: this.name,
-        success: true,
-        outputPath: outputPaths[0],
-        outputPaths,
-      };
+      // Video: use standard submit-poll-download
+      return super.execute(task, taskPath, ctx);
     } catch (err: any) {
-      return {
-        taskPath,
-        shotId,
-        provider: this.name,
-        success: false,
-        error: err.message,
-      };
+      const message = err instanceof ExecutionError ? err.message : `${this.name} execution error: ${err.message}`;
+      return { taskPath, shotId, provider: this.name, success: false, error: message };
     }
+  }
+
+  private extractImageUrls(data: VolcImageSubmitResponse): string[] {
+    const dataItems = data?.data;
+    let imageUrls: string[] = [];
+
+    if (Array.isArray(dataItems)) {
+      imageUrls = dataItems.map((item: any) => item.url).filter(Boolean);
+    } else {
+      const url = (dataItems as any)?.url || data?.url;
+      if (url) imageUrls = [url];
+    }
+
+    return imageUrls;
   }
 }

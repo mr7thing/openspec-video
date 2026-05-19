@@ -25,7 +25,7 @@ function getMimeType(filePath: string): string {
 export function createFileController(queueRoot: string) {
   return {
     serve(req: Request, res: Response): void {
-      const raw: string[] | string = (req.params as any).filePath;
+      const raw = req.params['filePath'];
       if (!raw) {
         res.status(400).send('Bad request');
         return;

@@ -61,12 +61,12 @@ export class FileUtils {
     return fs.readdir(dirPath);
   }
 
-  static async readJson<T = any>(filePath: string): Promise<T> {
+  static async readJson<T = unknown>(filePath: string): Promise<T> {
     const raw = await fs.readFile(filePath, 'utf-8');
     return JSON.parse(raw);
   }
 
-  static async writeJson(filePath: string, data: any, pretty = true): Promise<void> {
+  static async writeJson(filePath: string, data: unknown, pretty = true): Promise<void> {
     const content = pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
     await FileUtils.atomicWrite(filePath, content);
   }

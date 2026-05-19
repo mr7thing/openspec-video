@@ -16,13 +16,19 @@ export interface VideoSettings {
   quality: string;
 }
 
+export interface PromptExtra {
+  media_refs: string[];
+  negative_prompt?: string;
+  [key: string]: unknown;
+}
+
 export interface PromptPayload {
   prompt?: string;
   global_settings: VideoSettings;
   camera?: { type: string; motion: string };
   duration?: string;
   frame_ref?: FrameRef;
-  extra?: { media_refs: string[]; [key: string]: any };
+  extra?: PromptExtra;
 }
 
 export interface Job {

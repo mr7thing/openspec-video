@@ -73,7 +73,6 @@ export function setupTtlShutdown(server: http.Server, ttl: number): void {
     idleTimer = setTimeout(() => {
       console.log(`Idle for ${ttl}s, shutting down...`);
       server.close();
-      process.exit(0);
     }, ttl * 1000);
   };
 

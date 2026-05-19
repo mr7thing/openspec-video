@@ -8,6 +8,12 @@ import { QueueRunner } from '../executor/QueueRunner';
 import { logger } from '../utils/logger';
 import { container, ctx } from '../cli';
 
+interface RunCommandOptions {
+  retry?: boolean;
+  dryRun?: boolean;
+  concurrency?: number;
+}
+
 export function registerRunCommand(program: Command): void {
   program
     .command('run <paths...>')
@@ -15,7 +21,7 @@ export function registerRunCommand(program: Command): void {
     .option('--retry', 'Retry failed tasks')
     .option('--dry-run', 'Show execution plan without running')
     .option('-c, --concurrency <number>', 'Max concurrent tasks per provider (overrides api_config)', (v) => parseInt(v, 10))
-    .action(async (paths: string[], options: any) => {
+    .action(async (paths: string[], options: RunCommandOptions) => {
       try {
         const runner = new QueueRunner(container, ctx);
         const results = await runner.runPaths(paths, {

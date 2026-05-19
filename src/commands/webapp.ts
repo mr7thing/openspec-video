@@ -15,7 +15,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -31,7 +31,7 @@ export function registerWebappCommand(program: Command): void {
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
     .option('--file <id>', 'Run specific asset by id (from manifest)')
     .option('--dry-run', 'Show compiled tasks without writing files')
-    .action(async (options: any) => {
+    .action(async (options: ImageProduceCommandOptions) => {
       try {
         const cwd = process.cwd();
         const modelKey = options.model;

@@ -14,7 +14,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ComfyCommandOptions } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -34,7 +34,7 @@ export function registerComfyCommand(program: Command): void {
     .option('--param <json>', 'Override workflow parameters as JSON')
     .option('--force-api-mapping', 'Force use api_config.node_mappings, ignore frontmatter node_mapping')
     .option('--dry-run', 'Show compiled tasks without writing files')
-    .action(async (options: any) => {
+    .action(async (options: ComfyCommandOptions) => {
       try {
         const cwd = process.cwd();
         const modelKey = options.model;

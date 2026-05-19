@@ -43,7 +43,7 @@ export function registerReviewCommand(program: Command): void {
     .option('--latest', 'Show only latest circle outputs (global mode)')
     .option('--all', 'Show all circle outputs (global mode)')
     .option('--ttl <seconds>', `Auto-shutdown after idle seconds (default: ${DEFAULT_REVIEW_TTL})`, `${DEFAULT_REVIEW_TTL}`)
-    .action(async (options: any) => {
+    .action(async (options: ReviewOptions) => {
       try {
         const projectRoot = process.cwd();
         const queueRoot = getProjectDir(projectRoot, 'queue');

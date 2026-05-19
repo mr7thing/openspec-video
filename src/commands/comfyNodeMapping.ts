@@ -10,6 +10,12 @@ import path from 'path';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
 
+interface ComfyNodeMappingOptions {
+  prefix?: string;
+  output?: string;
+  workflowId?: string;
+}
+
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../../package.json');
 let pkgVersion = '0.9.0';
@@ -59,7 +65,7 @@ export function registerComfyNodeMappingCommand(program: Command): void {
     .option('-o, --output <path>', 'Write JSON to file instead of stdout')
     .option('--prefix <str>', 'Node title prefix to match', 'opsv-')
     .option('--workflow-id <id>', 'RunningHub workflow ID to embed in output (for cloud workflows)')
-    .action(async (workflowFile: string, options: any) => {
+    .action(async (workflowFile: string, options: ComfyNodeMappingOptions) => {
       try {
         const filePath = path.resolve(workflowFile);
         const workflowDir = path.dirname(filePath);
