@@ -12,7 +12,7 @@ import { ErrorFactory } from '../errors/OpsVError';
 export function getProjectDir(projectRoot: string, name: 'videospec' | 'queue'): string {
   try {
     const loader = new ConfigLoader();
-    loader.loadConfig(projectRoot);
+    loader.loadConfig(projectRoot, { silent: true });
     const settings = loader.getSettings();
     if (name === 'videospec') {
       return path.join(projectRoot, settings?.dirs?.videospec || 'videospec');
@@ -101,11 +101,13 @@ export class ConfigLoader {
     this.config = { models: {} };
   }
 
-  loadConfig(projectRoot: string): ApiConfig {
+  loadConfig(projectRoot: string, options?: { silent?: boolean }): ApiConfig {
     const configPath = path.join(projectRoot, '.opsv', 'api_config.yaml');
 
     if (!fs.existsSync(configPath)) {
-      logger.warn(`API config not found at ${configPath}, using empty config`);
+      if (!options?.silent) {
+        logger.warn(`API config not found at ${configPath}, using empty config`);
+      }
       this.config = { models: {} };
       return this.config;
     }
