@@ -197,6 +197,11 @@ workflows/
 - 在 `opsv-workflow.json` 中可以同时设置 `workflowId` + `workflowPath`（同时支持本地和云端）
 - 只有你需要 opsv 控制的节点才需要在 ComfyUI 中用 `opsv-` 前缀命名（输入/输出相关）
 
+**`opsv-` 前缀映射规则**：
+- 前缀后的字符串 = 映射键（如 `opsv-prompt` → key `prompt`，`opsv-image1` → key `image1`）
+- 映射键对齐 api_config `inputs` key 和 frontmatter `refs.type`
+- fieldName 自动推断，优先级：`text` → `image` → `video` → `audio` → `seed` → `width` → `height` → 第一个输入字段
+
 ### Step 1: Extract node mappings
 
 Design your workflow in ComfyUI, name nodes with prefix `opsv-` (right-click → Title), then:
@@ -256,7 +261,20 @@ opsv circle create
 cd opsv-queue/videospec_circle1
 opsv comfy --model comfylocal.myworkflow
 opsv run opsv-queue/videospec_circle1/comfylocal.myworkflow_001/
+
+# Force using api_config node_mappings (ignore frontmatter)
+opsv comfy --model runninghub.default --force-api-mapping
 ```
+
+**Node Mapping 降级策略**（优先级从高到低）：
+
+| 优先级 | 来源 | 触发条件 |
+|--------|------|----------|
+| 1 | `api_config.yaml` `node_mappings` | `--force-api-mapping` |
+| 2 | 文档 frontmatter `node_mapping` | 默认，frontmatter 有值时优先 |
+| 3 | `api_config.yaml` `node_mappings` | frontmatter 无值时兜底 |
+
+**inputs + node_mappings 协作**（v0.9.0）：`inputs` 定义数据来源（source），`node_mappings` 定义注入位置（nodeId + fieldName）。inputs key 与 node_mappings key 对齐。
 
 ### Step 4: Iterate (preserve previous, clone new)
 

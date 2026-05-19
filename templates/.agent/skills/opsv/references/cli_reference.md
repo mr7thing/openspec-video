@@ -120,22 +120,88 @@ opsv comfy --model runninghub.default
 # 输出到终端
 opsv comfy-node-mapping my_workflow.json
 
-# 保存到文件
-opsv comfy-node-mapping my_workflow.json -o node_mappings.json
+# 保存到 .opsv-workflow.json 伴生文件
+opsv comfy-node-mapping my_workflow.json -o my_workflow.opsv-workflow.json
+
+# RunningHub 云端工作流（嵌入 workflowId）
+opsv comfy-node-mapping my_workflow.json --workflow-id rh_abc123 -o my_workflow.opsv-workflow.json
 
 # 使用自定义前缀
 opsv comfy-node-mapping my_workflow.json --prefix rh-
 ```
 
-**使用流程**：
-1. 在 ComfyUI 中右键节点 → **Title**，将需要外部控制的节点重命名为 `opsv-prompt`、`opsv-image1`、`opsv-negative_prompt` 等
-2. 导出 API 格式 JSON（Save → API format）
-3. 运行 `opsv comfy-node-mapping workflow.json`
-4. 将输出的 JSON 复制到 frontmatter `node_mapping:` 或 `api_config.yaml` 的 `node_mappings:` 下
+**完整使用流程**：
 
-**参考图映射**：`image1`、`image2`… 严格匹配 `image\d+` 模式，按数字顺序对应参考图列表。
+1. **下载/导出 workflow JSON**：在 ComfyUI 中设计工作流，导出 API 格式 JSON（Save → API format）
+2. **标记控制节点**：在 ComfyUI 中右键节点 → **Title**，将需要外部控制的节点重命名为 `opsv-` 前缀：
+   - `opsv-prompt` → 映射键 `prompt`，自动推断 fieldName 为 `text`
+   - `opsv-negative_prompt` → 映射键 `negative_prompt`，推断为 `text`
+   - `opsv-image1` → 映射键 `image1`，推断为 `image`（参考图按序号对应）
+   - `opsv-seed` → 映射键 `seed`，推断为 `seed`
+   - `opsv-first_frame` → 映射键 `first_frame`，推断为 `image`
+3. **提取映射**：运行 `opsv comfy-node-mapping workflow.json -o workflow.opsv-workflow.json`
+4. **配置映射**：将提取结果写入以下位置之一：
 
-**fieldName 推断优先级**：`text` → `image` → `video` → `audio` → `seed` → `width` → `height` → 第一个输入字段。
+**方案 A — 写入 api_config.yaml（推荐，全局共享）**：
+```yaml
+runninghub.default:
+  provider: runninghub
+  type: comfy
+  workflowId: "rh_abc123"
+  inputs:
+    prompt:       { source: "prompt" }
+    negative_prompt: { source: "negative_prompt" }
+    seed:         { source: "default.seed" }
+    image1:       { source: "reference_images[0]" }
+  node_mappings:
+    prompt:       { nodeId: "6", fieldName: "text" }
+    negative_prompt: { nodeId: "7", fieldName: "text" }
+    seed:         { nodeId: "116", fieldName: "seed" }
+    image1:       { nodeId: "10", fieldName: "image" }
+```
+
+**方案 B — 写入文档 frontmatter（按文档定制）**：
+```yaml
+---
+category: shot-production
+status: drafting
+workflow_id: "rh_abc123"
+workflow_path: "workflows/my_workflow.json"
+node_mapping:
+  prompt:       { nodeId: "6", fieldName: "text" }
+  negative_prompt: { nodeId: "7", fieldName: "text" }
+  seed:         { nodeId: "116", fieldName: "seed" }
+  image1:       { nodeId: "10", fieldName: "image" }
+---
+```
+
+**node_mapping 降级策略**（优先级从高到低）：
+
+| 优先级 | 来源 | 触发条件 |
+|--------|------|----------|
+| 1 | `api_config.yaml` node_mappings | `--force-api-mapping` 强制使用 |
+| 2 | 文档 frontmatter `node_mapping` | 默认行为，frontmatter 有值时优先 |
+| 3 | `api_config.yaml` node_mappings | frontmatter 无值时兜底 |
+
+```bash
+# 默认：frontmatter 优先 → api_config 兜底
+opsv comfy --model runninghub.default
+
+# 强制使用 api_config 的 mapping（忽略 frontmatter）
+opsv comfy --model runninghub.default --force-api-mapping
+```
+
+**inputs + node_mappings 协作**（v0.9.0）：
+- `inputs` 定义数据来源（source）和注入目标（target），由 InputEvaluator 求值
+- `node_mappings` 定义工作流节点注入位置（nodeId + fieldName）
+- inputs key 与 node_mappings key 对齐：inputs 解析值，node_mappings 指定注入位置
+- 若 api_config 配置了 `inputs`，编译器使用 InputEvaluator 求值；否则回退到旧命名约定
+
+**opsv- 前缀映射规则**：
+- `opsv-` 前缀后的字符串 = 映射键（如 `opsv-prompt` → key `prompt`）
+- 映射键对齐 api_config `inputs` key 和 frontmatter `refs.type`
+- fieldName 自动推断，优先级：`text` → `image` → `video` → `audio` → `seed` → `width` → `height` → 第一个输入字段
+- 参考图映射：`image1`、`image2`… 严格匹配 `image\d+` 模式，按数字顺序对应参考图列表
 
 ### opsv audio
 音频生成（规划中）。
