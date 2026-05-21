@@ -52,7 +52,7 @@ export class RunningHubCompiler implements ProviderCompiler {
     // ------------------------------------------------------------------------
     // Resolve inputs via InputEvaluator (uses api_config inputs if defined)
     // ------------------------------------------------------------------------
-    const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: cappedRefImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+    const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: cappedRefImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios, groupedInputs: ctx.groupedInputs };
     const inputs = modelConfig.inputs;
 
     if (inputs && Object.keys(inputs).length > 0) {

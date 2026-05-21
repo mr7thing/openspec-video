@@ -5,16 +5,18 @@ visual_detailed: >
   写意水墨风格，强调黑白灰的层次感与虚实结合。
   画面中应有大量的留白，模拟宣纸的质感。
 status: drafting
+# v0.10.0 refs: 按 input_type 分组，prompt 中每个 @id 都必须在此声明
 refs:
-  - id: "@story"
-    type: image
+  image:
+    "@story": []
 reviews: []
 ---
 
 # Video Script - Episode 1
 
-> 规范指引：正文应具备完整的场景描写文法。支持两种引用：全局资产 (@id) 和 镜头局部参考 (![]())。
-> 类型化引用：### <type> 子标题对齐 api_config inputs key，[标题](#refid) 引用资产输出。
+> 规范指引：正文应具备完整的场景描写文法。
+> 引用语法：@id（外部资产）、@id:variant（变体）、@:key（本文档 Design References）、@FRAME:shot_*_first/last（帧引用）。
+> prompt 与 refs 必须严格一一对应，可用 `opsv refs check <file>` 检查。
 
 ## Shot 1 (5s)
 那只脆弱的 蝴蝶 (@role_butterfly) 在一间 幽暗的室內 (@scene_cocoon) 中开始了破茧过程。

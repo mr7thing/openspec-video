@@ -16,7 +16,7 @@ export interface Asset {
   id: string;
   category: string;
   status: string;
-  refs: Array<{ id: string; type?: string }>;
+  refs: Record<string, Record<string, string[]>>;
   description: string;
   approvedRefs: ApprovedRef[];
   designRefs: DesignRef[];
@@ -75,7 +75,7 @@ export class AssetManager {
             id,
             category: frontmatter.category || 'other',
             status: frontmatter.status || 'drafting',
-            refs: frontmatter.refs || [],
+            refs: frontmatter.refs || {},
             description,
             approvedRefs,
             designRefs,

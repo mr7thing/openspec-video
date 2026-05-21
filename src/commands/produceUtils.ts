@@ -23,6 +23,7 @@ export interface ProduceCommandOptions {
   statusSkip?: string;
   file?: string;
   dryRun?: boolean;
+  promptMode?: 'keep' | 'index' | 'name';
 }
 
 /** Shared by animate, imagen, webapp (same as ProduceCommandOptions + dryRun) */
@@ -123,13 +124,14 @@ export function validateRefStatuses(
     const content = fs.readFileSync(filePath, 'utf-8');
     const { frontmatter } = FrontmatterParser.parseRaw(content);
 
-    if (frontmatter.refs && Array.isArray(frontmatter.refs)) {
-      for (const ref of frontmatter.refs) {
-        let refId = ref.id.startsWith('@') ? ref.id.slice(1) : ref.id;
+    const refs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
+    for (const typeMap of Object.values(refs)) {
+      if (!typeMap || typeof typeMap !== 'object') continue;
+      for (const key of Object.keys(typeMap)) {
+        if (!key.startsWith('@') || key.startsWith('@:')) continue;
+        let refId = key.slice(1);
         const colonIdx = refId.indexOf(':');
-        if (colonIdx > 0) {
-          refId = refId.slice(0, colonIdx);
-        }
+        if (colonIdx > 0) refId = refId.slice(0, colonIdx);
 
         const refAsset = manifestAssets[refId];
         if (refAsset && refAsset.status !== 'approved') {

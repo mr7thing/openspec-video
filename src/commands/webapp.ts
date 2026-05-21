@@ -30,6 +30,7 @@ export function registerWebappCommand(program: Command): void {
     .option('--category <cat>', 'Filter assets by category')
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
     .option('--file <id>', 'Run specific asset by id (from manifest)')
+    .option('--prompt-mode <mode>', 'Prompt @-token compile mode: keep | index | name')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: ImageProduceCommandOptions) => {
       try {
@@ -87,7 +88,7 @@ export function registerWebappCommand(program: Command): void {
         const ctx = OpsVContext.create(cwd);
         const builder = new TaskBuilder(ctx);
 
-        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun);
+        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun, undefined, undefined, undefined, options.promptMode);
 
         if (options.dryRun) {
           console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));
@@ -121,11 +122,12 @@ async function buildWebappJob(
   const prompt = frontmatter.prompt || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
 
   let referenceImages: string[] = [];
-  if (frontmatter.refs && frontmatter.refs.length > 0) {
-    const refs = await refResolver.parseAll(body);
-    referenceImages = refs
-      .filter((r) => r.resolvedImagePath)
-      .map((r) => r.resolvedImagePath!);
+  // v0.10.0: refs is { type: { key: paths[] } }; flatten image paths
+  const fmRefs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
+  if (fmRefs.image) {
+    for (const paths of Object.values(fmRefs.image)) {
+      if (Array.isArray(paths)) referenceImages.push(...paths);
+    }
   }
 
   // Load design refs directly from file

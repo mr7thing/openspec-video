@@ -84,6 +84,16 @@ Describe your project vision here.
         );
 
         copyTemplateFile(
+          path.join(TEMPLATES_DIR, '.opsv', 'input_types.yaml'),
+          path.join(targetDir, '.opsv', 'input_types.yaml')
+        );
+
+        copyTemplateFile(
+          path.join(TEMPLATES_DIR, '.opsv', 'category_validate.yaml'),
+          path.join(targetDir, 'videospec', '_category_validate.yaml')
+        );
+
+        copyTemplateFile(
           path.join(TEMPLATES_DIR, '.env'),
           path.join(targetDir, '.env')
         );

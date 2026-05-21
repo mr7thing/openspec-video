@@ -7,19 +7,25 @@ visual_detailed: >
   视觉详细特征描述。
 prompt: >
   Core Prompt.
-refs: []                             # 结构化引用: { id: "@assetId", type: "image" }
+# v0.10.0 refs: 按 input_type 分组，key 为 @id / @id:variant / @:docKey
+refs:
+  image: {}
+  # video: {}
+  # audio: {}
 reviews: []
 ---
 
 ## Vision
 <!-- 导演原意 -->
 
-### image
-<!-- 类型化参考区域：### <type> 对齐 api_config inputs key -->
-<!-- 内部引用语法: [标题](#refid) -->
-
 ## Design References
-<!-- 外部参考与附件 -->
+<!-- 资料堆：本文档专属参考图，alt 文本作为 @:key 索引 -->
+
+### image
+<!-- ![angle_side](./refs/hero_side.png) → prompt 用 @:angle_side 引用 -->
+
+### video
+<!-- ![motion_ref](./refs/run.mp4) → prompt 用 @:motion_ref 引用 -->
 
 ## Approved References
 <!-- 审批回写区域 -->

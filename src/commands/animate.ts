@@ -35,6 +35,7 @@ export function registerAnimateCommand(program: Command): void {
     .option('--category <cat>', 'Filter assets by category (e.g. shot-production, shot-design)')
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
     .option('--file <id>', 'Run specific asset by id (from manifest)')
+    .option('--prompt-mode <mode>', 'Prompt @-token compile mode: keep | index | name')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: ImageProduceCommandOptions) => {
       try {
@@ -92,7 +93,7 @@ export function registerAnimateCommand(program: Command): void {
         const ctx = OpsVContext.create(cwd);
         const builder = new TaskBuilder(ctx);
 
-        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun);
+        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun, undefined, undefined, undefined, options.promptMode);
 
         if (options.dryRun) {
           console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));
@@ -138,24 +139,16 @@ async function buildVideoJob(
   }
 
   let referenceImages: string[] = [];
-  if (frontmatter.refs && frontmatter.refs.length > 0) {
-    // Check if refs are direct paths (start with . or /) or @asset references
-    const directPaths = frontmatter.refs.filter((r: any) => r.id.startsWith('.') || r.id.startsWith('/'));
-    const assetRefs = frontmatter.refs.filter((r: any) => !r.id.startsWith('.') && !r.id.startsWith('/'));
-
-    // Resolve direct paths relative to the shotlist file
-    for (const ref of directPaths) {
-      const resolved = resolveFrameRef(filePath, ref.id);
-      if (resolved) referenceImages.push(resolved);
-    }
-
-    // Parse @asset references from body
-    if (assetRefs.length > 0 || body.includes('@')) {
-      const refs = await refResolver.parseAll(body);
-      referenceImages = [
-        ...referenceImages,
-        ...refs.filter((r) => r.resolvedImagePath).map((r) => r.resolvedImagePath!),
-      ];
+  // v0.10.0: refs is { type: { key: paths[] } }; flatten image paths
+  const refs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
+  if (refs.image) {
+    for (const paths of Object.values(refs.image)) {
+      if (Array.isArray(paths)) {
+        for (const p of paths) {
+          const resolved = p.startsWith('/') ? p : resolveFrameRef(filePath, p) || p;
+          if (resolved) referenceImages.push(resolved);
+        }
+      }
     }
   }
 

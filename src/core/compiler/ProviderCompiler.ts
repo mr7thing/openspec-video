@@ -1,10 +1,11 @@
 // ============================================================================
-// OpsV Provider Compiler Interface
+// OpsV Provider Compiler Interface (v0.10.0)
 // ============================================================================
 
 import { Job, BaseTaskJson } from '../../types/Job';
 import { ModelConfig } from '../../utils/configLoader';
-import { ResolvedRef, TypedSectionRef } from '../../types/FrontmatterSchema';
+import { ResolvedRef } from '../../types/FrontmatterSchema';
+import { PromptCompileMode } from '../../types/Refs';
 
 export interface CompileContext {
   job: Job;
@@ -21,9 +22,12 @@ export interface CompileContext {
   refCount?: number;
   nodeMapping?: Record<string, { nodeId: string; fieldName: string }>;
   forceApiMapping?: boolean;
+  /** Bound refs from frontmatter (v0.10.0) */
   resolvedRefs?: ResolvedRef[];
-  typedSectionRefs?: TypedSectionRef[];
+  /** Type-grouped paths derived from resolvedRefs */
   groupedInputs?: Record<string, string[]>;
+  /** Override prompt compilation mode */
+  promptCompileMode?: PromptCompileMode;
 }
 
 export interface ProviderCompiler {

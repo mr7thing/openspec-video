@@ -33,6 +33,7 @@ export function registerComfyCommand(program: Command): void {
     .option('--workflow-dir <dir>', 'Workflow template directory (overrides api_config defaults.templateDir)')
     .option('--param <json>', 'Override workflow parameters as JSON')
     .option('--force-api-mapping', 'Force use api_config.node_mappings, ignore frontmatter node_mapping')
+    .option('--prompt-mode <mode>', 'Prompt @-token compile mode: keep | index | name')
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: ComfyCommandOptions) => {
       try {
@@ -116,7 +117,7 @@ export function registerComfyCommand(program: Command): void {
 
         const results = await builder.compileToDir(
           jobs, modelKey, outputDir, options.dryRun,
-          workflowPath, workflowDir, options.forceApiMapping
+          workflowPath, workflowDir, options.forceApiMapping, options.promptMode
         );
 
         if (options.dryRun) {
@@ -156,12 +157,22 @@ async function buildComfyJob(
   let referenceVideos: string[] = [];
   let referenceAudios: string[] = [];
 
-  // External refs (@assetId:variant → resolved image paths)
-  if (frontmatter.refs && frontmatter.refs.length > 0) {
-    const refs = await refResolver.parseAll(body);
-    referenceImages = refs
-      .filter((r) => r.resolvedImagePath)
-      .map((r) => r.resolvedImagePath!);
+  // v0.10.0: refs is { type: { key: paths[] } }; flatten image/video/audio paths
+  const fmRefs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
+  if (fmRefs.image) {
+    for (const paths of Object.values(fmRefs.image)) {
+      if (Array.isArray(paths)) referenceImages.push(...paths);
+    }
+  }
+  if (fmRefs.video) {
+    for (const paths of Object.values(fmRefs.video)) {
+      if (Array.isArray(paths)) referenceVideos.push(...paths);
+    }
+  }
+  if (fmRefs.audio) {
+    for (const paths of Object.values(fmRefs.audio)) {
+      if (Array.isArray(paths)) referenceAudios.push(...paths);
+    }
   }
 
   // Internal design refs (## Design References)

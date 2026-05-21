@@ -13,6 +13,8 @@ export interface InputEvalContext {
   referenceImages?: string[];
   referenceVideos?: string[];
   referenceAudios?: string[];
+  /** Grouped refs by type, e.g. { image: ["a.png", "b.png"], video: ["c.mp4"] } */
+  groupedInputs?: Record<string, string[]>;
 }
 
 // ============================================================================
@@ -36,7 +38,21 @@ export function evaluateSource(source: string, ctx: InputEvalContext): unknown {
     return job.payload.frame_ref?.last;
   }
 
-  // reference_images[N] or reference_images
+  // refs[type] or refs[type][N] (v0.10.0)
+  const refsAllMatch = source.match(/^refs\[(\w+)\]$/);
+  if (refsAllMatch) {
+    const type = refsAllMatch[1];
+    return ctx.groupedInputs?.[type] || [];
+  }
+  const refsIdxMatch = source.match(/^refs\[(\w+)\]\[(\d+)\]$/);
+  if (refsIdxMatch) {
+    const type = refsIdxMatch[1];
+    const idx = parseInt(refsIdxMatch[2], 10);
+    const arr = ctx.groupedInputs?.[type] || [];
+    return idx < arr.length ? arr[idx] : undefined;
+  }
+
+  // reference_images[N] or reference_images (legacy)
   if (source === 'reference_images') {
     return ctx.referenceImages || job.reference_images || [];
   }
@@ -69,12 +85,7 @@ export function evaluateSource(source: string, ctx: InputEvalContext): unknown {
     return idx < auds.length ? auds[idx] : undefined;
   }
 
-  // job.payload.X — dot-path into payload
-  if (source.startsWith('job.payload.')) {
-    return resolveDotPath(job, source.slice('job.'.length));
-  }
-
-  // job.payload.extra.X
+  // job.payload.extra.X (must come before general job.payload.X)
   if (source.startsWith('job.payload.extra.')) {
     return job.payload.extra?.[source.slice('job.payload.extra.'.length)];
   }
@@ -85,6 +96,11 @@ export function evaluateSource(source: string, ctx: InputEvalContext): unknown {
   }
   if (source === 'job.payload.frame_ref.last') {
     return job.payload.frame_ref?.last;
+  }
+
+  // job.payload.X — dot-path into payload
+  if (source.startsWith('job.payload.')) {
+    return resolveDotPath(job, source.slice('job.'.length));
   }
 
   // default.X — model config defaults

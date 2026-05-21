@@ -47,7 +47,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     // Resolve inputs via InputEvaluator if configured, else legacy behavior
     const inputs = modelConfig.inputs;
     if (inputs && Object.keys(inputs).length > 0) {
-      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios, groupedInputs: ctx.groupedInputs };
       const values = evaluateInputs(inputs, evalCtx);
       applyToPayload(values, inputs, payload);
     } else if (ctx.referenceImages && ctx.referenceImages.length > 0 && modelConfig.supports_reference_images) {
@@ -82,7 +82,7 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     // Resolve inputs via InputEvaluator if configured, else legacy behavior
     const inputs = modelConfig.inputs;
     if (inputs && Object.keys(inputs).length > 0) {
-      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios };
+      const evalCtx: InputEvalContext = { job, modelConfig, referenceImages: ctx.referenceImages, referenceVideos: ctx.referenceVideos, referenceAudios: ctx.referenceAudios, groupedInputs: ctx.groupedInputs };
       const values = evaluateInputs(inputs, evalCtx);
       applyToPayload(values, inputs, payload);
     } else {

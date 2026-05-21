@@ -8,7 +8,8 @@ visual_detailed: >
   注：本资产 ID 自动映射为 "broken_sword"。
 prompt: >
   A broken black iron sword with glowing red magma-like cracks, 8k texture.
-refs: []                             # 结构化引用: { id: "@assetId", type: "image" }
+refs:
+  image: {}
 reviews: []
 ---
 
@@ -16,7 +17,9 @@ reviews: []
 这把剑是战争残酷的图腾。
 
 ## Design References
-![熔岩质感参考](refs/lava_texture_sample.jpg)
+
+### image
+![lava_texture_sample](refs/lava_texture_sample.jpg)
 
 ## Approved References
 <!-- 待审批 -->

@@ -1,9 +1,9 @@
 ---
 name: opsv
-description: OpsV v0.9.0 核心框架 — Circle 架构、资产管线、输入绑定、任务编排与审查协议。
+description: OpsV v0.10.0 核心框架 — Circle 架构、统一 @ 语法、refs 分组、prompt 编译、类别校验。
 ---
 
-# OpsV 框架规范 (v0.9.0)
+# OpsV 框架规范 (v0.10.0)
 
 OpenSpec-Video (OpsV) 是一个面向 AI 视频生产的结构化工作流框架。它将创意过程拆解为可编译、可审查、可迭代的工业管线。
 
@@ -54,71 +54,139 @@ OpsV 区分两种参考图来源，分别对应文档的两个不同区域：
 - `Asset.approvedRefs`：存储从被引用文档 `## Approved References` 解析出的图像路径
 - `Asset.designRefs`：存储从自身文档 `## Design References` 解析出的图像路径（v0.8.3 新增）
 
-### 输入绑定体系 (v0.9.0)
+### 引用语法体系 (v0.10.0)
 
-建立 **frontmatter refs → type 分类 → api_config inputs → API payload** 的完整链路，零硬编码扩展。
+统一的 `@` 前缀语法，覆盖所有引用场景：
 
-**结构化 refs**（替代旧的字符串数组）：
+| 形式 | 含义 | 示例 |
+|------|------|------|
+| `@id` | 外部资产 | `@hero` |
+| `@id:variant` | 外部资产 + variant | `@style:night` |
+| `@:key` | 本文档 Design References 中的图 | `@:angle_side` |
+| `@FRAME:shotId_first/last` | 帧引用（编译时解析，不进 refs） | `@FRAME:shot_01_first` |
+
+### Refs 分组结构 (v0.10.0)
+
+**frontmatter refs 按 input_type 分组**，每个 key 必须有至少一个明确路径：
 
 ```yaml
 refs:
-  - id: "@hero"
-    type: image            # image / video / audio / bvh / mask / 自定义
-  - id: "@bgm"
-    type: audio
-  - id: "@style:night"     # variant 引用
-    type: image
+  image:
+    "@hero":
+      - opsv-queue/.../hero_1.png
+    "@:angle_side":          # 本文档引用
+      - ./refs/hero_side.png
+    "@style:night":          # variant
+      - opsv-queue/.../style_night.png
+  video:
+    "@swim_loop":
+      - opsv-queue/.../swim.mp4
+  audio:
+    "@bgm":
+      - opsv-queue/.../bgm.mp3
 ```
 
-**类型化子标题**（正文 `### <type>` 对齐 api_config inputs key）：
+**核心规则**：
+- 每个 ref 必须**至少**指向 1 个资产文件（路径数组非空）
+- 一个 ref 可对应多个文件（人物多角度、流程序列）
+- prompt + visual_brief + visual_detailed 中每个 @-token 都必须在 refs 中有对应 key
+- refs 中每个 key 都必须在 prompt 中被引用（双向校验，违反 = error）
+
+### Design References 区域
 
 ```markdown
-### image
-[英雄设计稿](#hero)         # 内部引用 → 解析为 hero 的 image 输出
-[风格参考](#style:night)     # variant 引用
+## Design References
 
-### audio
-[背景音乐](#bgm)
+### image
+![angle_side](./refs/hero_side.png)    ← alt 文本 = @:key
+![angle_front](./refs/hero_front.png)
+
+### video
+![motion_ref](./refs/run.mp4)
 ```
 
-- **`### <type>`** 子标题对齐 api_config `inputs` key（image/video/audio/bvh/mask 等，可自定义）
-- **`[标题](#refid)`** 标准内部引用语法，`#refid` 指向资产 id
-- **`@id:variant`** 延续现有 variant 语法
-- **简写 `@id`** 类型在 review 时确认后填入 refs
-- **RefBinder** 统一解析 frontmatter refs + typed sections → `Record<string, string[]>` 类型分组
-- **InputEvaluator** 根据 api_config `inputs` 配置求值 source 快捷路径，按 target 注入 API payload
+- 资料堆性质，可堆任意参考图
+- alt 文本（`[]` 里的字符串）= `@:key` 的索引
+- 只有 prompt 中 `@:xxx` 引用的图才进 refs
 
-**api_config inputs 配置示例**：
+### Input Types 注册表
+
+`.opsv/input_types.yaml` 集中定义所有合法的 input_type（image / video / audio / bvh / mask / 自定义）：
+- frontmatter refs 分组 key 必须来自此注册表
+- api_config `inputs.<key>` 也受此约束
+- 找不到时编译报错
+
+### Prompt 编译模式 (v0.10.0)
+
+由 `--prompt-mode` CLI 选项或 api_config `prompt_compile_mode` 控制：
+
+| 模式 | 行为 | 适用 |
+|------|------|------|
+| `keep` (默认) | prompt 原文不变 + 在 `_opsv._refs_map` 附加 `{ "@hero": "@hero" }` 映射表 | 现代模型能直接理解 @ 语法 |
+| `index` | `@hero` → `image1`、`@:angle_side` → `image2` | ComfyUI 节点编号场景 |
+| `name` | `@hero` → `hero`、`@:angle_side` → `angle_side` | 模型按语义名匹配 |
+
+### api_config inputs 配置
 
 ```yaml
 volc.seedance2:
+  prompt_compile_mode: keep      # 可选：keep | index | name
   inputs:
     prompt:
       source: prompt
       target: content[0].text
-    first_frame:
-      source: first_frame
-      target: content[].image_url
     image:
-      source: reference_images
+      source: refs[image]        # 取 refs.image 所有路径
       target: content[].image_url
     audio:
-      source: reference_audios
+      source: refs[audio]
       target: content[].audio_url
 
 runninghub.default:
   inputs:
-    prompt:
-      source: prompt
-    image1:
-      source: reference_images[0]
-    seed:
-      source: default.seed
+    prompt:    { source: prompt }
+    image1:    { source: refs[image][0] }    # 取 refs.image 第一个
+    seed:      { source: default.seed }
 ```
 
-**source 快捷路径**：`prompt`、`negative_prompt`、`first_frame`、`last_frame`、`reference_images[N]`、`reference_videos`、`reference_audios`、`job.payload.X`、`default.X`
+**source 快捷路径**：
+- `prompt` / `negative_prompt` — frontmatter 字段
+- `first_frame` / `last_frame` — frame_ref 字段
+- `refs[image]` / `refs[image][N]` — 分组 refs 全部或第 N 个
+- `reference_images[N]` — 兼容旧路径
+- `job.payload.X` / `default.X` — 通用 dot-path
 
-**编译器行为**：若 api_config 配置了 `inputs`，使用 InputEvaluator 求值；否则回退到旧命名约定（向后兼容无 inputs 配置的旧模型）。
+### opsv refs 工具
+
+```bash
+opsv refs check <file>          # 报告 prompt ↔ refs 差异
+opsv refs sync <file> --write   # 自动补全 refs（多候选留空让 review 处理）
+```
+
+### Category 校验配置 (v0.10.0)
+
+`.opsv/category_validate.yaml`（项目级）+ `~/.opsv/category_validate.yaml`（用户级）+ 内置默认：
+
+```yaml
+shot:
+  required_fields: [status, prompt, refs]
+  field_schema:
+    prompt:
+      min_length: 20
+      no_placeholder: true                    # 禁用 TODO/FIXME/XXX/TBD
+      refs_in_prompt_must_match_refs: true   # 双向校验
+
+project:
+  required_fields: [status]
+  skip_prompt_check: true                    # project 元数据，无需 prompt
+```
+
+CLI 选项：
+```bash
+opsv validate --category shot              # 只验证 shot 类型
+opsv validate --strict                      # warning 也视为失败
+opsv validate --skip-category-rules        # 跳过 category 规则
+```
 
 ### 状态机
 每个可审阅对象拥有 `status` 字段：
@@ -227,26 +295,26 @@ first_frame: "@shot_01:first"
 last_frame: "@shot_01:last"
 duration: "5s"
 refs:
-  - id: "@role_hero"
-    type: image
-  - id: "@scene_forest"
-    type: image
+  image:
+    "@role_hero":
+      - opsv-queue/.../role_hero_1.png
+    "@scene_forest":
+      - opsv-queue/.../scene_forest_1.png
 ---
 
 ## Shot 01 - 开场森林
 
-角色走进阴暗的森林，镜头缓慢推进...
+@role_hero 走进 @scene_forest，镜头缓慢推进...
 
-### image
-[英雄角色](#role_hero)
+## Design References
+<!-- 资料堆，可放任意参考 -->
 [森林场景](#scene_forest)
 ```
 
 - `id` 绑定文件名，改名 = 删除重建
 - `first_frame` / `last_frame` 用 `@shot_XX:first/last` 语法
-- `refs` 为结构化数组，参与拓扑排序，决定 Circle 分层
-- `### <type>` 子标题声明类型化参考区域
-- `[标题](#refid)` 引用资产输出，类型由所在 `### <type>` 决定
+- `refs` 为 `{ type: { @key: paths[] } }` 分组结构，参与拓扑排序，决定 Circle 分层
+- prompt 中的 `@id` / `@:key` 必须与 refs 一一对应（双向校验）
 - `shotlist.md` 是末环，独立处理，不进依赖图
 
 ## Agent 角色速查
@@ -273,12 +341,13 @@ duration: "5s"
 first_frame: "/path/to/shot_01_1.png"
 negative_prompt: "low quality, blurry"
 refs:
-  - id: "@scene_lab"
-    type: image
-  - id: "@hero"
-    type: image
+  image:
+    "@scene_lab":
+      - opsv-queue/.../scene_lab_1.png
+    "@hero":
+      - opsv-queue/.../hero_1.png
 visual_detailed: |
-  场景描述文字...
+  @hero 进入 @scene_lab...
 ---
 
 正文从此处开始...
@@ -299,9 +368,10 @@ category: shot-production
 - frontmatter 必填字段：`category`、`status`
 - Shot 特定字段：`duration`、`first_frame`、`last_frame`、`frame_ref`
 - Prompt 取值优先级：`prompt` → `visual_detailed` → `visual_brief` → body 第一段
-- `refs` 为结构化数组 `[{ id: "@assetId", type: "image" }]`，`type` 对齐 api_config inputs key
-- 正文 `### <type>` 子标题下的 `[标题](#refid)` 引用解析为类型化输入
-- `@FRAME:shotId_type` 只用于 body 的 `refs` 数组，不用于 frontmatter 字段
+- `refs` 为 `{ type: { @key: paths[] } }` 分组结构，type 必须在 `.opsv/input_types.yaml` 注册
+- prompt 中的 `@id` / `@id:variant` / `@:key` / `@FRAME:*` 由 `RefSyntaxParser` 统一解析
+- `opsv refs check <file>` 校验 prompt ↔ refs 双向对应
+- `opsv refs sync <file>` 自动补全 refs（多候选留空让 review 确定）
 - ComfyUI / RunningHub 工作流支持 `seed: random`（自动替换为随机自然数）
 
 ## 关键工作流命令

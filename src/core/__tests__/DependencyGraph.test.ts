@@ -1,7 +1,16 @@
 import { DependencyGraph, ParsedDocument } from '../DependencyGraph';
 
 function makeDoc(id: string, refs: string[] = []): ParsedDocument {
-  return { id, filePath: `/fake/${id}.md`, frontmatter: { refs: refs.map(r => ({ id: r })) } };
+  const refsMap: Record<string, string[]> = {};
+  for (const r of refs) {
+    const key = r.startsWith('@') ? r : `@${r}`;
+    refsMap[key] = [`/fake/${r}.png`];
+  }
+  return {
+    id,
+    filePath: `/fake/${id}.md`,
+    frontmatter: refs.length > 0 ? { refs: { image: refsMap } } : { refs: undefined as any },
+  };
 }
 
 describe('DependencyGraph', () => {

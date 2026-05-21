@@ -69,6 +69,7 @@ export interface ModelConfig {
   workflowId?: string;
   node_mappings?: Record<string, { nodeId: string; fieldName: string }>;
   inputs?: Record<string, InputBinding>;
+  prompt_compile_mode?: 'keep' | 'index' | 'name';
   timeout?: TimeoutConfig;
   max_poll_duration?: number;
   retry?: RetryConfig;

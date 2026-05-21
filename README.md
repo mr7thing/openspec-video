@@ -1,4 +1,4 @@
-# OpenSpec-Video (OpsV) v0.9.0
+# OpenSpec-Video (OpsV) v0.10.0
 
 > **Spec-as-Code** framework that compiles narrative Markdown into production-ready media via a multi-provider pipeline with circle-centric dependency management.
 
@@ -361,55 +361,89 @@ drafting → syncing → approved
 
 All provider API URLs and models must be configured in `.opsv/api_config.yaml`. No hardcoded defaults.
 
-### Input Binding (v0.9.0)
+### Input Binding (v0.10.0)
 
-OpsV v0.9.0 introduces a unified input binding chain: **frontmatter refs → type classification → api_config inputs → API payload**.
+OpsV v0.10.0 unifies references under a single `@` syntax and a grouped refs structure.
 
-**Structured refs** in frontmatter (replaces string array):
+**Reference syntax** (in prompt / visual_brief / visual_detailed):
+
+| Form | Meaning |
+|------|---------|
+| `@hero` | External asset |
+| `@style:night` | External + variant |
+| `@:angle_side` | In-document Design Reference |
+| `@FRAME:shot_01_first` | Frame ref (resolved at compile time, not in refs) |
+
+**Frontmatter refs** — grouped by input_type, each key mapped to one or more paths:
 
 ```yaml
 refs:
-  - id: "@hero"
-    type: image            # image / video / audio / bvh / mask / custom
-  - id: "@bgm"
-    type: audio
-  - id: "@style:night"     # variant reference
-    type: image
+  image:
+    "@hero":
+      - opsv-queue/.../hero_1.png
+    "@:angle_side":
+      - ./refs/hero_side.png
+    "@style:night":
+      - opsv-queue/.../style_night.png
+  video:
+    "@swim_loop":
+      - opsv-queue/.../swim.mp4
+  audio:
+    "@bgm":
+      - opsv-queue/.../bgm.mp3
 ```
 
-**Typed sections** in body (aligns with api_config `inputs` keys):
+**Bidirectional validation**: prompt `@-tokens` must equal refs keys exactly (configurable per category in `.opsv/category_validate.yaml`).
 
-```markdown
-### image
-[Hero design](#hero)         # internal ref → resolves to hero's image output
-[Style ref](#style:night)     # variant ref
-
-### audio
-[Background music](#bgm)
-```
+**Input types registry** (`.opsv/input_types.yaml`): declares allowed input_type values; refs grouping keys and `api_config.yaml` `inputs.<key>` must come from this registry.
 
 **api_config inputs** (configurable, zero-hardcode):
 
 ```yaml
 volc.seedance2:
+  prompt_compile_mode: keep      # keep | index | name
   inputs:
     prompt:
       source: prompt
       target: content[0].text
-    first_frame:
-      source: first_frame
-      target: content[].image_url
     image:
-      source: reference_images
+      source: refs[image]        # new v0.10.0 source path
       target: content[].image_url
     audio:
-      source: reference_audios
+      source: refs[audio]
       target: content[].audio_url
 ```
 
-**Source shortcuts**: `prompt`, `negative_prompt`, `first_frame`, `last_frame`, `reference_images[N]`, `reference_videos`, `reference_audios`, `job.payload.X`, `default.X`
+**Prompt compile modes**:
 
-Compilers use `InputEvaluator` when `inputs` is configured, falling back to legacy naming convention for backward compatibility.
+- `keep` (default): prompt unchanged, `_opsv._refs_map` attached for model lookup
+- `index`: `@hero` → `image1`, `@:angle_side` → `image2`
+- `name`: `@hero` → `hero` (bare id)
+
+Override with `--prompt-mode <mode>` CLI flag.
+
+**`opsv refs` tool**:
+
+```bash
+opsv refs check <file>          # report prompt ↔ refs misalignment
+opsv refs sync <file> --write   # auto-fill refs (multi-candidate left blank for review)
+```
+
+**Category validation** (`.opsv/category_validate.yaml`):
+
+```yaml
+shot:
+  required_fields: [status, prompt, refs]
+  field_schema:
+    prompt:
+      min_length: 20
+      no_placeholder: true
+      refs_in_prompt_must_match_refs: true
+```
+
+```bash
+opsv validate --category shot --strict   # filter + treat warnings as errors
+```
 
 ---
 
@@ -478,4 +512,4 @@ OpsV uses git as the version control layer for all project assets.
 
 MIT
 
-> *OpsV v0.9.0 | 2026-05-19*
+> *OpsV v0.10.0 | 2026-05-21*

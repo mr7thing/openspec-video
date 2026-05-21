@@ -26,7 +26,7 @@ export interface ParsedDocument {
   filePath: string;
   frontmatter: {
     category?: string;
-    refs?: Array<{ id: string; type?: string }>;
+    refs?: Record<string, Record<string, string[]>>;
     status?: string;
   };
 }
@@ -74,13 +74,17 @@ export class DependencyGraph {
       const deps = new Set<string>();
 
       if (doc.frontmatter.refs) {
-        for (const ref of doc.frontmatter.refs) {
-          let cleanId = ref.id.startsWith('@') ? ref.id.slice(1) : ref.id;
-          const colonIdx = cleanId.indexOf(':');
-          if (colonIdx > 0) {
-            cleanId = cleanId.slice(0, colonIdx);
+        for (const typeMap of Object.values(doc.frontmatter.refs)) {
+          if (!typeMap || typeof typeMap !== 'object') continue;
+          for (const key of Object.keys(typeMap)) {
+            // Strip @ prefix; skip in-doc refs (@:) — they don't create cross-doc dependencies
+            if (!key.startsWith('@')) continue;
+            if (key.startsWith('@:')) continue;
+            let cleanId = key.slice(1);
+            const colonIdx = cleanId.indexOf(':');
+            if (colonIdx > 0) cleanId = cleanId.slice(0, colonIdx);
+            if (cleanId !== doc.id) deps.add(cleanId);
           }
-          if (cleanId !== doc.id) deps.add(cleanId);
         }
       }
 
@@ -374,12 +378,16 @@ export class DependencyGraph {
 
     for (const doc of documents) {
       if (doc.frontmatter.refs) {
-        for (const ref of doc.frontmatter.refs) {
-          let cleanId = ref.id.startsWith('@') ? ref.id.slice(1) : ref.id;
-          const colonIdx = cleanId.indexOf(':');
-          if (colonIdx > 0) cleanId = cleanId.slice(0, colonIdx);
-          if (!targetAssetIds.has(cleanId)) {
-            targetRefs.add(cleanId);
+        for (const typeMap of Object.values(doc.frontmatter.refs)) {
+          if (!typeMap || typeof typeMap !== 'object') continue;
+          for (const key of Object.keys(typeMap)) {
+            if (!key.startsWith('@') || key.startsWith('@:')) continue;
+            let cleanId = key.slice(1);
+            const colonIdx = cleanId.indexOf(':');
+            if (colonIdx > 0) cleanId = cleanId.slice(0, colonIdx);
+            if (!targetAssetIds.has(cleanId)) {
+              targetRefs.add(cleanId);
+            }
           }
         }
       }

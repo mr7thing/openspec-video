@@ -106,13 +106,13 @@ models:
         source: last_frame
         target: content[].image_url
       image:
-        source: reference_images
+        source: refs[image]              # v0.10.0: 取 refs.image 所有路径
         target: content[].image_url
       video:
-        source: reference_videos
+        source: refs[video]
         target: content[].video_url
       audio:
-        source: reference_audios
+        source: refs[audio]
         target: content[].audio_url
     defaults:
       ratio: "16:9"
@@ -292,7 +292,7 @@ models:
       seed:
         source: default.seed
       image1:
-        source: reference_images[0]
+        source: refs[image][0]            # v0.10.0: 取 refs.image 第一个
     node_mappings:
       # 提示词节点 (通常是 CLIPTextEncode 或 CR Prompt Text)
       prompt:
