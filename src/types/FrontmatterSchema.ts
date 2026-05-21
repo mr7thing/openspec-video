@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { RefsByTypeSchema } from './Refs';
 
 // ============================================================================
-// OpsV Frontmatter Schema
+// OpsV Frontmatter Schema (v0.10.0)
 // ============================================================================
 
 // Document category — organizational classification, NOT generation type.
@@ -18,25 +19,23 @@ export const NodeMappingSchema = z.record(z.object({
 }));
 export type NodeMapping = z.infer<typeof NodeMappingSchema>;
 
-export const RefEntrySchema = z.object({
-  id: z.string(),
-  type: z.string().optional(),
-});
-export type RefEntry = z.infer<typeof RefEntrySchema>;
-
+/**
+ * ResolvedRef — runtime structure produced by RefBinder.
+ * Each entry corresponds to one canonical ref key from frontmatter refs.
+ */
 export interface ResolvedRef {
+  /** Canonical key, e.g. "@hero", "@style:night", "@:angle_side" */
+  key: string;
+  /** Input type bucket (image / video / audio / ...) */
+  type: string;
+  /** "external" | "doc" — frame refs never appear here */
+  kind: 'external' | 'doc';
+  /** Bare id (after @ or @:) */
   id: string;
+  /** Variant suffix for external refs */
   variant?: string;
-  type: string;
-  docPath: string;
-  outputs: string[];
-}
-
-export interface TypedSectionRef {
-  type: string;
-  refId: string;
-  label: string;
-  variant?: string;
+  /** Resolved file paths (at least one when validated) */
+  paths: string[];
 }
 
 export const BaseFrontmatterSchema = z.object({
@@ -46,7 +45,7 @@ export const BaseFrontmatterSchema = z.object({
   visual_detailed: z.string().optional(),
   prompt: z.string().optional(),
   negative_prompt: z.string().optional(),
-  refs: z.array(RefEntrySchema).optional(),
+  refs: RefsByTypeSchema.optional(),
   reviews: z.array(z.string()).optional(),
   workflow: z.string().optional(),              // Deprecated: use workflow_id or workflow_path
   workflow_id: z.string().optional(),            // RunningHub workflowId
@@ -81,7 +80,5 @@ export const ShotProductionFrontmatterSchema = BaseFrontmatterSchema.extend({
     last: z.string().nullable().optional(),
   }).optional(),
   video_path: z.string().nullable().optional(),
-  ref_videos: z.array(z.string()).optional(),
-  ref_audios: z.array(z.string()).optional(),
 });
 export type ShotProductionFrontmatter = z.infer<typeof ShotProductionFrontmatterSchema>;

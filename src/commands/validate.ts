@@ -1,5 +1,5 @@
 // ============================================================================
-// OpsV opsv validate
+// OpsV opsv validate (v0.10.0)
 // ============================================================================
 
 import { Command } from 'commander';
@@ -14,13 +14,22 @@ import {
   ShotDesignFrontmatterSchema,
   ShotProductionFrontmatterSchema,
 } from '../types/FrontmatterSchema';
+import { RefsByType } from '../types/Refs';
 import { logger } from '../utils/logger';
 import { resolveProjectRoot } from '../utils/projectResolver';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
 import { AssetManager } from '../core/AssetManager';
+import { CategoryValidateLoader } from '../utils/categoryValidateLoader';
+import { InputTypesLoader } from '../utils/inputTypesLoader';
+import { validateCategory, ValidationIssue } from '../core/CategoryValidator';
+import { bindRefs } from '../core/RefBinder';
+import { parseKey } from '../core/RefBinder';
 
 interface ValidateCommandOptions {
   dir: string;
+  category?: string;
+  strict?: boolean;
+  skipCategoryRules?: boolean;
 }
 
 export function registerValidateCommand(program: Command, version: string): void {
@@ -28,6 +37,9 @@ export function registerValidateCommand(program: Command, version: string): void
     .command('validate')
     .description('Validate project documents and frontmatter')
     .option('--dir <path>', 'Target directory to validate (default: videospec)', 'videospec')
+    .option('--category <cat>', 'Only validate documents of this category')
+    .option('--strict', 'Treat warnings as errors (non-zero exit)')
+    .option('--skip-category-rules', 'Skip category_validate.yaml rule checks')
     .action(async (options: ValidateCommandOptions) => {
       try {
         const projectRoot = resolveProjectRoot(process.cwd());
@@ -42,6 +54,12 @@ export function registerValidateCommand(program: Command, version: string): void
           console.error(chalk.red(`Target is not a directory: ${targetDir}`));
           process.exit(1);
         }
+
+        // Load category rules + input_types registry
+        const catLoader = new CategoryValidateLoader();
+        catLoader.load(projectRoot, { silent: true });
+        const inputTypes = new InputTypesLoader();
+        inputTypes.load(projectRoot, { silent: true });
 
         // Build asset index recursively (supports deep nesting)
         const index = buildAssetDocIndex(targetDir);
@@ -61,14 +79,13 @@ export function registerValidateCommand(program: Command, version: string): void
           }
         }
 
-        // Validate documents: only files in subdirectories (*/*.md) are validated
-        // Root level *.md files are treated as assets but not validated as documents
         let totalFiles = 0;
         let validFiles = 0;
         const errors: Array<{ file: string; message: string }> = [];
         const deadRefs: Array<{ file: string; ref: string; relPath: string }> = [];
         const missingImages: Array<{ file: string; ref: string }> = [];
         const statusIssues: Array<{ file: string; docStatus: string; manifestStatus: string }> = [];
+        const categoryIssues: Array<{ file: string; issue: ValidationIssue }> = [];
 
         for (const [assetId, entry] of entries) {
           // Only validate files in subdirectories (not root level)
@@ -76,32 +93,55 @@ export function registerValidateCommand(program: Command, version: string): void
             totalFiles++;
             try {
               const content = fs.readFileSync(entry.filePath, 'utf-8');
-              const { frontmatter } = FrontmatterParser.parseRaw(content);
+              const { frontmatter, body } = FrontmatterParser.parseRaw(content);
+
+              if (options.category && frontmatter.category !== options.category) {
+                totalFiles--;
+                continue;
+              }
 
               // Schema validation
               const schema = getSchemaForCategory(frontmatter.category);
               FrontmatterParser.parse(content, schema);
+
+              // refs structure check (input_type registered + key syntax)
+              const refsResult = bindRefs(frontmatter.refs as RefsByType | undefined, {
+                projectRoot,
+                inputTypes,
+              });
+              for (const err of refsResult.errors) {
+                errors.push({ file: entry.relativePath, message: err });
+              }
+
+              // Category-level business rules
+              if (!options.skipCategoryRules) {
+                const rule = catLoader.getRule(String(frontmatter.category ?? ''));
+                const issues = validateCategory(frontmatter, body, rule);
+                for (const issue of issues) {
+                  categoryIssues.push({ file: entry.relativePath, issue });
+                }
+              }
+
               validFiles++;
             } catch (err: any) {
               errors.push({ file: entry.relativePath, message: err.message });
             }
           }
 
-          // Dead link detection: check refs in frontmatter and body
+          // Dead link detection: refs target docs must exist
           try {
             const content = fs.readFileSync(entry.filePath, 'utf-8');
             const { frontmatter } = FrontmatterParser.parseRaw(content);
+            const refs = (frontmatter.refs || {}) as RefsByType;
 
-            const refsInFrontmatter = (frontmatter.refs || []).map((r: any) => r.id || r);
-            const refsInBody = extractRefsFromBody(content);
-
-            const allRefs = [...refsInFrontmatter, ...refsInBody];
-            for (const ref of allRefs) {
-              let refId = ref.startsWith('@') ? ref.slice(1) : ref;
-              const colonIdx = refId.indexOf(':');
-              if (colonIdx > 0) refId = refId.slice(0, colonIdx);
-              if (!entries.has(refId)) {
-                deadRefs.push({ file: entry.relativePath, ref: refId, relPath: entry.relativePath });
+            for (const typeMap of Object.values(refs)) {
+              for (const key of Object.keys(typeMap || {})) {
+                const parsed = parseKey(key);
+                if (!parsed) continue;
+                if (parsed.kind === 'doc') continue; // local doc refs not in asset index
+                if (!entries.has(parsed.id)) {
+                  deadRefs.push({ file: entry.relativePath, ref: parsed.id, relPath: entry.relativePath });
+                }
               }
             }
           } catch {
@@ -141,17 +181,41 @@ export function registerValidateCommand(program: Command, version: string): void
           }
         }
 
+        const catErrors = categoryIssues.filter(x => x.issue.severity === 'error');
+        const catWarnings = categoryIssues.filter(x => x.issue.severity === 'warning');
+
+        if (catErrors.length > 0) {
+          console.log(chalk.red(`\n${catErrors.length} category rule error(s):`));
+          for (const { file, issue } of catErrors) {
+            const f = issue.field ? `[${issue.field}] ` : '';
+            console.log(chalk.red(`  ${file} (${issue.category}): ${f}${issue.message}`));
+          }
+        }
+
+        if (catWarnings.length > 0) {
+          console.log(chalk.yellow(`\n${catWarnings.length} category rule warning(s):`));
+          for (const { file, issue } of catWarnings) {
+            const f = issue.field ? `[${issue.field}] ` : '';
+            console.log(chalk.yellow(`  ${file} (${issue.category}): ${f}${issue.message}`));
+          }
+        }
+
         if (errors.length > 0) {
           console.log(chalk.red(`\n${errors.length} error(s):`));
           for (const e of errors) {
             console.log(chalk.red(`  ${e.file}: ${e.message}`));
           }
           process.exit(1);
-        } else if (deadRefs.length > 0) {
-          process.exit(1);
-        } else if (missingImages.length > 0) {
-          process.exit(1);
-        } else if (statusIssues.length > 0) {
+        }
+
+        const hasFailure =
+          deadRefs.length > 0 ||
+          missingImages.length > 0 ||
+          statusIssues.length > 0 ||
+          catErrors.length > 0 ||
+          (options.strict && catWarnings.length > 0);
+
+        if (hasFailure) {
           process.exit(1);
         } else {
           console.log(chalk.green('All documents valid!'));

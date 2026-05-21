@@ -21,6 +21,7 @@ import { registerWebappCommand } from './commands/webapp';
 import { registerRunCommand } from './commands/run';
 import { registerReviewCommand } from './commands/review';
 import { registerIterateCommand } from './commands/iterate';
+import { registerRefsCommand } from './commands/refs';
 import { resolveProjectRoot } from './utils/projectResolver';
 
 // Load .env from the resolved project root (not just cwd)
@@ -86,5 +87,6 @@ registerWebappCommand(program);
 registerRunCommand(program);
 registerReviewCommand(program);
 registerIterateCommand(program);
+registerRefsCommand(program);
 
 program.parse(process.argv);

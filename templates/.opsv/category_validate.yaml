@@ -1,0 +1,51 @@
+# OpsV Category Validation Rules (v0.10.0)
+# Document-level business rules by `category` field.
+# Lookup order:
+#   1. <projectRoot>/videospec/_category_validate.yaml (project-level, overrides)
+#   2. ~/.opsv/category_validate.yaml (user-level fallback)
+#   3. Built-in defaults below
+
+# ---------------------------------------------------------------------------
+# Built-in defaults — applied unless overridden.
+# Two categories have special semantics:
+#   - project:  metadata file, no generation, skip prompt checks
+#   - shotlist: video batch frontmatter, still needs prompt quality
+# ---------------------------------------------------------------------------
+
+project:
+  required_fields: [status]
+  skip_prompt_check: true
+
+shotlist:
+  required_fields: [status, title]
+  field_schema:
+    prompt:
+      min_length: 10
+      no_placeholder: true
+
+# ---------------------------------------------------------------------------
+# Example user-defined categories (uncomment / edit per project)
+# ---------------------------------------------------------------------------
+
+# element:
+#   required_fields: [status, title, visual_brief, prompt]
+#   field_schema:
+#     prompt:
+#       min_length: 10
+#       no_placeholder: true
+#       refs_in_prompt_must_match_refs: true
+#
+# scene:
+#   required_fields: [status, title, prompt]
+#   field_schema:
+#     prompt:
+#       min_length: 10
+#       refs_in_prompt_must_match_refs: true
+#
+# shot:
+#   required_fields: [status, prompt, refs]
+#   field_schema:
+#     prompt:
+#       min_length: 20
+#       no_placeholder: true
+#       refs_in_prompt_must_match_refs: true

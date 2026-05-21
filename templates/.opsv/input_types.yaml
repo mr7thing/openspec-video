@@ -1,0 +1,33 @@
+# OpsV Input Types Registry (v0.10.0)
+# Defines available input_type values used across:
+#   - frontmatter refs grouping keys
+#   - api_config.yaml `inputs.<key>` keys
+#   - ### <type> subsection headings in ## Design References
+#
+# Compilation will error if any of the above references an input_type not defined here.
+
+input_types:
+  image:
+    description: Static image (reference photos, character portraits, scene compositions)
+    extensions: [.png, .jpg, .jpeg, .webp]
+
+  video:
+    description: Video file (motion reference, loop, source footage)
+    extensions: [.mp4, .mov, .webm, .avi]
+
+  audio:
+    description: Audio file (background music, sound effects, voice)
+    extensions: [.mp3, .wav, .m4a, .flac, .ogg]
+
+  bvh:
+    description: Motion capture data (BVH skeletal animation)
+    extensions: [.bvh]
+
+  mask:
+    description: Alpha mask or segmentation image
+    extensions: [.png]
+
+  # Add custom types here, e.g.:
+  # depth:
+  #   description: Depth map
+  #   extensions: [.png, .exr]
