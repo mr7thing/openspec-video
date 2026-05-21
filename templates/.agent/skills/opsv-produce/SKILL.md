@@ -43,18 +43,21 @@ opsv webapp --model webapp.gemini
 | `--status-skip <statuses>` | Comma-separated statuses to skip (default: approved, use "none" to skip nothing) |
 | `--dry-run` | Show compiled tasks without writing files |
 
-## Compilation Flow (v0.9.0)
+## Compilation Flow (v0.10.0)
 1. Read `_manifest.json` from target circle (including `assets` field)
 2. Filter by `--file`, `--category`, `--status-skip`
 3. **Validate ref statuses**: all `@ref` references must point to `approved` assets (syncing blocks downstream)
 4. Load asset frontmatter and resolve `@ref` references
-5. Read reference images via two readers (v0.8.3):
+5. Read reference images via two readers:
    - **`ApprovedRefReader`**: reads `## Approved References` from **referenced documents** → `Asset.approvedRefs`
    - **`DesignRefReader`**: reads `## Design References` from **own document** → `Asset.designRefs`
-6. **RefBinder** (v0.9.0): parse structured `refs: [{ id, type }]` + `### <type>` typed sections → `groupedInputs`
+6. **RefBinder** (v0.10.0): parse grouped `refs: { type: { @key: paths[] } }` → `ResolvedRef[]` + `groupedInputs`
+   - Validates input_type registration against `.opsv/input_types.yaml`
+   - Each ref key must have ≥1 path
 7. Build `Job` objects with prompt, references, frame_ref
 8. Call `await TaskBuilder.compileToDir()` → provider-specific `TaskJson`
-   - **InputEvaluator** (v0.9.0): if api_config `inputs` defined, evaluate source paths and apply to payload; otherwise fall back to legacy naming convention
+   - **PromptCompiler** (v0.10.0): rewrite prompt @-tokens per `--prompt-mode` (keep|index|name); attach `_refs_map` in keep mode
+   - **InputEvaluator** (v0.10.0): if api_config `inputs` defined, evaluate source paths (incl. `refs[type]` / `refs[type][N]`) and apply to payload; otherwise fall back to legacy naming
 9. Write to `opsv-queue/{basename}.circle{N}/<provider.model>/<id>.json`
 
 **Syncing Gate**: `syncing` assets block downstream compilation. If an asset's `@ref` points to a `syncing` asset, compilation is skipped with a warning.

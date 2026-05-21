@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.9.0 (输入绑定 + 类型化引用 + InputEvaluator)
+> 当前版本：v0.10.0 (统一 @ 语法 + refs 分组 + PromptCompiler + category 校验)
 
 ## 命令总览
 
@@ -191,10 +191,11 @@ opsv comfy --model runninghub.default
 opsv comfy --model runninghub.default --force-api-mapping
 ```
 
-**inputs + node_mappings 协作**（v0.9.0）：
+**inputs + node_mappings 协作**（v0.10.0）：
 - `inputs` 定义数据来源（source）和注入目标（target），由 InputEvaluator 求值
 - `node_mappings` 定义工作流节点注入位置（nodeId + fieldName）
 - inputs key 与 node_mappings key 对齐：inputs 解析值，node_mappings 指定注入位置
+- v0.10.0 新增 source：`refs[image]` / `refs[image][N]` 直接取分组 refs
 - 若 api_config 配置了 `inputs`，编译器使用 InputEvaluator 求值；否则回退到旧命名约定
 
 **opsv- 前缀映射规则**：

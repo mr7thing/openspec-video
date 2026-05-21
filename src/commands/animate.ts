@@ -161,21 +161,28 @@ async function buildVideoJob(
     ];
   }
 
-  // Resolve reference video paths (HTTP URLs or local paths)
+  // v0.10.0: video and audio refs come from refs.video / refs.audio
   let referenceVideos: string[] = [];
-  if (frontmatter.ref_videos && frontmatter.ref_videos.length > 0) {
-    for (const refPath of frontmatter.ref_videos) {
-      const resolved = resolveFrameRef(filePath, refPath);
-      if (resolved) referenceVideos.push(resolved);
+  if (refs.video) {
+    for (const paths of Object.values(refs.video)) {
+      if (Array.isArray(paths)) {
+        for (const p of paths) {
+          const resolved = p.startsWith('http') || p.startsWith('/') ? p : resolveFrameRef(filePath, p) || p;
+          if (resolved) referenceVideos.push(resolved);
+        }
+      }
     }
   }
 
-  // Resolve reference audio paths (HTTP URLs or local paths)
   let referenceAudios: string[] = [];
-  if (frontmatter.ref_audios && frontmatter.ref_audios.length > 0) {
-    for (const refPath of frontmatter.ref_audios) {
-      const resolved = resolveFrameRef(filePath, refPath);
-      if (resolved) referenceAudios.push(resolved);
+  if (refs.audio) {
+    for (const paths of Object.values(refs.audio)) {
+      if (Array.isArray(paths)) {
+        for (const p of paths) {
+          const resolved = p.startsWith('http') || p.startsWith('/') ? p : resolveFrameRef(filePath, p) || p;
+          if (resolved) referenceAudios.push(resolved);
+        }
+      }
     }
   }
 

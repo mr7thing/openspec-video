@@ -187,7 +187,7 @@ workflows/
     "prompt": { "nodeId": "3", "fieldName": "text" },
     "image":  { "nodeId": "5", "fieldName": "image" }
   },
-  "opsvVersion": "0.9.0"
+  "opsvVersion": "0.10.0"
 }
 ```
 
@@ -227,7 +227,7 @@ opsv comfy-node-mapping workflows/my_workflow.json --workflow-id rh_abc123 -o wo
     "prompt": { "nodeId": "3", "fieldName": "text" },
     "image":  { "nodeId": "5", "fieldName": "image" }
   },
-  "opsvVersion": "0.9.0"
+  "opsvVersion": "0.10.0"
 }
 ```
 
@@ -274,7 +274,7 @@ opsv comfy --model runninghub.default --force-api-mapping
 | 2 | 文档 frontmatter `node_mapping` | 默认，frontmatter 有值时优先 |
 | 3 | `api_config.yaml` `node_mappings` | frontmatter 无值时兜底 |
 
-**inputs + node_mappings 协作**（v0.9.0）：`inputs` 定义数据来源（source），`node_mappings` 定义注入位置（nodeId + fieldName）。inputs key 与 node_mappings key 对齐。
+**inputs + node_mappings 协作**（v0.10.0）：`inputs` 定义数据来源（source，含 `refs[type]` / `refs[type][N]`），`node_mappings` 定义注入位置（nodeId + fieldName）。inputs key 与 node_mappings key 对齐。
 
 ### Step 4: Iterate (preserve previous, clone new)
 
@@ -333,7 +333,7 @@ opsv-queue/
 
 ```json
 {
-  "version": "0.9.0",
+  "version": "0.10.0",
   "target": "videospec",
   "generatedAt": "2026-04-30T00:00:00.000Z",
   "circles": [

@@ -276,12 +276,15 @@ duration: "5s"
 first_frame: null
 last_frame: null
 refs:
-  - id: "../../opsv-queue/.../参考图.png"
-    type: image
-ref_videos:
-  - "https://.../参考视频.mp4"
-ref_audios:
-  - "https://.../背景音.mp3"
+  image:
+    "@ref1":
+      - ../../opsv-queue/.../参考图.png
+  video:
+    "@ref_video":
+      - https://.../参考视频.mp4
+  audio:
+    "@ref_audio":
+      - https://.../背景音.mp3
 visual_detailed: |
   提示词内容...
 ---
@@ -292,9 +295,7 @@ visual_detailed: |
 | `duration` | string | 视频时长，如 `"5s"` |
 | `first_frame` | string / null | 首帧图片路径或 URL |
 | `last_frame` | string / null | 尾帧图片路径或 URL |
-| `refs` | string[] | 参考图片路径（相对路径或 @asset 引用） |
-| `ref_videos` | string[] | 参考视频 URL（仅支持 HTTP URL） |
-| `ref_audios` | string[] | 参考音频 URL（仅支持 HTTP URL） |
+| `refs` | object | 分组引用：`refs.image[@key]: paths[]`、`refs.video[@key]: paths[]`、`refs.audio[@key]: paths[]`（v0.10.0） |
 
 ### 常见场景的 global_settings / payload 配置
 

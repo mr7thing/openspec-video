@@ -438,7 +438,7 @@ opsv review --port 3100 --ttl 300        # 自定义端口与空闲超时
 #    → 全部 approved 后 opsv circle refresh 自动更新 _manifest.json
 ```
 
-## Node Mapping 降级策略 (v0.9.0)
+## Node Mapping 降级策略 (v0.10.0)
 
 编译时 node_mapping 的来源优先级：
 
@@ -456,7 +456,7 @@ opsv comfy --model runninghub.default
 opsv comfy --model runninghub.default --force-api-mapping
 ```
 
-**inputs + node_mappings 协作**（v0.9.0）：
+**inputs + node_mappings 协作**（v0.10.0）：
 - `inputs` 定义数据来源（source 快捷路径）和注入目标（target），由 InputEvaluator 求值
 - `node_mappings` 定义工作流节点注入位置（nodeId + fieldName）
 - inputs key 与 node_mappings key 对齐：inputs 解析值，node_mappings 指定注入位置
