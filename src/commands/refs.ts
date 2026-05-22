@@ -103,11 +103,9 @@ export function diffRefs(
   frontmatter: Record<string, any>,
   body: string,
 ): { promptKeys: Set<string>; refKeys: Set<string>; missingInRefs: string[]; unusedInPrompt: string[] } {
+  // v0.10.0: refs only mirrors the `prompt` field (not visual_brief / visual_detailed / body)
   const prompt = String(frontmatter.prompt ?? '');
-  const visualBrief = String(frontmatter.visual_brief ?? '');
-  const visualDetailed = String(frontmatter.visual_detailed ?? '');
-
-  const tokens = extractAllRefs(prompt, visualBrief, visualDetailed, body);
+  const tokens = extractAllRefs(prompt);
   const promptKeys = new Set(tokens.map(t => t.key));
 
   const refs = (frontmatter.refs || {}) as RefsByType;
@@ -141,10 +139,9 @@ async function autofillRefs(
   body: string,
   projectRoot: string,
 ): Promise<RefsByType> {
+  // v0.10.0: refs only mirrors the `prompt` field
   const prompt = String(frontmatter.prompt ?? '');
-  const visualBrief = String(frontmatter.visual_brief ?? '');
-  const visualDetailed = String(frontmatter.visual_detailed ?? '');
-  const tokens = extractAllRefs(prompt, visualBrief, visualDetailed, body);
+  const tokens = extractAllRefs(prompt);
 
   const out: RefsByType = (frontmatter.refs || {}) as RefsByType;
   const approvedRefReader = new ApprovedRefReader(projectRoot);

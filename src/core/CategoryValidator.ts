@@ -115,9 +115,13 @@ export function validateCategory(
 }
 
 /**
- * Bidirectional refs ↔ prompt validation:
- *  - Every @-token in prompt+visual_brief+visual_detailed must have a refs entry
- *  - Every refs key must appear as an @-token somewhere
+ * Bidirectional refs ↔ prompt validation (v0.10.0):
+ *   refs only mirror what the prompt field references.
+ *   visual_brief / visual_detailed / body are NOT scanned — they may
+ *   contain narrative @-references that don't represent generation inputs.
+ *
+ *  - Every @-token in `prompt` must have a refs entry
+ *  - Every refs key must appear as an @-token in `prompt`
  */
 export function validateRefsBidirectional(
   frontmatter: Record<string, any>,
@@ -128,10 +132,7 @@ export function validateRefsBidirectional(
   const issues: ValidationIssue[] = [];
 
   const prompt = String(frontmatter.prompt ?? '');
-  const visualBrief = String(frontmatter.visual_brief ?? '');
-  const visualDetailed = String(frontmatter.visual_detailed ?? '');
-
-  const promptTokens = extractAllRefs(prompt, visualBrief, visualDetailed, body);
+  const promptTokens = extractAllRefs(prompt);
   const promptKeys = new Set(promptTokens.map(t => t.key));
 
   const refs = (frontmatter.refs || {}) as RefsByType;

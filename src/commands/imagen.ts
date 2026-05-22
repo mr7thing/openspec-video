@@ -15,7 +15,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions, resolvePromptText } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -118,7 +118,7 @@ async function buildImageJob(
   const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+  const prompt = resolvePromptText(frontmatter, body, asset.id);
 
   let referenceImages: string[] = [];
   // v0.10.0: refs is { type: { key: paths[] } }; flatten image paths

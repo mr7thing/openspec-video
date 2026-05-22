@@ -13,6 +13,39 @@ import { Job } from '../types/Job';
 import { resolveProjectRoot } from '../utils/projectResolver';
 import { getProjectDir } from '../utils/configLoader';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
+import { logger } from '../utils/logger';
+
+/**
+ * Resolve the prompt to send to the model.
+ *
+ * Strict path: use `frontmatter.prompt` only. This is the only field whose
+ * @-tokens are validated against `refs` (v0.10.0 semantic).
+ *
+ * Fallback path (when prompt is missing): visual_detailed → visual_brief →
+ * first body paragraph. Logs a warning, since these fields are NOT scanned
+ * by `opsv refs check` and may contain narrative @-tokens that won't have
+ * matching refs entries.
+ */
+export function resolvePromptText(
+  frontmatter: Record<string, any>,
+  body: string,
+  assetId: string,
+): string {
+  if (frontmatter.prompt) return String(frontmatter.prompt);
+
+  const fallback =
+    frontmatter.visual_detailed ||
+    frontmatter.visual_brief ||
+    FrontmatterParser.extractFirstParagraph(body);
+
+  if (fallback) {
+    logger.warn(
+      `${assetId}: frontmatter.prompt missing, falling back to visual_detailed/brief/body. ` +
+      `These fields are not scanned by refs validation — @-tokens inside may not have matching refs entries.`
+    );
+  }
+  return String(fallback || '');
+}
 import { CompilationError, OpsVErrorCode } from '../errors/OpsVError';
 import { escapeRegex } from '../utils/string';
 

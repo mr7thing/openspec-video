@@ -16,7 +16,7 @@ import { DesignRefReader } from '../core/DesignRefReader';
 import { Job, FrameRef } from '../types/Job';
 import { logger } from '../utils/logger';
 import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions, resolvePromptText } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -123,7 +123,7 @@ async function buildVideoJob(
   const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt || frontmatter.visual_detailed || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+  const prompt = resolvePromptText(frontmatter, body, asset.id);
 
   let frameRef: FrameRef | undefined;
   if (frontmatter.frame_ref) {

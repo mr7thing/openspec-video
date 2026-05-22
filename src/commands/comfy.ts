@@ -14,7 +14,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ComfyCommandOptions } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ComfyCommandOptions, resolvePromptText } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -150,7 +150,7 @@ async function buildComfyJob(
   const content = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-  const prompt = frontmatter.prompt || frontmatter.visual_brief || FrontmatterParser.extractFirstParagraph(body);
+  const prompt = resolvePromptText(frontmatter, body, asset.id);
 
   // Collect reference images
   let referenceImages: string[] = [];

@@ -73,7 +73,7 @@ describe('CategoryValidator', () => {
     });
   });
 
-  describe('refs_in_prompt_must_match_refs (bidirectional)', () => {
+  describe('refs_in_prompt_must_match_refs (bidirectional, prompt-only)', () => {
     it('errors when prompt @id missing from refs', () => {
       const issues = validateRefsBidirectional(
         {
@@ -108,6 +108,21 @@ describe('CategoryValidator', () => {
           refs: { image: { '@hero': ['/p/hero.png'], '@:angle_side': ['/p/side.png'] } },
         },
         '',
+        'error',
+      );
+      expect(issues).toEqual([]);
+    });
+
+    it('ignores @-tokens in visual_brief / visual_detailed / body (prompt-only)', () => {
+      const issues = validateRefsBidirectional(
+        {
+          category: 'shot',
+          prompt: '@hero alone',
+          visual_brief: 'meanwhile @villain is plotting',
+          visual_detailed: '@villain in @bar',
+          refs: { image: { '@hero': ['/p/hero.png'] } },
+        },
+        '@brother elsewhere',
         'error',
       );
       expect(issues).toEqual([]);

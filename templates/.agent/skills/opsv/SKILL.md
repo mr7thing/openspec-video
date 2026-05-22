@@ -89,7 +89,7 @@ refs:
 **核心规则**：
 - 每个 ref 必须**至少**指向 1 个资产文件（路径数组非空）
 - 一个 ref 可对应多个文件（人物多角度、流程序列）
-- prompt + visual_brief + visual_detailed 中每个 @-token 都必须在 refs 中有对应 key
+- prompt 中每个 @-token 都必须在 refs 中有对应 key（注意：只扫 prompt 字段，不扫 visual_brief / visual_detailed / body）
 - refs 中每个 key 都必须在 prompt 中被引用（双向校验，违反 = error）
 
 ### Refs 语义铁律 ⚠️
@@ -198,7 +198,7 @@ prompt: >
 | `prompt` | 提交给模型的最终提示词（通常 = visual_detailed，但可定制） |
 | 正文 body | 自由记录创作过程、推翻草稿、协作讨论 |
 
-`@id` 引用语义统一：**只要出现在 prompt / visual_brief / visual_detailed 三个字段中的 @-token，都必须在 refs 有对应路径**（`opsv refs check` 强制）。
+`@id` 引用语义：**refs 只校验 `prompt` 字段的 @-token**（`opsv refs check` 强制）。`visual_brief` / `visual_detailed` / body 可以自由叙述、记录创作过程，里面写 @-token 也不会触发 refs 校验——它们是给人看的，不是给模型生成用的。
 
 ### Design References 区域
 
@@ -475,7 +475,7 @@ category: shot-production
 - 每个 shot 是独立 `.md` 文件，拥有自己的 frontmatter
 - frontmatter 必填字段：`category`、`status`
 - Shot 特定字段：`duration`、`first_frame`、`last_frame`、`frame_ref`
-- Prompt 取值优先级：`prompt` → `visual_detailed` → `visual_brief` → body 第一段
+- Prompt 取值：仅 `frontmatter.prompt`（refs 校验的唯一字段）。缺失时 fallback 到 `visual_detailed` → `visual_brief` → body 第一段并打警告（fallback 字段不参与 refs 校验，里面的 @-token 可能与 refs 不对应）
 - `refs` 为 `{ type: { @key: paths[] } }` 分组结构，type 必须在 `.opsv/input_types.yaml` 注册
 - prompt 中的 `@id` / `@id:variant` / `@:key` / `@FRAME:*` 由 `RefSyntaxParser` 统一解析
 - `opsv refs check <file>` 校验 prompt ↔ refs 双向对应
