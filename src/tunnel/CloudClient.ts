@@ -6,10 +6,19 @@ export interface TunnelSession {
   sessionId: string;
   reviewUrl: string;
   jwt: string;
-  sessionToken: string; // Token used for authenticating the WS tunnel connection
+  sessionToken: string;
+  tunnelUrl?: string;
 }
 
 const CLOUD_TIMEOUT = 30000;
+
+function unwrapData<T>(responseData: any): T {
+  return (responseData?.data ?? responseData) as T;
+}
+
+function getResponseError(err: any): string {
+  return err.response?.data?.error || err.response?.data?.message || err.message;
+}
 
 export class CloudClient {
   constructor(private cloudUrl: string, private apiKey: string) {}
@@ -20,9 +29,16 @@ export class CloudClient {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         timeout: CLOUD_TIMEOUT,
       });
-      return response.data;
+      const data = unwrapData<any>(response.data);
+      return {
+        sessionId: data.sessionId,
+        reviewUrl: data.reviewUrl,
+        jwt: data.jwt || data.reviewJwt,
+        sessionToken: data.sessionToken,
+        tunnelUrl: data.tunnelUrl,
+      };
     } catch (err: any) {
-      if (err.response?.status === 402) {
+      if (err.response?.status === 402 || err.response?.status === 429) {
         throw new InfrastructureError(
           OpsVErrorCode.INFRA_NETWORK_ERROR,
           'OpsV Cloud quota exceeded. Please check your subscription plan.'
@@ -31,7 +47,7 @@ export class CloudClient {
       logger.error(`Failed to create cloud session: ${err.message}`);
       throw new InfrastructureError(
         OpsVErrorCode.INFRA_NETWORK_ERROR,
-        err.response?.data?.error || err.message
+        getResponseError(err)
       );
     }
   }
@@ -42,12 +58,12 @@ export class CloudClient {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         timeout: CLOUD_TIMEOUT,
       });
-      return response.data;
+      return unwrapData<{ jwt: string, reviewUrl: string }>(response.data);
     } catch (err: any) {
       logger.error(`Failed to refresh cloud session: ${err.message}`);
       throw new InfrastructureError(
         OpsVErrorCode.INFRA_NETWORK_ERROR,
-        err.response?.data?.error || err.message
+        getResponseError(err)
       );
     }
   }
@@ -62,7 +78,7 @@ export class CloudClient {
       logger.error(`Failed to close cloud session: ${err.message}`);
       throw new InfrastructureError(
         OpsVErrorCode.INFRA_NETWORK_ERROR,
-        err.response?.data?.error || err.message
+        getResponseError(err)
       );
     }
   }

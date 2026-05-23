@@ -15,9 +15,29 @@ import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
 import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
+import { CloudClient } from '../tunnel/CloudClient';
+import { TunnelClient } from '../tunnel/TunnelClient';
 
 const DEFAULT_REVIEW_PORT = 3100;
 const DEFAULT_REVIEW_TTL = 900;
+
+function normalizeCloudUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
+function resolveCloudConfig(opts: ReviewOptions): { cloudUrl: string; apiKey: string } | null {
+  if (!opts.cloud) return null;
+
+  const cloudUrl = opts.cloudUrl || process.env.OPSV_CLOUD_URL;
+  const apiKey = opts.cloudApiKey || process.env.OPSV_CLOUD_API_KEY;
+
+  if (!cloudUrl || !apiKey) {
+    console.error(chalk.red('Cloud review requires --cloud-url/OPSV_CLOUD_URL and --cloud-api-key/OPSV_CLOUD_API_KEY.'));
+    process.exit(1);
+  }
+
+  return { cloudUrl: normalizeCloudUrl(cloudUrl), apiKey };
+}
 
 function autoCommitPendingChanges(projectRoot: string): void {
   try {
@@ -43,6 +63,9 @@ export function registerReviewCommand(program: Command): void {
     .option('--latest', 'Show only latest circle outputs (global mode)')
     .option('--all', 'Show all circle outputs (global mode)')
     .option('--ttl <seconds>', `Auto-shutdown after idle seconds (default: ${DEFAULT_REVIEW_TTL})`, `${DEFAULT_REVIEW_TTL}`)
+    .option('--cloud', 'Expose the review server through OpsV Cloud tunnel')
+    .option('--cloud-url <url>', 'OpsV Cloud base URL (or OPSV_CLOUD_URL)')
+    .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY)')
     .action(async (options: ReviewOptions) => {
       try {
         const projectRoot = process.cwd();
@@ -91,9 +114,58 @@ export function registerReviewCommand(program: Command): void {
           manifestReader,
         });
 
-        const server = app.listen(opts.port, () => {
+        const cloudConfig = resolveCloudConfig(opts);
+        let tunnelClient: TunnelClient | null = null;
+        let cloudClient: CloudClient | null = null;
+        let cloudSessionId: string | null = null;
+        let cleanedUp = false;
+
+        const cleanupCloud = async () => {
+          if (cleanedUp) return;
+          cleanedUp = true;
+          tunnelClient?.close();
+          if (cloudClient && cloudSessionId) {
+            try {
+              await cloudClient.closeSession(cloudSessionId);
+              console.log(chalk.gray(`Cloud session closed: ${cloudSessionId}`));
+            } catch (err: any) {
+              logger.warn(`Failed to close cloud session: ${err.message}`);
+            }
+          }
+        };
+
+        const server = app.listen(opts.port, async () => {
           console.log(chalk.green(`Review server running at http://localhost:${opts.port}`));
+
+          if (!cloudConfig) return;
+
+          try {
+            cloudClient = new CloudClient(cloudConfig.cloudUrl, cloudConfig.apiKey);
+            const session = await cloudClient.createSession();
+            cloudSessionId = session.sessionId;
+            tunnelClient = new TunnelClient(cloudConfig.cloudUrl, session.sessionToken, opts.port);
+            await tunnelClient.connect();
+            console.log(chalk.green(`Cloud review URL: ${session.reviewUrl}`));
+            console.log(chalk.gray(`Cloud session: ${session.sessionId}`));
+          } catch (err: any) {
+            logger.error(err.message);
+            await cleanupCloud();
+            server.close(() => process.exit(1));
+          }
         });
+
+        server.on('close', () => {
+          void cleanupCloud();
+        });
+
+        const shutdown = () => {
+          server.close(async () => {
+            await cleanupCloud();
+            process.exit(0);
+          });
+        };
+        process.once('SIGINT', shutdown);
+        process.once('SIGTERM', shutdown);
 
         setupTtlShutdown(server, opts.ttl);
       } catch (err: any) {

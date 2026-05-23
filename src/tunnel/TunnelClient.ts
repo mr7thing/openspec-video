@@ -59,7 +59,15 @@ export class TunnelClient {
 
     if (type === 1) { // HTTP_REQ
       const payload = data.subarray(13, 13 + payloadLength);
-      const { method, path, headers, body } = this.deserializeRequest(payload);
+      let request: { method: string, path: string, headers: Record<string, string>, body: Buffer };
+      try {
+        request = this.deserializeRequest(payload);
+      } catch (err: any) {
+        logger.warn(`[TunnelClient] Invalid request frame: ${err.message}`);
+        this.sendChunkedResponse(reqId, 400, {}, Buffer.from('Invalid tunnel request'));
+        return;
+      }
+      const { method, path, headers, body } = request;
 
       // Forward to local Express
       const localReq = http.request({
@@ -151,19 +159,34 @@ export class TunnelClient {
   }
 
   private deserializeRequest(payload: Buffer): { method: string, path: string, headers: Record<string, string>, body: Buffer } {
+    if (payload.length < 4) {
+      throw new Error('Payload too short for meta length prefix');
+    }
     const metaLength = payload.readUInt32BE(0);
+    if (metaLength > payload.length - 4) {
+      throw new Error(`Invalid meta length ${metaLength} for payload size ${payload.length}`);
+    }
+    const metaStr = payload.subarray(4, 4 + metaLength).toString('utf-8');
     let meta: Record<string, unknown>;
     try {
-      meta = JSON.parse(payload.subarray(4, 4 + metaLength).toString('utf-8'));
-    } catch (parseErr: any) {
-      logger.warn('[TunnelClient] Failed to parse meta JSON:', parseErr?.message);
-      meta = {};
+      meta = JSON.parse(metaStr);
+    } catch {
+      throw new Error('Failed to parse request meta JSON');
+    }
+    const reqPath = String(meta.path || '/');
+    if (!reqPath.startsWith('/')) {
+      throw new Error(`Invalid request path: ${reqPath}`);
     }
     const body = payload.subarray(4 + metaLength);
+    const headers = { ...(meta.headers || {}) } as Record<string, string>;
+    delete headers['connection'];
+    delete headers['keep-alive'];
+    delete headers['transfer-encoding'];
+    delete headers['upgrade'];
     return {
       method: String(meta.method || 'GET'),
-      path: String(meta.path || '/'),
-      headers: (meta.headers || {}) as Record<string, string>,
+      path: reqPath,
+      headers,
       body,
     };
   }
