@@ -188,10 +188,13 @@ export function registerReviewCommand(program: Command): void {
         });
 
         const shutdown = () => {
-          server.close(async () => {
-            await cleanupCloud();
-            process.exit(0);
+          // Close cloud resources first, then the HTTP server.
+          // server.close() waits for all connections (including WS) to close,
+          // so we must cleanup before calling it, with a timeout fallback.
+          cleanupCloud().then(() => {
+            server.close(() => process.exit(0));
           });
+          setTimeout(() => process.exit(0), 5000);
         };
         process.once('SIGINT', shutdown);
         process.once('SIGTERM', shutdown);
