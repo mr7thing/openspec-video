@@ -28,8 +28,9 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
     return res.id || res.data?.id || res.data?.task_id || res.task_id;
   }
 
-  protected buildStatusUrl(apiUrl: string, taskId: string): string {
-    return `${apiUrl}/${taskId}`;
+  protected buildStatusUrl(meta: { api_url: string; api_status_url?: string }, taskId: string): string {
+    const base = meta.api_status_url || meta.api_url;
+    return `${base}/${taskId}`;
   }
 
   protected isComplete(res: RhStatusResponse): boolean {

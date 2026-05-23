@@ -16,7 +16,7 @@ import { DesignRefReader } from '../core/DesignRefReader';
 import { Job, FrameRef } from '../types/Job';
 import { logger } from '../utils/logger';
 import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions, resolvePromptText } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions, resolvePromptText, resolveRefPaths } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -79,7 +79,7 @@ export function registerAnimateCommand(program: Command): void {
             continue;
           }
 
-          const job = await buildVideoJob(asset, refResolver, designRefReader);
+          const job = await buildVideoJob(asset, refResolver, designRefReader, projectRoot);
           jobs.push(job);
         }
 
@@ -113,7 +113,8 @@ export function registerAnimateCommand(program: Command): void {
 async function buildVideoJob(
   asset: CircleAssetEntry,
   refResolver: RefResolver,
-  designRefReader: DesignRefReader
+  designRefReader: DesignRefReader,
+  projectRoot: string
 ): Promise<Job> {
   const filePath = asset.filePath;
   if (!filePath) {
@@ -138,19 +139,8 @@ async function buildVideoJob(
     };
   }
 
-  let referenceImages: string[] = [];
-  // v0.10.0: refs is { type: { key: paths[] } }; flatten image paths
   const refs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
-  if (refs.image) {
-    for (const paths of Object.values(refs.image)) {
-      if (Array.isArray(paths)) {
-        for (const p of paths) {
-          const resolved = p.startsWith('/') ? p : resolveFrameRef(filePath, p) || p;
-          if (resolved) referenceImages.push(resolved);
-        }
-      }
-    }
-  }
+  let referenceImages: string[] = await resolveRefPaths(refs, 'image', refResolver, projectRoot, filePath, asset.id);
 
   // Load design refs directly from file
   const designRefs = await designRefReader.getAll(filePath);
@@ -162,29 +152,8 @@ async function buildVideoJob(
   }
 
   // v0.10.0: video and audio refs come from refs.video / refs.audio
-  let referenceVideos: string[] = [];
-  if (refs.video) {
-    for (const paths of Object.values(refs.video)) {
-      if (Array.isArray(paths)) {
-        for (const p of paths) {
-          const resolved = p.startsWith('http') || p.startsWith('/') ? p : resolveFrameRef(filePath, p) || p;
-          if (resolved) referenceVideos.push(resolved);
-        }
-      }
-    }
-  }
-
-  let referenceAudios: string[] = [];
-  if (refs.audio) {
-    for (const paths of Object.values(refs.audio)) {
-      if (Array.isArray(paths)) {
-        for (const p of paths) {
-          const resolved = p.startsWith('http') || p.startsWith('/') ? p : resolveFrameRef(filePath, p) || p;
-          if (resolved) referenceAudios.push(resolved);
-        }
-      }
-    }
-  }
+  let referenceVideos: string[] = await resolveRefPaths(refs, 'video', refResolver, projectRoot, filePath, asset.id);
+  let referenceAudios: string[] = await resolveRefPaths(refs, 'audio', refResolver, projectRoot, filePath, asset.id);
 
   return {
     id: asset.id,

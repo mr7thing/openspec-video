@@ -321,7 +321,7 @@ models:
       usePersonalQueue: false
       retainSeconds: null
       accessPassword: null
-      # seed 支持固定数字或 "random" (opsv run 时自动生成 < 10^16 的随机自然数)
+      # seed 支持固定数字或 "random" (opsv run 时自动生成 < 10^10 的随机自然数)
       seed: random
 
   # ==========================================

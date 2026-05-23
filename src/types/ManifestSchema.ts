@@ -59,9 +59,11 @@ export type DocumentInfo = z.infer<typeof DocumentInfoSchema>;
 
 export const ReviewEntrySchema = z.object({
   timestamp: z.string(),
-  action: z.enum(['approved', 'syncing', 'rejected']),
+  action: z.enum(['approved', 'syncing', 'rejected', 'design_feedback', 'revise_prompt']),
   outputFile: z.string().optional(),
+  outputFiles: z.array(z.string()).optional(),
   modifiedTaskPath: z.string().optional(),
+  note: z.string().optional(),
 });
 export type ReviewEntry = z.infer<typeof ReviewEntrySchema>;
 

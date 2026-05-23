@@ -375,11 +375,14 @@
         <div class="content">
             <div class="toolbar">
                 <div class="toolbar-left">
-                    <button class="btn btn-approve" id="approveBtn" disabled onclick="openReviewModal('approved')">
+                    <button class="btn btn-approve" id="approveBtn" disabled onclick="openReviewModal('approve')">
                         ✓ Approve (<span id="selectedCount">0</span>)
                     </button>
-                    <button class="btn btn-draft" id="draftBtn" disabled onclick="openReviewModal('drafting')">
-                        ↩ Set Drafting
+                    <button class="btn btn-draft" id="designBtn" disabled onclick="openReviewModal('design_feedback')">
+                        ✎ Design Feedback
+                    </button>
+                    <button class="btn btn-ghost" id="reviseBtn" onclick="openReviewModal('revise_prompt')">
+                        ✏ Revise Prompt
                     </button>
                     <span id="currentDoc" style="font-size:12px;color:var(--muted);margin-left:8px;">—</span>
                 </div>
@@ -708,7 +711,8 @@
             document.getElementById('selectedCount').textContent = selectedOutputs.size;
             const hasSelection = selectedOutputs.size > 0;
             document.getElementById('approveBtn').disabled = !hasSelection;
-            document.getElementById('draftBtn').disabled = !hasSelection;
+            document.getElementById('designBtn').disabled = !hasSelection;
+            // reviseBtn is always enabled (no image required)
 
             // Update card selection states
             document.querySelectorAll('.media-card').forEach(card => {
@@ -769,25 +773,34 @@
             if (selectedOutputs.size === 0) return;
 
             const firstPath = Array.from(selectedOutputs)[0];
-            const filename = firstPath.split('/').pop();
-            const src = `${API}/api/files/${firstPath}`;
+            const filename = firstPath ? firstPath.split('/').pop() : '';
+            const src = firstPath ? `${API}/api/files/${firstPath}` : '';
 
-            document.getElementById('reviewMediaPreview').style.display = 'flex';
-            document.getElementById('reviewMediaThumb').src = src;
-            document.getElementById('reviewMediaName').textContent = filename;
-            document.getElementById('reviewMediaProvider').textContent = firstPath;
+            if (firstPath) {
+                document.getElementById('reviewMediaPreview').style.display = 'flex';
+                document.getElementById('reviewMediaThumb').src = src;
+                document.getElementById('reviewMediaName').textContent = filename;
+                document.getElementById('reviewMediaProvider').textContent = firstPath;
+            } else {
+                document.getElementById('reviewMediaPreview').style.display = 'none';
+            }
             document.getElementById('reviewNote').value = '';
 
-            if (mode === 'approved') {
+            if (mode === 'approve') {
                 document.getElementById('reviewModalTitle').textContent = '✓ Approve Output';
-                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected`;
+                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected → status: approved, write Approved References`;
                 document.getElementById('reviewSubmitBtn').textContent = 'Confirm Approve';
                 document.getElementById('reviewSubmitBtn').className = 'btn btn-approve';
-            } else {
-                document.getElementById('reviewModalTitle').textContent = '↩ Set to Drafting';
-                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected`;
-                document.getElementById('reviewSubmitBtn').textContent = 'Confirm';
+            } else if (mode === 'design_feedback') {
+                document.getElementById('reviewModalTitle').textContent = '✎ Design Feedback';
+                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected → status: drafting, write Design References`;
+                document.getElementById('reviewSubmitBtn').textContent = 'Submit Feedback';
                 document.getElementById('reviewSubmitBtn').className = 'btn btn-draft';
+            } else {
+                document.getElementById('reviewModalTitle').textContent = '✏ Revise Prompt';
+                document.getElementById('reviewModalSubtitle').textContent = 'No image selected → status: drafting, write review note only';
+                document.getElementById('reviewSubmitBtn').textContent = 'Submit Revision Request';
+                document.getElementById('reviewSubmitBtn').className = 'btn btn-ghost';
             }
 
             document.getElementById('reviewModal').classList.add('active');
@@ -811,35 +824,46 @@
                 }
             }
 
+            // Group selected outputs by (circle, docId)
+            const groups = {};
             for (const filePath of selectedOutputs) {
                 const filename = filePath.split('/').pop();
-                // circle is the first path segment (e.g. "shotframev4.circle1")
                 const circle = filePath.split('/')[0];
                 const out = outputLookup[filePath] || {};
-                // Extract docId: remove last _N.ext only (e.g. "hero_2_1.png" -> "hero_2")
                 const docIdMatch = filename.match(/^(.+)_(\d+)\.\w+$/);
                 const docId = docIdMatch ? docIdMatch[1] : filename.replace(/\.\w+$/, '');
+                const key = `${circle}/${docId}`;
+                if (!groups[key]) groups[key] = { circle, docId, filenames: [] };
+                groups[key].filenames.push(filename);
+            }
 
+            // For revise_prompt (no image), use currentDoc
+            if (mode === 'revise_prompt' && currentDoc) {
+                const key = `${currentDoc.circle}/${currentDoc.docId}`;
+                if (!groups[key]) groups[key] = { circle: currentDoc.circle, docId: currentDoc.docId, filenames: [] };
+            }
+
+            for (const [key, { circle, docId, filenames }] of Object.entries(groups)) {
                 try {
                     const res = await fetch(`${API}/api/approve/${circle}/${docId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            outputFile: filename,
-                            taskJsonPath: out.taskJsonPath || undefined,
+                            action: mode,
+                            outputFiles: filenames.length > 0 ? filenames : undefined,
                             note: note || undefined
                         })
                     });
                     const json = await res.json();
-                    results.push({ success: json.success, filename });
+                    results.push({ success: json.success, docId });
                 } catch (e) {
-                    results.push({ success: false, filename, error: e.message });
+                    results.push({ success: false, docId, error: e.message });
                 }
             }
 
             const allSuccess = results.every(r => r.success);
             if (allSuccess) {
-                showToast(`${results.length} output(s) updated to ${mode}`, 'success');
+                showToast(`${results.length} asset(s) reviewed (${mode})`, 'success');
                 selectedOutputs.clear();
                 updateSelectionUI();
                 closeReviewModal();

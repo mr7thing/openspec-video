@@ -43,8 +43,8 @@ export class ComfyLocalProvider extends BaseApiProvider<ComfyPayload, ComfySubmi
     return res.prompt_id;
   }
 
-  protected buildStatusUrl(apiUrl: string, taskId: string): string {
-    const base = apiUrl.replace(/\/$/, '');
+  protected buildStatusUrl(meta: { api_url: string; api_status_url?: string }, taskId: string): string {
+    const base = (meta.api_status_url || meta.api_url).replace(/\/$/, '');
     return `${base}/history/${taskId}`;
   }
 

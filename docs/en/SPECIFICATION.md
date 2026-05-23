@@ -92,16 +92,60 @@ The `_manifest.json` is the **single source of truth** for asset state:
 ## Status State Machine
 
 ```
-drafting -> syncing -> approved
+drafting ──┬──> syncing ──> approved
+           └──> drafting (stays)
 ```
 
 - `drafting`: Asset specification in progress (default, no review history)
 - `syncing`: Modified task approved, source document needs field alignment (blocks downstream)
 - `approved`: Output accepted, downstream dependencies unblocked
 
-Review approve sets status based on output filename pattern:
-- `id_1.ext` (original task) → directly `approved`
-- `id_m{n}_1.ext` (iterated task) → `syncing` + review record includes `modified_task` path; agent aligns fields then sets `approved`
+### Review Actions (v0.10.1)
+
+Every review action **always** writes a review entry to `frontmatter.reviews[]`, recording timestamp, action, output files, and note. This ensures review history is the authoritative truth source — even if `## Approved References` or `## Design References` sections are missing, the review log can reconstruct which files were associated with each decision.
+
+| Action | Button | Requires image? | Status | `## Approved Refs` | `## Design Refs` | Description |
+|--------|--------|----------------|--------|-------------------|-----------------|-------------|
+| `approve` | ✓ Approve | ✅ | `approved` or `syncing` | ✅ append | — | Accept output as final |
+| `design_feedback` | ✎ Design Feedback | ✅ | `drafting` | — | ✅ append | Attach image as design reference + feedback note |
+| `revise_prompt` | ✏ Revise Prompt | ❌ | `drafting` | — | — | Request prompt revision (note required) |
+
+#### Approve → `approved` vs `syncing`
+
+The `approve` action detects whether the output came from an **original** or **modified** task:
+
+- `id_1.ext` (original task) → status = `approved`
+- `id_m{n}_1.ext` (modified/iterated task, e.g. `hero_m1_1.png`) → status = `syncing`
+
+When `syncing`, the output is provisionally approved and written to `## Approved References`, but the source document still needs field alignment (e.g. prompt was edited in the task JSON before running, and the edit hasn't been synced back). An agent or user must align the source document fields, then manually set `status: approved`.
+
+Both paths write the output image to `## Approved References` — `syncing` does NOT delay reference writing.
+
+#### Redundancy mechanism
+
+Review records and reference sections serve as dual guarantees:
+
+1. **Review entry** (`frontmatter.reviews[]`) — Always written. Contains action, output file paths, note. Cannot be lost unless frontmatter is deleted.
+2. **References section** (`## Approved References` / `## Design References`) — Index of images. Can be rebuilt from review history if lost.
+
+When downstream compilation resolves `@assetId` refs, it reads `## Approved References` via `ApprovedRefReader`. If that section is empty but review history shows an approved output, the section can be reconstructed.
+
+#### Review Entry Schema
+
+```yaml
+reviews:
+  - "2026-05-22T12:00:00Z approved output: hero_1.png | note: perfect"
+  - "2026-05-22T12:30:00Z design_feedback output: hero_2.png | note: eyes need more intensity"
+  - "2026-05-22T13:00:00Z syncing output: hero_m1_1.png | modified_task: hero_m1.json | note: adjusted prompt"
+  - "2026-05-22T14:00:00Z revise_prompt | note: add more setting detail"
+```
+
+Fields:
+- `timestamp` — ISO 8601
+- `action` — `approved` | `syncing` | `design_feedback` | `revise_prompt` | `rejected`
+- `output` — Comma-separated list of output filenames
+- `modified_task` — (optional) path to modified task JSON, only for `syncing`
+- `note` — (optional) review feedback text
 
 CLI never modifies `prompt` or other content fields during review — only appends review records and sets status.
 
@@ -114,8 +158,13 @@ status: drafting | syncing | approved
 visual_brief: "Brief description for prompt generation"
 visual_detailed: "Detailed description for video prompt"
 prompt: "Prompt for AI generation"
-refs: ["@hero:portrait", "@villain"]
-reviews: ["2026-01-15 Approved by director"]
+refs:
+  image:
+    "@hero": ["/elements/hero.md"]
+  video: {}
+reviews:
+  - "2026-05-22T12:00:00Z approved output: hero_1.png"
+  - "2026-05-22T12:30:00Z design_feedback output: hero_2.png | note: adjust lighting"
 ```
 
 `category` is a document management classification — it does NOT determine generation type. Any document can be used with any `--model` (imagen/video/comfy/etc.). Generation type comes from `api_config.yaml` via the `--model` parameter.
@@ -209,10 +258,10 @@ Rules:
 
 ### Design References vs Approved References
 
-| Section | Direction | Purpose | Reader |
-|---------|-----------|---------|--------|
-| `## Design References` | **Input-side** | Design reference images bundled with the document; used as `reference_images` during compilation | `DesignRefReader` → `Asset.designRefs` |
-| `## Approved References` | **Output-side** | Images placed here after review approve; used when OTHER documents reference this one via `@assetId:variant` | `ApprovedRefReader` → `Asset.approvedRefs` |
+| Section | Direction | When Written | Purpose | Reader |
+|---------|-----------|-------------|---------|--------|
+| `## Design References` | **Input-side** | Review `design_feedback` action | Design reference images + feedback; used as `reference_images` during compilation | `DesignRefReader` → `Asset.designRefs` |
+| `## Approved References` | **Output-side** | Review `approve` action (both `approved` and `syncing` status) | Accepted output images; used when OTHER documents reference this one via `@assetId:variant` | `ApprovedRefReader` → `Asset.approvedRefs` |
 
 ### @FRAME Resolution
 

@@ -91,7 +91,7 @@ describe('VolcengineProvider', () => {
     const result = await provider.execute(task, '/tmp/task.json', ctx);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('No image URL');
+    expect(result.error).toContain('No task ID in submit response');
   });
 
   it('submits video and polls to completion', async () => {

@@ -15,7 +15,7 @@ import { RefResolver } from '../core/RefResolver';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
-import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions, resolvePromptText } from './produceUtils';
+import { parseStatusSkip, filterAssets, buildProduceContext, validateRefStatuses, resolveModelQueueDir, ImageProduceCommandOptions, resolvePromptText, resolveRefPaths } from './produceUtils';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
@@ -74,7 +74,7 @@ export function registerImagenCommand(program: Command): void {
             continue;
           }
 
-          const job = await buildImageJob(asset, refResolver, designRefReader);
+          const job = await buildImageJob(asset, refResolver, designRefReader, projectRoot);
           jobs.push(job);
         }
 
@@ -108,7 +108,8 @@ export function registerImagenCommand(program: Command): void {
 async function buildImageJob(
   asset: CircleAssetEntry,
   refResolver: RefResolver,
-  designRefReader: DesignRefReader
+  designRefReader: DesignRefReader,
+  projectRoot: string
 ): Promise<Job> {
   const filePath = asset.filePath;
   if (!filePath) {
@@ -120,14 +121,10 @@ async function buildImageJob(
 
   const prompt = resolvePromptText(frontmatter, body, asset.id);
 
-  let referenceImages: string[] = [];
-  // v0.10.0: refs is { type: { key: paths[] } }; flatten image paths
   const fmRefs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
-  if (fmRefs.image) {
-    for (const paths of Object.values(fmRefs.image)) {
-      if (Array.isArray(paths)) referenceImages.push(...paths);
-    }
-  }
+  // v0.10.1: resolve @-key refs through ApprovedRefReader to get actual approved
+  // image output files (not the .md descriptor paths).
+  let referenceImages: string[] = await resolveRefPaths(fmRefs, 'image', refResolver, projectRoot, filePath, asset.id);
 
   // Load design refs directly from file
   const designRefs = await designRefReader.getAll(filePath);

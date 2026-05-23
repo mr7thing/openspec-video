@@ -50,6 +50,18 @@ export class QueueRunner {
       console.log(chalk.cyan(`\n[dry-run] Would execute ${tasks.length} tasks:`));
       for (const { task, path: taskPath } of tasks) {
         console.log(`  ${task._opsv.provider}/${task._opsv.shotId} ← ${taskPath}`);
+        const meta: any = task._opsv;
+        if (meta?.api_url) {
+          const envVar = this.guessAuthEnvVar(meta.modelKey, meta.provider);
+          const authLine = envVar ? `    -H 'Authorization: Bearer $${envVar}' \\\n` : '';
+          console.log(chalk.gray(`    # equivalent curl:`));
+          console.log(chalk.gray(
+            `    curl -X POST '${meta.api_url}' \\\n` +
+            `      -H 'Content-Type: application/json' \\\n` +
+            (authLine ? `    ` + authLine.trim() + '\n' : '') +
+            `      -d @'${taskPath}'`
+          ));
+        }
       }
       return [];
     }
@@ -270,6 +282,25 @@ export class QueueRunner {
     const shotId = task._opsv?.shotId;
     if (!shotId) return false;
     return manifestAssets[shotId]?.status === 'approved';
+  }
+
+  private guessAuthEnvVar(modelKey?: string, provider?: string): string | undefined {
+    try {
+      if (modelKey) {
+        const cfg = this.ctx.configLoader.getModelConfig(modelKey);
+        const req = cfg?.required_env;
+        if (Array.isArray(req) && req.length > 0) return req[0];
+      }
+    } catch {
+      // fall through to provider guess
+    }
+    switch (provider) {
+      case 'minimax': return 'MINIMAX_API_KEY';
+      case 'siliconflow': return 'SILICONFLOW_API_KEY';
+      case 'volcengine': return 'ARK_API_KEY';
+      case 'runninghub': return 'RUNNINGHUB_API_KEY';
+      default: return undefined;
+    }
   }
 
   private findManifestAssets(startDir: string): Record<string, { status: string }> | null {

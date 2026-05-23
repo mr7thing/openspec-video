@@ -167,7 +167,9 @@ export function validateRefStatuses(
         if (colonIdx > 0) refId = refId.slice(0, colonIdx);
 
         const refAsset = manifestAssets[refId];
-        if (refAsset && refAsset.status !== 'approved') {
+        if (!refAsset) {
+          errors.push(`@${refId} not found in manifest`);
+        } else if (refAsset.status !== 'approved') {
           errors.push(`@${refId} is ${refAsset.status}, must be approved`);
         }
       }
@@ -177,4 +179,94 @@ export function validateRefStatuses(
   }
 
   return errors;
+}
+
+/**
+ * Resolve frontmatter refs of a given type (`image` | `video` | `audio`) into
+ * absolute output file paths suitable for sending to a generation API.
+ *
+ * Each ref key like `@marriage_stele` (optionally `@marriage_stele:variant`)
+ * points to an asset descriptor markdown file. We resolve it through
+ * RefResolver, which extracts the asset's approved output (e.g.
+ * `marriage_stele_1.png`) from the `## Approved References` section of the
+ * descriptor. Plain http(s) URLs and existing on-disk files pass through.
+ *
+ * Returns absolute paths. Errors when the asset has no approved output —
+ * silently passing a `.md` path to a generation API guarantees a downstream
+ * failure with a confusing error.
+ */
+export async function resolveRefPaths(
+  refs: Record<string, Record<string, string[]>>,
+  refType: 'image' | 'video' | 'audio',
+  refResolver: RefResolver,
+  projectRoot: string,
+  assetFilePath: string,
+  assetId: string
+): Promise<string[]> {
+  const out: string[] = [];
+  const typeRefs = refs[refType];
+  if (!typeRefs) return out;
+
+  for (const [key, paths] of Object.entries(typeRefs)) {
+    // Asset-doc reference: resolve through approved-refs index
+    if (key.startsWith('@') && !key.startsWith('@:')) {
+      const identifier = key.slice(1); // e.g. "marriage_stele" or "marriage_stele:variant"
+      const resolved = await refResolver.resolve(identifier);
+      if (resolved.resolvedImagePath && fs.existsSync(resolved.resolvedImagePath)) {
+        out.push(resolved.resolvedImagePath);
+      } else {
+        throw new CompilationError(
+          OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND,
+          `${assetId}: ref ${key} (${refType}) has no approved output file. ` +
+          `Asset descriptor must contain an "## Approved References" section listing a generated ${refType}, ` +
+          `not just a .md path. Run \`opsv approve\` after generating an output.`
+        );
+      }
+      continue;
+    }
+
+    // Non-@ key or @:docKey: treat path entries as literal locators
+    if (!Array.isArray(paths)) continue;
+    for (const p of paths) {
+      if (!p) continue;
+      if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:')) {
+        out.push(p);
+        continue;
+      }
+      // Normalize project-rooted paths (leading "/") and relative paths.
+      // A leading "/" is interpreted as project-root-relative (under videospec/),
+      // NOT filesystem-absolute — fs sees it as absolute and would ENOENT.
+      let abs: string;
+      if (path.isAbsolute(p) && fs.existsSync(p)) {
+        abs = p;
+      } else if (p.startsWith('/')) {
+        // Try videospec/<path> first, then projectRoot/<path>
+        const stripped = p.replace(/^\/+/, '');
+        const videospecPath = path.join(getProjectDir(projectRoot, 'videospec'), stripped);
+        const rootPath = path.join(projectRoot, stripped);
+        abs = fs.existsSync(videospecPath) ? videospecPath
+            : fs.existsSync(rootPath) ? rootPath
+            : videospecPath;
+      } else {
+        abs = path.resolve(path.dirname(assetFilePath), p);
+      }
+      if (!fs.existsSync(abs)) {
+        throw new CompilationError(
+          OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND,
+          `${assetId}: ref path "${p}" (${refType}) not found on disk (resolved to ${abs})`
+        );
+      }
+      // Reject .md files — those are descriptors, not media. Use @assetId form instead.
+      if (abs.endsWith('.md')) {
+        throw new CompilationError(
+          OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND,
+          `${assetId}: ref "${p}" points to a markdown descriptor, not a media file. ` +
+          `Use "@<assetId>" key form so opsv resolves the asset's approved output.`
+        );
+      }
+      out.push(abs);
+    }
+  }
+
+  return out;
 }

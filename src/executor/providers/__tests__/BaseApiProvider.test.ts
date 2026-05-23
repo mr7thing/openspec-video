@@ -37,8 +37,8 @@ class TestProvider extends BaseApiProvider<TestPayload, TestSubmit, TestStatus> 
     return res.id;
   }
 
-  protected buildStatusUrl(apiUrl: string, taskId: string): string {
-    return `${apiUrl}/status/${taskId}`;
+  protected buildStatusUrl(meta: { api_url: string; api_status_url?: string }, taskId: string): string {
+    return `${meta.api_url}/status/${taskId}`;
   }
 
   protected isComplete(res: TestStatus): boolean {
