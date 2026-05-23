@@ -68,6 +68,22 @@ export class CloudClient {
     }
   }
 
+  async getSession(sessionId: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.cloudUrl}/api/sessions/${sessionId}`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+        timeout: CLOUD_TIMEOUT,
+      });
+      return unwrapData<any>(response.data);
+    } catch (err: any) {
+      logger.error(`Failed to get cloud session: ${err.message}`);
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_NETWORK_ERROR,
+        getResponseError(err)
+      );
+    }
+  }
+
   async closeSession(sessionId: string): Promise<void> {
     try {
       await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/close`, {}, {

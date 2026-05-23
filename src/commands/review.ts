@@ -66,8 +66,45 @@ export function registerReviewCommand(program: Command): void {
     .option('--cloud', 'Expose the review server through OpsV Cloud tunnel')
     .option('--cloud-url <url>', 'OpsV Cloud base URL (or OPSV_CLOUD_URL)')
     .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY)')
+    .option('--status <sessionId>', 'Get cloud session status (requires --cloud)')
+    .option('--refresh <sessionId>', 'Refresh cloud session JWT (requires --cloud)')
+    .option('--close <sessionId>', 'Close a cloud session (requires --cloud)')
     .action(async (options: ReviewOptions) => {
       try {
+        const parsed = ReviewOptionsSchema.safeParse(options);
+        if (!parsed.success) {
+          console.error(chalk.red('Invalid options'));
+          process.exit(1);
+        }
+        const opts: ReviewOptions = parsed.data;
+
+        // ─── Cloud lifecycle commands (no local server needed) ───
+        const cloudConfig = resolveCloudConfig(opts);
+        if (cloudConfig && (opts.status || opts.refresh || opts.close)) {
+          const client = new CloudClient(cloudConfig.cloudUrl, cloudConfig.apiKey);
+
+          if (opts.status) {
+            const info = await client.getSession(opts.status);
+            console.log(chalk.cyan(`Session: ${opts.status}`));
+            console.log(JSON.stringify(info, null, 2));
+            return;
+          }
+
+          if (opts.refresh) {
+            const result = await client.refreshSession(opts.refresh);
+            console.log(chalk.green(`Session refreshed: ${opts.refresh}`));
+            console.log(chalk.green(`Review URL: ${result.reviewUrl}`));
+            return;
+          }
+
+          if (opts.close) {
+            await client.closeSession(opts.close);
+            console.log(chalk.green(`Session closed: ${opts.close}`));
+            return;
+          }
+        }
+
+        // ─── Standard review server startup ───
         const projectRoot = process.cwd();
         const queueRoot = getProjectDir(projectRoot, 'queue');
 
@@ -76,13 +113,6 @@ export function registerReviewCommand(program: Command): void {
           console.error(chalk.yellow('Run "opsv circle create" first.'));
           process.exit(1);
         }
-
-        const parsed = ReviewOptionsSchema.safeParse(options);
-        if (!parsed.success) {
-          console.error(chalk.red('Invalid options'));
-          process.exit(1);
-        }
-        const opts: ReviewOptions = parsed.data;
 
         const manifestReader = new ManifestReader();
         const circleMode = opts.circle !== undefined;
@@ -114,7 +144,6 @@ export function registerReviewCommand(program: Command): void {
           manifestReader,
         });
 
-        const cloudConfig = resolveCloudConfig(opts);
         let tunnelClient: TunnelClient | null = null;
         let cloudClient: CloudClient | null = null;
         let cloudSessionId: string | null = null;
