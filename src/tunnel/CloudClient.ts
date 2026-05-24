@@ -8,6 +8,8 @@ export interface TunnelSession {
   jwt: string;
   sessionToken: string;
   tunnelUrl?: string;
+  routeMode: 'tunnel' | 'relay';
+  relayAvailable: boolean;
 }
 
 const CLOUD_TIMEOUT = 30000;
@@ -21,12 +23,16 @@ function getResponseError(err: any): string {
 }
 
 export class CloudClient {
-  constructor(private cloudUrl: string, private apiKey: string) {}
+  constructor(private cloudUrl: string, private authToken: string) {}
+
+  private getHeaders() {
+    return { Authorization: this.authToken };
+  }
 
   async createSession(): Promise<TunnelSession> {
     try {
       const response = await axios.post(`${this.cloudUrl}/api/sessions`, {}, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+        headers: this.getHeaders(),
         timeout: CLOUD_TIMEOUT,
       });
       const data = unwrapData<any>(response.data);
@@ -36,6 +42,8 @@ export class CloudClient {
         jwt: data.jwt || data.reviewJwt,
         sessionToken: data.sessionToken,
         tunnelUrl: data.tunnelUrl,
+        routeMode: data.routeMode || 'tunnel',
+        relayAvailable: data.relayAvailable ?? false,
       };
     } catch (err: any) {
       if (err.response?.status === 402 || err.response?.status === 429) {
@@ -52,10 +60,26 @@ export class CloudClient {
     }
   }
 
+  async updateTunnelUrl(sessionId: string, tunnelUrl: string): Promise<void> {
+    try {
+      await axios.put(
+        `${this.cloudUrl}/api/sessions/${sessionId}/tunnel-url`,
+        { tunnelUrl },
+        { headers: this.getHeaders(), timeout: CLOUD_TIMEOUT }
+      );
+    } catch (err: any) {
+      logger.error(`Failed to update tunnel URL: ${err.message}`);
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_NETWORK_ERROR,
+        getResponseError(err)
+      );
+    }
+  }
+
   async refreshSession(sessionId: string): Promise<{ jwt: string, reviewUrl: string }> {
     try {
       const response = await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/refresh`, {}, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+        headers: this.getHeaders(),
         timeout: CLOUD_TIMEOUT,
       });
       return unwrapData<{ jwt: string, reviewUrl: string }>(response.data);
@@ -71,7 +95,7 @@ export class CloudClient {
   async getSession(sessionId: string): Promise<any> {
     try {
       const response = await axios.get(`${this.cloudUrl}/api/sessions/${sessionId}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+        headers: this.getHeaders(),
         timeout: CLOUD_TIMEOUT,
       });
       return unwrapData<any>(response.data);
@@ -87,7 +111,7 @@ export class CloudClient {
   async closeSession(sessionId: string): Promise<void> {
     try {
       await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/close`, {}, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+        headers: this.getHeaders(),
         timeout: CLOUD_TIMEOUT,
       });
     } catch (err: any) {

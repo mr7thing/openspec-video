@@ -30,6 +30,8 @@ describe('CloudClient', () => {
       jwt: 'review-jwt',
       reviewUrl: 'https://cloud.example/s/sid_1?t=review-jwt',
       tunnelUrl: 'wss://cloud.example/tunnel?token=session-token',
+      routeMode: 'tunnel',
+      relayAvailable: false,
     });
   });
 

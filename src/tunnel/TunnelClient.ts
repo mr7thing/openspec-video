@@ -5,15 +5,29 @@ import { logger } from '../utils/logger';
 
 const CHUNK_SIZE = 512 * 1024; // 512KB per frame
 
+export interface AccessLogEntry {
+  sessionId: string;
+  reviewerIp: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  bytesSent: number;
+  accessedAt: string;
+}
+
 export class TunnelClient {
   private ws: WebSocket | null = null;
   private localPort: number;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private isIntentionalClose = false;
+  private pendingLogs: AccessLogEntry[] = [];
+  private logFlushTimer: NodeJS.Timeout | null = null;
+  private sessionId: string;
 
-  constructor(private cloudUrl: string, private sessionToken: string, localPort: number) {
+  constructor(private cloudUrl: string, private sessionToken: string, localPort: number, sessionId: string = '') {
     this.localPort = localPort;
+    this.sessionId = sessionId;
   }
 
   async connect(): Promise<void> {
@@ -38,14 +52,36 @@ export class TunnelClient {
         logger.error(`Tunnel error: ${err.message}`);
       }
     });
+
+    // Start log batch flush timer
+    this.logFlushTimer = setInterval(() => this.flushLogs(), 30000);
   }
 
   close(): void {
     this.isIntentionalClose = true;
+    if (this.logFlushTimer) {
+      clearInterval(this.logFlushTimer);
+      this.logFlushTimer = null;
+    }
+    this.flushLogs(); // Final flush
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
+  }
+
+  logAccess(entry: AccessLogEntry): void {
+    this.pendingLogs.push(entry);
+    if (this.pendingLogs.length >= 50) {
+      this.flushLogs();
+    }
+  }
+
+  private flushLogs(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.pendingLogs.length === 0) return;
+    const payload = Buffer.from(JSON.stringify({ logs: this.pendingLogs }));
+    this.ws.send(this.buildFrame(8, 0, 0, 1, payload)); // LOG_BATCH = 8
+    this.pendingLogs = [];
   }
 
   private async handleFrame(data: Buffer) {
@@ -96,6 +132,16 @@ export class TunnelClient {
       localReq.end();
     } else if (type === 3) { // PING
       this.ws?.send(this.buildFrame(4, 0, 0, 1, Buffer.alloc(0))); // PONG
+    } else if (type === 7) { // NOTIFY
+      const payload = data.subarray(13, 13 + payloadLength).toString('utf-8');
+      try {
+        const notification = JSON.parse(payload);
+        if (notification.code === 'RELAY_DOWNGRADED') {
+          console.log(chalk.yellow(`[OpsV Cloud] ${notification.message || 'Relay quota exhausted, switched to tunnel mode'}`));
+        }
+      } catch {
+        logger.debug('[TunnelClient] Invalid NOTIFY frame');
+      }
     }
   }
 

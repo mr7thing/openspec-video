@@ -16,7 +16,11 @@ import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
 import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
 import { CloudClient } from '../tunnel/CloudClient';
-import { TunnelClient } from '../tunnel/TunnelClient';
+import { TunnelClient, AccessLogEntry } from '../tunnel/TunnelClient';
+import { CloudflaredManager } from '../tunnel/CloudflaredManager';
+import { createAuthMiddleware } from '../review-ui/middleware/auth';
+import { CredentialManager } from '../auth/CredentialManager';
+import { DeviceFlowClient } from '../auth/DeviceFlowClient';
 
 const DEFAULT_REVIEW_PORT = 3100;
 const DEFAULT_REVIEW_TTL = 900;
@@ -25,18 +29,35 @@ function normalizeCloudUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
-function resolveCloudConfig(opts: ReviewOptions): { cloudUrl: string; apiKey: string } | null {
+async function resolveCloudConfig(opts: ReviewOptions): Promise<{ cloudUrl: string; authToken: string } | null> {
   if (!opts.cloud) return null;
 
   const cloudUrl = opts.cloudUrl || process.env.OPSV_CLOUD_URL;
-  const apiKey = opts.cloudApiKey || process.env.OPSV_CLOUD_API_KEY;
-
-  if (!cloudUrl || !apiKey) {
-    console.error(chalk.red('Cloud review requires --cloud-url/OPSV_CLOUD_URL and --cloud-api-key/OPSV_CLOUD_API_KEY.'));
+  if (!cloudUrl) {
+    console.error(chalk.red('Cloud review requires --cloud-url/OPSV_CLOUD_URL.'));
     process.exit(1);
   }
 
-  return { cloudUrl: normalizeCloudUrl(cloudUrl), apiKey };
+  const normalizedUrl = normalizeCloudUrl(cloudUrl);
+
+  // Try OAuth first
+  const deviceFlow = new DeviceFlowClient(normalizedUrl);
+  let authToken = await deviceFlow.refreshIfNeeded();
+
+  // Fallback to API key
+  if (!authToken) {
+    const apiKey = opts.cloudApiKey || process.env.OPSV_CLOUD_API_KEY;
+    if (apiKey) {
+      authToken = `Bearer ${apiKey}`;
+    }
+  }
+
+  if (!authToken) {
+    console.error(chalk.red('未登录。请先运行 opsv login，或设置 OPSV_CLOUD_API_KEY。'));
+    process.exit(1);
+  }
+
+  return { cloudUrl: normalizedUrl, authToken };
 }
 
 function autoCommitPendingChanges(projectRoot: string): void {
@@ -65,7 +86,7 @@ export function registerReviewCommand(program: Command): void {
     .option('--ttl <seconds>', `Auto-shutdown after idle seconds (default: ${DEFAULT_REVIEW_TTL})`, `${DEFAULT_REVIEW_TTL}`)
     .option('--cloud', 'Expose the review server through OpsV Cloud tunnel')
     .option('--cloud-url <url>', 'OpsV Cloud base URL (or OPSV_CLOUD_URL)')
-    .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY)')
+    .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY, fallback if not logged in)')
     .option('--status <sessionId>', 'Get cloud session status (requires --cloud)')
     .option('--refresh <sessionId>', 'Refresh cloud session JWT (requires --cloud)')
     .option('--close <sessionId>', 'Close a cloud session (requires --cloud)')
@@ -79,9 +100,9 @@ export function registerReviewCommand(program: Command): void {
         const opts: ReviewOptions = parsed.data;
 
         // ─── Cloud lifecycle commands (no local server needed) ───
-        const cloudConfig = resolveCloudConfig(opts);
+        const cloudConfig = await resolveCloudConfig(opts);
         if (cloudConfig && (opts.status || opts.refresh || opts.close)) {
-          const client = new CloudClient(cloudConfig.cloudUrl, cloudConfig.apiKey);
+          const client = new CloudClient(cloudConfig.cloudUrl, cloudConfig.authToken);
 
           if (opts.status) {
             const info = await client.getSession(opts.status);
@@ -144,15 +165,19 @@ export function registerReviewCommand(program: Command): void {
           manifestReader,
         });
 
+        let cloudflaredManager: CloudflaredManager | null = null;
+
         let tunnelClient: TunnelClient | null = null;
         let cloudClient: CloudClient | null = null;
         let cloudSessionId: string | null = null;
+        let cloudSessionToken: string | null = null;
         let cleanedUp = false;
 
         const cleanupCloud = async () => {
           if (cleanedUp) return;
           cleanedUp = true;
           tunnelClient?.close();
+          cloudflaredManager?.stop();
           if (cloudClient && cloudSessionId) {
             try {
               await cloudClient.closeSession(cloudSessionId);
@@ -169,11 +194,26 @@ export function registerReviewCommand(program: Command): void {
           if (!cloudConfig) return;
 
           try {
-            cloudClient = new CloudClient(cloudConfig.cloudUrl, cloudConfig.apiKey);
+            cloudClient = new CloudClient(cloudConfig.cloudUrl, cloudConfig.authToken);
             const session = await cloudClient.createSession();
             cloudSessionId = session.sessionId;
-            tunnelClient = new TunnelClient(cloudConfig.cloudUrl, session.sessionToken, opts.port);
+            cloudSessionToken = session.sessionToken;
+
+            // Mount HMAC auth middleware for tunnel mode
+            app.use(createAuthMiddleware({ sessionToken: session.sessionToken }));
+
+            // Start cloudflared tunnel
+            cloudflaredManager = new CloudflaredManager();
+            const tunnelUrl = await cloudflaredManager.start(opts.port);
+            console.log(chalk.green(`Cloudflared tunnel: ${tunnelUrl}`));
+
+            // Report tunnel URL to VPS
+            await cloudClient.updateTunnelUrl(session.sessionId, tunnelUrl);
+
+            // Keep WebSocket connection for relay fallback + control
+            tunnelClient = new TunnelClient(cloudConfig.cloudUrl, session.sessionToken, opts.port, session.sessionId);
             await tunnelClient.connect();
+
             console.log(chalk.green(`Cloud review URL: ${session.reviewUrl}`));
             console.log(chalk.gray(`Cloud session: ${session.sessionId}`));
           } catch (err: any) {

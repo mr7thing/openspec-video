@@ -20,6 +20,7 @@ import { registerAudioCommand } from './commands/audio';
 import { registerWebappCommand } from './commands/webapp';
 import { registerRunCommand } from './commands/run';
 import { registerReviewCommand } from './commands/review';
+import { registerLoginCommand } from './commands/login';
 import { registerIterateCommand } from './commands/iterate';
 import { registerRefsCommand } from './commands/refs';
 import { resolveProjectRoot } from './utils/projectResolver';
@@ -86,6 +87,7 @@ registerAudioCommand(program);
 registerWebappCommand(program);
 registerRunCommand(program);
 registerReviewCommand(program);
+registerLoginCommand(program);
 registerIterateCommand(program);
 registerRefsCommand(program);
 
