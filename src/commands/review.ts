@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
+import qrcode from 'qrcode-terminal';
 import { ManifestReader } from '../core/ManifestReader';
 import { ManifestReviewStrategy, GlobalReviewStrategy } from '../core/ReviewStrategy';
 import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
@@ -216,6 +217,27 @@ export function registerReviewCommand(program: Command): void {
 
             console.log(chalk.green(`Cloud review URL: ${session.reviewUrl}`));
             console.log(chalk.gray(`Cloud session: ${session.sessionId}`));
+            console.log(chalk.cyan('\nScan QR code to open on mobile:'));
+            qrcode.generate(session.reviewUrl, { small: true });
+
+            // Expose relay control endpoints
+            app.get('/api/session-info', async (_req, res) => {
+              try {
+                const info = await cloudClient!.getSession(session.sessionId);
+                res.json(info);
+              } catch (err: any) {
+                res.status(500).json({ error: err.message });
+              }
+            });
+
+            app.post('/api/enable-relay', async (_req, res) => {
+              try {
+                const result = await cloudClient!.enableRelay(session.sessionId);
+                res.json(result);
+              } catch (err: any) {
+                res.status(500).json({ error: err.message });
+              }
+            });
           } catch (err: any) {
             logger.error(err.message);
             await cleanupCloud();

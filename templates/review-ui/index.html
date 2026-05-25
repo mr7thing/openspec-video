@@ -2,611 +2,665 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OpsV Review</title>
     <style>
         :root {
-            --bg: #0f0f12;
-            --surface: #18181c;
-            --card: #222228;
+            --bg: #0a0a0c;
+            --surface: #141418;
+            --card: #1e1e24;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
             --red: #ef4444;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+            --orange: #f97316;
             --text: #f1f5f9;
             --muted: #64748b;
-            --border: rgba(255,255,255,0.07);
+            --border: rgba(255,255,255,0.06);
             --radius: 10px;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg);
             color: var(--text);
             height: 100vh;
+            height: 100dvh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            font-size: 15px;
+            line-height: 1.6;
         }
 
-        .header {
+        /* Top Bar */
+        .topbar {
             background: var(--surface);
-            padding: 14px 24px;
+            padding: 10px 16px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 10px;
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
+            position: relative;
+            z-index: 100;
         }
-        .header h1 { font-size: 16px; font-weight: 700; }
-        .header-info { font-size: 12px; color: var(--muted); }
-
-        .main {
-            display: flex;
+        .topbar .back-btn {
+            background: none; border: none; color: var(--text); font-size: 20px; padding: 4px;
+            display: none; cursor: pointer;
+        }
+        .topbar .doc-select {
             flex: 1;
-            overflow: hidden;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        .topbar .status-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: var(--card);
+            color: var(--muted);
+            white-space: nowrap;
         }
 
-        /* Left Sidebar */
-        .sidebar {
-            width: 300px;
+        /* Relay Status Bar */
+        .relay-bar {
             background: var(--surface);
-            border-right: 1px solid var(--border);
+            padding: 6px 16px;
             display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-        .sidebar-header {
-            padding: 12px 16px;
+            align-items: center;
+            justify-content: space-between;
             border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            font-size: 12px;
+            gap: 8px;
+        }
+        .relay-bar .relay-info { color: var(--muted); }
+        .relay-bar .relay-mode { font-weight: 600; }
+        .relay-bar .relay-mode.tunnel { color: var(--green); }
+        .relay-bar .relay-mode.relay { color: var(--accent); }
+        .relay-bar .relay-btn {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 10px;
+            border-radius: 6px;
             font-size: 11px;
+            cursor: pointer;
+        }
+        .relay-bar .relay-quota {
+            flex: 1;
+            height: 4px;
+            background: var(--card);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 0 8px;
+        }
+        .relay-bar .relay-quota-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 120px;
+        }
+        .main::-webkit-scrollbar { display: none; }
+
+        /* Frontmatter Card */
+        .fm-card {
+            background: var(--card);
+            margin: 12px 16px;
+            padding: 14px 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+        .fm-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .fm-tag {
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 12px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.03em;
+        }
+        .fm-tag.scene { background: rgba(59,130,246,0.15); color: var(--blue); }
+        .fm-tag.character { background: rgba(34,197,94,0.15); color: var(--green); }
+        .fm-tag.prop { background: rgba(249,115,22,0.15); color: var(--orange); }
+        .fm-tag.shot { background: rgba(168,85,247,0.15); color: var(--purple); }
+        .fm-tag.status-draft { background: rgba(100,116,139,0.15); color: var(--muted); }
+        .fm-tag.status-sync { background: rgba(234,179,8,0.15); color: var(--yellow); }
+        .fm-tag.status-approve { background: rgba(34,197,94,0.15); color: var(--green); }
+        .fm-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+        .fm-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 12px;
             color: var(--muted);
         }
-        .category-group { border-bottom: 1px solid var(--border); }
-        .category-name {
-            padding: 10px 16px;
-            font-size: 11px;
+        .fm-meta span {
+            background: rgba(255,255,255,0.04);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        /* Markdown Content */
+        .md-content {
+            padding: 0 16px 20px;
+            font-size: 15px;
+            line-height: 1.65;
+        }
+        .md-content h1 { font-size: 20px; margin: 24px 0 12px; color: var(--text); }
+        .md-content h2 { font-size: 17px; margin: 20px 0 10px; color: var(--text); scroll-margin-top: 60px; }
+        .md-content h3 { font-size: 15px; margin: 16px 0 8px; color: var(--text); }
+        .md-content p { margin-bottom: 10px; color: #94a3b8; }
+        .md-content strong { color: var(--text); }
+        .md-content pre {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 10px 0;
+            -webkit-overflow-scrolling: touch;
+        }
+        .md-content code {
+            background: var(--card);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #a5b4fc;
+        }
+        .md-content pre code { background: none; padding: 0; }
+        .md-content blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+            color: var(--muted);
+            font-style: italic;
+            margin: 10px 0;
+        }
+        .md-content ul, .md-content ol { margin: 8px 0 10px 20px; color: #94a3b8; }
+        .md-content li { margin-bottom: 4px; }
+        .md-content img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
+        .md-content table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        .md-content th, .md-content td { padding: 8px; border: 1px solid var(--border); }
+        .md-content th { background: var(--card); }
+        .md-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+        /* Assets Section */
+        .assets-section {
+            padding: 0 16px 20px;
+        }
+        .assets-title {
+            font-size: 13px;
             font-weight: 700;
             color: var(--muted);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            background: rgba(0,0,0,0.2);
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            letter-spacing: 0.06em;
+            margin-bottom: 12px;
         }
-        .category-name:hover { color: var(--text); }
-        .category-name .count { font-size: 10px; background: var(--card); padding: 2px 6px; border-radius: 4px; }
-
-        .doc-item {
-            padding: 10px 16px 10px 28px;
-            cursor: pointer;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-            transition: background 0.15s;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .doc-item:hover { background: rgba(255,255,255,0.03); }
-        .doc-item.active { background: rgba(99,102,241,0.15); border-left: 3px solid var(--accent); padding-left: 25px; }
-        .doc-item .doc-id { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .doc-item .doc-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
-        .status-dot.approved { background: var(--green); }
-        .status-dot.syncing { background: var(--yellow); }
-        .status-dot.drafting { background: var(--muted); }
-        .output-count { font-size: 10px; color: var(--muted); }
-
-        /* Content Area */
-        .content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .toolbar {
-            padding: 12px 20px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        .toolbar-left { display: flex; align-items: center; gap: 10px; }
-        .toolbar-right { display: flex; gap: 8px; }
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: var(--radius);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-approve { background: var(--green); color: #000; }
-        .btn-approve:hover:not(:disabled) { background: #16a34a; }
-        .btn-draft { background: var(--yellow); color: #000; }
-        .btn-draft:hover:not(:disabled) { background: #ca8a04; }
-        .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-        .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
-
-        .panes {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        /* Doc Pane */
-        .doc-pane {
-            width: 40%;
-            border-right: 1px solid var(--border);
-            overflow-y: auto;
-            background: #0d0d10;
-        }
-        .doc-empty {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--muted);
-            gap: 12px;
-            font-size: 13px;
-            padding: 20px;
-            text-align: center;
-        }
-        .doc-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-        .doc-header h2 { font-size: 16px; margin-bottom: 4px; }
-        .doc-header .doc-id-badge { font-size: 11px; background: var(--card); padding: 3px 8px; border-radius: 4px; color: var(--muted); }
-        .doc-content { padding: 20px; font-size: 13px; line-height: 1.7; }
-        .doc-content h1 { font-size: 18px; margin-bottom: 16px; color: var(--text); }
-        .doc-content h2 { font-size: 15px; margin: 20px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-        .doc-content h3 { font-size: 14px; margin: 16px 0 8px; color: var(--text); }
-        .doc-content p { margin-bottom: 10px; color: #94a3b8; }
-        .doc-content pre { background: var(--card); border-radius: 6px; padding: 12px; font-size: 12px; overflow-x: auto; margin: 10px 0; }
-        .doc-content code { background: var(--card); padding: 2px 5px; border-radius: 4px; font-size: 12px; color: #a5b4fc; }
-        .doc-content pre code { background: none; padding: 0; color: inherit; }
-        .doc-content blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); font-style: italic; margin: 10px 0; }
-        .doc-content ul, .doc-content ol { margin: 8px 0 10px 20px; color: #94a3b8; }
-        .doc-content li { margin-bottom: 4px; }
-        .doc-content img { max-width: 100%; border-radius: 6px; margin: 10px 0; }
-        .doc-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        .doc-content th, .doc-content td { padding: 8px; border: 1px solid var(--border); text-align: left; }
-        .doc-content th { background: var(--card); }
-
-        .collapsible-header {
-            cursor: pointer;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 0;
-        }
-        .collapsible-header::before { content: '▼'; font-size: 10px; transition: transform 0.2s; }
-        .collapsible-header.collapsed::before { transform: rotate(-90deg); }
-        .collapsible-content { overflow: hidden; }
-        .collapsible-content.collapsed { display: none; }
-
-        /* Media Pane */
-        .media-pane {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: var(--bg);
-        }
-        .media-empty {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--muted);
-            gap: 12px;
-            font-size: 13px;
-        }
-        .media-grid {
+        .asset-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 16px;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        .media-card {
+        .asset-card {
             background: var(--card);
             border-radius: var(--radius);
             overflow: hidden;
             border: 2px solid transparent;
             cursor: pointer;
-            transition: all 0.2s;
+            position: relative;
         }
-        .media-card:hover { border-color: rgba(99,102,241,0.4); transform: translateY(-2px); }
-        .media-card.selected { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
-        .media-card img, .media-card video { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #000; }
-        .media-info { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
-        .media-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
-        .media-meta { font-size: 10px; color: var(--muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
-        .selected-badge { position: absolute; top: 8px; right: 8px; background: var(--green); color: #000; width: 20px; height: 20px; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
-        .media-card { position: relative; }
-        .media-card.selected .selected-badge { display: flex; }
+        .asset-card.selected { border-color: var(--green); }
+        .asset-card img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+            background: #000;
+        }
+        .asset-card video {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+        }
+        .asset-card .asset-name {
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .asset-card .asset-overlay {
+            position: absolute;
+            top: 6px; right: 6px;
+            background: var(--green);
+            color: #000;
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .asset-card.selected .asset-overlay { display: flex; }
 
-        .output-group { margin-bottom: 24px; }
-        .output-group-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-        .output-group-title span { color: var(--text); font-size: 12px; }
+        /* Bottom Action Bar */
+        .action-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0; right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 10px 16px 24px;
+            display: flex;
+            gap: 8px;
+            z-index: 200;
+        }
+        .action-bar .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+        }
+        .action-bar .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .action-bar .btn-revise { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .action-bar .btn-approve { background: var(--green); color: #000; }
+        .action-bar .btn-feedback { background: var(--yellow); color: #000; }
 
-        /* Preview Modal */
-        .preview-modal {
+        /* Anchor Panel */
+        .anchor-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0; right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            border-radius: 16px 16px 0 0;
+            transform: translateY(calc(100% - 44px));
+            transition: transform 0.25s ease;
+            z-index: 150;
+            max-height: 60vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .anchor-panel.expanded { transform: translateY(0); }
+        .anchor-panel-header {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .anchor-panel-header span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+        .anchor-panel-header .chevron {
+            transition: transform 0.2s;
+            font-size: 12px;
+        }
+        .anchor-panel.expanded .chevron { transform: rotate(180deg); }
+        .anchor-list {
+            overflow-y: auto;
+            padding: 0 16px 16px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .anchor-list::-webkit-scrollbar { display: none; }
+        .anchor-item {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            color: var(--muted);
+            cursor: pointer;
+        }
+        .anchor-item:active { color: var(--text); }
+
+        /* Modals */
+        .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.92);
+            background: rgba(0,0,0,0.85);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            flex-direction: column;
-            gap: 16px;
+            padding: 20px;
         }
-        .preview-modal.active { display: flex; }
-        .preview-modal img, .preview-modal video { max-width: 95vw; max-height: 85vh; object-fit: contain; }
-        .preview-close { position: absolute; top: 20px; right: 20px; background: var(--card); border: 1px solid var(--border); color: var(--text); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
-        .preview-controls { display: flex; gap: 12px; align-items: center; }
-        .preview-name { font-size: 14px; color: #94a3b8; }
-        .preview-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-        .preview-btn:hover { border-color: var(--accent); }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 24px;
+            width: 100%;
+            max-width: 360px;
+            border: 1px solid var(--border);
+        }
+        .modal-box h2 { font-size: 16px; margin-bottom: 4px; }
+        .modal-box .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+        .modal-box textarea {
+            width: 100%;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            padding: 10px 12px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            outline: none;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .modal-actions .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+        }
+        .modal-actions .btn-cancel { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .modal-actions .btn-confirm { background: var(--green); color: #000; }
 
-        /* Review Modal */
-        .review-modal {
+        /* Image Preview */
+        .img-preview {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.95);
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 500;
+            z-index: 1000;
         }
-        .review-modal.active { display: flex; }
-        .review-box {
-            background: var(--surface);
-            border-radius: var(--radius);
-            padding: 28px;
-            width: 440px;
+        .img-preview.active { display: flex; }
+        .img-preview img { max-width: 95%; max-height: 85vh; object-fit: contain; }
+        .img-preview .close-btn {
+            position: absolute;
+            top: 16px; right: 16px;
+            background: var(--card);
             border: 1px solid var(--border);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            color: var(--text);
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
-        .review-box h2 { font-size: 17px; margin-bottom: 6px; }
-        .review-box .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
-        .review-preview { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card); border-radius: 8px; margin-bottom: 16px; }
-        .review-preview img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; }
-        .review-preview .name { font-size: 13px; font-weight: 600; }
-        .review-preview .provider { font-size: 11px; color: var(--muted); }
-        .review-fields { display: flex; flex-direction: column; gap: 12px; }
-        .review-fields label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-        .review-fields input, .review-fields textarea {
-            width: 100%; padding: 10px 12px;
-            background: var(--card); border: 1px solid var(--border);
-            border-radius: 6px; color: var(--text); font-size: 13px;
-            font-family: inherit;
-        }
-        .review-fields textarea { resize: vertical; min-height: 80px; }
-        .review-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
 
         /* Toast */
         .toast {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
             background: var(--card);
             border: 1px solid var(--border);
-            padding: 12px 18px;
+            padding: 10px 18px;
             border-radius: 8px;
             font-size: 13px;
             z-index: 2000;
-            display: none;
-            animation: slideIn 0.2s ease;
+            opacity: 0;
+            transition: all 0.2s;
+            pointer-events: none;
+            white-space: nowrap;
         }
-        .toast.show { display: block; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .toast.success { border-color: var(--green); }
         .toast.error { border-color: var(--red); }
-        @keyframes slideIn {
-            from { transform: translateY(10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
 
-        /* Filter Bar */
-        .filter-bar {
-            padding: 10px 16px;
-            display: flex;
-            gap: 8px;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
+        /* Empty State */
+        .empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--muted);
         }
-        .filter-bar select, .filter-bar input {
-            background: var(--card);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            outline: none;
-        }
-        .filter-bar select { min-width: 110px; cursor: pointer; }
-        .filter-bar input { flex: 1; }
-        .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>OpsV Review</h1>
-        <span class="header-info" id="serverInfo">Loading...</span>
+    <!-- Top Bar -->
+    <div class="topbar">
+        <button class="back-btn" id="backBtn" onclick="showDocList()">←</button>
+        <select class="doc-select" id="docSelect" onchange="onDocSelect(this.value)">
+            <option value="">选择文档...</option>
+        </select>
+        <span class="status-badge" id="statusBadge">—</span>
     </div>
 
-    <div class="main">
-        <!-- Left Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">Documents</div>
-            <div class="filter-bar">
-                <select id="categoryFilter" onchange="applyFilters()">
-                    <option value="">All Categories</option>
-                </select>
-                <input type="text" id="searchInput" placeholder="🔍 Search..." oninput="applyFilters()">
-            </div>
-            <div id="docList" style="flex:1;overflow-y:auto;">
-                <div style="padding:20px;color:var(--muted);font-size:13px;">Loading...</div>
-            </div>
+    <!-- Relay Status -->
+    <div class="relay-bar" id="relayBar" style="display:none;">
+        <span class="relay-info">模式:</span>
+        <span class="relay-mode tunnel" id="relayMode">直连</span>
+        <div class="relay-quota" id="relayQuotaBar" style="display:none;">
+            <div class="relay-quota-fill" id="relayQuotaFill" style="width:0%"></div>
         </div>
+        <button class="relay-btn" id="relayBtn" style="display:none;" onclick="toggleRelay()">开启中转</button>
+    </div>
 
-        <!-- Right Content -->
-        <div class="content">
-            <div class="toolbar">
-                <div class="toolbar-left">
-                    <button class="btn btn-approve" id="approveBtn" disabled onclick="openReviewModal('approve')">
-                        ✓ Approve (<span id="selectedCount">0</span>)
-                    </button>
-                    <button class="btn btn-draft" id="designBtn" disabled onclick="openReviewModal('design_feedback')">
-                        ✎ Design Feedback
-                    </button>
-                    <button class="btn btn-ghost" id="reviseBtn" onclick="openReviewModal('revise_prompt')">
-                        ✏ Revise Prompt
-                    </button>
-                    <span id="currentDoc" style="font-size:12px;color:var(--muted);margin-left:8px;">—</span>
-                </div>
-                <div class="toolbar-right">
-                    <button class="btn btn-ghost" onclick="location.reload()">↻ Refresh</button>
-                </div>
-            </div>
-
-            <div class="panes">
-                <!-- Doc Pane -->
-                <div class="doc-pane" id="docPane">
-                    <div class="doc-empty">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <span>Select a document from the left</span>
-                    </div>
-                </div>
-
-                <!-- Media Pane -->
-                <div class="media-pane" id="mediaPane">
-                    <div class="media-empty">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                        <span>No media to review</span>
-                    </div>
-                </div>
-            </div>
+    <!-- Main Content -->
+    <div class="main" id="main">
+        <div class="empty-state" id="emptyState">
+            <p>加载中...</p>
         </div>
     </div>
 
-    <!-- Preview Modal -->
-    <div class="preview-modal" id="previewModal">
-        <button class="preview-close" onclick="closePreview()">✕</button>
-        <div id="previewContent"></div>
-        <div class="preview-controls">
-            <span class="preview-name" id="previewName"></span>
-            <button class="preview-btn" onclick="selectCurrentMedia()">✓ Select</button>
+    <!-- Anchor Panel -->
+    <div class="anchor-panel" id="anchorPanel">
+        <div class="anchor-panel-header" onclick="toggleAnchors()">
+            <span>📑 目录</span>
+            <span class="chevron">▲</span>
         </div>
+        <div class="anchor-list" id="anchorList"></div>
+    </div>
+
+    <!-- Bottom Action Bar -->
+    <div class="action-bar" id="actionBar">
+        <button class="btn btn-revise" onclick="submitAction('revise')">修订</button>
+        <button class="btn btn-approve" id="btnApprove" disabled onclick="submitAction('approve')">通过</button>
+        <button class="btn btn-feedback" id="btnFeedback" disabled onclick="submitAction('feedback')">反馈</button>
     </div>
 
     <!-- Review Modal -->
-    <div class="review-modal" id="reviewModal">
-        <div class="review-box">
-            <h2 id="reviewModalTitle">Review Decision</h2>
-            <p class="subtitle" id="reviewModalSubtitle"></p>
-
-            <div class="review-preview" id="reviewMediaPreview" style="display:none;">
-                <img id="reviewMediaThumb" src="" alt="">
-                <div>
-                    <div class="name" id="reviewMediaName"></div>
-                    <div class="provider" id="reviewMediaProvider"></div>
-                </div>
-            </div>
-
-            <div class="review-fields">
-                <div>
-                    <label>Review Note</label>
-                    <textarea id="reviewNote" placeholder="Add comments or feedback..."></textarea>
-                </div>
-            </div>
-
-            <div class="review-actions">
-                <button class="btn btn-ghost" onclick="closeReviewModal()">Cancel</button>
-                <button class="btn btn-approve" id="reviewSubmitBtn" onclick="submitReview()">Confirm</button>
+    <div class="modal-overlay" id="reviewModal">
+        <div class="modal-box">
+            <h2 id="modalTitle">操作确认</h2>
+            <p class="subtitle" id="modalSubtitle"></p>
+            <textarea id="modalNote" placeholder="输入备注（可选）..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn btn-confirm" id="modalConfirm" onclick="confirmAction()">确认</button>
             </div>
         </div>
+    </div>
+
+    <!-- Image Preview -->
+    <div class="img-preview" id="imgPreview" onclick="closePreview()">
+        <button class="close-btn">✕</button>
+        <img id="previewImg" src="" alt="">
     </div>
 
     <div class="toast" id="toast"></div>
 
     <script>
         const API = '';
-
         let documents = [];
-        let filteredDocuments = [];
-        let selectedOutputs = new Set(); // "filePath" (full relative path under queueRoot)
         let currentDoc = null;
-        let pendingMedia = null;
+        let selectedAssets = new Set();
+        let pendingAction = null;
+        let relayInfo = null;
 
         async function init() {
             try {
                 const res = await fetch(`${API}/api/documents`);
                 documents = await res.json();
-                filteredDocuments = [...documents];
-                populateCategoryFilter();
-                document.getElementById('serverInfo').textContent = `${documents.length} document(s)`;
-                renderDocList();
+                populateDocSelect();
+                updateRelayBar();
+
+                if (documents.length > 0) {
+                    selectDoc(documents[0].circle, documents[0].docId);
+                } else {
+                    document.getElementById('emptyState').innerHTML = '<p>无可用文档</p>';
+                }
             } catch (e) {
-                showToast('Failed to load documents: ' + e.message, 'error');
+                showToast('加载失败: ' + e.message, 'error');
             }
         }
 
-        function populateCategoryFilter() {
-            const select = document.getElementById('categoryFilter');
-            const categories = [...new Set(documents.map(d => d.category).filter(Boolean))].sort();
-            let html = '<option value="">All Categories</option>';
-            for (const cat of categories) {
-                const count = documents.filter(d => d.category === cat).length;
-                html += `<option value="${cat}">${cat} (${count})</option>`;
-            }
-            select.innerHTML = html;
+        function populateDocSelect() {
+            const select = document.getElementById('docSelect');
+            select.innerHTML = '<option value="">选择文档...</option>' +
+                documents.map(d => `<option value="${d.circle}/${d.docId}">${d.docId} (${d.category})</option>`).join('');
         }
 
-        function applyFilters() {
-            const category = document.getElementById('categoryFilter').value;
-            const query = document.getElementById('searchInput').value.trim().toLowerCase();
-
-            filteredDocuments = documents.filter(doc => {
-                const matchCategory = !category || doc.category === category;
-                const matchSearch = !query ||
-                    doc.docId.toLowerCase().includes(query) ||
-                    (doc.category && doc.category.toLowerCase().includes(query));
-                return matchCategory && matchSearch;
-            });
-
-            renderDocList();
+        function onDocSelect(value) {
+            if (!value) return;
+            const [circle, docId] = value.split('/');
+            selectDoc(circle, docId);
         }
 
-        function renderDocList() {
-            const list = document.getElementById('docList');
-
-            // Group by category
-            const groups = {};
-            for (const doc of filteredDocuments) {
-                if (!groups[doc.category]) groups[doc.category] = [];
-                groups[doc.category].push(doc);
-            }
-
-            let html = '';
-            for (const [category, docs] of Object.entries(groups)) {
-                html += `
-                    <div class="category-group">
-                        <div class="category-name" onclick="toggleCategory('${category}')">
-                            <span>${category}</span>
-                            <span class="count">${docs.length}</span>
-                        </div>
-                        <div id="cat-${category}">
-                            ${docs.map(doc => `
-                                <div class="doc-item ${currentDoc && currentDoc.docId === doc.docId ? 'active' : ''}"
-                                     onclick="selectDoc(event, '${doc.circle}', '${doc.docId}')">
-                                    <span class="doc-id">
-                                        <span class="status-dot ${doc.status || 'drafting'}"></span>
-                                        ${doc.docId}
-                                    </span>
-                                    <span class="doc-meta">
-                                        <span>${doc.outputs.length} output(s)</span>
-                                    </span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (filteredDocuments.length === 0) {
-                html = '<div style="padding:20px;color:var(--muted);font-size:13px;">No documents match the current filters.</div>';
-            }
-
-            list.innerHTML = html;
-        }
-
-        function toggleCategory(name) {
-            const el = document.getElementById(`cat-${name}`);
-            el.style.display = el.style.display === 'none' ? 'block' : 'none';
-        }
-
-        async function selectDoc(event, circle, docId) {
-            event.stopPropagation();
-
-            // Update active state
-            document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-
-            // Find the document
+        async function selectDoc(circle, docId) {
             currentDoc = documents.find(d => d.circle === circle && d.docId === docId);
             if (!currentDoc) return;
 
-            document.getElementById('currentDoc').textContent = docId;
+            document.getElementById('docSelect').value = `${circle}/${docId}`;
+            document.getElementById('statusBadge').textContent = currentDoc.status || 'draft';
+            selectedAssets.clear();
+            updateActionButtons();
 
-            // Render doc content
-            renderDocContent(currentDoc);
-
-            // Render media
-            renderMedia(currentDoc);
+            // Fetch full document content
+            try {
+                const res = await fetch(`${API}/api/documents/${circle}/${docId}`);
+                const data = await res.json();
+                renderDocument(data);
+            } catch (e) {
+                showToast('加载文档失败', 'error');
+            }
         }
 
-        function renderDocContent(doc) {
-            const pane = document.getElementById('docPane');
+        function renderDocument(data) {
+            const main = document.getElementById('main');
+            const content = data.content || '';
+            const frontmatter = parseFrontmatter(content);
+            const body = stripFrontmatter(content);
 
-            // Fetch the actual .md content
-            fetch(`${API}/api/documents/${doc.circle}/${doc.docId}`)
-                .then(r => r.json())
-                .then(data => {
-                    const content = data.content || 'Document content not available';
-                    pane.innerHTML = `
-                        <div class="doc-header">
-                            <div>
-                                <h2>${doc.docId}</h2>
-                                <span class="doc-id-badge">${doc.category}</span>
-                            </div>
-                        </div>
-                        <div class="doc-content">
-                            ${renderMarkdown(content)}
-                        </div>
-                    `;
-                    initCollapsibles();
-                })
-                .catch(() => {
-                    pane.innerHTML = `
-                        <div class="doc-header">
-                            <div>
-                                <h2>${doc.docId}</h2>
-                                <span class="doc-id-badge">${doc.category}</span>
-                            </div>
-                        </div>
-                        <div class="doc-content">
-                            <p style="color:var(--muted)">Failed to load document content</p>
+            let html = '';
+
+            // Frontmatter card
+            if (frontmatter) {
+                html += renderFrontmatterCard(frontmatter);
+            }
+
+            // Markdown body
+            html += `<div class="md-content">${renderMarkdown(body)}</div>`;
+
+            // Assets
+            if (currentDoc.outputs && currentDoc.outputs.length > 0) {
+                html += `<div class="assets-section">`;
+                html += `<div class="assets-title">资产 (${currentDoc.outputs.length})</div>`;
+                html += `<div class="asset-grid">`;
+                for (const out of currentDoc.outputs) {
+                    const key = out.path;
+                    const selected = selectedAssets.has(key);
+                    const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(out.filename);
+                    const src = `${API}/api/files/${out.path}`;
+                    html += `
+                        <div class="asset-card ${selected ? 'selected' : ''}" onclick="toggleAsset('${key.replace(/'/g, "\\'")}', '${src.replace(/'/g, "\\'")}', ${isImg})" data-key="${key}">
+                            <div class="asset-overlay">✓</div>
+                            ${isImg ? `<img src="${src}" loading="lazy" alt="${out.filename}">` : ''}
+                            ${!isImg ? `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--card);font-size:32px;">📄</div>` : ''}
+                            <div class="asset-name">${out.filename}</div>
                         </div>
                     `;
-                });
+                }
+                html += `</div></div>`;
+            }
+
+            main.innerHTML = html;
+            buildAnchors();
+        }
+
+        function parseFrontmatter(content) {
+            const match = content.match(/^---\n([\s\S]*?)\n---/);
+            if (!match) return null;
+            const lines = match[1].split('\n');
+            const fm = {};
+            for (const line of lines) {
+                const m = line.match(/^([\w_]+):\s*(.*)$/);
+                if (m) fm[m[1]] = m[2].trim();
+            }
+            return fm;
+        }
+
+        function stripFrontmatter(content) {
+            return content.replace(/^---[\s\S]*?---\n*/, '');
+        }
+
+        function renderFrontmatterCard(fm) {
+            const category = fm.category || 'unknown';
+            const status = fm.status || 'drafting';
+            const tagClass = category.toLowerCase();
+            const statusClass = status === 'approved' ? 'status-approve' : status === 'syncing' ? 'status-sync' : 'status-draft';
+
+            let metaHtml = '';
+            const metaFields = ['scene_location', 'time_period', 'age_group', 'role', 'prop_type', 'episode', 'scene_num', 'location', 'shot_type'];
+            for (const f of metaFields) {
+                if (fm[f]) metaHtml += `<span>${f}: ${fm[f]}</span>`;
+            }
+
+            return `
+                <div class="fm-card">
+                    <div class="fm-tags">
+                        <span class="fm-tag ${tagClass}">${category}</span>
+                        <span class="fm-tag ${statusClass}">${status}</span>
+                    </div>
+                    ${fm.title ? `<div class="fm-title">${fm.title}</div>` : ''}
+                    <div class="fm-meta">${metaHtml}</div>
+                </div>
+            `;
         }
 
         function renderMarkdown(content) {
-            // Simple markdown rendering
-            let html = content
-                .replace(/^---[\s\S]*?---\n*/, '') // Remove frontmatter
+            return content
                 .replace(/^### (.+)$/gm, '<h3>$1</h3>')
                 .replace(/^## (.+)$/gm, '<h2>$1</h2>')
                 .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -615,276 +669,211 @@
                 .replace(/`(.+?)`/g, '<code>$1</code>')
                 .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
                 .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-                .replace(/^\| (.+) \|$/gm, (m) => {
-                    const cells = m.split('|').filter(c => c.trim());
-                    return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
-                })
-                .replace(/(<tr>.*<\/tr>)/s, '<table>$1</table>')
-                .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1">')
+                .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" onclick="openPreview(\'$2\')">')
                 .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
                 .replace(/^---$/gm, '<hr>')
-                .replace(/\n\n+/g, '</p><p>')
-                .replace(/^(?!<[hpuolbt]|<pre|<blockquote|<table|<hr)(.+)$/gm, '<p>$1</p>')
+                .split('\n\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')
+                .replace(/<p>(<h\d|<pre|<blockquote|<table|<hr|<ul|<ol)/g, '$1')
+                .replace(/(<\/h\d>|<\/pre>|<\/blockquote>|<\/table>|<\/ul>|<\/ol>)<\/p>/g, '$1')
                 .replace(/<p><\/p>/g, '');
-
-            return html;
         }
 
-        function initCollapsibles() {
-            document.querySelectorAll('.collapsible-header').forEach(h => {
-                h.onclick = () => {
-                    h.classList.toggle('collapsed');
-                    const content = h.nextElementSibling;
-                    if (content) content.classList.toggle('collapsed');
-                };
+        function buildAnchors() {
+            const anchors = [];
+            document.querySelectorAll('.md-content h2').forEach((h, i) => {
+                const id = `section-${i}`;
+                h.id = id;
+                anchors.push({ id, text: h.textContent });
             });
+
+            const list = document.getElementById('anchorList');
+            if (anchors.length === 0) {
+                list.innerHTML = '<div class="anchor-item" style="color:var(--muted);">无目录</div>';
+            } else {
+                list.innerHTML = anchors.map(a =>
+                    `<div class="anchor-item" onclick="scrollToAnchor('${a.id}')">${a.text}</div>`
+                ).join('');
+            }
         }
 
-        function renderMedia(doc) {
-            const pane = document.getElementById('mediaPane');
+        function scrollToAnchor(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                toggleAnchors(false);
+            }
+        }
 
-            if (!doc.outputs || doc.outputs.length === 0) {
-                pane.innerHTML = `
-                    <div class="media-empty">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                        <span>No outputs for this document</span>
-                    </div>
-                `;
+        function toggleAnchors(force) {
+            const panel = document.getElementById('anchorPanel');
+            if (typeof force === 'boolean') {
+                panel.classList.toggle('expanded', force);
+            } else {
+                panel.classList.toggle('expanded');
+            }
+        }
+
+        function toggleAsset(key, src, isImg) {
+            if (isImg) {
+                openPreview(src);
                 return;
             }
-
-            // Group outputs by circle
-            const byCircle = {};
-            for (const out of doc.outputs) {
-                if (!byCircle[out.circle]) byCircle[out.circle] = [];
-                byCircle[out.circle].push(out);
-            }
-
-            let html = '';
-            for (const [circle, outputs] of Object.entries(byCircle)) {
-                html += `
-                    <div class="output-group">
-                        <div class="output-group-title">${circle} <span>— ${outputs.length} file(s)</span></div>
-                        <div class="media-grid">
-                            ${outputs.map(out => {
-                                const key = out.path;
-                                const selected = selectedOutputs.has(key);
-                                const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(out.filename);
-                                const isVid = /\.(mp4|webm|mov|avi)$/i.test(out.filename);
-                                const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(out.filename);
-                                const src = `${API}/api/files/${out.path}`;
-                                const safeKey = out.path.replace(/'/g, "\\'");
-
-                                return `
-                                    <div class="media-card ${selected ? 'selected' : ''}"
-                                         onclick="toggleSelection('${safeKey}')"
-                                         ondblclick="openPreview('${safeKey}')">
-                                        <div class="selected-badge">✓</div>
-                                        ${isImg ? `<img src="${src}" loading="lazy" alt="${out.filename}">` : ''}
-                                        ${isVid ? `<video src="${src}" muted></video>` : ''}
-                                        ${isAud ? `<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--card);"><span style="font-size:32px;">🔊</span></div>` : ''}
-                                        <div class="media-info">
-                                            <span class="media-name" title="${out.filename}">${out.filename}</span>
-                                            <span class="media-meta">${out.provider}</span>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            pane.innerHTML = html;
-        }
-
-        function toggleSelection(filePath) {
-            if (selectedOutputs.has(filePath)) {
-                selectedOutputs.delete(filePath);
+            if (selectedAssets.has(key)) {
+                selectedAssets.delete(key);
             } else {
-                selectedOutputs.add(filePath);
+                selectedAssets.add(key);
             }
-            updateSelectionUI();
+            updateAssetUI();
+            updateActionButtons();
         }
 
-        function updateSelectionUI() {
-            document.getElementById('selectedCount').textContent = selectedOutputs.size;
-            const hasSelection = selectedOutputs.size > 0;
-            document.getElementById('approveBtn').disabled = !hasSelection;
-            document.getElementById('designBtn').disabled = !hasSelection;
-            // reviseBtn is always enabled (no image required)
-
-            // Update card selection states
-            document.querySelectorAll('.media-card').forEach(card => {
-                card.classList.remove('selected');
+        function updateAssetUI() {
+            document.querySelectorAll('.asset-card').forEach(card => {
+                const key = card.dataset.key;
+                card.classList.toggle('selected', selectedAssets.has(key));
             });
-            for (const key of selectedOutputs) {
-                document.querySelectorAll('.media-card').forEach(card => {
-                    const onclick = card.getAttribute('onclick') || '';
-                    if (onclick.includes(key)) {
-                        card.classList.add('selected');
-                    }
-                });
-            }
         }
 
-        function openPreview(filePath) {
-            const filename = filePath.split('/').pop();
-            const isImg = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(filename);
-            const isVid = /\.(mp4|webm|mov|avi)$/i.test(filename);
-            const isAud = /\.(mp3|wav|ogg|m4a|aac)$/i.test(filename);
-            const src = `${API}/api/files/${filePath}`;
+        function updateActionButtons() {
+            const hasSelection = selectedAssets.size > 0;
+            document.getElementById('btnApprove').disabled = !hasSelection;
+            document.getElementById('btnFeedback').disabled = !hasSelection;
+        }
 
-            const content = document.getElementById('previewContent');
-            if (isImg) {
-                content.innerHTML = `<img src="${src}" alt="${filename}">`;
-            } else if (isVid) {
-                content.innerHTML = `<video src="${src}" controls autoplay style="max-width:95vw;max-height:85vh;"></video>`;
-            } else if (isAud) {
-                content.innerHTML = `
-                    <div style="background:var(--card);padding:40px;border-radius:12px;text-align:center;">
-                        <span style="font-size:64px;">🔊</span>
-                        <p style="margin-top:16px;font-size:14px;color:var(--muted)">${filename}</p>
-                        <audio src="${src}" controls style="margin-top:20px;"></audio>
-                    </div>
-                `;
-            }
-
-            document.getElementById('previewName').textContent = filename;
-            pendingMedia = filePath;
-            document.getElementById('previewModal').classList.add('active');
+        function openPreview(src) {
+            document.getElementById('previewImg').src = src;
+            document.getElementById('imgPreview').classList.add('active');
         }
 
         function closePreview() {
-            document.getElementById('previewModal').classList.remove('active');
+            document.getElementById('imgPreview').classList.remove('active');
         }
 
-        function selectCurrentMedia() {
-            if (pendingMedia) {
-                if (!selectedOutputs.has(pendingMedia)) {
-                    selectedOutputs.add(pendingMedia);
-                    updateSelectionUI();
-                }
-                closePreview();
-            }
-        }
+        function submitAction(action) {
+            if ((action === 'approve' || action === 'feedback') && selectedAssets.size === 0) return;
+            pendingAction = action;
 
-        function openReviewModal(mode) {
-            if (selectedOutputs.size === 0) return;
+            const titles = { approve: '✓ 通过', feedback: '✎ 反馈', revise: '✏ 修订' };
+            const subtitles = {
+                approve: '确认通过选中的资产？',
+                feedback: '对选中资产提供反馈',
+                revise: '请求修订当前文档'
+            };
 
-            const firstPath = Array.from(selectedOutputs)[0];
-            const filename = firstPath ? firstPath.split('/').pop() : '';
-            const src = firstPath ? `${API}/api/files/${firstPath}` : '';
-
-            if (firstPath) {
-                document.getElementById('reviewMediaPreview').style.display = 'flex';
-                document.getElementById('reviewMediaThumb').src = src;
-                document.getElementById('reviewMediaName').textContent = filename;
-                document.getElementById('reviewMediaProvider').textContent = firstPath;
-            } else {
-                document.getElementById('reviewMediaPreview').style.display = 'none';
-            }
-            document.getElementById('reviewNote').value = '';
-
-            if (mode === 'approve') {
-                document.getElementById('reviewModalTitle').textContent = '✓ Approve Output';
-                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected → status: approved, write Approved References`;
-                document.getElementById('reviewSubmitBtn').textContent = 'Confirm Approve';
-                document.getElementById('reviewSubmitBtn').className = 'btn btn-approve';
-            } else if (mode === 'design_feedback') {
-                document.getElementById('reviewModalTitle').textContent = '✎ Design Feedback';
-                document.getElementById('reviewModalSubtitle').textContent = `${selectedOutputs.size} output(s) selected → status: drafting, write Design References`;
-                document.getElementById('reviewSubmitBtn').textContent = 'Submit Feedback';
-                document.getElementById('reviewSubmitBtn').className = 'btn btn-draft';
-            } else {
-                document.getElementById('reviewModalTitle').textContent = '✏ Revise Prompt';
-                document.getElementById('reviewModalSubtitle').textContent = 'No image selected → status: drafting, write review note only';
-                document.getElementById('reviewSubmitBtn').textContent = 'Submit Revision Request';
-                document.getElementById('reviewSubmitBtn').className = 'btn btn-ghost';
-            }
-
+            document.getElementById('modalTitle').textContent = titles[action];
+            document.getElementById('modalSubtitle').textContent = subtitles[action];
+            document.getElementById('modalNote').value = '';
             document.getElementById('reviewModal').classList.add('active');
-            document.getElementById('reviewModal').dataset.mode = mode;
         }
 
-        function closeReviewModal() {
+        function closeModal() {
             document.getElementById('reviewModal').classList.remove('active');
+            pendingAction = null;
         }
 
-        async function submitReview() {
-            const mode = document.getElementById('reviewModal').dataset.mode;
-            const note = document.getElementById('reviewNote').value.trim();
-            const results = [];
+        async function confirmAction() {
+            if (!pendingAction || !currentDoc) return;
+            const note = document.getElementById('modalNote').value.trim();
+            const action = pendingAction;
 
-            // Collect all output objects from rendered documents for lookup
+            // Build output files list
+            const outputFiles = [];
             const outputLookup = {};
             for (const doc of documents) {
-                for (const out of doc.outputs) {
-                    outputLookup[out.path] = out;
+                for (const out of doc.outputs) outputLookup[out.path] = out;
+            }
+            for (const key of selectedAssets) {
+                const out = outputLookup[key];
+                if (out) outputFiles.push(out.filename);
+            }
+
+            try {
+                const res = await fetch(`${API}/api/approve/${currentDoc.circle}/${currentDoc.docId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: action === 'approve' ? 'approve' : action === 'feedback' ? 'design_feedback' : 'revise_prompt',
+                        outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
+                        note: note || undefined
+                    })
+                });
+                const json = await res.json();
+                if (json.success) {
+                    showToast('操作成功', 'success');
+                    selectedAssets.clear();
+                    updateAssetUI();
+                    updateActionButtons();
+                    closeModal();
+                    setTimeout(() => location.reload(), 600);
+                } else {
+                    showToast('操作失败', 'error');
                 }
-            }
-
-            // Group selected outputs by (circle, docId)
-            const groups = {};
-            for (const filePath of selectedOutputs) {
-                const filename = filePath.split('/').pop();
-                const circle = filePath.split('/')[0];
-                const out = outputLookup[filePath] || {};
-                const docIdMatch = filename.match(/^(.+)_(\d+)\.\w+$/);
-                const docId = docIdMatch ? docIdMatch[1] : filename.replace(/\.\w+$/, '');
-                const key = `${circle}/${docId}`;
-                if (!groups[key]) groups[key] = { circle, docId, filenames: [] };
-                groups[key].filenames.push(filename);
-            }
-
-            // For revise_prompt (no image), use currentDoc
-            if (mode === 'revise_prompt' && currentDoc) {
-                const key = `${currentDoc.circle}/${currentDoc.docId}`;
-                if (!groups[key]) groups[key] = { circle: currentDoc.circle, docId: currentDoc.docId, filenames: [] };
-            }
-
-            for (const [key, { circle, docId, filenames }] of Object.entries(groups)) {
-                try {
-                    const res = await fetch(`${API}/api/approve/${circle}/${docId}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            action: mode,
-                            outputFiles: filenames.length > 0 ? filenames : undefined,
-                            note: note || undefined
-                        })
-                    });
-                    const json = await res.json();
-                    results.push({ success: json.success, docId });
-                } catch (e) {
-                    results.push({ success: false, docId, error: e.message });
-                }
-            }
-
-            const allSuccess = results.every(r => r.success);
-            if (allSuccess) {
-                showToast(`${results.length} asset(s) reviewed (${mode})`, 'success');
-                selectedOutputs.clear();
-                updateSelectionUI();
-                closeReviewModal();
-                setTimeout(() => location.reload(), 800);
-            } else {
-                const failures = results.filter(r => !r.success).length;
-                showToast(`${failures} failed`, 'error');
+            } catch (e) {
+                showToast('提交失败: ' + e.message, 'error');
             }
         }
 
-        function showToast(msg, type = '') {
+        // Relay status
+        async function updateRelayBar() {
+            try {
+                const res = await fetch(`${API}/api/session-info`);
+                relayInfo = await res.json();
+                const data = relayInfo.data || relayInfo;
+
+                const bar = document.getElementById('relayBar');
+                const mode = document.getElementById('relayMode');
+                const btn = document.getElementById('relayBtn');
+                const quotaBar = document.getElementById('relayQuotaBar');
+                const quotaFill = document.getElementById('relayQuotaFill');
+
+                bar.style.display = 'flex';
+                const isRelay = data.routeMode === 'relay';
+                mode.textContent = isRelay ? '中转' : '直连';
+                mode.className = 'relay-mode ' + (isRelay ? 'relay' : 'tunnel');
+
+                if (isRelay && data.relayQuota) {
+                    quotaBar.style.display = 'block';
+                    const pct = Math.min(100, Math.round((data.relayQuota.usedBytes / data.relayQuota.limitBytes) * 100));
+                    quotaFill.style.width = pct + '%';
+                    btn.style.display = 'none';
+                } else if (!isRelay && data.relayAvailable) {
+                    quotaBar.style.display = 'none';
+                    btn.style.display = 'block';
+                    btn.textContent = '开启中转';
+                } else {
+                    btn.style.display = 'none';
+                }
+            } catch {
+                // Ignore — relay bar is optional
+            }
+        }
+
+        async function toggleRelay() {
+            try {
+                const res = await fetch(`${API}/api/enable-relay`, { method: 'POST' });
+                const json = await res.json();
+                if (json.data || json.success) {
+                    showToast('中转已开启，请刷新页面', 'success');
+                    await updateRelayBar();
+                } else {
+                    showToast('开启失败', 'error');
+                }
+            } catch (e) {
+                showToast('开启失败: ' + e.message, 'error');
+            }
+        }
+
+        function showToast(msg, type) {
             const toast = document.getElementById('toast');
             toast.textContent = msg;
             toast.className = 'toast show ' + type;
-            setTimeout(() => toast.classList.remove('show'), 3000);
+            setTimeout(() => toast.classList.remove('show'), 2500);
         }
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closePreview();
-                closeReviewModal();
+                closeModal();
             }
         });
 

@@ -108,6 +108,23 @@ export class CloudClient {
     }
   }
 
+  async enableRelay(sessionId: string): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this.cloudUrl}/api/sessions/${sessionId}/relay`,
+        {},
+        { headers: this.getHeaders(), timeout: CLOUD_TIMEOUT }
+      );
+      return unwrapData<any>(response.data);
+    } catch (err: any) {
+      logger.error(`Failed to enable relay: ${err.message}`);
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_NETWORK_ERROR,
+        getResponseError(err)
+      );
+    }
+  }
+
   async closeSession(sessionId: string): Promise<void> {
     try {
       await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/close`, {}, {
