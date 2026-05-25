@@ -215,9 +215,14 @@ export function registerReviewCommand(program: Command): void {
             tunnelClient = new TunnelClient(cloudConfig.cloudUrl, session.sessionToken, opts.port, session.sessionId);
             await tunnelClient.connect();
 
+            // Write full URL to file so it's never truncated in terminal
+            const urlFile = path.join(process.cwd(), '.opsv-review-url');
+            fs.writeFileSync(urlFile, session.reviewUrl, 'utf-8');
+
             console.log(chalk.green(`Cloud review URL: ${session.reviewUrl}`));
             console.log(chalk.gray(`Cloud session: ${session.sessionId}`));
-            console.log(chalk.cyan('\nScan QR code to open on mobile:'));
+            console.log(chalk.cyan('Full URL saved to:'), chalk.yellow(urlFile));
+            console.log(chalk.cyan('Scan QR code to open on mobile:'));
             qrcode.generate(session.reviewUrl, { small: true });
 
             // Expose relay control endpoints
