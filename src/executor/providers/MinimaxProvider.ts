@@ -88,7 +88,7 @@ export class MinimaxProvider extends BaseApiProvider<Record<string, any>, MxSubm
     if (res.status === 'Success' && res.file_id) {
       try {
         const fileRes = await client.get<{ file?: { download_url?: string }; download_url?: string }>(
-          `https://api.minimaxi.com/v1/files/${res.file_id}`,
+          `https://api.minimaxi.com/v1/files/retrieve?file_id=${encodeURIComponent(res.file_id)}`,
           { timeout }
         );
         res._resolved_download_url = fileRes.file?.download_url || fileRes.download_url || undefined;

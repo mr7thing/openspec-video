@@ -13,9 +13,15 @@ interface RhSubmitResponse {
   task_id?: string;
 }
 
+interface RhOutputsItem {
+  fileUrl?: string;
+  fileType?: string;
+}
+
 interface RhStatusResponse {
-  status?: string;
-  data?: { status?: string; url?: string; video_url?: string; image_url?: string };
+  code?: number;
+  msg?: string;
+  data?: string | { netWssUrl?: string } | RhOutputsItem[];
   error?: { message?: string };
 }
 
@@ -34,7 +40,7 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
   }
 
   protected parseTaskId(res: RhSubmitResponse): string | undefined {
-    return res.id || res.data?.id || res.data?.task_id || res.task_id;
+    return (res.data as any)?.taskId || res.id || res.data?.id || res.data?.task_id || res.task_id;
   }
 
   protected buildStatusUrl(meta: { api_url: string; api_status_url?: string }, taskId: string): string {
@@ -42,7 +48,9 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
     return `${base}/${taskId}`;
   }
 
-  // RunningHub status endpoint requires POST with { apiKey, taskId } body
+  // RunningHub status endpoint requires POST with { apiKey, taskId } body.
+  // We poll the /outputs endpoint (auto-derived from /status url) because it
+  // returns the result URLs when complete, while /status only returns a string.
   protected async pollStatus(
     client: HttpClient,
     meta: { api_url: string; api_status_url?: string },
@@ -51,31 +59,34 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
     ctx?: OpsVContext
   ): Promise<RhStatusResponse> {
     const base = meta.api_status_url || meta.api_url;
+    // Auto-switch from /status to /outputs if the config still points at the legacy status URL
+    const outputsUrl = base.replace(/\/status$/, '/outputs');
     const apiKey = ctx ? ctx.configLoader.getResolvedApiKey((meta as any).modelKey || '') : undefined;
-    return client.post<RhStatusResponse>(base, { apiKey, taskId }, { timeout });
+    return client.post<RhStatusResponse>(outputsUrl, { apiKey, taskId }, { timeout });
   }
 
+  // outputs endpoint: code=0 + data array = success
   protected isComplete(res: RhStatusResponse): boolean {
-    const status = res.status || res.data?.status;
-    return status === 'succeeded' || status === 'completed' || status === 'success';
+    return res.code === 0 && Array.isArray(res.data);
   }
 
+  // outputs endpoint: non-zero code that is not "still running" (804)
   protected isFailed(res: RhStatusResponse): boolean {
-    const status = res.status || res.data?.status;
-    return status === 'failed' || status === 'error';
+    return res.code !== undefined && res.code !== 0 && res.code !== 804;
   }
 
   protected extractError(res: RhStatusResponse): string {
-    return res.error?.message || res.data?.status || 'Unknown error';
+    return res.msg || res.error?.message || 'Unknown error';
   }
 
   protected extractOutputUrls(res: RhStatusResponse): string[] {
-    const d = res.data;
-    const url = d?.video_url || d?.image_url || d?.url;
-    return url ? [url] : [];
+    if (!Array.isArray(res.data)) return [];
+    return res.data
+      .map((item: any) => item?.fileUrl)
+      .filter((u): u is string => !!u);
   }
 
-  protected getOutputExtension(): string {
-    return 'mp4';
+  protected getOutputExtension(task?: BaseTaskJson<Record<string, unknown>>): string {
+    return task?._opsv?.type === 'imagen' ? 'png' : 'mp4';
   }
 }
