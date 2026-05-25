@@ -157,7 +157,16 @@ export class CloudflaredManager {
 
       this.process.stderr?.on('data', (data: Buffer) => {
         const line = data.toString().trim();
-        if (line) logger.debug(`[cloudflared] ${line}`);
+        const match = line.match(urlRegex);
+        if (match && this.urlResolver) {
+          clearTimeout(timeout);
+          this.tunnelUrl = match[0];
+          this.urlResolver(match[0]);
+          this.urlResolver = null;
+          this.urlRejecter = null;
+        } else if (line) {
+          logger.debug(`[cloudflared] ${line}`);
+        }
       });
 
       this.process.on('error', (err) => {
@@ -169,10 +178,13 @@ export class CloudflaredManager {
       });
 
       this.process.on('exit', (code) => {
-        clearTimeout(timeout);
-        if (code !== 0 && code !== null && this.urlRejecter) {
-          this.urlRejecter(new Error(`cloudflared exited with code ${code}`));
-          this.urlRejecter = null;
+        if (this.urlRejecter) {
+          // Only treat unexpected exits as errors
+          clearTimeout(timeout);
+          if (code !== 0 && code !== null) {
+            this.urlRejecter(new Error(`cloudflared exited with code ${code}`));
+            this.urlRejecter = null;
+          }
         }
         this.process = null;
       });

@@ -26,7 +26,8 @@ export class CloudClient {
   constructor(private cloudUrl: string, private authToken: string) {}
 
   private getHeaders() {
-    return { Authorization: this.authToken };
+    const token = this.authToken.startsWith('Bearer ') ? this.authToken : `Bearer ${this.authToken}`;
+    return { Authorization: token };
   }
 
   async createSession(): Promise<TunnelSession> {
