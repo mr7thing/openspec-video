@@ -48,7 +48,7 @@ export class VolcengineProvider extends BaseApiProvider<Record<string, any>, Vol
     throw new ExecutionError(OpsVErrorCode.EXECUTION_API_ERROR, `Local ${kind} paths not supported: ${value}`);
   }
 
-  protected buildPayload(task: BaseTaskJson<Record<string, any>>): unknown {
+  protected buildPayload(task: BaseTaskJson<Record<string, any>>, _ctx?: any): unknown {
     return { ...task.payload };
   }
 

@@ -40,6 +40,17 @@ function expandRandomSeeds(payload: unknown): void {
     return;
   }
   const obj = payload as Record<string, unknown>;
+
+  // RunningHub-style nodeInfoList: { nodeId: "...", fieldName: "seed", fieldValue: "random" }
+  if (
+    typeof obj.fieldName === 'string' &&
+    /seed$/i.test(obj.fieldName) &&
+    obj.fieldValue === 'random'
+  ) {
+    obj.fieldValue = generateRandomSeed();
+    return;
+  }
+
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string' && value === 'random' && /seed$/i.test(key)) {
       obj[key] = generateRandomSeed();
@@ -52,7 +63,7 @@ function expandRandomSeeds(payload: unknown): void {
 export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse> {
   abstract readonly name: string;
 
-  protected abstract buildPayload(task: BaseTaskJson<TPayload>): unknown;
+  protected abstract buildPayload(task: BaseTaskJson<TPayload>, ctx?: OpsVContext): unknown;
   protected abstract parseTaskId(res: TSubmitResponse): string | undefined;
   protected abstract buildStatusUrl(meta: { api_url: string; api_status_url?: string }, taskId: string): string;
   protected abstract isComplete(statusRes: TStatusResponse): boolean;
@@ -67,7 +78,8 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     client: HttpClient,
     meta: { api_url: string; api_status_url?: string },
     taskId: string,
-    timeout: number
+    timeout: number,
+    _ctx?: OpsVContext
   ): Promise<TStatusResponse> {
     const statusUrl = this.buildStatusUrl(meta, taskId);
     return client.get<TStatusResponse>(statusUrl, { timeout });
@@ -122,7 +134,7 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
 
     try {
       if (!taskId) {
-        const payload = this.buildPayload(task);
+        const payload = this.buildPayload(task, ctx);
         expandRandomSeeds(payload);
         const submitRes = await client.post<TSubmitResponse>(meta.api_url, payload);
 
@@ -181,7 +193,8 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
           client,
           meta,
           taskId,
-          modelConfig?.timeout?.status || 120000
+          modelConfig?.timeout?.status || 120000,
+          ctx
         );
 
         if (this.isFailed(statusRes)) {

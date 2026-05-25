@@ -32,7 +32,7 @@ interface ComfyStatusResponse {
 export class ComfyLocalProvider extends BaseApiProvider<ComfyPayload, ComfySubmitResponse, ComfyStatusResponse> {
   readonly name = 'comfylocal';
 
-  protected buildPayload(task: BaseTaskJson<ComfyPayload>): unknown {
+  protected buildPayload(task: BaseTaskJson<ComfyPayload>, _ctx?: any): unknown {
     const payload = { ...task.payload };
     delete (payload as any)._opsv_workflow;
     this.resolveRandomInWorkflow(payload);

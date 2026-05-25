@@ -32,7 +32,7 @@ interface MxStatusResponse {
 export class MinimaxProvider extends BaseApiProvider<Record<string, any>, MxSubmitResponse, MxStatusResponse> {
   readonly name = 'minimax';
 
-  protected buildPayload(task: BaseTaskJson<Record<string, any>>): unknown {
+  protected buildPayload(task: BaseTaskJson<Record<string, any>>, _ctx?: any): unknown {
     return { ...task.payload };
   }
 
@@ -82,8 +82,8 @@ export class MinimaxProvider extends BaseApiProvider<Record<string, any>, MxSubm
     return `${base}${sep}task_id=${encodeURIComponent(taskId)}`;
   }
 
-  protected async pollStatus(client: HttpClient, meta: { api_url: string; api_status_url?: string }, taskId: string, timeout: number): Promise<MxStatusResponse> {
-    const res = await super.pollStatus(client, meta, taskId, timeout);
+  protected async pollStatus(client: HttpClient, meta: { api_url: string; api_status_url?: string }, taskId: string, timeout: number, ctx?: any): Promise<MxStatusResponse> {
+    const res = await super.pollStatus(client, meta, taskId, timeout, ctx);
     // When status=Success, fetch download URL via files API
     if (res.status === 'Success' && res.file_id) {
       try {

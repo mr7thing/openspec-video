@@ -4,6 +4,8 @@
 
 import { BaseTaskJson } from '../../types/Job';
 import { BaseApiProvider } from './BaseApiProvider';
+import { HttpClient } from '../HttpClient';
+import { OpsVContext } from '../../container/OpsVContext';
 
 interface RhSubmitResponse {
   id?: string;
@@ -20,8 +22,15 @@ interface RhStatusResponse {
 export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>, RhSubmitResponse, RhStatusResponse> {
   readonly name = 'runninghub';
 
-  protected buildPayload(task: BaseTaskJson<Record<string, unknown>>): unknown {
-    return { ...task.payload };
+  protected buildPayload(task: BaseTaskJson<Record<string, unknown>>, ctx?: OpsVContext): unknown {
+    const payload = { ...task.payload };
+    if (ctx) {
+      const apiKey = ctx.configLoader.getResolvedApiKey(task._opsv.modelKey);
+      if (apiKey) {
+        (payload as any).apiKey = apiKey;
+      }
+    }
+    return payload;
   }
 
   protected parseTaskId(res: RhSubmitResponse): string | undefined {
@@ -31,6 +40,19 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
   protected buildStatusUrl(meta: { api_url: string; api_status_url?: string }, taskId: string): string {
     const base = meta.api_status_url || meta.api_url;
     return `${base}/${taskId}`;
+  }
+
+  // RunningHub status endpoint requires POST with { apiKey, taskId } body
+  protected async pollStatus(
+    client: HttpClient,
+    meta: { api_url: string; api_status_url?: string },
+    taskId: string,
+    timeout: number,
+    ctx?: OpsVContext
+  ): Promise<RhStatusResponse> {
+    const base = meta.api_status_url || meta.api_url;
+    const apiKey = ctx ? ctx.configLoader.getResolvedApiKey((meta as any).modelKey || '') : undefined;
+    return client.post<RhStatusResponse>(base, { apiKey, taskId }, { timeout });
   }
 
   protected isComplete(res: RhStatusResponse): boolean {

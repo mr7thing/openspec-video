@@ -36,7 +36,7 @@ const MIME_BY_EXT: Record<string, string> = {
 export class SiliconFlowProvider extends BaseApiProvider<Record<string, any>, SfSubmitResponse, SfStatusResponse> {
   readonly name = 'siliconflow';
 
-  protected buildPayload(task: BaseTaskJson<Record<string, any>>): unknown {
+  protected buildPayload(task: BaseTaskJson<Record<string, any>>, _ctx?: any): unknown {
     // Note: local-file → data URI conversion happens lazily in execute() via async resolveImageField.
     // buildPayload is sync, so we return the raw payload; execute() pre-processes it.
     return { ...task.payload };
@@ -66,11 +66,11 @@ export class SiliconFlowProvider extends BaseApiProvider<Record<string, any>, Sf
   }
 
   // SiliconFlow video status uses POST with { requestId } body, not GET.
-  protected async pollStatus(client: HttpClient, meta: { api_url: string; api_status_url?: string }, taskId: string, timeout: number): Promise<SfStatusResponse> {
+  protected async pollStatus(client: HttpClient, meta: { api_url: string; api_status_url?: string }, taskId: string, timeout: number, ctx?: any): Promise<SfStatusResponse> {
     if (meta.api_status_url) {
       return client.post<SfStatusResponse>(meta.api_status_url, { requestId: taskId }, { timeout });
     }
-    return super.pollStatus(client, meta, taskId, timeout);
+    return super.pollStatus(client, meta, taskId, timeout, ctx);
   }
 
   protected isComplete(res: SfStatusResponse): boolean {
