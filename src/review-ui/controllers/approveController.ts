@@ -3,6 +3,7 @@
 // Supports three review actions: approve, design_feedback, revise_prompt
 // ============================================================================
 
+import fs from 'fs';
 import { Request, Response } from 'express';
 import { ManifestReader } from '../../core/ManifestReader';
 import { ApproveService, ReviewAction } from '../../core/ApproveService';
@@ -48,6 +49,9 @@ export function createApproveController(projectRoot: string, queueRoot: string, 
   return {
     async execute(req: Request, res: Response): Promise<void> {
       try {
+        const circle = Array.isArray(req.params.circle) ? req.params.circle[0] : req.params.circle;
+        const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
+        fs.appendFileSync('/tmp/approve_log.txt', `[APPROVE] circle="${circle}" assetId="${assetId}" queueRoot="${queueRoot}"\n`);
         const body = req.body || {};
         const action: ReviewAction = body.action || 'approve';
         if (!VALID_ACTIONS.includes(action)) {

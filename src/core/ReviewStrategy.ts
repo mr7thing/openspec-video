@@ -24,6 +24,7 @@ export interface ReviewStrategy {
   listCircles(): CircleSummary[];
   listDocuments(): DocumentInfo[];
   findDocument(circle: string, docId: string): DocumentInfo | null;
+  findDocumentById(docId: string): DocumentInfo | null;
   listCircleAssets(circleName: string): CircleAssetsResult;
 }
 
@@ -200,6 +201,16 @@ export class ManifestReviewStrategy implements ReviewStrategy {
       doc.content = fs.readFileSync(docPath, 'utf-8');
     }
     return doc;
+  }
+
+  findDocumentById(docId: string): DocumentInfo | null {
+    const docs = this.listDocuments();
+    const found = docs.find(d => d.docId === docId);
+    if (!found) return null;
+    if (!found.content && fs.existsSync(found.docPath)) {
+      found.content = fs.readFileSync(found.docPath, 'utf-8');
+    }
+    return found;
   }
 
   listCircleAssets(circleName: string): CircleAssetsResult {
@@ -383,6 +394,16 @@ export class GlobalReviewStrategy implements ReviewStrategy {
       doc.content = fs.readFileSync(docPath, 'utf-8');
     }
     return doc;
+  }
+
+  findDocumentById(docId: string): DocumentInfo | null {
+    const docs = this.listDocuments();
+    const found = docs.find(d => d.docId === docId);
+    if (!found) return null;
+    if (!found.content && fs.existsSync(found.docPath)) {
+      found.content = fs.readFileSync(found.docPath, 'utf-8');
+    }
+    return found;
   }
 
   listCircleAssets(circleName: string): CircleAssetsResult {

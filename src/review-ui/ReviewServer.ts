@@ -13,6 +13,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { createDocumentController } from './controllers/documentController';
 import { createCircleController } from './controllers/circleController';
 import { createApproveController } from './controllers/approveController';
+import { createReviewApproveController } from './controllers/reviewApproveController';
 import { createFileController } from './controllers/fileController';
 
 export interface ReviewServerDeps {
@@ -30,13 +31,17 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   const docCtrl = createDocumentController(strategy);
   const circleCtrl = createCircleController(strategy);
   const approveCtrl = createApproveController(projectRoot, queueRoot, manifestReader);
+  const reviewApproveCtrl = createReviewApproveController(projectRoot, queueRoot);
   const fileCtrl = createFileController(queueRoot);
 
   app.get('/api/documents', docCtrl.listDocuments);
+  app.get('/api/documents/by-id/:docId', docCtrl.getDocumentById);
+  app.patch('/api/documents/by-id/:docId', express.json(), docCtrl.updateDocumentById);
   app.get('/api/documents/:circle/:docId', docCtrl.getDocument);
   app.get('/api/circles', circleCtrl.listCircles);
   app.get('/api/circles/:name/assets', circleCtrl.listCircleAssets);
   app.get('/api/files/*filePath', fileCtrl.serve);
+  app.post('/api/review/approve', express.json(), reviewApproveCtrl.execute);
   app.post('/api/approve/:circle/:assetId', express.json(), approveCtrl.execute);
 
   // Serve static review UI from templates/review-ui/
@@ -53,7 +58,8 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
           <li>GET /api/circles</li>
           <li>GET /api/circles/:name/assets</li>
           <li>GET /api/files/*</li>
-          <li>POST /api/approve/:circle/:assetId</li>
+          <li>POST /api/review/approve</li>
+          <li>POST /api/approve/:circle/:assetId (legacy)</li>
         </ul>
         </body></html>
       `);

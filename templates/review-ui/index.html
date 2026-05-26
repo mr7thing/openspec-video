@@ -35,8 +35,8 @@
             line-height: 1.6;
         }
 
-        /* Top Bar */
-        .topbar {
+        /* ===================== TOP NAVIGATION ===================== */
+        .top-nav {
             background: var(--surface);
             padding: 10px 16px;
             display: flex;
@@ -47,11 +47,12 @@
             position: relative;
             z-index: 100;
         }
-        .topbar .back-btn {
-            background: none; border: none; color: var(--text); font-size: 20px; padding: 4px;
-            display: none; cursor: pointer;
+        .nav-dropdowns {
+            display: flex;
+            gap: 10px;
+            flex: 1;
         }
-        .topbar .doc-select {
+        .nav-dropdown {
             flex: 1;
             background: var(--card);
             border: 1px solid var(--border);
@@ -60,72 +61,103 @@
             border-radius: 8px;
             font-size: 14px;
             outline: none;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 30px;
         }
-        .topbar .status-badge {
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            background: var(--card);
-            color: var(--muted);
-            white-space: nowrap;
-        }
+        .nav-dropdown:focus { border-color: var(--accent); }
 
-        /* Relay Status Bar */
-        .relay-bar {
+        /* ===================== DOC ACTION BUTTONS ===================== */
+        .doc-actions {
             background: var(--surface);
-            padding: 6px 16px;
+            padding: 8px 16px;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            gap: 8px;
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
-            font-size: 12px;
-            gap: 8px;
+            flex-wrap: wrap;
         }
-        .relay-bar .relay-info { color: var(--muted); }
-        .relay-bar .relay-mode { font-weight: 600; }
-        .relay-bar .relay-mode.tunnel { color: var(--green); }
-        .relay-bar .relay-mode.relay { color: var(--accent); }
-        .relay-bar .relay-btn {
-            background: var(--card);
+        .doc-btn {
+            padding: 8px 14px;
             border: 1px solid var(--border);
-            color: var(--text);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-        .relay-bar .relay-quota {
-            flex: 1;
-            height: 4px;
             background: var(--card);
-            border-radius: 2px;
-            overflow: hidden;
-            margin: 0 8px;
+            color: var(--text);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
         }
-        .relay-bar .relay-quota-fill {
-            height: 100%;
-            background: var(--accent);
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
+        .doc-btn:hover { border-color: var(--accent); background: rgba(99,102,241,0.1); }
+        .doc-btn:active { transform: scale(0.97); }
+        .doc-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .doc-btn.primary:hover { background: #5558e3; }
+        .doc-btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+        .doc-btn.danger:hover { background: #dc2626; }
+        .doc-btn.success { background: var(--green); border-color: var(--green); color: #000; }
+        .doc-btn.success:hover { background: #16a34a; }
+        .doc-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        /* Main Content */
-        .main {
+        /* ===================== MAIN CONTENT ===================== */
+        .main-content {
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
-            padding-bottom: 120px;
+            padding-bottom: 90px;
         }
-        .main::-webkit-scrollbar { display: none; }
+        .main-content::-webkit-scrollbar { width: 6px; }
+        .main-content::-webkit-scrollbar-track { background: transparent; }
+        .main-content::-webkit-scrollbar-thumb { background: var(--card); border-radius: 3px; }
 
-        /* Frontmatter Card */
+        /* ===================== DOC BLOCK (expandable) ===================== */
+        .doc-block {
+            background: var(--surface);
+            margin: 12px 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .doc-block-header {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .doc-block-header:hover { background: rgba(255,255,255,0.02); }
+        .doc-block-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .doc-block-meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+        .doc-block-chevron {
+            font-size: 12px;
+            color: var(--muted);
+            transition: transform 0.2s;
+        }
+        .doc-block.expanded .doc-block-chevron { transform: rotate(180deg); }
+
+        .doc-block-body {
+            display: none;
+            border-top: 1px solid var(--border);
+        }
+        .doc-block.expanded .doc-block-body { display: block; }
+
         .fm-card {
             background: var(--card);
             margin: 12px 16px;
             padding: 14px 16px;
             border-radius: var(--radius);
-            border: 1px solid var(--border);
         }
         .fm-tags {
             display: flex;
@@ -146,8 +178,7 @@
         .fm-tag.prop { background: rgba(249,115,22,0.15); color: var(--orange); }
         .fm-tag.shot { background: rgba(168,85,247,0.15); color: var(--purple); }
         .fm-tag.status-draft { background: rgba(100,116,139,0.15); color: var(--muted); }
-        .fm-tag.status-sync { background: rgba(234,179,8,0.15); color: var(--yellow); }
-        .fm-tag.status-approve { background: rgba(34,197,94,0.15); color: var(--green); }
+        .fm-tag.status-approved { background: rgba(34,197,94,0.15); color: var(--green); }
         .fm-title {
             font-size: 18px;
             font-weight: 700;
@@ -167,9 +198,8 @@
             border-radius: 4px;
         }
 
-        /* Markdown Content */
         .md-content {
-            padding: 0 16px 20px;
+            padding: 0 16px 16px;
             font-size: 15px;
             line-height: 1.65;
         }
@@ -210,11 +240,11 @@
         .md-content th { background: var(--card); }
         .md-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
-        /* Assets Section */
-        .assets-section {
+        /* ===================== ASSET GRID ===================== */
+        .asset-section {
             padding: 0 16px 20px;
         }
-        .assets-title {
+        .asset-title {
             font-size: 13px;
             font-weight: 700;
             color: var(--muted);
@@ -224,9 +254,20 @@
         }
         .asset-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 10px;
         }
+        /* Responsive breakpoints */
+        @media (max-width: 767px) {
+            .asset-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 200px)); }
+        }
+        @media (min-width: 768px) and (max-width: 1199px) {
+            .asset-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 240px)); }
+        }
+        @media (min-width: 1200px) {
+            .asset-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 280px)); }
+        }
+
         .asset-card {
             background: var(--card);
             border-radius: var(--radius);
@@ -234,6 +275,7 @@
             border: 2px solid transparent;
             cursor: pointer;
             position: relative;
+            transition: border-color 0.15s;
         }
         .asset-card.selected { border-color: var(--green); }
         .asset-card img {
@@ -242,20 +284,6 @@
             object-fit: cover;
             display: block;
             background: #000;
-        }
-        .asset-card video {
-            width: 100%;
-            aspect-ratio: 1;
-            object-fit: cover;
-            display: block;
-        }
-        .asset-card .asset-name {
-            padding: 8px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
         .asset-card .asset-overlay {
             position: absolute;
@@ -271,9 +299,17 @@
             font-weight: bold;
         }
         .asset-card.selected .asset-overlay { display: flex; }
+        .asset-card .asset-name {
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
-        /* Bottom Action Bar */
-        .action-bar {
+        /* ===================== BOTTOM IMAGE ACTIONS ===================== */
+        .img-actions {
             position: fixed;
             bottom: 0;
             left: 0; right: 0;
@@ -284,7 +320,7 @@
             gap: 8px;
             z-index: 200;
         }
-        .action-bar .btn {
+        .img-btn {
             flex: 1;
             padding: 12px;
             border: none;
@@ -293,62 +329,17 @@
             font-weight: 700;
             cursor: pointer;
             text-align: center;
+            transition: all 0.15s;
         }
-        .action-bar .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .action-bar .btn-revise { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-        .action-bar .btn-approve { background: var(--green); color: #000; }
-        .action-bar .btn-feedback { background: var(--yellow); color: #000; }
+        .img-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .img-btn.approve { background: var(--green); color: #000; }
+        .img-btn.approve:not(:disabled):hover { background: #16a34a; }
+        .img-btn.feedback { background: var(--yellow); color: #000; }
+        .img-btn.feedback:not(:disabled):hover { background: #ca8a04; }
+        .img-btn.revise { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .img-btn.revise:not(:disabled):hover { border-color: var(--accent); }
 
-        /* Anchor Panel */
-        .anchor-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0; right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
-            border-radius: 16px 16px 0 0;
-            transform: translateY(calc(100% - 44px));
-            transition: transform 0.25s ease;
-            z-index: 150;
-            max-height: 60vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .anchor-panel.expanded { transform: translateY(0); }
-        .anchor-panel-header {
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-        .anchor-panel-header span {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--muted);
-        }
-        .anchor-panel-header .chevron {
-            transition: transform 0.2s;
-            font-size: 12px;
-        }
-        .anchor-panel.expanded .chevron { transform: rotate(180deg); }
-        .anchor-list {
-            overflow-y: auto;
-            padding: 0 16px 16px;
-            -webkit-overflow-scrolling: touch;
-        }
-        .anchor-list::-webkit-scrollbar { display: none; }
-        .anchor-item {
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 14px;
-            color: var(--muted);
-            cursor: pointer;
-        }
-        .anchor-item:active { color: var(--text); }
-
-        /* Modals */
+        /* ===================== MODALS ===================== */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -383,6 +374,7 @@
             min-height: 80px;
             outline: none;
         }
+        .modal-box textarea:focus { border-color: var(--accent); }
         .modal-actions {
             display: flex;
             gap: 10px;
@@ -401,7 +393,7 @@
         .modal-actions .btn-cancel { background: var(--card); color: var(--text); border: 1px solid var(--border); }
         .modal-actions .btn-confirm { background: var(--green); color: #000; }
 
-        /* Image Preview */
+        /* ===================== IMAGE PREVIEW ===================== */
         .img-preview {
             position: fixed;
             inset: 0;
@@ -428,7 +420,7 @@
             cursor: pointer;
         }
 
-        /* Toast */
+        /* ===================== TOAST ===================== */
         .toast {
             position: fixed;
             top: 60px;
@@ -449,55 +441,59 @@
         .toast.success { border-color: var(--green); }
         .toast.error { border-color: var(--red); }
 
-        /* Empty State */
+        /* ===================== EMPTY STATE ===================== */
         .empty-state {
             padding: 60px 20px;
             text-align: center;
             color: var(--muted);
         }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state p { font-size: 14px; }
+
+        /* ===================== NO DOC SELECTED STATE ===================== */
+        .no-doc-placeholder {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--muted);
+        }
+        .no-doc-placeholder .icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+        .no-doc-placeholder p { font-size: 13px; }
     </style>
 </head>
 <body>
-    <!-- Top Bar -->
-    <div class="topbar">
-        <button class="back-btn" id="backBtn" onclick="showDocList()">←</button>
-        <select class="doc-select" id="docSelect" onchange="onDocSelect(this.value)">
-            <option value="">选择文档...</option>
-        </select>
-        <span class="status-badge" id="statusBadge">—</span>
-    </div>
-
-    <!-- Relay Status -->
-    <div class="relay-bar" id="relayBar" style="display:none;">
-        <span class="relay-info">模式:</span>
-        <span class="relay-mode tunnel" id="relayMode">直连</span>
-        <div class="relay-quota" id="relayQuotaBar" style="display:none;">
-            <div class="relay-quota-fill" id="relayQuotaFill" style="width:0%"></div>
+    <!-- Top Navigation: Two-level dropdowns -->
+    <div class="top-nav">
+        <div class="nav-dropdowns">
+            <select class="nav-dropdown" id="categorySelect" onchange="onCategoryChange(this.value)">
+                <option value="">全部</option>
+            </select>
+            <select class="nav-dropdown" id="docSelect" onchange="onDocChange(this.value)">
+                <option value="">请选择文档</option>
+            </select>
         </div>
-        <button class="relay-btn" id="relayBtn" style="display:none;" onclick="toggleRelay()">开启中转</button>
     </div>
 
-    <!-- Main Content -->
-    <div class="main" id="main">
+    <!-- Doc Action Buttons -->
+    <div class="doc-actions" id="docActions" style="display:none;">
+        <button class="doc-btn" id="btnValidate" onclick="doValidate()">Validate</button>
+        <button class="doc-btn" id="btnDocRevise" onclick="doDocRevise()">修订</button>
+        <button class="doc-btn success" id="btnApproveDoc" onclick="doApproveDoc()">设为Approved</button>
+        <button class="doc-btn" id="btnRefresh" onclick="doRefresh()">刷新</button>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content" id="mainContent">
         <div class="empty-state" id="emptyState">
+            <div class="icon">📋</div>
             <p>加载中...</p>
         </div>
     </div>
 
-    <!-- Anchor Panel -->
-    <div class="anchor-panel" id="anchorPanel">
-        <div class="anchor-panel-header" onclick="toggleAnchors()">
-            <span>📑 目录</span>
-            <span class="chevron">▲</span>
-        </div>
-        <div class="anchor-list" id="anchorList"></div>
-    </div>
-
-    <!-- Bottom Action Bar -->
-    <div class="action-bar" id="actionBar">
-        <button class="btn btn-revise" onclick="submitAction('revise')">修订</button>
-        <button class="btn btn-approve" id="btnApprove" disabled onclick="submitAction('approve')">通过</button>
-        <button class="btn btn-feedback" id="btnFeedback" disabled onclick="submitAction('feedback')">反馈</button>
+    <!-- Bottom Image Action Buttons -->
+    <div class="img-actions" id="imgActions">
+        <button class="img-btn approve" id="btnImgApprove" disabled onclick="submitImgAction('approve')">✓ 通过</button>
+        <button class="img-btn feedback" id="btnImgFeedback" disabled onclick="submitImgAction('feedback')">✎ 反馈</button>
+        <button class="img-btn revise" id="btnImgRevise" onclick="submitImgAction('revise')">✏ 修订</button>
     </div>
 
     <!-- Review Modal -->
@@ -508,7 +504,7 @@
             <textarea id="modalNote" placeholder="输入备注（可选）..."></textarea>
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeModal()">取消</button>
-                <button class="btn btn-confirm" id="modalConfirm" onclick="confirmAction()">确认</button>
+                <button class="btn btn-confirm" id="modalConfirmBtn" onclick="confirmAction()">确认</button>
             </div>
         </div>
     </div>
@@ -523,108 +519,150 @@
 
     <script>
         const API = '';
-        let documents = [];
+        let allDocuments = [];
         let currentDoc = null;
         let selectedAssets = new Set();
         let pendingAction = null;
-        let relayInfo = null;
 
+        // ── Init ──────────────────────────────────────────────────────────────
         async function init() {
             try {
                 const res = await fetch(`${API}/api/documents`);
-                documents = await res.json();
-                populateDocSelect();
-                updateRelayBar();
-
-                if (documents.length > 0) {
-                    selectDoc(documents[0].circle, documents[0].docId);
-                } else {
-                    document.getElementById('emptyState').innerHTML = '<p>无可用文档</p>';
-                }
+                allDocuments = await res.json();
+                populateCategorySelect();
+                updateDocSelect('');
+                document.getElementById('emptyState').innerHTML =
+                    '<div class="icon">📋</div><p>请从上方选择文档</p>';
             } catch (e) {
                 showToast('加载失败: ' + e.message, 'error');
             }
         }
 
-        function populateDocSelect() {
-            const select = document.getElementById('docSelect');
-            select.innerHTML = '<option value="">选择文档...</option>' +
-                documents.map(d => `<option value="${d.circle}/${d.docId}">${d.docId} (${d.category})</option>`).join('');
+        // ── Dropdowns ─────────────────────────────────────────────────────────
+        function populateCategorySelect() {
+            const categories = [...new Set(allDocuments.map(d => d.category || 'unknown'))].sort();
+            const sel = document.getElementById('categorySelect');
+            sel.innerHTML = '<option value="">全部</option>' +
+                categories.map(c => `<option value="${c}">${c}</option>`).join('');
         }
 
-        function onDocSelect(value) {
-            if (!value) return;
-            const [circle, docId] = value.split('/');
-            selectDoc(circle, docId);
+        function onCategoryChange(cat) {
+            updateDocSelect(cat);
         }
 
-        async function selectDoc(circle, docId) {
-            currentDoc = documents.find(d => d.circle === circle && d.docId === docId);
-            if (!currentDoc) return;
+        function updateDocSelect(category) {
+            const docs = category ? allDocuments.filter(d => d.category === category) : allDocuments;
+            const sel = document.getElementById('docSelect');
+            sel.innerHTML = '<option value="">请选择文档</option>' +
+                docs.map(d => {
+                    const count = (d.outputs || []).length;
+                    return `<option value="${d.docId}">${d.title || d.docId} (${count})</option>`;
+                }).join('');
+        }
 
-            document.getElementById('docSelect').value = `${circle}/${docId}`;
-            document.getElementById('statusBadge').textContent = currentDoc.status || 'draft';
+        function onDocChange(docId) {
+            if (!docId) {
+                currentDoc = null;
+                document.getElementById('docActions').style.display = 'none';
+                document.getElementById('mainContent').innerHTML =
+                    '<div class="no-doc-placeholder"><div class="icon">📋</div><p>请选择文档</p></div>';
+                return;
+            }
+            const cat = document.getElementById('categorySelect').value;
+            const docs = cat ? allDocuments.filter(d => d.category === cat) : allDocuments;
+            selectDoc(docs.find(d => d.docId === docId));
+        }
+
+        // ── Load Document ─────────────────────────────────────────────────────
+        async function selectDoc(doc) {
+            if (!doc) return;
+            currentDoc = doc;
             selectedAssets.clear();
-            updateActionButtons();
+            updateImgButtons();
+            document.getElementById('docActions').style.display = 'flex';
 
-            // Fetch full document content
             try {
-                const res = await fetch(`${API}/api/documents/${circle}/${docId}`);
+                const res = await fetch(`${API}/api/documents/by-id/${doc.docId}`);
                 const data = await res.json();
-                renderDocument(data);
+                renderDoc(data);
             } catch (e) {
                 showToast('加载文档失败', 'error');
             }
         }
 
-        function renderDocument(data) {
-            const main = document.getElementById('main');
+        // ── Render ────────────────────────────────────────────────────────────
+        function renderDoc(data) {
             const content = data.content || '';
             const frontmatter = parseFrontmatter(content);
             const body = stripFrontmatter(content);
+            const fm = frontmatter || {};
 
-            let html = '';
+            const status = fm.status || 'drafting';
+            const cat = fm.category || currentDoc.category || 'unknown';
+            const catClass = cat.toLowerCase();
+            const statusClass = status === 'approved' ? 'status-approved' : 'status-draft';
 
-            // Frontmatter card
-            if (frontmatter) {
-                html += renderFrontmatterCard(frontmatter);
-            }
+            let metaFields = ['scene_location', 'time_period', 'age_group', 'role', 'prop_type', 'episode', 'scene_num', 'location', 'shot_type'];
+            let metaHtml = metaFields.filter(f => fm[f]).map(f => `<span>${fm[f]}</span>`).join('');
 
-            // Markdown body
-            html += `<div class="md-content">${renderMarkdown(body)}</div>`;
+            const outputs = currentDoc.outputs || [];
+            const outputsHtml = outputs.map(out => {
+                const key = out.path;
+                const selected = selectedAssets.has(key);
+                const src = `${API}/api/files/${out.path}`;
+                return `
+                    <div class="asset-card ${selected ? 'selected' : ''}"
+                         onclick="toggleAsset('${key.replace(/'/g, "\\'")}')"
+                         ondblclick="openPreview('${src.replace(/'/g, "\\'")}')"
+                         data-key="${key}">
+                        <div class="asset-overlay">✓</div>
+                        <img src="${src}" loading="lazy" alt="${out.filename}">
+                        <div class="asset-name">${out.filename}</div>
+                    </div>
+                `;
+            }).join('');
 
-            // Assets
-            if (currentDoc.outputs && currentDoc.outputs.length > 0) {
-                html += `<div class="assets-section">`;
-                html += `<div class="assets-title">资产 (${currentDoc.outputs.length})</div>`;
-                html += `<div class="asset-grid">`;
-                for (const out of currentDoc.outputs) {
-                    const key = out.path;
-                    const selected = selectedAssets.has(key);
-                    const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(out.filename);
-                    const src = `${API}/api/files/${out.path}`;
-                    html += `
-                        <div class="asset-card ${selected ? 'selected' : ''}" onclick="toggleAsset('${key.replace(/'/g, "\\'")}', '${src.replace(/'/g, "\\'")}', ${isImg})" data-key="${key}">
-                            <div class="asset-overlay">✓</div>
-                            ${isImg ? `<img src="${src}" loading="lazy" alt="${out.filename}">` : ''}
-                            ${!isImg ? `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--card);font-size:32px;">📄</div>` : ''}
-                            <div class="asset-name">${out.filename}</div>
+            const html = `
+                <div class="doc-block expanded" id="docBlock">
+                    <div class="doc-block-header" onclick="toggleDocBlock()">
+                        <div>
+                            <div class="doc-block-title">${fm.title || currentDoc.docId}</div>
+                            <div class="doc-block-meta">${cat} · ${outputs.length} 个资产</div>
                         </div>
-                    `;
-                }
-                html += `</div></div>`;
-            }
+                        <span class="doc-block-chevron">▼</span>
+                    </div>
+                    <div class="doc-block-body">
+                        <div class="fm-card">
+                            <div class="fm-tags">
+                                <span class="fm-tag ${catClass}">${cat}</span>
+                                <span class="fm-tag ${statusClass}">${status}</span>
+                            </div>
+                            ${fm.title ? `<div class="fm-title">${fm.title}</div>` : ''}
+                            <div class="fm-meta">${metaHtml}</div>
+                        </div>
+                        <div class="md-content">${renderMarkdown(body)}</div>
+                    </div>
+                </div>
+                <div class="asset-section">
+                    <div class="asset-title">资产 (${outputs.length})</div>
+                    <div class="asset-grid">${outputsHtml || '<div class="empty-state"><p>暂无资产</p></div>'}</div>
+                </div>
+            `;
 
-            main.innerHTML = html;
-            buildAnchors();
+            document.getElementById('mainContent').innerHTML = html;
         }
 
+        // ── Doc Block Toggle ──────────────────────────────────────────────────
+        function toggleDocBlock() {
+            document.getElementById('docBlock').classList.toggle('expanded');
+        }
+
+        // ── Frontmatter Helpers ───────────────────────────────────────────────
         function parseFrontmatter(content) {
             const match = content.match(/^---\n([\s\S]*?)\n---/);
             if (!match) return null;
-            const lines = match[1].split('\n');
             const fm = {};
-            for (const line of lines) {
+            for (const line of match[1].split('\n')) {
                 const m = line.match(/^([\w_]+):\s*(.*)$/);
                 if (m) fm[m[1]] = m[2].trim();
             }
@@ -635,30 +673,7 @@
             return content.replace(/^---[\s\S]*?---\n*/, '');
         }
 
-        function renderFrontmatterCard(fm) {
-            const category = fm.category || 'unknown';
-            const status = fm.status || 'drafting';
-            const tagClass = category.toLowerCase();
-            const statusClass = status === 'approved' ? 'status-approve' : status === 'syncing' ? 'status-sync' : 'status-draft';
-
-            let metaHtml = '';
-            const metaFields = ['scene_location', 'time_period', 'age_group', 'role', 'prop_type', 'episode', 'scene_num', 'location', 'shot_type'];
-            for (const f of metaFields) {
-                if (fm[f]) metaHtml += `<span>${f}: ${fm[f]}</span>`;
-            }
-
-            return `
-                <div class="fm-card">
-                    <div class="fm-tags">
-                        <span class="fm-tag ${tagClass}">${category}</span>
-                        <span class="fm-tag ${statusClass}">${status}</span>
-                    </div>
-                    ${fm.title ? `<div class="fm-title">${fm.title}</div>` : ''}
-                    <div class="fm-meta">${metaHtml}</div>
-                </div>
-            `;
-        }
-
+        // ── Markdown Renderer ─────────────────────────────────────────────────
         function renderMarkdown(content) {
             return content
                 .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -678,68 +693,26 @@
                 .replace(/<p><\/p>/g, '');
         }
 
-        function buildAnchors() {
-            const anchors = [];
-            document.querySelectorAll('.md-content h2').forEach((h, i) => {
-                const id = `section-${i}`;
-                h.id = id;
-                anchors.push({ id, text: h.textContent });
-            });
-
-            const list = document.getElementById('anchorList');
-            if (anchors.length === 0) {
-                list.innerHTML = '<div class="anchor-item" style="color:var(--muted);">无目录</div>';
-            } else {
-                list.innerHTML = anchors.map(a =>
-                    `<div class="anchor-item" onclick="scrollToAnchor('${a.id}')">${a.text}</div>`
-                ).join('');
-            }
-        }
-
-        function scrollToAnchor(id) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                toggleAnchors(false);
-            }
-        }
-
-        function toggleAnchors(force) {
-            const panel = document.getElementById('anchorPanel');
-            if (typeof force === 'boolean') {
-                panel.classList.toggle('expanded', force);
-            } else {
-                panel.classList.toggle('expanded');
-            }
-        }
-
-        function toggleAsset(key, src, isImg) {
-            if (isImg) {
-                openPreview(src);
-                return;
-            }
+        // ── Asset Selection ──────────────────────────────────────────────────
+        function toggleAsset(key) {
             if (selectedAssets.has(key)) {
                 selectedAssets.delete(key);
             } else {
                 selectedAssets.add(key);
             }
-            updateAssetUI();
-            updateActionButtons();
-        }
-
-        function updateAssetUI() {
             document.querySelectorAll('.asset-card').forEach(card => {
-                const key = card.dataset.key;
-                card.classList.toggle('selected', selectedAssets.has(key));
+                card.classList.toggle('selected', selectedAssets.has(card.dataset.key));
             });
+            updateImgButtons();
         }
 
-        function updateActionButtons() {
-            const hasSelection = selectedAssets.size > 0;
-            document.getElementById('btnApprove').disabled = !hasSelection;
-            document.getElementById('btnFeedback').disabled = !hasSelection;
+        function updateImgButtons() {
+            const hasSel = selectedAssets.size > 0;
+            document.getElementById('btnImgApprove').disabled = !hasSel;
+            document.getElementById('btnImgFeedback').disabled = !hasSel;
         }
 
+        // ── Image Preview ────────────────────────────────────────────────────
         function openPreview(src) {
             document.getElementById('previewImg').src = src;
             document.getElementById('imgPreview').classList.add('active');
@@ -749,7 +722,54 @@
             document.getElementById('imgPreview').classList.remove('active');
         }
 
-        function submitAction(action) {
+        // ── Doc Actions ─────────────────────────────────────────────────────
+        function doValidate() {
+            if (!currentDoc) return;
+            showToast(`请在终端运行: opsv validate "${currentDoc.docPath}"`, 'error');
+        }
+
+        function doDocRevise() {
+            if (!currentDoc) return;
+            pendingAction = 'doc_revise';
+            document.getElementById('modalTitle').textContent = '✏ 修订';
+            document.getElementById('modalSubtitle').textContent = '输入文档修订意见（写入 reviews 字段）';
+            document.getElementById('modalNote').value = '';
+            document.getElementById('reviewModal').classList.add('active');
+        }
+
+        async function doApproveDoc() {
+            if (!currentDoc) return;
+            try {
+                const res = await fetch(`${API}/api/documents/by-id/${currentDoc.docId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'approved' })
+                });
+                const json = await res.json();
+                if (json.success || res.ok) {
+                    showToast('已设为 Approved', 'success');
+                    currentDoc.status = 'approved';
+                    // Refresh doc to update UI
+                    const docRes = await fetch(`${API}/api/documents/${currentDoc.docId}`);
+                    const data = await docRes.json();
+                    renderDoc(data);
+                } else {
+                    showToast('操作失败', 'error');
+                }
+            } catch (e) {
+                showToast('操作失败: ' + e.message, 'error');
+            }
+        }
+
+        function doRefresh() {
+            if (!currentDoc) return;
+            selectedAssets.clear();
+            updateImgButtons();
+            selectDoc(currentDoc);
+        }
+
+        // ── Image Actions ─────────────────────────────────────────────────────
+        function submitImgAction(action) {
             if ((action === 'approve' || action === 'feedback') && selectedAssets.size === 0) return;
             pendingAction = action;
 
@@ -757,7 +777,7 @@
             const subtitles = {
                 approve: '确认通过选中的资产？',
                 feedback: '对选中资产提供反馈',
-                revise: '请求修订当前文档'
+                revise: '请求修订选中资产'
             };
 
             document.getElementById('modalTitle').textContent = titles[action];
@@ -766,6 +786,7 @@
             document.getElementById('reviewModal').classList.add('active');
         }
 
+        // ── Modal ─────────────────────────────────────────────────────────────
         function closeModal() {
             document.getElementById('reviewModal').classList.remove('active');
             pendingAction = null;
@@ -776,24 +797,44 @@
             const note = document.getElementById('modalNote').value.trim();
             const action = pendingAction;
 
-            // Build output files list
-            const outputFiles = [];
-            const outputLookup = {};
-            for (const doc of documents) {
-                for (const out of doc.outputs) outputLookup[out.path] = out;
-            }
-            for (const key of selectedAssets) {
-                const out = outputLookup[key];
-                if (out) outputFiles.push(out.filename);
+            // doc revise -> POST /api/review/approve with action doc_revise
+            if (action === 'doc_revise') {
+                try {
+                    const res = await fetch(`${API}/api/review/approve`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            docPath: currentDoc.docPath,
+                            outputFiles: [],
+                            action: 'revise_prompt',
+                            note: note || undefined
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        showToast('修订意见已提交', 'success');
+                    } else {
+                        showToast('提交失败', 'error');
+                    }
+                } catch (e) {
+                    showToast('提交失败: ' + e.message, 'error');
+                }
+                closeModal();
+                return;
             }
 
+            // image actions
+            const actionMap = { approve: 'approve', feedback: 'design_feedback', revise: 'revise_prompt' };
+            const outputFiles = [...selectedAssets];
+
             try {
-                const res = await fetch(`${API}/api/approve/${currentDoc.circle}/${currentDoc.docId}`, {
+                const res = await fetch(`${API}/api/review/approve`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action: action === 'approve' ? 'approve' : action === 'feedback' ? 'design_feedback' : 'revise_prompt',
-                        outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
+                        docPath: currentDoc.docPath,
+                        outputFiles,
+                        action: actionMap[action],
                         note: note || undefined
                     })
                 });
@@ -801,10 +842,10 @@
                 if (json.success) {
                     showToast('操作成功', 'success');
                     selectedAssets.clear();
-                    updateAssetUI();
-                    updateActionButtons();
+                    updateImgButtons();
                     closeModal();
-                    setTimeout(() => location.reload(), 600);
+                    // Reload current doc to refresh state
+                    setTimeout(() => selectDoc(currentDoc), 600);
                 } else {
                     showToast('操作失败', 'error');
                 }
@@ -813,56 +854,7 @@
             }
         }
 
-        // Relay status
-        async function updateRelayBar() {
-            try {
-                const res = await fetch(`${API}/api/session-info`);
-                relayInfo = await res.json();
-                const data = relayInfo.data || relayInfo;
-
-                const bar = document.getElementById('relayBar');
-                const mode = document.getElementById('relayMode');
-                const btn = document.getElementById('relayBtn');
-                const quotaBar = document.getElementById('relayQuotaBar');
-                const quotaFill = document.getElementById('relayQuotaFill');
-
-                bar.style.display = 'flex';
-                const isRelay = data.routeMode === 'relay';
-                mode.textContent = isRelay ? '中转' : '直连';
-                mode.className = 'relay-mode ' + (isRelay ? 'relay' : 'tunnel');
-
-                if (isRelay && data.relayQuota) {
-                    quotaBar.style.display = 'block';
-                    const pct = Math.min(100, Math.round((data.relayQuota.usedBytes / data.relayQuota.limitBytes) * 100));
-                    quotaFill.style.width = pct + '%';
-                    btn.style.display = 'none';
-                } else if (!isRelay && data.relayAvailable) {
-                    quotaBar.style.display = 'none';
-                    btn.style.display = 'block';
-                    btn.textContent = '开启中转';
-                } else {
-                    btn.style.display = 'none';
-                }
-            } catch {
-                // Ignore — relay bar is optional
-            }
-        }
-
-        async function toggleRelay() {
-            try {
-                const res = await fetch(`${API}/api/enable-relay`, { method: 'POST' });
-                const json = await res.json();
-                if (json.data || json.success) {
-                    showToast('中转已开启，请刷新页面', 'success');
-                    await updateRelayBar();
-                } else {
-                    showToast('开启失败', 'error');
-                }
-            } catch (e) {
-                showToast('开启失败: ' + e.message, 'error');
-            }
-        }
-
+        // ── Toast ─────────────────────────────────────────────────────────────
         function showToast(msg, type) {
             const toast = document.getElementById('toast');
             toast.textContent = msg;
@@ -870,6 +862,7 @@
             setTimeout(() => toast.classList.remove('show'), 2500);
         }
 
+        // ── Keyboard ───────────────────────────────────────────────────────────
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closePreview();
