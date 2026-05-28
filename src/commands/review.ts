@@ -89,7 +89,7 @@ export function registerReviewCommand(program: Command): void {
     .option('--cloud-url <url>', 'OpsV Cloud base URL (or OPSV_CLOUD_URL)')
     .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY, fallback if not logged in)')
     .option('--status <sessionId>', 'Get cloud session status (requires --cloud)')
-    .option('--refresh <sessionId>', 'Refresh cloud session JWT (requires --cloud)')
+    .option('--rotate-review-token <sessionId>', 'Rotate the reviewer URL token (requires --cloud)')
     .option('--close <sessionId>', 'Close a cloud session (requires --cloud)')
     .action(async (options: ReviewOptions) => {
       try {
@@ -102,7 +102,7 @@ export function registerReviewCommand(program: Command): void {
 
         // ─── Cloud lifecycle commands (no local server needed) ───
         const cloudConfig = await resolveCloudConfig(opts);
-        if (cloudConfig && (opts.status || opts.refresh || opts.close)) {
+        if (cloudConfig && (opts.status || opts.rotateReviewToken || opts.close)) {
           const client = new CloudClient(cloudConfig.cloudUrl, cloudConfig.authToken);
 
           if (opts.status) {
@@ -112,9 +112,9 @@ export function registerReviewCommand(program: Command): void {
             return;
           }
 
-          if (opts.refresh) {
-            const result = await client.refreshSession(opts.refresh);
-            console.log(chalk.green(`Session refreshed: ${opts.refresh}`));
+          if (opts.rotateReviewToken) {
+            const result = await client.rotateReviewToken(opts.rotateReviewToken);
+            console.log(chalk.green(`Review token rotated: ${opts.rotateReviewToken}`));
             console.log(chalk.green(`Review URL: ${result.reviewUrl}`));
             return;
           }

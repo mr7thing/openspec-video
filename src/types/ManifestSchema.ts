@@ -77,7 +77,7 @@ export const ReviewOptionsSchema = z.object({
   cloudUrl: z.string().optional(),
   cloudApiKey: z.string().optional(),
   status: z.string().optional(),
-  refresh: z.string().optional(),
+  rotateReviewToken: z.string().optional(),
   close: z.string().optional(),
 });
 export type ReviewOptions = z.infer<typeof ReviewOptionsSchema>;

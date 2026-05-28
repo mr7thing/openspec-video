@@ -21,8 +21,8 @@ export function registerLoginCommand(program: Command): void {
 
       try {
         const client = new DeviceFlowClient(cloudUrl.replace(/\/+$/, ''));
-        const { email, tier } = await client.login();
-        console.log(chalk.green(`\n✓ 登录成功: ${email} (${tier})`));
+        const { email, plan } = await client.login();
+        console.log(chalk.green(`\n✓ 登录成功: ${email} (${plan})`));
       } catch (err: any) {
         console.error(chalk.red(`登录失败: ${err.message}`));
         process.exit(1);
@@ -38,7 +38,7 @@ export function registerLoginCommand(program: Command): void {
         console.log(chalk.yellow('未登录。运行 opsv login 进行登录。'));
         return;
       }
-      console.log(chalk.green(`${creds.email} (${creds.tier})`));
+      console.log(chalk.green(`${creds.email} (${creds.plan})`));
     });
 
   program

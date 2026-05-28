@@ -5,7 +5,7 @@ import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 export interface TunnelSession {
   sessionId: string;
   reviewUrl: string;
-  jwt: string;
+  reviewToken: string;
   sessionToken: string;
   tunnelUrl?: string;
   routeMode: 'tunnel' | 'relay';
@@ -40,7 +40,7 @@ export class CloudClient {
       return {
         sessionId: data.sessionId,
         reviewUrl: data.reviewUrl,
-        jwt: data.jwt || data.reviewJwt,
+        reviewToken: data.reviewToken,
         sessionToken: data.sessionToken,
         tunnelUrl: data.tunnelUrl,
         routeMode: data.routeMode || 'tunnel',
@@ -77,15 +77,15 @@ export class CloudClient {
     }
   }
 
-  async refreshSession(sessionId: string): Promise<{ jwt: string, reviewUrl: string }> {
+  async rotateReviewToken(sessionId: string): Promise<{ reviewToken: string; reviewUrl: string }> {
     try {
-      const response = await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/refresh`, {}, {
+      const response = await axios.post(`${this.cloudUrl}/api/sessions/${sessionId}/rotate-review-token`, {}, {
         headers: this.getHeaders(),
         timeout: CLOUD_TIMEOUT,
       });
-      return unwrapData<{ jwt: string, reviewUrl: string }>(response.data);
+      return unwrapData<{ reviewToken: string; reviewUrl: string }>(response.data);
     } catch (err: any) {
-      logger.error(`Failed to refresh cloud session: ${err.message}`);
+      logger.error(`Failed to rotate review token: ${err.message}`);
       throw new InfrastructureError(
         OpsVErrorCode.INFRA_NETWORK_ERROR,
         getResponseError(err)

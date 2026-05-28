@@ -8,10 +8,10 @@ import os from 'os';
 
 export interface Credentials {
   email: string;
-  token: string;
-  refresh_token: string;
-  expires_at: string; // ISO timestamp
-  tier: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string; // ISO timestamp
+  plan: string;
 }
 
 const OPSV_DIR = path.join(os.homedir(), '.opsv');
@@ -40,13 +40,13 @@ export class CredentialManager {
   }
 
   static isTokenExpired(creds: Credentials, bufferMs: number = 5 * 60 * 1000): boolean {
-    const expiresAt = new Date(creds.expires_at).getTime();
+    const expiresAt = new Date(creds.expiresAt).getTime();
     return Date.now() + bufferMs >= expiresAt;
   }
 
   static getAuthHeader(): string | null {
     const creds = this.getCredentials();
     if (!creds) return null;
-    return `Bearer ${creds.token}`;
+    return `Bearer ${creds.accessToken}`;
   }
 }

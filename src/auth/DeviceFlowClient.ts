@@ -14,47 +14,47 @@ const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 120; // 10 minutes
 
 export interface DeviceCodeResponse {
-  device_code: string;
-  verification_url: string;
-  expires_in: number;
+  deviceCode: string;
+  verificationUrl: string;
+  expiresIn: number;
 }
 
 export interface DeviceTokenResponse {
-  token: string;
-  refresh_token: string;
-  expires_at: string;
-  tier: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  plan: string;
 }
 
 export class DeviceFlowClient {
   constructor(private cloudUrl: string) {}
 
-  async login(): Promise<{ email: string; tier: string }> {
+  async login(): Promise<{ email: string; plan: string }> {
     // 1. Request device code
     const deviceCode = await this.requestDeviceCode();
     console.log(chalk.cyan('正在打开浏览器进行登录验证...'));
-    console.log(chalk.gray(`如果浏览器没有自动打开，请访问: ${deviceCode.verification_url}`));
+    console.log(chalk.gray(`如果浏览器没有自动打开，请访问: ${deviceCode.verificationUrl}`));
 
     // 2. Open browser
-    this.openBrowser(deviceCode.verification_url);
+    this.openBrowser(deviceCode.verificationUrl);
 
     // 3. Poll for token
-    const token = await this.pollForToken(deviceCode.device_code);
+    const token = await this.pollForToken(deviceCode.deviceCode);
 
     // 4. Decode JWT to get email
-    const payload = this.decodeJwtPayload(token.token);
+    const payload = this.decodeJwtPayload(token.accessToken);
     const email = payload.email || 'unknown';
 
     // 5. Save credentials
     CredentialManager.saveCredentials({
       email,
-      token: token.token,
-      refresh_token: token.refresh_token,
-      expires_at: token.expires_at,
-      tier: token.tier,
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      expiresAt: token.expiresAt,
+      plan: token.plan,
     });
 
-    return { email, tier: token.tier };
+    return { email, plan: token.plan };
   }
 
   async refreshIfNeeded(): Promise<string | null> {
@@ -62,30 +62,30 @@ export class DeviceFlowClient {
     if (!creds) return null;
 
     if (!CredentialManager.isTokenExpired(creds)) {
-      return creds.token;
+      return creds.accessToken;
     }
 
     // Token expired or about to expire — refresh
-    logger.info('Token expired, refreshing...');
+    logger.info('Access token expired, refreshing...');
     try {
       const response = await axios.post(
-        `${this.cloudUrl}/auth/refresh`,
-        { refresh_token: creds.refresh_token },
+        `${this.cloudUrl}/auth/refresh-token`,
+        { refreshToken: creds.refreshToken },
         { timeout: 15000 }
       );
       const data = response.data?.data || response.data;
-      const newToken = data.token;
-      const newExpiresAt = data.expires_at;
+      const newAccessToken = data.accessToken;
+      const newExpiresAt = data.expiresAt;
 
       CredentialManager.saveCredentials({
         ...creds,
-        token: newToken,
-        expires_at: newExpiresAt,
+        accessToken: newAccessToken,
+        expiresAt: newExpiresAt,
       });
 
-      return newToken;
+      return newAccessToken;
     } catch (err: any) {
-      logger.error(`Failed to refresh token: ${err.message}`);
+      logger.error(`Failed to refresh access token: ${err.message}`);
       CredentialManager.clearCredentials();
       return null;
     }
@@ -100,9 +100,9 @@ export class DeviceFlowClient {
       );
       const data = response.data?.data || response.data;
       return {
-        device_code: data.device_code,
-        verification_url: data.verification_url,
-        expires_in: data.expires_in,
+        deviceCode: data.deviceCode,
+        verificationUrl: data.verificationUrl,
+        expiresIn: data.expiresIn,
       };
     } catch (err: any) {
       throw new Error(`Failed to request device code: ${err.message}`);
@@ -118,15 +118,15 @@ export class DeviceFlowClient {
       try {
         const response = await axios.post(
           `${this.cloudUrl}/auth/device-token`,
-          { device_code: deviceCode },
+          { deviceCode },
           { timeout: 15000 }
         );
         const data = response.data?.data || response.data;
         return {
-          token: data.token,
-          refresh_token: data.refresh_token,
-          expires_at: data.expires_at,
-          tier: data.tier,
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: data.expiresAt,
+          plan: data.plan,
         };
       } catch (err: any) {
         const errorCode = err.response?.data?.code || err.response?.data?.error;
