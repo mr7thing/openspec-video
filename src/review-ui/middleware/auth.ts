@@ -14,7 +14,25 @@ export interface AuthOptions {
   sessionToken: string;
 }
 
-const usedTokens = new Set<string>(); // Single-use enforcement
+// Map<token, expiryTime> with TTL-based eviction instead of unbounded Set
+const usedTokens = new Map<string, number>();
+const CLEANUP_INTERVAL_MS = 60 * 1000; // run cleanup every 60s
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+function scheduleCleanup(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [token, expiry] of usedTokens.entries()) {
+      if (now >= expiry) usedTokens.delete(token);
+    }
+    // Stop the timer when there's nothing left to clean
+    if (usedTokens.size === 0 && cleanupTimer) {
+      clearInterval(cleanupTimer);
+      cleanupTimer = null;
+    }
+  }, CLEANUP_INTERVAL_MS);
+}
 
 export function createAuthMiddleware(options: AuthOptions) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -24,6 +42,7 @@ export function createAuthMiddleware(options: AuthOptions) {
       return res.status(401).json({ error: 'Access token required', code: 'TOKEN_REQUIRED' });
     }
 
+    // Check single-use: reject if token was already consumed
     if (usedTokens.has(accessToken)) {
       return res.status(401).json({ error: 'Token already used', code: 'TOKEN_REUSED' });
     }
@@ -32,14 +51,9 @@ export function createAuthMiddleware(options: AuthOptions) {
       return res.status(401).json({ error: 'Invalid or expired token', code: 'TOKEN_INVALID' });
     }
 
-    // Mark as used
-    usedTokens.add(accessToken);
-
-    // Cleanup old tokens periodically (simple LRU-like)
-    if (usedTokens.size > 10000) {
-      const toDelete = Array.from(usedTokens).slice(0, 5000);
-      toDelete.forEach(t => usedTokens.delete(t));
-    }
+    // Mark as used with TTL-based expiry
+    usedTokens.set(accessToken, Date.now() + TOKEN_TTL_MS);
+    scheduleCleanup();
 
     next();
   };

@@ -179,12 +179,15 @@ export class CloudflaredManager {
 
       this.process.on('exit', (code) => {
         if (this.urlRejecter) {
-          // Only treat unexpected exits as errors
           clearTimeout(timeout);
-          if (code !== 0 && code !== null) {
-            this.urlRejecter(new Error(`cloudflared exited with code ${code}`));
-            this.urlRejecter = null;
-          }
+          // Any exit before URL resolution is a failure — code=null (SIGTERM)
+          // and code=0 (clean exit without printing URL) both mean the tunnel
+          // didn't start, so reject rather than hanging.
+          const reason = code === null
+            ? 'cloudflared was terminated before tunnel URL was resolved'
+            : `cloudflared exited with code ${code} before tunnel URL was resolved`;
+          this.urlRejecter(new Error(reason));
+          this.urlRejecter = null;
         }
         this.process = null;
       });

@@ -105,12 +105,10 @@ export class ApproveService {
 
   resolveTargetRoot(circle: string): string {
     const circleDir = resolveWithin(this.queueRoot, circle);
-    console.error(`[resolveTargetRoot] circle="${circle}" queueRoot="${this.queueRoot}" circleDir="${circleDir}"`);
     if (!circleDir) throw new InfrastructureError(OpsVErrorCode.INFRA_PATH_FORBIDDEN, 'Forbidden');
 
     const circleManifestPath = path.join(circleDir, '_manifest.json');
     let targetRoot = getProjectDir(this.projectRoot, 'videospec');
-    console.error(`[resolveTargetRoot] manifestPath="${circleManifestPath}" exists=${fs.existsSync(circleManifestPath)}`);
 
     if (fs.existsSync(circleManifestPath)) {
       const manifest = this.manifestReader.read(circleManifestPath);
