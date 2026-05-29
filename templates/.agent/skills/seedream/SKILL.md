@@ -189,8 +189,8 @@ sequential_image_generation: "auto"
 ### 编译命令
 
 ```bash
-# 文生图
-opsv imagen --model volcengine.seadream --circle circle1
+# 文生图（自动从当前工作目录或 --manifest 定位 Circle）
+opsv imagen --model volcengine.seadream
 ```
 
 ### 常见场景的 global_settings 配置

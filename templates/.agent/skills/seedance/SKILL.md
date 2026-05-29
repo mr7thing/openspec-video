@@ -258,11 +258,11 @@ description: Seedance 2.0 视频生成专家。精通火山方舟 Seedance 2.0/2
 ### 编译命令
 
 ```bash
-# Seedance 2.0
-opsv animate --model volcengine.seedance2 --circle circle2
+# Seedance 2.0（自动从当前工作目录或 --manifest 定位 Circle）
+opsv animate --model volcengine.seedance2
 
 # Seedance 2.0 fast
-opsv animate --model volcengine.seedance2-fast --circle circle2
+opsv animate --model volcengine.seedance2-fast
 ```
 
 ### Shot 文件 Frontmatter 格式
