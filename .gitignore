@@ -32,3 +32,5 @@ coverage/*
 # ensure templates
 !templates
 docs/0.8.7audit_report.md
+REASONIX.md
+.reasonix/truncated-results/1779978211123-45a6cd66-run_skill.txt
