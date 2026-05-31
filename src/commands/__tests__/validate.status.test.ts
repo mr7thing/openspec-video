@@ -53,7 +53,7 @@ describe('validate status vs manifest consistency', () => {
     const inconsistencies = findStatusInconsistencies(tmpDir);
     expect(inconsistencies).toContainEqual(
       expect.objectContaining({
-        file: 'shots/shot.md',
+        file: path.join('shots', 'shot.md'),
         docStatus: 'drafting',
         manifestStatus: 'approved',
       })

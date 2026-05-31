@@ -28,7 +28,7 @@ interface ReviewApproveRequest {
   note?: string;
 }
 
-function validateAbsolutePath(value: string, fieldName: string): string {
+function validateAbsolutePath(value: string, fieldName: string, projectRoot: string): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `Invalid ${fieldName}: must be a non-empty string`);
   }
@@ -36,7 +36,14 @@ function validateAbsolutePath(value: string, fieldName: string): string {
   if (!path.isAbsolute(value)) {
     throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, `${fieldName} must be an absolute path`);
   }
-  return value;
+  const resolved = path.resolve(value);
+  const normalized = path.normalize(resolved);
+  const absProjectRoot = path.resolve(projectRoot);
+  const prefix = absProjectRoot.endsWith(path.sep) ? absProjectRoot : absProjectRoot + path.sep;
+  if (normalized !== absProjectRoot && !normalized.startsWith(prefix)) {
+    throw new ValidationError(OpsVErrorCode.INFRA_PATH_FORBIDDEN, `Access forbidden: ${fieldName} must be inside the project root`);
+  }
+  return normalized;
 }
 
 function validateOutputFiles(values: unknown, fieldName: string): string[] {
@@ -94,7 +101,7 @@ export function createReviewApproveController(projectRoot: string, queueRoot: st
     async execute(req: Request, res: Response): Promise<void> {
       try {
         const body = req.body as ReviewApproveRequest;
-        const docPath = validateAbsolutePath(body.docPath, 'docPath');
+        const docPath = validateAbsolutePath(body.docPath, 'docPath', projectRoot);
         const outputFiles = validateOutputFiles(body.outputFiles, 'outputFiles');
         const action: ReviewAction = body.action || 'approve';
 

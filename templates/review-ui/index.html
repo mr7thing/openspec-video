@@ -750,7 +750,7 @@
                     showToast('已设为 Approved', 'success');
                     currentDoc.status = 'approved';
                     // Refresh doc to update UI
-                    const docRes = await fetch(`${API}/api/documents/${currentDoc.docId}`);
+                    const docRes = await fetch(`${API}/api/documents/by-id/${currentDoc.docId}`);
                     const data = await docRes.json();
                     renderDoc(data);
                 } else {
