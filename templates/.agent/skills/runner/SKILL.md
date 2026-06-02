@@ -216,5 +216,6 @@ ZeroCircle 资产在 FirstCircle 渲染时发现问题需要修改：
 | 编译 ComfyUI | `opsv comfy --model <m>` |
 | 执行渲染 | `opsv run <path/dir>` |
 | 启动审查 | `opsv review` |
+| 批量审批 | `opsv approved` |
 | 克隆迭代 | `opsv iterate <path>` |
 | 聚合脚本 | `opsv script` |

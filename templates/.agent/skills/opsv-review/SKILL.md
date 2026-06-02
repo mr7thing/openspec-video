@@ -1,7 +1,7 @@
 # opsv-review Skill
 
 ## Overview
-OpsV Review v0.8.28 — Visual review of generated outputs.
+OpsV Review v0.10.3 — Visual review + CLI batch approve of generated outputs.
 
 - **Global mode** (default, no `--circle`): scans all documents and all circles. Document frontmatter is the single source of truth for `category`/`status`. Manifest is used only to discover which assets exist and find their output files.
 - **Manifest-driven mode** (`--circle`): focuses on a single circle's manifest. Assets and outputs are scoped to that circle.
@@ -13,7 +13,9 @@ OpsV Review v0.8.28 — Visual review of generated outputs.
 - **Outputs are matched by docId**: Given a docId from the manifest, review recursively scans circle directories for output files whose names start with that docId prefix.
 - **Naming follows the document**: `@hero.md` → `@hero.json` → `@hero_1.png`. The document name is the origin; everything downstream derives from it.
 
-## Command
+## Commands
+
+### Visual Review (Web UI)
 ```bash
 opsv review                              # Global mode: all circles, docs as source of truth
 opsv review --port 3100 --ttl 300        # Custom port and idle timeout
@@ -21,6 +23,18 @@ opsv review --latest                     # Global mode: only latest circle
 opsv review --circle                     # Manifest-driven: auto-discover latest manifest
 opsv review --circle videospec_circle1   # Manifest-driven: explicit circle directory
 opsv review --circle opsv-queue/videospec_circle1/_manifest.json  # Explicit manifest path
+```
+
+### CLI Batch Approve (Agent-driven, no Web UI)
+```bash
+opsv approved                              # Approve all assets in latest circle
+opsv approved --file @hero                 # Single asset
+opsv approved --file @hero,@temple          # Multiple assets (comma-separated)
+opsv approved --category comic_character    # Filter by category
+opsv approved --circle videospec_circle1    # Specify circle
+opsv approved --action design_feedback     # Other review actions
+opsv approved --dry-run                     # Preview without writing
+opsv approved --note "导演确认"             # Attach note
 ```
 
 ## API Endpoints

@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.10.0 (统一 @ 语法 + refs 分组 + PromptCompiler + category 校验)
+> 当前版本：v0.10.3 (统一 @ 语法 + refs 分组 + PromptCompiler + category 校验 + CLI 批量 approve)
 
 ## 命令总览
 
@@ -19,6 +19,7 @@
 | `opsv run <paths...>` | 按路径引用执行渲染任务 | 执行 |
 | `opsv iterate <path>` | 克隆任务 JSON 或模型队列目录用于迭代 | 迭代 |
 | `opsv review` | 启动 Web Review UI 页面服务 | 审阅 |
+| `opsv approved` | CLI 批量审批（Agent 直接执行，无需 Web UI） | 审阅 |
 | `opsv script` | 从 shot_*.md 聚合生成 Script.md | 展示 |
 
 ---
@@ -365,6 +366,34 @@ opsv animate --model volcengine.seedance-2.0
 **CLI 非冲突原则**：Review approve 绝不修改 `prompt` 等内容字段，仅追加 review 记录 + 设置状态。
 `syncing` 资产需 Agent 检查 review 记录中的 `modified_task`，对齐文档描述字段后改为 `approved`。
 Review 后刷新 circle：`opsv circle refresh`；有变化 → 继续当前 Circle；全部 approve → 可晋升下一环。
+
+---
+
+### opsv approved
+Agent 驱动的 CLI 批量审批——遵循与 `opsv review` Web UI 相同的 `ApproveService` 执行规则，但无需启动 Web 服务器。Agent 可直接通过命令行执行 approve 动作。
+
+**参数**:
+- `--circle [name]`：目标 Circle（不指定则自动发现最新 Circle）
+- `--file <ids>`：逗号分隔的 assetId 列表（如 `@hero,@temple`）
+- `--category <name>`：按 frontmatter category 筛选
+- `--action <action>`：审批动作：`approve`(默认) / `design_feedback` / `revise_prompt`
+- `--dry-run`：预览模式，不实际写入
+- `--note <text>`：审批备注，写入 review 记录
+
+**用法示例**:
+```bash
+opsv approved                              # 审批最新 Circle 全部资产
+opsv approved --file @hero                 # 审批单个资产
+opsv approved --file @hero,@temple         # 批量审批
+opsv approved --category comic_character   # 按 category 审批
+opsv approved --circle videospec_circle1   # 指定 Circle
+opsv approved --dry-run                    # 预览
+opsv approved --action design_feedback --file @temple --note "光影偏暗"
+```
+
+**执行流程**: 每个匹配资产 → 递归扫描 Circle 目录下产出文件（`assetId_`/`assetId.` 前缀）→ 调用 `ApproveService.execute()` → 写入 review 记录、更新 frontmatter status、写入 Approved References、更新 `_manifest.json` → 输出摘要报告。
+
+**自动区分**：`id_1.png` → `approved`；`id_m1_1.png` → `syncing`（Agent 需执行对齐）。
 
 ---
 

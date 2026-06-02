@@ -249,6 +249,13 @@ opsv iterate <dir>/                    # 克隆整个 provider 目录
 opsv review                            # 启动审查 Web UI
 opsv review --circle                   # Manifest 模式
 opsv review --latest                   # 仅最新 Circle
+
+opsv approved                          # CLI 批量审批（Agent 直接执行）
+opsv approved --file @hero             # 审批单个资产
+opsv approved --file @hero,@temple     # 批量审批
+opsv approved --category <cat>         # 按 category 审批
+opsv approved --circle <name>          # 指定 Circle
+opsv approved --dry-run                # 预览模式
 ```
 
 ### 管理命令
