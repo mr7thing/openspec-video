@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework: structured narrative specs → production-ready media via multi-provider pipeline.",
   "main": "dist/index.js",
   "bin": {
@@ -12,7 +12,7 @@
   },
   "homepage": "https://github.com/mr7thing/openspec-video#readme",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-clis.cjs",
     "prepublishOnly": "npm run build",
     "start": "ts-node src/index.ts",
     "test": "jest --passWithNoTests",
@@ -20,6 +20,7 @@
   },
   "files": [
     "dist",
+    "dist/clis",
     "templates",
     "README.md",
     "LICENSE"
@@ -36,6 +37,7 @@
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@jackwener/opencli": "^1.8.3",
     "axios": "^1.13.6",
     "chalk": "^4.1.2",
     "commander": "^13.1.0",

@@ -1,3 +1,6 @@
 [submodule "extension"]
 	path = extension
 	url = https://github.com/mr7thing/opsv-chrome-extgension.git
+[submodule "vendor/opencli"]
+	path = vendor/opencli
+	url = https://github.com/jackwener/opencli.git
