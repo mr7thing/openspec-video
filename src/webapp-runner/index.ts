@@ -8,7 +8,7 @@
  * result saving), and manages the complete batch lifecycle.
  *
  * Can be used:
- *   - Programmatically (import and call executeTask / executeBatch)
+ *   - Programmatically (import and call executeTask / executeBatch) — both are async
  *   - Via CLI (opsv webapp-exec)
  */
 
@@ -44,7 +44,7 @@ export interface TaskResult {
 /**
  * Execute one task end-to-end: dispatch → post-process → save.
  */
-export function executeTask(taskPath: string, queueDir?: string, watermark = true): TaskResult {
+export async function executeTask(taskPath: string, queueDir?: string, watermark = true): Promise<TaskResult> {
   const taskInfo = parseTask(taskPath);
   const actualQueueDir = queueDir || path.dirname(taskPath);
 
@@ -59,23 +59,10 @@ export function executeTask(taskPath: string, queueDir?: string, watermark = tru
 
   log(`Processing: ${taskInfo.shotId} (site=${taskInfo.site})`);
 
-  // Step 1: Dispatch to site runner
-  // Note: dispatch is async, but we need it sync here since TaskBuilder runs sync
-  // We'll use an inline approach for the CLI context
   try {
-    // For the CLI, we require() the runner synchronously
-    const { resolveRunner } = require('./core/dispatcher');
-    const runnerPath = resolveRunner(taskInfo.modelKey);
-    if (!runnerPath) {
-      result.error = `No runner for model_key '${taskInfo.modelKey}'`;
-      writeErrorLog(actualQueueDir, taskInfo.shotId, result);
-      return result;
-    }
-
-    // Resolve runner path relative to the dispatcher's location
-    const resolvedPath = require.resolve('./core/' + runnerPath);
-    const runnerMod = require(resolvedPath);
-    const runnerResult: RunnerResult = runnerMod.run(taskInfo);
+    // Dispatch via dynamic import (supports async runners)
+    const { dispatch } = await import('./core/dispatcher');
+    const runnerResult: RunnerResult = await dispatch(taskInfo);
 
     if (runnerResult.status !== 'success' || !runnerResult.images?.length) {
       result.error = runnerResult.error || 'Runner returned no images';
@@ -120,7 +107,7 @@ export interface BatchSummary {
 /**
  * Execute all pending tasks in a queue directory.
  */
-export function executeBatch(queueDir: string, watermark = true, retry = false): BatchSummary {
+export async function executeBatch(queueDir: string, watermark = true, retry = false): Promise<BatchSummary> {
   const pendingTasks = findPendingTasks(queueDir, retry);
 
   if (pendingTasks.length === 0) {
@@ -134,7 +121,7 @@ export function executeBatch(queueDir: string, watermark = true, retry = false):
 
   for (const taskJson of pendingTasks) {
     try {
-      const result = executeTask(taskJson, queueDir, watermark);
+      const result = await executeTask(taskJson, queueDir, watermark);
       summary.results.push(result);
       if (result.status === 'completed') {
         summary.success++;

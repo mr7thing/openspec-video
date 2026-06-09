@@ -1,696 +1,721 @@
 /**
- * gemini-daemon.ts
+ * gemini-daemon.ts — ⛔ DEPRECATED
  *
- * Gemini browser engine using OpenCLI daemon (port 19825).
- * No Puppeteer, no separate Chrome launch.
- * Communicates with the user's existing Chrome via:
- *   - POST /command → OpenCLI daemon → Chrome extension → chrome.debugger API
+ * This file is superseded by the standalone extension approach:
  *
- * Benefits:
- *   - Uses user's already-logged-in Chrome (no login step needed)
- *   - No cookie copying or profile management
- *   - All existing tabs preserved
+ *   extension/background.js + native-host.py  ← OpenCLI control via Native Messaging
+ *   extension/content.js                       ← Gemini automation (runs in user's Chrome)
+ *
+ * No Puppeteer daemon needed. Install the extension in your existing Chrome
+ * via chrome://extensions → Load unpacked.
+ *
+ * For control: `opsv-gemini generate --prompt "..."` (sends via Unix socket)
+ *
+ * ── Old Architecture (preserved for reference) ────────────────────────────
+ *
+ * OPSV Gemini Browser Engine — Puppeteer + Extension
+ *
+ * Launches a Puppeteer browser (new window per queue) with the companion
+ * extension loaded. A WebSocket server (port 3061-3070) allows the extension
+ * to connect for observation/recording.
+ *
+ * Architecture:
+ *   - Puppeteer handles: navigate, click, type, wait, screenshot
+ *   - Extension's content script handles: file upload (hidden input → paste)
+ *   - WS server: status updates for extension sidepanel / OpenCLI
+ *
+ * Queue Model: One batch → One browser window → One Gemini conversation
+ *   All tasks in a queue are processed sequentially in the same chat session.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { WebSocketServer, WebSocket } from 'ws';
+import puppeteer, { Browser, Page, CDPSession } from 'puppeteer';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const DAEMON_PORT = parseInt(process.env.OPENCLI_DAEMON_PORT ?? '19825', 10);
-const DAEMON_URL = `http://127.0.0.1:${DAEMON_PORT}`;
+const WS_PORT_RANGE = { start: 3061, end: 3070 };
+const WS_CONNECTION_TIMEOUT_MS = 30000;
 const GEMINI_APP_URL = 'https://gemini.google.com/app';
+const COMPOSER_SELECTORS = [
+  'rich-textarea [contenteditable="true"]',
+  'div[contenteditable="true"][role="textbox"]',
+  '#c-input',
+  'div[role="textbox"]',
+  '.ql-editor[contenteditable="true"]',
+];
+const SEND_BUTTON_SELECTORS = [
+  '.send-button',
+  'button[aria-label="Send message"]',
+  'button[aria-label="Send"]',
+  'button[aria-label="发送消息"]',
+  'button[aria-label="发送"]',
+];
+const REF_INPUT_SELECTOR = '#opsv-ref-file';
+const UPLOAD_POLL_INTERVAL_MS = 500;
+const UPLOAD_MAX_POLLS = 20;
 
-// Default session name for Gemini operations
-const GEMINI_SESSION = 'opsv-gemini';
+// ── State ──────────────────────────────────────────────────────────────────
 
-// ── Types ──────────────────────────────────────────────────────────────────
+let wss: WebSocketServer | null = null;
+let wsClients: Set<WebSocket> = new Set();
+let wsPort = 0;
+let browser: Browser | null = null;
+let page: Page | null = null;
 
-interface ExportedImage {
-  url: string;
-  dataUrl: string;
-  mimeType: string;
-  width: number;
-  height: number;
+// ── Logging ────────────────────────────────────────────────────────────────
+
+function log(msg: string, level = 'INFO'): void {
+  const ts = new Date().toISOString().slice(11, 23);
+  console.log(`[${ts}] [gemini-daemon] ${msg}`);
 }
 
-// ── Daemon HTTP Client ─────────────────────────────────────────────────────
+// ── WebSocket Server ───────────────────────────────────────────────────────
 
-let _cmdCounter = 0;
+/**
+ * Start a WS server on the first available port in 3061-3070.
+ * Returns the port number.
+ */
+async function startWsServer(): Promise<number> {
+  for (let port = WS_PORT_RANGE.start; port <= WS_PORT_RANGE.end; port++) {
+    try {
+      const server = await new Promise<WebSocketServer>((resolve, reject) => {
+        const s = new WebSocketServer({ port, host: '127.0.0.1' });
+        s.on('listening', () => {
+          resolve(s);
+        });
+        s.on('error', (err: any) => {
+          reject(err);
+        });
+        // Safety timeout: if neither fires in 3s, reject
+        setTimeout(() => reject(new Error('timeout')), 3000);
+      });
 
-async function sendCommand(
-  action: string,
-  params: Record<string, any> = {},
-): Promise<any> {
-  const id = `opsv_${process.pid}_${Date.now()}_${++_cmdCounter}`;
-  const body: Record<string, any> = { id, action, ...params };
+      // Successfully bound this port
+      wss = server;
+      wsPort = port;
+      log(`WS server listening on 127.0.0.1:${port}`);
 
-  const res = await fetch(`${DAEMON_URL}/command`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-OpenCLI': '1' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60000),
+      server.on('connection', (ws) => {
+        wsClients.add(ws);
+        log(`WS client connected (${wsClients.size} total)`);
+
+        ws.on('message', (data) => {
+          try {
+            const msg = JSON.parse(data.toString());
+            if (msg.type === 'hello') {
+              log('Extension connected:', msg.name || 'unknown');
+            }
+          } catch { /* ignore malformed */ }
+        });
+
+        ws.on('close', () => {
+          wsClients.delete(ws);
+          log(`WS client disconnected (${wsClients.size} remaining)`);
+        });
+
+        ws.on('error', (err) => {
+          log(`WS client error: ${err.message}`, 'ERROR');
+          wsClients.delete(ws);
+        });
+      });
+
+      return port;
+    } catch (err: any) {
+      if (err.code === 'EADDRINUSE') {
+        log(`Port ${port} in use, trying next`, 'WARN');
+        continue;
+      }
+      // For other errors, keep trying
+      log(`Port ${port}: ${err.message}`, 'WARN');
+      continue;
+    }
+  }
+  throw new Error('All ports 3061-3070 are in use');
+}
+
+/**
+ * Broadcast a status message to all connected WS clients.
+ */
+function broadcastStatus(status: string, data: Record<string, any> = {}): void {
+  const msg = JSON.stringify({ type: 'status', status, ...data, ts: Date.now() });
+  for (const ws of wsClients) {
+    try { ws.send(msg); } catch { /* ignore */ }
+  }
+}
+
+/**
+ * Stop the WS server.
+ */
+function stopWsServer(): void {
+  for (const ws of wsClients) {
+    try { ws.close(); } catch { /* ignore */ }
+  }
+  wsClients.clear();
+  if (wss) {
+    wss.close(() => log('WS server stopped'));
+    wss = null;
+  }
+}
+
+// ── Browser Launch ─────────────────────────────────────────────────────────
+
+/**
+ * Resolve the extension directory path relative to the project root.
+ */
+function resolveExtensionDir(): string {
+  // Start from this file's location and walk up to find extension/
+  const searchPaths = [
+    path.join(__dirname, '..', '..', '..', 'extension'),
+    path.join(__dirname, '..', '..', '..', '..', 'extension'),
+    path.join(__dirname, '..', 'extension'),
+    path.join(process.cwd(), 'extension'),
+  ];
+  for (const p of searchPaths) {
+    const manifest = path.join(p, 'manifest.json');
+    if (fs.existsSync(manifest)) return p;
+  }
+  throw new Error('Cannot find extension/ directory (looked for manifest.json)');
+}
+
+/**
+ * Launch a Puppeteer browser with the OPSV companion extension loaded.
+ */
+async function launchBrowser(): Promise<{ browser: Browser; page: Page }> {
+  const extDir = resolveExtensionDir();
+  log(`Loading extension from: ${extDir}`);
+
+  const profileDir = path.join(os.homedir(), '.opsv', 'gemini-profile');
+  fs.mkdirSync(profileDir, { recursive: true });
+
+  // Use Puppeteer's bundled Chromium (avoids conflict with running system Chrome)
+  const b = await puppeteer.launch({
+    headless: false,
+    executablePath: await puppeteer.executablePath(),
+    userDataDir: profileDir,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      `--disable-extensions-except=${extDir}`,
+      `--load-extension=${extDir}`,
+      '--window-size=1280,900',
+      '--disable-features=TranslateUI',
+      '--disable-sync',
+      '--proxy-server=127.0.0.1:7890',
+    ],
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => 'unknown');
-    throw new Error(`Daemon request failed (${res.status}): ${text.slice(0, 200)}`);
-  }
+  const [p] = await b.pages();
+  await p.setViewport({ width: 1280, height: 900 });
 
-  const result = await res.json();
-  if (!result.ok) {
-    throw new Error(result.error ?? 'Daemon command failed');
-  }
-  return result.data;
+  browser = b;
+  page = p;
+
+  log('Browser launched with extension loaded');
+  broadcastStatus('browser_ready');
+
+  return { browser: b, page: p };
 }
+
+// ── Page Interaction ───────────────────────────────────────────────────────
 
 /**
- * Execute JavaScript in the Gemini page (via daemon's exec action).
+ * Navigate to Gemini and wait for the page to be ready.
  */
-async function execJS(code: string): Promise<any> {
-  return sendCommand('exec', { session: GEMINI_SESSION, code });
-}
+async function navigateToGemini(p: Page): Promise<void> {
+  log('Navigating to Gemini...');
+  broadcastStatus('navigating', { url: GEMINI_APP_URL });
 
-/**
- * Navigate Gemini tab to a URL.
- */
-async function navigateTo(url: string): Promise<any> {
-  return sendCommand('navigate', { session: GEMINI_SESSION, url });
-}
+  // Navigate — use domcontentloaded to avoid hanging on slow resources
+  await p.goto(GEMINI_APP_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-/**
- * Take a screenshot of the Gemini tab (for debugging).
- */
-async function screenshot(): Promise<string> {
-  return sendCommand('screenshot', { session: GEMINI_SESSION, format: 'png' });
-}
+  // Take a diagnostic screenshot
+  const debugDir = path.join(os.tmpdir(), 'opsv-daemon-debug');
+  fs.mkdirSync(debugDir, { recursive: true });
+  await p.screenshot({ path: path.join(debugDir, 'after-navigate.png') });
+  log(`Screenshot saved to ${debugDir}/after-navigate.png`);
 
-// ── Ensure Gemini Page is Ready ───────────────────────────────────────────
+  const pageTitle = await p.title();
+  log(`Page title: "${pageTitle}"`);
 
-export async function ensureGeminiPage(): Promise<void> {
-  log('Ensuring Gemini page is ready...');
+  const pageUrl = p.url();
+  log(`Current URL: ${pageUrl}`);
 
-  // Navigate to Gemini app URL
-  try {
-    await navigateTo(GEMINI_APP_URL);
-  } catch (e: any) {
-    log(`Navigation warning: ${e.message}`, 'WARN');
-  }
+  // Check if we're on a login page (handles both redirect and in-page login overlay)
+  const bodyText = await p.evaluate(() => document.body.innerText || '');
+  const isLoginPage = pageUrl.includes('accounts.google.com') || pageUrl.includes('signin') ||
+    /登录|sign.?in|log.?in|accept.*terms|同意.*条款/i.test(bodyText.substring(0, 500));
 
-  // Wait for Gemini to be ready (check for contenteditable composer)
-  const maxWait = 30; // seconds
-  for (let i = 0; i < maxWait; i++) {
-    const url = await execJS('window.location.href').catch(() => '');
-    if (typeof url === 'string' && (url.includes('accounts.google.com') || url.includes('ServiceLogin'))) {
-      throw new Error(
-        'Gemini login page detected. Please make sure Chrome is logged into Google.\n' +
-        'Run: opencli browser status — to verify daemon health.',
-      );
-    }
+  if (isLoginPage) {
+    log('Login page detected. Please log in to your Google account in the browser window.', 'WARN');
+    log('Waiting up to 180s for login to complete...', 'WARN');
+    broadcastStatus('login_required');
 
-    const hasComposer = await execJS(`
-      (() => {
-        const isVisible = (el) => {
-          if (!(el instanceof HTMLElement)) return false;
-          const s = window.getComputedStyle(el);
-          if (s.display === 'none' || s.visibility === 'hidden') return false;
-          const r = el.getBoundingClientRect();
-          return r.width > 0 && r.height > 0;
-        };
-        const selectors = [
-          '.ql-editor[contenteditable="true"]',
-          '[contenteditable="true"][aria-label*="Gemini"]',
-          '[aria-label="Enter a prompt for Gemini"]',
-          '[aria-label*="prompt for Gemini"]',
-          '[aria-label*="输入提示"]',
-          '[aria-label*="prompt"]',
-        ];
-        return selectors.some(sel => {
-          const el = document.querySelector(sel);
-          return el && isVisible(el);
-        });
-      })()
-    `).catch(() => false);
-
-    if (hasComposer) {
-      log('Gemini page is ready.');
-      return;
-    }
-
-    await sleep(1000);
-  }
-
-  log('WARNING: Proceeding without confirmed Gemini page ready', 'WARN');
-}
-
-// ── Enable Image Generation Mode ──────────────────────────────────────────
-
-export async function enableImageMode(): Promise<void> {
-  log('Enabling image generation mode (制作图片)...');
-
-  // Click "上传和工具" button to open the menu
-  const menuOpened = await execJS(`
-    document.querySelector('button[aria-label="上传和工具"]')?.click();
-    "ok";
-  `);
-  await sleep(1500);
-
-  // Click "制作图片" checkbox (menuitemcheckbox) if not already checked
-  const result = await execJS(`
-    (() => {
-      const imgMode = document.querySelector('[role="menuitemcheckbox"][aria-checked="false"]');
-      if (imgMode && (imgMode.textContent || '').includes('制作图片')) {
-        imgMode.click();
-        return 'toggled-on';
+    if (pageUrl.includes('accounts.google.com')) {
+      // Full-page login: wait for navigation away
+      try {
+        await p.waitForNavigation({ timeout: 180000 });
+        log('Login detected, continuing...');
+      } catch {
+        throw new Error('Login timeout — please log in manually and re-run');
       }
-      const checkedMode = document.querySelector('[role="menuitemcheckbox"][aria-checked="true"]');
-      if (checkedMode && (checkedMode.textContent || '').includes('制作图片')) {
-        return 'already-on';
-      }
-      return 'not-found';
-    })()
-  `);
-  log(`Image mode: ${result}`);
-
-  // Close menu by clicking outside
-  await sleep(500);
-}
-
-// ── Start a New Chat ──────────────────────────────────────────────────────
-
-export async function startNewChat(): Promise<void> {
-  const action = await execJS(`
-    (() => {
-      const buttons = document.querySelectorAll('button');
-      for (const btn of buttons) {
-        const txt = (btn.textContent || '').trim().toLowerCase();
-        if (txt.includes('new chat') || txt.includes('新对话')) {
-          btn.click();
-          return 'click';
+    } else {
+      // In-page login dialog: wait for the overlay to disappear (check body text changes)
+      log('Waiting for in-page login to complete (polling)...');
+      let loggedIn = false;
+      for (let i = 0; i < 180; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const currentText = await p.evaluate(() => document.body.innerText || '');
+        if (!/登录|sign.?in|log.?in|accept.*terms|同意.*条款/i.test(currentText.substring(0, 500))) {
+          loggedIn = true;
+          break;
         }
       }
-      return 'navigate';
-    })()
-  `);
+      if (!loggedIn) {
+        throw new Error('Login timeout — please log in manually and re-run');
+      }
+      log('In-page login detected as complete');
+    }
 
-  if (action === 'navigate') {
-    await navigateTo(GEMINI_APP_URL);
-    await sleep(1500);
-  } else {
-    await sleep(1000);
+    // After login, give a moment for the page to settle
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  await waitForComposer(p);
+  log('Gemini page ready');
+  broadcastStatus('gemini_ready');
+}
+
+/**
+ * Wait for the chat composer (input area) to appear and be interactive.
+ */
+async function waitForComposer(p: Page): Promise<void> {
+  for (const sel of COMPOSER_SELECTORS) {
+    try {
+      await p.waitForSelector(sel, { timeout: 30000 });
+      return;
+    } catch { /* try next selector */ }
+  }
+  // If nth selector failed too, try one more with the full page
+  try {
+    await p.waitForFunction(() => {
+      const selectors = arguments as unknown as string[];
+      return selectors.some(s => document.querySelector(s));
+    }, { timeout: 10000 }, ...COMPOSER_SELECTORS);
+  } catch {
+    log('Composer not found after all attempts', 'WARN');
   }
 }
 
-// ── Upload Reference Image ────────────────────────────────────────────────
-//
-// Uses the companion extension's hidden #opsv-ref-file input + OpenCLI daemon's
-// set-file-input action. The daemon uses CDP DOM.setFileInputFiles to set the
-// file on the input, triggering a change event that the content script handles
-// by reading the file and injecting it into Gemini via ClipboardEvent paste.
+/**
+ * Find the chat input element and type text into it.
+ */
+async function typePrompt(p: Page, text: string): Promise<void> {
+  let input = null;
+  for (const sel of COMPOSER_SELECTORS) {
+    try { input = await p.$(sel); if (input) break; } catch { /* continue */ }
+  }
+  if (!input) throw new Error('Cannot find chat input');
 
-export async function uploadReferenceImage(absPath: string): Promise<boolean> {
+  await input.click();
+  await new Promise(r => setTimeout(r, 300));
+
+  // Clear any existing content
+  await p.evaluate((sel: string) => {
+    const el = document.querySelector(sel);
+    if (el) {
+      el.textContent = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, COMPOSER_SELECTORS[0]);
+
+  // Type the prompt with human-like delays
+  for (const char of text) {
+    await p.keyboard.type(char, { delay: 10 + Math.random() * 20 });
+  }
+
+  log(`Prompt typed (${text.length} chars)`);
+}
+
+/**
+ * Click the send button to submit the prompt.
+ */
+async function clickSend(p: Page): Promise<void> {
+  for (let t = 0; t < 30; t++) {
+    for (const sel of SEND_BUTTON_SELECTORS) {
+      try {
+        const btn = await p.$(sel);
+        if (btn) {
+          const disabled = await p.evaluate((el: Element) =>
+            (el as HTMLButtonElement).disabled, btn);
+          if (!disabled) {
+            await new Promise(r => setTimeout(r, 500 + Math.random() * 500));
+            await btn.click();
+            log('Send button clicked');
+            return;
+          }
+        }
+      } catch { /* continue */ }
+    }
+    await new Promise(r => setTimeout(r, 200));
+  }
+  throw new Error('Send button not found or disabled');
+}
+
+/**
+ * Wait for images to appear after sending a prompt.
+ * Returns the number of new images found.
+ */
+async function waitForImages(p: Page, timeoutMs = 120000): Promise<string[]> {
+  log('Waiting for generated images...');
+  broadcastStatus('generating');
+
+  const initialSrcs = new Set<string>();
+  const existingImgs = await p.$$('img');
+  for (const img of existingImgs) {
+    const src = await p.evaluate(el => el.getAttribute('src') || '', img);
+    if (src) initialSrcs.add(src);
+  }
+
+  const startTime = Date.now();
+  const newUrls: string[] = [];
+
+  while (Date.now() - startTime < timeoutMs) {
+    const imgs = await p.$$('img');
+    for (const img of imgs) {
+      const src = await p.evaluate(el => el.getAttribute('src') || '', img);
+      if (src && src.startsWith('http') && !initialSrcs.has(src) && !newUrls.includes(src)) {
+        const complete = await p.evaluate(el => (el as HTMLImageElement).complete, img);
+        const nw = await p.evaluate(el => (el as HTMLImageElement).naturalWidth, img);
+
+        if (complete && nw > 200) {
+          newUrls.push(src);
+          log(`Found new image: ${src.slice(0, 60)} (${nw}px)`);
+        }
+      }
+    }
+
+    if (newUrls.length > 0) {
+      // Give a moment for more images to appear
+      await new Promise(r => setTimeout(r, 2000));
+      // Check again
+      const imgs2 = await p.$$('img');
+      for (const img of imgs2) {
+        const src = await p.evaluate(el => el.getAttribute('src') || '', img);
+        if (src && src.startsWith('http') && !initialSrcs.has(src) && !newUrls.includes(src)) {
+          const complete = await p.evaluate(el => (el as HTMLImageElement).complete, img);
+          const nw = await p.evaluate(el => (el as HTMLImageElement).naturalWidth, img);
+          if (complete && nw > 200) newUrls.push(src);
+        }
+      }
+      break;
+    }
+
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  log(`Found ${newUrls.length} generated images`);
+  return newUrls;
+}
+
+/**
+ * Download an image from a URL using CDP's Page.navigate to get data URL,
+ * or extract via CDP fetch.
+ */
+async function downloadImage(p: Page, imageUrl: string, outputPath: string): Promise<void> {
+  log(`Downloading image to ${outputPath}`);
+
+  // Try using CDP fetch to get the image
+  const cdpSession = await p.createCDPSession();
+  try {
+    const { result } = await cdpSession.send('Runtime.evaluate', {
+      expression: `fetch("${imageUrl.replace(/"/g, '\\"')}", { credentials: 'include' })
+        .then(r => r.blob())
+        .then(b => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(b);
+        }))`,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+
+    const dataUrl = result?.value;
+    if (dataUrl && typeof dataUrl === 'string') {
+      const base64 = dataUrl.split(',')[1];
+      fs.writeFileSync(outputPath, Buffer.from(base64, 'base64'));
+      log(`Image saved: ${outputPath} (${fs.statSync(outputPath).size} bytes)`);
+      return;
+    }
+  } catch (e: any) {
+    log(`CDP fetch failed: ${e.message}`, 'WARN');
+  } finally {
+    await cdpSession.detach();
+  }
+
+  // Fallback: use page.goto to view image, then screenshot or read data
+  const newPage = await browser!.newPage();
+  try {
+    await newPage.goto(imageUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    const dataUrl = await newPage.evaluate(() => {
+      const img = document.querySelector('img');
+      if (!img) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL('image/png');
+    });
+    if (dataUrl) {
+      const base64 = dataUrl.split(',')[1];
+      fs.writeFileSync(outputPath, Buffer.from(base64, 'base64'));
+      log(`Image saved (fallback): ${outputPath}`);
+    }
+  } finally {
+    await newPage.close();
+  }
+}
+
+// ── File Upload via Content Script ─────────────────────────────────────────
+
+/**
+ * Upload a reference image to Gemini using the content script's hidden input.
+ *
+ * Flow:
+ *   1. Reset the upload signal via page.evaluate
+ *   2. Use CDP DOM.setFileInputFiles to set the file on #opsv-ref-file
+ *   3. Content script's change handler fires → pastes file into Gemini
+ *   4. Poll dataset.uploadComplete on the hidden input to confirm
+ *   5. Fallback: try direct clipboard injection
+ */
+async function uploadReferenceImage(p: Page, filePath: string): Promise<boolean> {
+  const absPath = path.resolve(filePath);
   if (!fs.existsSync(absPath)) {
-    log(`File not found: ${absPath}`, 'WARN');
+    log(`Reference file not found: ${absPath}`, 'ERROR');
     return false;
   }
 
-  const fileName = path.basename(absPath);
-  const fileSize = fs.statSync(absPath).size;
-  log(`Uploading reference image via CDP set-file-input: ${fileName} (${fileSize} bytes)`);
+  log(`Uploading reference image: ${absPath}`);
+  broadcastStatus('uploading', { file: path.basename(absPath) });
 
-  // Step 1: Reset upload signal on the hidden input (set by content script)
+  // 1. Reset upload signal
+  await p.evaluate((sel: string) => {
+    const el = document.querySelector(sel);
+    if (el) {
+      (el as HTMLElement).dataset.uploadComplete = '';
+      (el as HTMLElement).dataset.uploadError = '';
+    }
+  }, REF_INPUT_SELECTOR);
+
+  // 2. Set file on the hidden input via CDP
+  const cdpSession = await p.createCDPSession();
   try {
-    await sendCommand('exec', {
-      session: GEMINI_SESSION,
-      code: `(() => {
-        const el = document.querySelector('#opsv-ref-file');
-        if (el) { el.dataset.uploadComplete = ''; el.dataset.uploadError = ''; return 'reset'; }
-        return 'no-input';
-      })()`,
+    // Get document
+    const { root } = await cdpSession.send('DOM.getDocument', { depth: -1, pierce: true });
+
+    // Find the hidden input
+    const { nodeId } = await cdpSession.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: REF_INPUT_SELECTOR,
     });
-  } catch (e: any) {
-    log(`Signal reset exec failed (non-fatal): ${e.message}`, 'WARN');
-  }
 
-  // Step 2: Set file on the hidden input via CDP DOM.setFileInputFiles
-  // The OpenCLI extension handles this via the 'set-file-input' action
-  try {
-    await sendCommand('set-file-input', {
-      session: GEMINI_SESSION,
-      files: [absPath],
-      selector: '#opsv-ref-file',
-    });
-  } catch (e: any) {
-    log(`set-file-input failed: ${e.message}`, 'WARN');
-
-    // Fallback: try CDP Page.setInterceptFileChooserDialog approach
-    log('Trying CDP file chooser interception fallback...');
-    try {
-      // Enable file chooser interception
-      await sendCommand('cdp', {
-        session: GEMINI_SESSION,
-        cdpMethod: 'Page.setInterceptFileChooserDialog',
-        cdpParams: { enabled: true },
+    if (!nodeId || nodeId === 0) {
+      log('Hidden file input not found (may not be injected yet)', 'WARN');
+      // Inject it manually
+      await p.evaluate(() => {
+        if (!document.getElementById('opsv-ref-file')) {
+          const input = document.createElement('input');
+          input.id = 'opsv-ref-file';
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;';
+          document.body.appendChild(input);
+        }
       });
-
-      // Click the hidden input to trigger file chooser
-      await sendCommand('exec', {
-        session: GEMINI_SESSION,
-        code: `document.querySelector('#opsv-ref-file')?.click()`,
+      // Retry query
+      const { root: r2 } = await cdpSession.send('DOM.getDocument', { depth: -1, pierce: true });
+      const { nodeId: nid2 } = await cdpSession.send('DOM.querySelector', {
+        nodeId: r2.nodeId,
+        selector: REF_INPUT_SELECTOR,
       });
-
-      // Wait for CDP to intercept and set the file
-      await sleep(2000);
-
-      // Disable interception
-      await sendCommand('cdp', {
-        session: GEMINI_SESSION,
-        cdpMethod: 'Page.setInterceptFileChooserDialog',
-        cdpParams: { enabled: false },
-      });
-    } catch (fbErr: any) {
-      log(`File chooser interception fallback also failed: ${fbErr.message}`, 'WARN');
-
-      // Last resort: try direct DOM.setFileInputFiles via CDP command
-      try {
-        await sendCommand('cdp', {
-          session: GEMINI_SESSION,
-          cdpMethod: 'DOM.setFileInputFiles',
-          cdpParams: {
-            backendNodeId: 0, // Will be resolved by content script
-            files: [absPath],
-          },
-        });
-      } catch (lastErr: any) {
-        log(`All upload methods failed: ${lastErr.message}`, 'ERROR');
+      if (!nid2 || nid2 === 0) {
+        log('Cannot find or create hidden file input', 'ERROR');
         return false;
       }
-    }
-  }
-
-  // Step 3: Wait for content script to complete the paste
-  // Content script sets opsv-ref-file.dataset.uploadComplete after paste
-  const POLL_INTERVAL = 500;
-  const MAX_POLLS = 20; // 10 seconds total
-  for (let i = 0; i < MAX_POLLS; i++) {
-    await sleep(POLL_INTERVAL);
-    try {
-      const result = await sendCommand('exec', {
-        session: GEMINI_SESSION,
-        code: `(() => {
-          const el = document.querySelector('#opsv-ref-file');
-          if (!el) return '{"complete":false,"error":"input_not_found"}';
-          return JSON.stringify({complete: el.dataset.uploadComplete === 'true', error: el.dataset.uploadError || ''});
-        })()`,
+      // Set file using updated nodeId
+      await cdpSession.send('DOM.setFileInputFiles', {
+        nodeId: nid2,
+        files: [absPath],
       });
-      const status = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
-      if (status?.complete) {
-        log(`Reference image uploaded and pasted into Gemini successfully.`);
-        return true;
-      }
-      if (status?.error) {
-        log(`Upload error detected: ${status.error}`, 'WARN');
-        return false;
-      }
-    } catch (e: any) {
-      // Poll failures are expected while the paste is in progress
-      if (i % 5 === 0) log(`Poll ${i + 1}/${MAX_POLLS}: still waiting...`);
+    } else {
+      // Set file on found input
+      await cdpSession.send('DOM.setFileInputFiles', {
+        nodeId,
+        files: [absPath],
+      });
     }
+  } finally {
+    await cdpSession.detach();
   }
 
-  // Step 4: Timeout — paste may still have worked, check for blob preview
-  log('Upload poll timeout — checking for preview as final verification...', 'WARN');
-  try {
-    const previewCheck = await execJS(`
-      (() => {
-        const blobImgs = Array.from(document.querySelectorAll('img'))
-          .filter(img => (img.src || '').startsWith('blob:') && img.width > 32);
-        return blobImgs.length > 0 ? 'verified' : 'no-preview';
-      })()
-    `);
-    if (String(previewCheck).startsWith('verified')) {
-      log('Blob preview found despite poll timeout — upload succeeded.');
+  log('File set on input, waiting for content script to paste...');
+
+  // 3. Poll for upload complete signal
+  for (let i = 0; i < UPLOAD_MAX_POLLS; i++) {
+    const status = await p.evaluate((sel: string) => {
+      const el = document.querySelector(sel);
+      return el ? (el as HTMLElement).dataset.uploadComplete || '' : '';
+    }, REF_INPUT_SELECTOR);
+
+    if (status === 'true') {
+      log('Upload complete (confirmed via DOM signal)');
+      broadcastStatus('upload_complete');
       return true;
     }
-  } catch {}
 
-  log('Upload may have failed — no completion signal received', 'WARN');
+    await new Promise(r => setTimeout(r, UPLOAD_POLL_INTERVAL_MS));
+  }
+
+  log('Upload signal not detected after polling, may still have worked', 'WARN');
+  broadcastStatus('upload_uncertain');
   return false;
 }
 
-// ── Send Prompt ───────────────────────────────────────────────────────────
+// ── Task Processing ────────────────────────────────────────────────────────
 
-async function sendPrompt(text: string): Promise<void> {
-  // Find and prepare composer
-  const prepared = await execJS(`
-    (() => {
-      const isVisible = (el) => {
-        if (!(el instanceof HTMLElement)) return false;
-        const s = window.getComputedStyle(el);
-        if (s.display === 'none' || s.visibility === 'hidden') return false;
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      };
-
-      const selectors = [
-        '.ql-editor[contenteditable="true"]',
-        '.ql-editor[role="textbox"]',
-        '[contenteditable="true"][aria-label*="Gemini"]',
-        '[aria-label="Enter a prompt for Gemini"]',
-        '[aria-label*="prompt for Gemini"]',
-        '[aria-label*="输入提示"]',
-        '[aria-label*="prompt"]',
-        '[contenteditable="true"]',
-      ];
-
-      for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el && isVisible(el)) {
-          el.setAttribute('data-opsv-composer', '1');
-          el.focus();
-          return 'found';
-        }
-      }
-
-      // Deep search with shadow DOM
-      function deepFind(root, depth) {
-        if (depth > 6) return null;
-        const all = root.querySelectorAll('*');
-        for (const el of all) {
-          if (!(el instanceof HTMLElement)) continue;
-          if (el.isContentEditable && isVisible(el)) {
-            el.setAttribute('data-opsv-composer', '1');
-            el.focus();
-            return el;
-          }
-          if (el.shadowRoot) {
-            const found = deepFind(el.shadowRoot, depth + 1);
-            if (found) return found;
-          }
-        }
-        return null;
-      }
-
-      const found = deepFind(document, 0);
-      return found ? 'found-shadow' : 'not-found';
-    })()
-  `);
-
-  if (typeof prepared === 'string' && prepared === 'not-found') {
-    throw new Error('Gemini composer not found');
-  }
-
-  log(`Composer found: ${prepared}`);
-
-  // Insert text
-  const inserted = await execJS(`
-    (() => {
-      const el = document.querySelector('[data-opsv-composer]');
-      if (!el) return false;
-      el.focus();
-
-      // Clear existing content
-      el.textContent = '';
-
-      // Try execCommand
-      const ok = document.execCommand('insertText', false, ${JSON.stringify(text)});
-      if (!ok) {
-        const p = document.createElement('p');
-        const lines = ${JSON.stringify(text)}.split('\\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (i > 0) p.appendChild(document.createElement('br'));
-          p.appendChild(document.createTextNode(lines[i]));
-        }
-        el.replaceChildren(p);
-      }
-
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-
-      // Verify text was inserted
-      const currentText = (el.textContent || el.innerText || '').trim();
-      return currentText.length > 0;
-    })()
-  `);
-
-  if (!inserted) {
-    throw new Error('Failed to insert prompt text into Gemini composer');
-  }
-
-  // Submit via keyboard Enter
-  await execJS(`
-    (() => {
-      const el = document.querySelector('[data-opsv-composer]');
-      if (!el) return false;
-      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-      return true;
-    })()
-  `);
-
-  await sleep(2000);
-  log('Prompt submitted.');
+export interface DaemonTask {
+  shotId: string;
+  prompt: string;
+  aspectRatio?: string;
+  referenceFiles?: string[];
+  outputDir?: string;
+  [key: string]: any;
 }
 
-// ── Wait for Images ───────────────────────────────────────────────────────
-
-async function waitForImages(timeoutSeconds: number): Promise<string[]> {
-  log(`Waiting for generated images (timeout: ${timeoutSeconds}s)...`);
-
-  const pollInterval = 3000;
-  const maxPolls = Math.max(1, Math.ceil((timeoutSeconds * 1000) / pollInterval));
-  let lastUrls: string[] = [];
-  let stableCount = 0;
-
-  for (let i = 0; i < maxPolls; i++) {
-    await sleep(pollInterval);
-
-    const urls: string[] = await execJS(`
-      (() => {
-        const isVisible = (el) => {
-          if (!(el instanceof HTMLElement)) return false;
-          const s = window.getComputedStyle(el);
-          if (s.display === 'none' || s.visibility === 'hidden') return false;
-          const r = el.getBoundingClientRect();
-          return r.width > 32 && r.height > 32;
-        };
-        const main = document.querySelector('main') || document.body;
-        const imgs = Array.from(main.querySelectorAll('img'));
-        return imgs
-          .filter(img => {
-            if (!(img instanceof HTMLImageElement)) return false;
-            if (!isVisible(img)) return false;
-            const src = img.currentSrc || img.src || '';
-            if (!src) return false;
-            const alt = (img.getAttribute('alt') || '').toLowerCase();
-            if (alt.includes('avatar') || alt.includes('logo') || alt.includes('icon')) return false;
-            const w = img.naturalWidth || img.width || 0;
-            const h = img.naturalHeight || img.height || 0;
-            if (w < 500 || h < 500) return false;
-            return true;
-          })
-          .map(img => img.currentSrc || img.src);
-      })()
-    `).catch(() => []);
-
-    if (!Array.isArray(urls) || urls.length === 0) continue;
-
-    // Check stability
-    const key = urls.join('\n');
-    const prevKey = lastUrls.join('\n');
-    if (key === prevKey) {
-      stableCount++;
-    } else {
-      lastUrls = urls;
-      stableCount = 1;
-    }
-
-    log(`  Poll ${i + 1}/${maxPolls}: ${urls.length} image(s)${stableCount >= 2 ? ' (stable)' : ''}`);
-
-    if (stableCount >= 2) return lastUrls;
-  }
-
-  return lastUrls;
+export interface DaemonResult {
+  shotId: string;
+  status: 'completed' | 'failed';
+  images: string[];
+  error: string | null;
 }
 
-// ── Export Images ─────────────────────────────────────────────────────────
+/**
+ * Process a single task in the current Gemini conversation.
+ */
+async function processTask(p: Page, task: DaemonTask): Promise<DaemonResult> {
+  const { shotId, prompt, referenceFiles, outputDir } = task;
+  log(`Processing task: ${shotId}`);
+  broadcastStatus('task_start', { shotId, prompt: prompt.slice(0, 60) });
 
-async function exportImages(imageUrls: string[]): Promise<ExportedImage[]> {
-  if (imageUrls.length === 0) return [];
-
-  log(`Exporting ${imageUrls.length} image(s)...`);
-
-  const assets: ExportedImage[] = await execJS(`
-    (async () => {
-      const targetUrls = ${JSON.stringify(imageUrls)};
-
-      const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Failed to read blob'));
-        reader.readAsDataURL(blob);
-      });
-
-      const results = [];
-
-      for (const targetUrl of targetUrls) {
-        const main = document.querySelector('main') || document.body;
-        const imgs = Array.from(main.querySelectorAll('img'));
-        const img = imgs.find(node => (node.currentSrc || node.src || '') === targetUrl);
-
-        let dataUrl = '';
-        let mimeType = 'image/jpeg';
-        const w = img?.naturalWidth || img?.width || 0;
-        const h = img?.naturalHeight || img?.height || 0;
-
-        try {
-          if (String(targetUrl).startsWith('data:')) {
-            dataUrl = String(targetUrl);
-            mimeType = (String(targetUrl).match(/^data:([^;]+);/i) || [])[1] || 'image/png';
-          } else {
-            const res = await fetch(String(targetUrl), { credentials: 'include' });
-            if (res.ok) {
-              const blob = await res.blob();
-              mimeType = blob.type || 'image/jpeg';
-              dataUrl = await blobToDataUrl(blob);
-            }
-          }
-        } catch {}
-
-        if (!dataUrl && img instanceof HTMLImageElement) {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth || img.width;
-            canvas.height = img.naturalHeight || img.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0);
-              dataUrl = canvas.toDataURL('image/png');
-              mimeType = 'image/png';
-            }
-          } catch {}
-        }
-
-        if (dataUrl && w >= 500 && h >= 500) {
-          results.push({ url: String(targetUrl), dataUrl, mimeType, width: w, height: h });
-        }
-      }
-
-      return results;
-    })()
-  `).catch(() => []);
-
-  return Array.isArray(assets) ? assets : [];
-}
-
-// ── Save Images to Disk ───────────────────────────────────────────────────
-
-function saveImages(assets: ExportedImage[], outputDir: string): string[] {
-  const stamp = Date.now();
-  const imagePaths: string[] = [];
-
-  for (let i = 0; i < assets.length; i++) {
-    const asset = assets[i];
-    const base64 = asset.dataUrl.replace(/^data:[^;]+;base64,/, '');
-    const ext = asset.mimeType.includes('png')
-      ? '.png'
-      : asset.mimeType.includes('webp')
-        ? '.webp'
-        : asset.mimeType.includes('gif')
-          ? '.gif'
-          : '.jpg';
-    const suffix = assets.length > 1 ? `_${i + 1}` : '';
-    const filePath = path.join(outputDir, `gemini_${stamp}${suffix}${ext}`);
-    fs.writeFileSync(filePath, base64, 'base64');
-    imagePaths.push(filePath);
-  }
-
-  return imagePaths;
-}
-
-// ── High-Level: Generate Images ───────────────────────────────────────────
-
-export async function generateImages(
-  prompt: string,
-  outputDir: string,
-  aspectRatio = '16:9',
-  referenceFiles?: string[],
-): Promise<string[]> {
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  // Ensure Gemini page
-  await ensureGeminiPage();
-
-  // Note: File upload uses companion extension's #opsv-ref-file input
-  // + OpenCLI daemon set-file-input action. No CDP script injection needed.
-
-  // Start fresh chat
-  await startNewChat();
-
-  // Enable image generation mode (制作图片)
-  await enableImageMode();
-
-  // Upload reference images
-  if (referenceFiles && referenceFiles.length > 0) {
-    for (const rf of referenceFiles) {
-      let absPath = rf;
-      if (!path.isAbsolute(rf)) {
-        const fromCwd = path.resolve(process.cwd(), rf);
-        if (fs.existsSync(fromCwd)) absPath = fromCwd;
-      }
-      if (fs.existsSync(absPath)) {
-        const ok = await uploadReferenceImage(absPath);
-        if (!ok) {
-          log(`Reference image upload may have failed for: ${path.basename(absPath)}`, 'WARN');
-        }
+  try {
+    // Upload reference images if provided
+    if (referenceFiles && referenceFiles.length > 0) {
+      for (const refFile of referenceFiles) {
+        await uploadReferenceImage(p, refFile);
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
+
+    // Type the prompt
+    await typePrompt(p, prompt);
+
+    // Wait for send button and click it
+    await clickSend(p);
+
+    // Wait for generated images
+    const imageUrls = await waitForImages(p);
+
+    if (imageUrls.length === 0) {
+      throw new Error('No images generated');
+    }
+
+    // Download images
+    const outputPaths: string[] = [];
+    const outDir = outputDir || path.join(os.tmpdir(), 'opsv-gemini', shotId);
+    fs.mkdirSync(outDir, { recursive: true });
+
+    for (let i = 0; i < imageUrls.length; i++) {
+      const outPath = path.join(outDir, `image_${i + 1}.png`);
+      await downloadImage(p, imageUrls[i], outPath);
+      outputPaths.push(outPath);
+    }
+
+    log(`Task ${shotId} completed: ${outputPaths.length} images`);
+    broadcastStatus('task_done', { shotId, images: outputPaths.length });
+
+    return {
+      shotId,
+      status: 'completed',
+      images: outputPaths,
+      error: null,
+    };
+  } catch (e: any) {
+    log(`Task ${shotId} failed: ${e.message}`, 'ERROR');
+    broadcastStatus('task_error', { shotId, error: e.message });
+    return {
+      shotId,
+      status: 'failed',
+      images: [],
+      error: e.message,
+    };
   }
-
-  // Build prompt with explicit reference to the uploaded image
-  let effectivePrompt = prompt;
-  if (referenceFiles && referenceFiles.length > 0) {
-    const refNames = referenceFiles.map(rf => path.basename(rf)).join(', ');
-    effectivePrompt = `Use the image I just uploaded (${refNames}) as the base reference image. Edit and modify it according to my instructions below, keeping everything else as close to the original as possible.\n\n${prompt}`;
-  }
-  if (aspectRatio && aspectRatio !== '1:1') {
-    effectivePrompt = `${effectivePrompt}\n\nImage requirements: aspect ratio ${aspectRatio}.`;
-  }
-
-  // Send prompt
-  log(`Sending prompt (${effectivePrompt.length} chars)...`);
-  await sendPrompt(effectivePrompt);
-
-  // Wait for images
-  const urls = await waitForImages(240);
-
-  if (urls.length === 0) {
-    log('No new images detected');
-    return [];
-  }
-
-  // Export
-  const assets = await exportImages(urls);
-
-  if (assets.length === 0) {
-    log('Image export failed');
-    return [];
-  }
-
-  // Save
-  const paths = saveImages(assets, outputDir);
-  log(`Saved ${paths.length} image(s) to ${outputDir}`);
-  return paths;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Batch Processing ───────────────────────────────────────────────────────
 
-function log(msg: string, level = 'INFO'): void {
-  console.log(`[${level}] [gemini-daemon] ${msg}`);
+/**
+ * Process a batch of tasks in a single Gemini conversation.
+ * One browser window → one conversation → sequential tasks.
+ */
+export async function processBatch(tasks: DaemonTask[]): Promise<DaemonResult[]> {
+  const results: DaemonResult[] = [];
+
+  try {
+    // 1. Start WS server
+    await startWsServer();
+
+    // 2. Launch browser with extension
+    const { page: p } = await launchBrowser();
+
+    // 3. Navigate to Gemini
+    await navigateToGemini(p);
+
+    // 4. Process each task sequentially
+    for (const task of tasks) {
+      const result = await processTask(p, task);
+      results.push(result);
+    }
+
+    log(`Batch complete: ${results.filter(r => r.status === 'completed').length}/${tasks.length} tasks succeeded`);
+    broadcastStatus('batch_done', { total: tasks.length, completed: results.filter(r => r.status === 'completed').length });
+
+  } catch (e: any) {
+    log(`Batch failed: ${e.message}`, 'ERROR');
+    broadcastStatus('batch_error', { error: e.message });
+  } finally {
+    // Cleanup
+    if (browser) {
+      await browser.close().catch(() => {});
+      browser = null;
+      page = null;
+    }
+    stopWsServer();
+  }
+
+  return results;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// ── Single Task Entry Point ────────────────────────────────────────────────
+
+/**
+ * Execute a single task (convenience wrapper around processBatch).
+ */
+export async function generateImages(taskInfo: DaemonTask): Promise<DaemonResult> {
+  const results = await processBatch([taskInfo]);
+  return results[0] || { shotId: taskInfo.shotId, status: 'failed', images: [], error: 'Unknown error' };
 }

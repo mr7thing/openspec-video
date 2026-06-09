@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""
+opsv-gemini — Send commands to OPSV Companion Extension
+
+Usage:
+  # Generate images on Gemini
+  opsv-gemini generate --prompt "your prompt" --shot-id shot_01
+
+  # Test connection
+  opsv-gemini ping
+
+  # Check status
+  opsv-gemini status
+
+Prerequisites:
+  - native-host.py must be running (start it in a terminal)
+  - Extension loaded in Chrome (chrome://extensions → Load unpacked)
+  - gemini.google.com open in a tab
+"""
+
+import json
+import socket
+import sys
+import os
+import uuid
+import argparse
+
+SOCKET_PATH = '/tmp/opsv-gemini.sock'
+
+
+def send_command_stream(cmd: dict, timeout: float = 120.0):
+    """Send a command and yield responses as they arrive (ack, then task_result)."""
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+
+    try:
+        sock.connect(SOCKET_PATH)
+    except FileNotFoundError:
+        print(f'Error: Socket {SOCKET_PATH} not found.', file=sys.stderr)
+        print('Make sure native-host.py is running:', file=sys.stderr)
+        print(f'  python3 {os.path.dirname(os.path.dirname(__file__))}/extension/native-host.py', file=sys.stderr)
+        sys.exit(1)
+    except ConnectionRefusedError:
+        print('Error: Connection refused. Is native-host.py running?', file=sys.stderr)
+        sys.exit(1)
+
+    # Send command
+    payload = (json.dumps(cmd, ensure_ascii=False) + '\n').encode('utf-8')
+    sock.sendall(payload)
+
+    # Read responses
+    data = b''
+    while True:
+        try:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            data += chunk
+            lines = data.split(b'\n')
+            data = lines[-1]  # Keep incomplete line
+            for line in lines[:-1]:
+                if line.strip():
+                    yield json.loads(line.decode('utf-8'))
+        except socket.timeout:
+            break
+
+    sock.close()
+    if data.strip():
+        try:
+            yield json.loads(data.decode('utf-8').strip())
+        except json.JSONDecodeError:
+            yield {'type': 'error', 'message': f'Bad response: {data[:200]}'}
+
+
+def send_command(cmd: dict, timeout: float = 10.0) -> dict:
+    """Simplified: send and return first response."""
+    for resp in send_command_stream(cmd, timeout):
+        return resp
+    return {'type': 'error', 'message': 'No response'}
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='OPSV Gemini — Control Chrome extension via native bridge'
+    )
+    subparsers = parser.add_subparsers(dest='command')
+
+    # generate
+    gen = subparsers.add_parser('generate', help='Generate images on Gemini')
+    gen.add_argument('--prompt', '-p', required=True, help='Generation prompt')
+    gen.add_argument('--shot-id', '-s', default=f'shot_{uuid.uuid4().hex[:8]}', help='Shot ID')
+    gen.add_argument('--ratio', '-r', default='16:9', help='Aspect ratio')
+    gen.add_argument('--ref', '-f', help='Reference image path')
+    gen.add_argument('--timeout', '-t', type=int, default=120, help='Max wait in seconds')
+
+    # ping
+    subparsers.add_parser('ping', help='Test connection')
+
+    # status
+    subparsers.add_parser('status', help='Check bridge status')
+
+    # ping-content-script
+    subparsers.add_parser('ping-content-script', help='Test if content script is reachable on Gemini')
+
+    args = parser.parse_args()
+
+    if args.command == 'ping':
+        resp = send_command({'type': 'ping', 'cmd_id': uuid.uuid4().hex}, timeout=5)
+        print(json.dumps(resp, indent=2, ensure_ascii=False))
+        if resp.get('type') == 'pong':
+            ext = resp.get('extension_connected', False)
+            print(f'\nBridge: OK  Extension: {"Connected" if ext else "Disconnected"}', file=sys.stderr)
+            sys.exit(0)
+        sys.exit(1)
+
+    elif args.command == 'status':
+        resp = send_command({'type': 'status', 'cmd_id': uuid.uuid4().hex}, timeout=5)
+        print(json.dumps(resp, indent=2, ensure_ascii=False))
+        sys.exit(0)
+
+    elif args.command == 'ping-content-script':
+        resp = send_command({'type': 'ping_content_script', 'cmd_id': uuid.uuid4().hex}, timeout=10)
+        print(json.dumps(resp, indent=2, ensure_ascii=False))
+        if resp.get('found'):
+            print('Content script: REACHABLE ✓', file=sys.stderr)
+            sys.exit(0)
+        else:
+            print(f'Content script: NOT FOUND - {resp.get("reason") or resp.get("error")}', file=sys.stderr)
+            sys.exit(1)
+
+    elif args.command == 'generate':
+        cmd_id = uuid.uuid4().hex
+        cmd = {
+            'type': 'generate',
+            'cmd_id': cmd_id,
+            'shotId': args.shot_id,
+            'prompt': args.prompt,
+            'aspectRatio': args.ratio,
+        }
+        if args.ref:
+            cmd['referenceFiles'] = [os.path.abspath(args.ref)]
+
+        print(f'Sending: prompt="{args.prompt[:60]}..."', file=sys.stderr)
+
+        for resp in send_command_stream(cmd, timeout=args.timeout):
+            rtype = resp.get('type', '')
+            if rtype == 'ack':
+                print(f'Job dispatched (cmd_id={cmd_id}), waiting for result...', file=sys.stderr)
+            elif rtype == 'task_result':
+                print('=== RESULT ===')
+                print(json.dumps(resp, indent=2, ensure_ascii=False))
+                if resp.get('imageUrl'):
+                    print(f'\nImage URL: {resp["imageUrl"]}', file=sys.stderr)
+                if resp.get('status') == 'completed':
+                    sys.exit(0)
+                else:
+                    sys.exit(1)
+            elif rtype == 'error':
+                print('=== ERROR ===')
+                print(json.dumps(resp, indent=2, ensure_ascii=False))
+                sys.exit(1)
+            else:
+                print(json.dumps(resp, indent=2, ensure_ascii=False))
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()

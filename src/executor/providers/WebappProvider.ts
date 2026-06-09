@@ -28,7 +28,7 @@ export class WebappProvider implements ProviderExecutor {
 
       // Delegate to webapp-runner which handles site-specific runners
       const queueDir = path.resolve(taskPath, '..');
-      const result = executeTask(taskPath, queueDir, true);
+      const result = await executeTask(taskPath, queueDir, true);
 
       if (result.status === 'completed' && result.outputPaths.length > 0) {
         return {

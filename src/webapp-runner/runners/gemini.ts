@@ -1,170 +1,235 @@
 /**
  * Gemini Runner
  *
- * Generates images via OpenCLI's Gemini CLI adapter (opencli gemini image).
+ * Generates images via the OPSV Chrome Extension Bridge.
  *
- * How it works:
- *   1. Calls `opencli gemini image "<prompt>" --op <dir> --rt <ratio> -f json`
- *   2. Parses JSON output to find saved files
- *   3. Falls back to directory scan if JSON parsing fails
+ * Flow:
+ *   task JSON → opsv run → WebappProvider → dispatch → gemini.ts
+ *     → Unix socket → native-host.py bridge → WS → extension → content.js → Gemini UI
  *
- * Prerequisites:
- *   - opencli (npm install -g @jackwener/opencli)
- *   - Persistent browser session
+ * No Puppeteer daemon, no separate browser process.
+ * Uses the user's existing Chrome with the companion extension loaded.
  */
 
-import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-
 import { TaskInfo } from '../core/task';
 import { RunnerResult } from '../core/types';
-import { findOpenCLI } from './opencli-path';
 
-const OPENCLI_TIMEOUT = 300_000; // 5 min
+const BRIDGE_SOCKET = '/tmp/opsv-gemini.sock';
+const GENERATION_TIMEOUT_MS = 180_000;  // 3 min
+const POLL_INTERVAL_MS = 2_000;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Logging ────────────────────────────────────────────────────────────────
 
 function log(msg: string, level = 'INFO'): void {
-  console.log(`[${level}] [gemini] ${msg}`);
+  console.log(`[${level}] [gemini-runner] ${msg}`);
 }
 
-function runCmd(cmd: string, timeout = OPENCLI_TIMEOUT): { stdout: string; stderr: string } | null {
-  try {
-    const out = execSync(cmd, { encoding: 'utf-8', timeout, maxBuffer: 10 * 1024 * 1024 });
-    return { stdout: out.trim(), stderr: '' };
-  } catch (e: any) {
-    log(`Command failed: ${cmd.slice(0, 200)}`, 'WARN');
-    log(`stderr: ${(e.stderr || e.message || '').slice(0, 300)}`, 'WARN');
-    return null;
-  }
-}
+// ── Unix Socket Client ────────────────────────────────────────────────────
 
-// ── Core Generation ────────────────────────────────────────────────────────
+/**
+ * Connect to the native-host.py bridge and send a generation command.
+ * Returns the result when the extension finishes.
+ */
+function sendViaBridge(payload: Record<string, any>): Promise<Record<string, any>> {
+  return new Promise((resolve, reject) => {
+    const net = require('net');
+    const client = new net.Socket();
 
-export function generateImages(
-  prompt: string,
-  outputDir: string,
-  aspectRatio = '16:9',
-  referenceFiles?: string[],
-): string[] {
-  fs.mkdirSync(outputDir, { recursive: true });
+    let buffer = '';
+    const timeout = setTimeout(() => {
+      client.destroy();
+      reject(new Error('Bridge timeout — is native-host.py running?'));
+    }, GENERATION_TIMEOUT_MS + 10_000);
 
-  // Build command — JSON-escape prompt to avoid shell injection
-  const escapedPrompt = JSON.stringify(prompt);
-  const cliBin = findOpenCLI();
-  const cmdParts: string[] = [
-    cliBin,
-    'gemini',
-    'image',
-    escapedPrompt,
-    '--op', outputDir,
-    '--rt', aspectRatio,
-    '--site-session', 'persistent',
-    '-f', 'json',
-  ];
+    client.connect(BRIDGE_SOCKET, () => {
+      client.write(JSON.stringify(payload) + '\n');
+    });
 
-  // Pass reference files as --upload (comma-separated paths)
-  if (referenceFiles && referenceFiles.length > 0) {
-    const resolvedRefs = referenceFiles
-      .map((rf) => {
-        // Resolve relative path from project root or cwd
-        if (path.isAbsolute(rf)) return rf;
-        const fromCwd = path.resolve(process.cwd(), rf);
-        if (fs.existsSync(fromCwd)) return fromCwd;
-        return path.resolve(rf);
-      })
-      .filter((rf) => fs.existsSync(rf));
-    if (resolvedRefs.length > 0) {
-      cmdParts.push('--upload', resolvedRefs.join(','));
-      log(`Reference images: ${resolvedRefs.map(p => path.basename(p)).join(', ')}`);
-    }
-  }
+    client.on('data', (data: Buffer) => {
+      buffer += data.toString('utf-8');
+      // Try to parse complete JSON response(s)
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';  // Keep incomplete line in buffer
 
-  const cmd = cmdParts.join(' ');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const response = JSON.parse(trimmed);
 
-  log(`Prompt (${prompt.length} chars): ${prompt.slice(0, 100)}...`);
-  log(`Image ratio: ${aspectRatio}`);
-
-  const result = runCmd(cmd);
-  const imagePaths: string[] = [];
-
-  // Try parsing JSON output
-  if (result?.stdout) {
-    try {
-      const parsed = JSON.parse(result.stdout);
-      if (Array.isArray(parsed)) {
-        for (const entry of parsed) {
-          if (entry?.file && fs.existsSync(entry.file) && fs.statSync(entry.file).size > 1000) {
-            imagePaths.push(entry.file);
+          // Skip 'ack' — wait for actual result
+          if (response.type === 'ack' || response.status === 'dispatched') {
+            log(`Task dispatched, waiting for result...`);
+            continue;
           }
-        }
-      } else if (typeof parsed === 'object' && parsed !== null) {
-        for (const key of ['file', 'files', 'path', 'paths'] as const) {
-          const val = parsed[key];
-          if (!val) continue;
-          if (typeof val === 'string' && fs.existsSync(val)) {
-            imagePaths.push(val);
-          } else if (Array.isArray(val)) {
-            for (const fp of val) {
-              if (typeof fp === 'string' && fs.existsSync(fp) && fs.statSync(fp).size > 1000) {
-                imagePaths.push(fp);
-              }
-            }
-          }
+
+          // We got a final result — resolve
+          clearTimeout(timeout);
+          client.destroy();
+          resolve(response);
+          return;
+        } catch {
+          // Incomplete JSON, keep accumulating
         }
       }
-    } catch {
-      // JSON parse failed — fall through to directory scan
-    }
-  }
+    });
 
-  // Fallback: scan output directory
-  if (imagePaths.length === 0) {
-    const exts = new Set(['.png', '.jpg', '.jpeg', '.webp']);
-    const files = fs.readdirSync(outputDir)
-      .map(f => path.join(outputDir, f))
-      .filter(f => {
-        try { const s = fs.statSync(f); return exts.has(path.extname(f).toLowerCase()) && s.size > 1000; }
-        catch { return false; }
-      })
-      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-    imagePaths.push(...files);
-  }
+    client.on('error', (err: Error) => {
+      clearTimeout(timeout);
+      client.destroy();
+      if ((err as any).code === 'ENOENT' || (err as any).code === 'ECONNREFUSED') {
+        reject(new Error(`Bridge socket not found at ${BRIDGE_SOCKET}. Start native-host.py first.`));
+      } else {
+        reject(err);
+      }
+    });
 
-  if (imagePaths.length > 0) {
-    log(`Generated ${imagePaths.length} image(s): ${imagePaths.map(p => path.basename(p)).join(', ')}`);
-  } else {
-    log(`No images generated. stdout: ${(result?.stdout || '').slice(0, 300)}`, 'ERROR');
-  }
+    client.on('close', () => {
+      clearTimeout(timeout);
+      if (buffer.trim()) {
+        try {
+          resolve(JSON.parse(buffer.trim()));
+        } catch {
+          reject(new Error('Bridge connection closed unexpectedly'));
+        }
+      } else {
+        reject(new Error('Bridge connection closed'));
+      }
+    });
+  });
+}
 
-  return imagePaths;
+/**
+ * Download an image from a URL to a local temp file.
+ */
+async function downloadImage(url: string, outputPath: string): Promise<void> {
+  const https = require('https');
+  const http = require('http');
+  const urlObj = new URL(url);
+
+  return new Promise((resolve, reject) => {
+    const proto = urlObj.protocol === 'https:' ? https : http;
+    const req = proto.get(url, { headers: { 'User-Agent': 'OPSV-Gemini/1.0' } }, (res: any) => {
+      // Handle redirects
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        downloadImage(new URL(res.headers.location, url).href, outputPath).then(resolve).catch(reject);
+        return;
+      }
+
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error(`HTTP ${res.statusCode} downloading ${url.slice(0, 80)}`));
+        return;
+      }
+
+      const fileStream = fs.createWriteStream(outputPath);
+      res.pipe(fileStream);
+      fileStream.on('finish', () => {
+        fileStream.close();
+        resolve();
+      });
+      fileStream.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(30_000, () => {
+      req.destroy();
+      reject(new Error('Timeout downloading image'));
+    });
+  });
 }
 
 // ── Runner Contract ────────────────────────────────────────────────────────
 
-export function run(taskInfo: TaskInfo): RunnerResult {
+export async function run(taskInfo: TaskInfo): Promise<RunnerResult> {
   const prompt = taskInfo.prompt;
-  const aspectRatio = taskInfo.aspectRatio;
+  const aspectRatio = taskInfo.aspectRatio || '16:9';
   const referenceFiles = taskInfo.referenceFiles;
 
   if (!prompt) {
     return { status: 'failed', images: [], error: 'Empty prompt' };
   }
 
-  // Create temp working directory
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `gemini_${taskInfo.shotId}_`));
+  log(`Prompt (${prompt.length} chars): ${prompt.slice(0, 120)}...`);
+  log(`Ratio: ${aspectRatio}`);
+
+  if (referenceFiles && referenceFiles.length > 0) {
+    log(`Reference images: ${referenceFiles.map((p) => path.basename(p)).join(', ')}`);
+  }
+
+  // Resolve reference file paths
+  const resolvedRefs: string[] = [];
+  if (referenceFiles) {
+    for (const rf of referenceFiles) {
+      let absPath = rf;
+      if (!path.isAbsolute(rf)) {
+        const fromCwd = path.resolve(process.cwd(), rf);
+        if (fs.existsSync(fromCwd)) absPath = fromCwd;
+      }
+      if (fs.existsSync(absPath)) {
+        resolvedRefs.push(absPath);
+      } else {
+        log(`Reference not found: ${rf}`, 'WARN');
+      }
+    }
+  }
 
   try {
-    const images = generateImages(prompt, tmpDir, aspectRatio, referenceFiles);
+    // 1. Send task to the extension bridge
+    log('Sending task to Chrome extension via bridge...');
 
-    if (images.length === 0) {
-      return { status: 'failed', images: [], error: 'Image generation returned no files' };
+    const response = await sendViaBridge({
+      type: 'generate',
+      cmd_id: taskInfo.shotId,
+      shotId: taskInfo.shotId,
+      prompt,
+      aspectRatio,
+      referenceFiles: resolvedRefs.length > 0 ? resolvedRefs : undefined,
+    });
+
+    log(`Bridge response: ${response.type} (${response.status || '?'})`);
+
+    // 2. Handle the response
+    if (response.type === 'task_result' && response.status === 'completed' && response.imageUrl) {
+      // Download the generated image
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-gemini-'));
+      const imagePath = path.join(tmpDir, `${taskInfo.shotId}_1.png`);
+
+      log(`Downloading image from: ${response.imageUrl.slice(0, 80)}...`);
+      await downloadImage(response.imageUrl, imagePath);
+
+      const size = fs.statSync(imagePath).size;
+      log(`Image downloaded: ${size} bytes`);
+
+      if (size < 1000) {
+        fs.unlinkSync(imagePath);
+        return { status: 'failed', images: [], error: 'Downloaded image is too small (likely an error page)' };
+      }
+
+      log(`Generated: ${imagePath}`);
+      return { status: 'success', images: [imagePath], error: null };
     }
 
-    return { status: 'success', images, error: null };
+    // Handle error responses
+    const errorMsg = response.error || response.message || 'Unknown bridge error';
+    log(`Generation failed: ${errorMsg}`, 'ERROR');
+    return { status: 'failed', images: [], error: errorMsg };
+
   } catch (e: any) {
+    log(`Generation error: ${e.message}`, 'ERROR');
+
+    // Helpful hints for common errors
+    if (e.message.includes('Bridge socket not found') || e.message.includes('native-host.py')) {
+      log('HINT: Start the bridge with: python3 extension/native-host.py', 'HINT');
+      log('HINT: Or use: opsv-gemini ping to check if it\'s running', 'HINT');
+    }
+    if (e.message.includes('No Gemini tab')) {
+      log('HINT: Open https://gemini.google.com in Chrome and try again', 'HINT');
+    }
+
     return { status: 'failed', images: [], error: e.message };
   }
 }

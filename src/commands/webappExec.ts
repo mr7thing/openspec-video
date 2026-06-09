@@ -33,12 +33,12 @@ export function registerWebappExecCommand(program: Command): void {
 
         if (options.task) {
           const queueDir = options.queueDir || require('path').dirname(options.task);
-          const result = executeTask(options.task, queueDir, enableWm);
+          const result = await executeTask(options.task, queueDir, enableWm);
           console.log(JSON.stringify(result, null, 2));
           if (result.status !== 'completed') process.exit(1);
         } else if (options.dir) {
           const queueDir = options.queueDir || options.dir;
-          const summary = executeBatch(options.dir, enableWm, options.retry);
+          const summary = await executeBatch(options.dir, enableWm, options.retry);
 
           // Handle retry tasks (those with error logs)
           if (options.retry) {
@@ -51,7 +51,7 @@ export function registerWebappExecCommand(program: Command): void {
               const taskJson = path.join(qp, `${shotId}.json`);
               if (fs.existsSync(taskJson)) {
                 try {
-                  const result = executeTask(taskJson, queueDir, enableWm);
+                  const result = await executeTask(taskJson, queueDir, enableWm);
                   summary.results.push(result);
                   if (result.status === 'completed') summary.success++;
                   else summary.failed++;
