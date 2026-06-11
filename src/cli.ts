@@ -25,6 +25,7 @@ import { registerApprovedCommand } from './commands/approved';
 import { registerLoginCommand } from './commands/login';
 import { registerIterateCommand } from './commands/iterate';
 import { registerRefsCommand } from './commands/refs';
+import { registerImageStitchCommand } from './commands/imageStitch';
 import { resolveProjectRoot } from './utils/projectResolver';
 
 // Load .env from the resolved project root (not just cwd)
@@ -94,5 +95,6 @@ registerLoginCommand(program);
 registerIterateCommand(program);
 registerApprovedCommand(program);
 registerRefsCommand(program);
+registerImageStitchCommand(program);
 
 program.parse(process.argv);

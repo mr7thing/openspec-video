@@ -22,4 +22,5 @@ export type { ModelConfig, ApiConfig, ProjectSettings, DirSettings } from './uti
 export { FileUtils } from './utils/FileUtils';
 export { downloadFile } from './utils/download';
 export { fileToBase64, fileToDataUri, fileToBase64Async } from './utils/fileToBase64';
+export { stitchImages } from './utils/imageStitch';
 export { FrameExtractor } from './utils/frameExtractor';

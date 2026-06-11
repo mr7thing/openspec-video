@@ -265,6 +265,7 @@ opsv init [name]                       # 初始化项目
 opsv refs check <file>                 # 检查 prompt ↔ refs 一致性
 opsv refs sync <file> --write          # 自动补全 refs
 opsv comfy-node-mapping <file> -o <out> # 提取 ComfyUI node_mappings
+opsv image-stitch <inputs...> --right/--down -o <out>  # 拼接多张图像
 opsv script                            # 从 shot_*.md 聚合 Script.md
 ```
 

@@ -1,6 +1,6 @@
 # CLI 命令参考
 
-> 当前版本：v0.10.3 (统一 @ 语法 + refs 分组 + PromptCompiler + category 校验 + CLI 批量 approve)
+> 当前版本：v0.11.2 (统一 @ 语法 + refs 分组 + PromptCompiler + category 校验 + CLI 批量 approve + image-stitch)
 
 ## 命令总览
 
@@ -20,6 +20,7 @@
 | `opsv iterate <path>` | 克隆任务 JSON 或模型队列目录用于迭代 | 迭代 |
 | `opsv review` | 启动 Web Review UI 页面服务 | 审阅 |
 | `opsv approved` | CLI 批量审批（Agent 直接执行，无需 Web UI） | 审阅 |
+| `opsv image-stitch` | 拼接多张图像（横/纵向），自动匹配缩放 | 预处理 |
 | `opsv script` | 从 shot_*.md 聚合生成 Script.md | 展示 |
 
 ---
@@ -394,6 +395,99 @@ opsv approved --action design_feedback --file @temple --note "光影偏暗"
 **执行流程**: 每个匹配资产 → 递归扫描 Circle 目录下产出文件（`assetId_`/`assetId.` 前缀）→ 调用 `ApproveService.execute()` → 写入 review 记录、更新 frontmatter status、写入 Approved References、更新 `_manifest.json` → 输出摘要报告。
 
 **自动区分**：`id_1.png` → `approved`；`id_m1_1.png` → `syncing`（Agent 需执行对齐）。
+
+---
+
+### opsv image-stitch
+
+拼接多张图像为一张，自动按最小维度缩放对齐。用于漫剧/多角色分镜的并稿预处理。
+
+```bash
+# 横向拼接（匹配最小高度缩放）
+opsv image-stitch char1.png char2.png --right -o merged.png
+
+# 纵向拼接（匹配最小宽度缩放）
+opsv image-stitch shot_01.png shot_02.png --down -o storyboard_strip.png
+```
+
+**参数**：
+| 参数 | 说明 |
+|------|------|
+| `<inputs...>` | 至少 2 个图片路径（位置参数） |
+| `--right` | 横向拼接，匹配最小高度缩放 |
+| `--down` | 纵向拼接，匹配最小宽度缩放 |
+| `-o, --output <path>` | 输出文件路径（必填） |
+
+**缩放规则**：
+- `--right`：所有输入缩放至最小高度，宽度等比调整
+- `--down`：所有输入缩放至最小宽度，高度等比调整
+- 缩放基于原图的 bitmap 宽高精确计算
+
+**典型流程**（漫剧多角色分镜）：
+```bash
+# 1. 角色设计通过后，拼接多个角色为一张参考图
+opsv image-stitch hero_1.png villain_1.png --right -o characters_merged.png
+
+# 2. 将并稿图 + 场景图作为 ComfyUI 分镜工作流的输入
+opsv comfy --model runninghub.default --workflow shot_ref2
+# → characters_merged.png 作为 image1，场景图作为 image2
+```
+
+---
+
+## 图片预处理与 Jimp 依赖
+
+OpsV 依赖 [Jimp](https://github.com/jimp-dev/jimp)（v1.x）对本地图片进行提交前的预处理。
+
+### resolveImageToBase64
+
+定义在 `BaseApiProvider` 中，所有 REST API provider 可共用：
+
+```
+本地文件 → Jimp.read() → 若像素数 > maxPixels（默认 1M ≈ 1024×1024）则等比缩放
+          → getBuffer('image/jpeg', { quality: 85 })
+          → data:image/jpeg;base64,<base64>
+```
+
+| 输入格式 | 处理方式 |
+|---------|---------|
+| `http://` / `https://` | 直传，不处理 |
+| `data:` | 直传，不处理 |
+| 本地文件路径 | Jimp 读取 → 缩放 → JPEG base64 |
+
+**缩放规则**：`scale = sqrt(maxPixels / (width × height))`，等比缩放宽高。
+
+### 各 Provider 图片提交方式
+
+| Provider | 机制 | 调用位置 |
+|----------|------|---------|
+| **Volcengine** (seadream/seedance) | `resolveImageField()` — 检测文件路径 → base64 | VolcengineProvider.execute() |
+| **SiliconFlow** (wan/qwenimg) | `resolveImageToBase64()` — 基类方法 | SiliconFlowProvider.execute() |
+| **RunningHub** (comfy 云端) | `nodeInfoList[].fieldValue` — `upload_method=base64` 时自动 Jimp 预处理，否则透传 | RunningHubProvider.execute() |
+| **Minimax** (img01/vid01) | Compiler 阶段已处理，透传 | N/A |
+| **ComfyLocal** | 本地执行，无需上传 | N/A |
+
+### RunningHub 图片上传
+
+RunningHub 通过 `api_config.yaml` 的 `upload_method` 参数控制图片提交方式：
+
+| upload_method | 行为 |
+|--------------|------|
+| 未设置（默认） | `nodeInfoList[].fieldValue` 直接透传，不做预处理 |
+| `base64` | RunningHubProvider 自动用 Jimp 将本地图片转为 base64 data URI（缩放≤1M像素，JPEG quality 85） |
+
+`base64` 模式下，agent 无需手动预处理——provider 在 `execute()` 阶段自动遍历 `nodeInfoList`，对每个 `fieldValue` 中的本地文件路径调用 `resolveImageToBase64()`，`http://` / `data:` 开头的值则透传不改动。
+
+**配置示例**（`api_config.yaml`）：
+```yaml
+models:
+  runninghub.default:
+    provider: runninghub
+    api_url: https://www.runninghub.cn/...
+    workflowId: abc123
+    defaults:
+      upload_method: base64  # 启用自动 base64 预处理
+```
 
 ---
 

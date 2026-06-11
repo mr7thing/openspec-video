@@ -6,6 +6,7 @@ import { BaseTaskJson } from '../../types/Job';
 import { BaseApiProvider } from './BaseApiProvider';
 import { HttpClient } from '../HttpClient';
 import { OpsVContext } from '../../container/OpsVContext';
+import { ProviderResult } from '../QueueRunner';
 
 interface RhSubmitResponse {
   id?: string;
@@ -37,6 +38,29 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
       }
     }
     return payload;
+  }
+
+  async execute(
+    task: BaseTaskJson<Record<string, unknown>>,
+    taskPath: string,
+    ctx: OpsVContext
+  ): Promise<ProviderResult> {
+    const payload = { ...task.payload } as Record<string, any>;
+
+    // Support upload_method: "base64" — auto-preprocess local image paths in nodeInfoList
+    if (payload.upload_method === 'base64' && Array.isArray(payload.nodeInfoList)) {
+      payload.nodeInfoList = await Promise.all(
+        payload.nodeInfoList.map(async (item: any) => {
+          if (item.fieldValue && typeof item.fieldValue === 'string') {
+            return { ...item, fieldValue: await this.resolveImageToBase64(item.fieldValue) };
+          }
+          return item;
+        })
+      );
+    }
+
+    const patched: BaseTaskJson<Record<string, unknown>> = { ...task, payload };
+    return super.execute(patched, taskPath, ctx);
   }
 
   protected parseTaskId(res: RhSubmitResponse): string | undefined {
