@@ -31,7 +31,7 @@ description: ComfyUI 漫剧资产生成 — 角色概念图、角色三视图、
 分镜生图前:
   1. 提取分镜中所有 @character 引用
   2. 选定每个角色的引用类型: concept → 概念图, turnaround → 三视图
-  3. 若角色数 ≥ 2: 运行 merge_characters.mjs 合并为一张并稿图
+  3. 若角色数 ≥ 2: 运行 opsv image-stitch 合并为一张并稿图
   4. 若角色数 = 1: 直接使用单张角色图
   5. 将并稿图 + 场景图送入分镜生图工作流
 ```
@@ -288,9 +288,8 @@ opsv comfy --model comfylocal.comic --category comic_scene --workflow-dir workfl
 # - 单角度即可 → 用 approved_concept
 
 # Step 2: 角色并稿（仅当 ≥ 2 个角色时）
-node skills/comic-pipeline/scripts/merge_characters.mjs \
-     --output shots/<shot_id>/merged_chars.png \
-     <char1_concept.png> <char2_turnaround.png>
+opsv image-stitch <char1_concept.png> <char2_turnaround.png> \
+     -o shots/<shot_id>/merged_chars.png --right
 
 # Step 3: 确认场景图可用（approved_establishing）
 ```
@@ -314,7 +313,7 @@ CLIP Text Encode ───────┤
 - `opsv-prompt` — 分镜提示词
 - `opsv-negative_prompt`
 - `opsv-seed`
-- `opsv-image1` — **角色并稿图**（merge_characters.mjs 产出）
+- `opsv-image1` — **角色并稿图**（opsv image-stitch 产出）
 - `opsv-image2` — **场景图**（approved_establishing）
 - `opsv-image3` — 风格参考（可选）
 
@@ -344,7 +343,7 @@ prompt: >
 refs:
   image:
     "@chars:lu_ran+yun_li":
-      - shots/EP01_shot_01/merged_chars.png          # ← merge_characters.mjs 产出
+      - shots/EP01_shot_01/merged_chars.png          # ← opsv image-stitch 产出
     "@temple":
       - opsv-queue/videospec_circle1/runninghub.comic_002/temple_1.png
     "@style:donghua":
@@ -474,7 +473,7 @@ opsv-queue/videospec_circle1/
 │   ├── @sea_shore.json
 │   └── @sea_shore_1.png
 └── runninghub.comic_storyboard/    # 分镜生图产出
-    ├── EP01_shot_01_merged_chars.png   # ← merge_characters.mjs 预处理产出
+    ├── EP01_shot_01_merged_chars.png   # ← opsv image-stitch 预处理产出
     ├── EP01_shot_01.json
     ├── EP01_shot_01_1.png              # 分镜画面
     ├── EP01_shot_02_merged_chars.png

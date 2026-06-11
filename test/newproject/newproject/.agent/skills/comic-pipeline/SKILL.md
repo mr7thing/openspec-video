@@ -95,7 +95,7 @@ ZeroCircle 资产:
   └─ comic_sfx             ──→ (人工素材库 / AI 音效生成)
 
 FirstCircle 资产:
-  ├─ comic_storyboard      ──→ ① 角色并稿预处理（merge_characters.mjs）
+  ├─ comic_storyboard      ──→ ① 角色并稿预处理（opsv image-stitch）
   │                            ② 场景角色合成 → 4 帧分镜生图
   └─ comic_storyboard_next ──→ next-scene 角色合成 (opsv-2511next分镜, 用于 connect_to_next=true 的镜头衔接)
 ```
@@ -182,9 +182,8 @@ Step 3C.1: 角色并稿预处理 ← ⚠ 分镜生图前必须执行
 │     （按分镜需求选择：需要多角度参考→三视图, 单角度→概念图）   │
 │                                                              │
 │ 过程:                                                        │
-│   node scripts/merge_characters.mjs                          │
-│        --output <shot_dir>/merged_chars.png                  │
-│        <char1.png> <char2.png> ...                           │
+│   opsv image-stitch <char1.png> <char2.png> ...               │
+│        -o <shot_dir>/merged_chars.png --right                 │
 │                                                              │
 │ 输出:                                                        │
 │   → <shot_dir>/merged_chars.png  (单张并稿图)                │
@@ -279,7 +278,7 @@ opsv circle refresh       # ← ZeroCircle 全部 ✅ ?
 # 预处理：角色并稿 (substep 3C.1) — 按需执行
 for shot in videospec/storyboard/shot_*.md; do
   # Agent 从分镜中提取角色列表, 判断是否需要合并
-  # node scripts/merge_characters.mjs --output merged.png char1.png char2.png
+  # opsv image-stitch char1.png char2.png -o merged.png --right
 done
 
 # 分镜生图 (substep 3C.2)
@@ -471,7 +470,7 @@ Maintain consistent character design and lighting across all frames.
 │   ├─ 复杂光影 + 精细场景 → ComfyUI 场景工作流 (runninghub.comic)
 │   └─ 通用场景 → Seedream 5.0 (volc.seadream5)
 ├─ 分镜生图
-│   ├─ 预处理 → merge_characters.mjs（角色并稿）
+│   ├─ 预处理 → opsv image-stitch（角色并稿）
 │   ├─ 场景角色合成 → ComfyUI 分镜工作流 (runninghub.comic)
 │   └─ 连续镜头衔接 (connect_to_next=true) → next-scene 角色合成 (runninghub.nextscene)
 ├─ 动态视频
@@ -493,7 +492,7 @@ Maintain consistent character design and lighting across all frames.
 | 分镜规范源（术语/Schema/6段式） | `skills/storyboard-ai-video/SKILL.md` |
 | 分镜脚本创作 | `skills/comic-storyboard/SKILL.md` |
 | ComfyUI 资产生成 | `skills/comic-comfyui/SKILL.md` |
-| 角色并稿脚本 | `skills/comic-pipeline/scripts/merge_characters.mjs` |
+| 角色并稿脚本 | `opsv image-stitch` CLI |
 | 视频动画生成 | `skills/comic-animation/SKILL.md` |
 | 配音/语音生成 | `skills/comic-voice/SKILL.md` |
 | 后期成片 | `skills/comic-post/SKILL.md` |
