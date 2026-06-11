@@ -3,8 +3,6 @@
 // Handles: seadream5 (imagen, sync URL response), seedance2 (video, async)
 // ============================================================================
 
-import { readFile } from 'fs/promises';
-import path from 'path';
 import { BaseTaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
 import { BaseApiProvider } from './BaseApiProvider';
@@ -25,22 +23,8 @@ interface VolcStatusResponse {
   error_message?: string;
 }
 
-const MIME_BY_EXT: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', jfif: 'image/jpeg',
-  png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', gif: 'image/gif',
-};
-
 export class VolcengineProvider extends BaseApiProvider<Record<string, any>, VolcSubmitResponse, VolcStatusResponse> {
   readonly name = 'volcengine';
-
-  private async resolveImageField(value: string): Promise<string> {
-    if (!value) return value;
-    if (value.startsWith('http') || value.startsWith('data:')) return value;
-    const data = await readFile(value);
-    const ext = path.extname(value).slice(1).toLowerCase() || 'png';
-    const mime = MIME_BY_EXT[ext] || `image/${ext}`;
-    return `data:${mime};base64,${data.toString('base64')}`;
-  }
 
   private async resolveMediaField(value: string, kind: 'video' | 'audio'): Promise<string> {
     if (!value) return value;
@@ -104,13 +88,13 @@ export class VolcengineProvider extends BaseApiProvider<Record<string, any>, Vol
 
     // Imagen: resolve reference_images
     if (task._opsv.type === 'imagen' && Array.isArray(payload.reference_images)) {
-      payload.reference_images = await Promise.all(payload.reference_images.map((v: string) => this.resolveImageField(v)));
+      payload.reference_images = await Promise.all(payload.reference_images.map((v: string) => this.resolveImageToBase64(v)));
     }
 
     // Video: resolve image/video/audio URLs inside content[]
     if (task._opsv.type === 'video' && Array.isArray(payload.content)) {
       for (const item of payload.content) {
-        if (item.image_url?.url) item.image_url.url = await this.resolveImageField(item.image_url.url);
+        if (item.image_url?.url) item.image_url.url = await this.resolveImageToBase64(item.image_url.url);
         if (item.video_url?.url) item.video_url.url = await this.resolveMediaField(item.video_url.url, 'video');
         if (item.audio_url?.url) item.audio_url.url = await this.resolveMediaField(item.audio_url.url, 'audio');
       }

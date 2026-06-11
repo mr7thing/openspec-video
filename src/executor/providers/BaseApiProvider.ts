@@ -12,6 +12,7 @@
 // ============================================================================
 
 import fs from 'fs';
+import { Jimp } from 'jimp';
 import { BaseTaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
 import { outputFilePath, resolveNextOutputIndex } from '../naming';
@@ -116,6 +117,35 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
 
   protected getModelConfig(ctx: OpsVContext, modelKey: string): ModelConfig | undefined {
     return ctx.configLoader.getModelConfig(modelKey);
+  }
+
+  /**
+   * Resolve a local image file path to a base64 data URI with optional preprocessing.
+   *
+   * - http:// and data: URLs are passed through unchanged.
+   * - Local file paths are read, optionally resized to keep pixel count ≤ maxPixels
+   *   (default 1M, ~1024×1024), and returned as a JPEG base64 data URI.
+   *
+   * @param filePath - local path, http URL, or data URI
+   * @param maxPixels - maximum pixel count (width × height), default 1_000_000
+   */
+  protected async resolveImageToBase64(
+    filePath: string,
+    maxPixels: number = 1_000_000
+  ): Promise<string> {
+    if (!filePath) return filePath;
+    if (filePath.startsWith('http') || filePath.startsWith('data:')) return filePath;
+
+    const image = await Jimp.read(filePath);
+    const { width, height } = image.bitmap;
+
+    if (width * height > maxPixels) {
+      const scale = Math.sqrt(maxPixels / (width * height));
+      image.resize({ w: Math.round(width * scale), h: Math.round(height * scale) });
+    }
+
+    const buffer = await image.getBuffer('image/jpeg', { quality: 85 });
+    return `data:image/jpeg;base64,${buffer.toString('base64')}`;
   }
 
   async execute(

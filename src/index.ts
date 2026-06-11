@@ -21,5 +21,5 @@ export { ConfigLoader } from './utils/configLoader';
 export type { ModelConfig, ApiConfig, ProjectSettings, DirSettings } from './utils/configLoader';
 export { FileUtils } from './utils/FileUtils';
 export { downloadFile } from './utils/download';
-export { fileToBase64, fileToDataUri } from './utils/fileToBase64';
+export { fileToBase64, fileToDataUri, fileToBase64Async } from './utils/fileToBase64';
 export { FrameExtractor } from './utils/frameExtractor';

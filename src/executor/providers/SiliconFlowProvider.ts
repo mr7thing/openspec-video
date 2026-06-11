@@ -3,8 +3,6 @@
 // Handles: qimg/edit2509 (imagen, sync), wan2v/i2v (video, async with POST status)
 // ============================================================================
 
-import path from 'path';
-import { readFile } from 'fs/promises';
 import { BaseTaskJson } from '../../types/Job';
 import { BaseApiProvider } from './BaseApiProvider';
 import { HttpClient } from '../HttpClient';
@@ -27,11 +25,6 @@ interface SfStatusResponse {
   error?: { message?: string };
   message?: string;
 }
-
-const MIME_BY_EXT: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', jfif: 'image/jpeg',
-  png: 'image/png', webp: 'image/webp', bmp: 'image/bmp', gif: 'image/gif',
-};
 
 export class SiliconFlowProvider extends BaseApiProvider<Record<string, any>, SfSubmitResponse, SfStatusResponse> {
   readonly name = 'siliconflow';
@@ -104,21 +97,12 @@ export class SiliconFlowProvider extends BaseApiProvider<Record<string, any>, Sf
     const payload = { ...task.payload } as Record<string, any>;
 
     if (Array.isArray(payload.reference_images)) {
-      payload.reference_images = await Promise.all(payload.reference_images.map((v: string) => this.resolveImageField(v)));
+      payload.reference_images = await Promise.all(payload.reference_images.map((v: string) => this.resolveImageToBase64(v)));
     }
-    if (payload.image) payload.image = await this.resolveImageField(payload.image);
-    if (payload.tail_image) payload.tail_image = await this.resolveImageField(payload.tail_image);
+    if (payload.image) payload.image = await this.resolveImageToBase64(payload.image);
+    if (payload.tail_image) payload.tail_image = await this.resolveImageToBase64(payload.tail_image);
 
     const patched: BaseTaskJson<Record<string, any>> = { ...task, payload };
     return super.execute(patched, taskPath, ctx);
-  }
-
-  private async resolveImageField(value: string): Promise<string> {
-    if (!value) return value;
-    if (value.startsWith('http') || value.startsWith('data:')) return value;
-    const data = await readFile(value);
-    const ext = path.extname(value).slice(1).toLowerCase() || 'png';
-    const mime = MIME_BY_EXT[ext] || `image/${ext}`;
-    return `data:${mime};base64,${data.toString('base64')}`;
   }
 }
