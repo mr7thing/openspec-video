@@ -1,0 +1,168 @@
+{
+  "communities": {
+    "0": [
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u4e91\u7483",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u566c\u5fc3\u5492",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u5929\u51e4\u6cd5\u76f8",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u7384\u5fae",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u83ab\u96e8",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u9646\u7136",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u9f99\u73e0"
+    ],
+    "1": [
+      "agents_voice_director",
+      "creative_agent_comic_creative",
+      "guardian_agent_guardian_agent",
+      "runner_agent_runner_agent"
+    ],
+    "2": [
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u5a5a\u7891",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u6d77\u5e95\u5996\u65cf",
+      "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u9f99\u8109"
+    ],
+    "3": [
+      "_category_validate_project",
+      "project_newproject"
+    ],
+    "4": [
+      "_category_validate_shotlist"
+    ],
+    "5": [
+      "_category_validate_comic_project"
+    ],
+    "6": [
+      "_category_validate_comic_character"
+    ],
+    "7": [
+      "_category_validate_comic_storyboard"
+    ],
+    "8": [
+      "_category_validate_comic_shot"
+    ],
+    "9": [
+      "_category_validate_comic_voice"
+    ],
+    "10": [
+      "_category_validate_comic_sfx"
+    ],
+    "11": [
+      "_category_validate_comic_episode"
+    ]
+  },
+  "cohesion": {
+    "0": 0.38095238095238093,
+    "1": 0.5,
+    "2": 0.6666666666666666,
+    "3": 1.0,
+    "4": 1.0,
+    "5": 1.0,
+    "6": 1.0,
+    "7": 1.0,
+    "8": 1.0,
+    "9": 1.0,
+    "10": 1.0,
+    "11": 1.0
+  },
+  "gods": [
+    {
+      "id": "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u9646\u7136",
+      "label": "\u9646\u7136",
+      "degree": 7
+    },
+    {
+      "id": "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u4e91\u7483",
+      "label": "\u4e91\u7483",
+      "degree": 3
+    },
+    {
+      "id": "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u5a5a\u7891",
+      "label": "\u5a5a\u7891",
+      "degree": 3
+    },
+    {
+      "id": "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u7384\u5fae",
+      "label": "\u7384\u5fae",
+      "degree": 2
+    },
+    {
+      "id": "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u5929\u51e4\u6cd5\u76f8",
+      "label": "\u5929\u51e4\u6cd5\u76f8",
+      "degree": 2
+    },
+    {
+      "id": "creative_agent_comic_creative",
+      "label": "Comic Creative Agent",
+      "degree": 2
+    },
+    {
+      "id": "guardian_agent_guardian_agent",
+      "label": "Guardian Agent",
+      "degree": 2
+    },
+    {
+      "id": "_category_validate_project",
+      "label": "Category: project",
+      "degree": 1
+    },
+    {
+      "id": "project_newproject",
+      "label": "newproject",
+      "degree": 1
+    },
+    {
+      "id": "\u5973\u5e1d\u767b\u57fa\u6094\u5a5a_\u8dea\u6c42\u6211\u4fee\u590d\u9f99\u8109_\u83ab\u96e8",
+      "label": "\u83ab\u96e8",
+      "degree": 1
+    }
+  ],
+  "surprises": [
+    {
+      "source": "newproject",
+      "target": "Category: project",
+      "source_files": [
+        "videospec/project.md",
+        "videospec/_category_validate.yaml"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "cross-file semantic connection"
+    },
+    {
+      "source": "Voice Director",
+      "target": "Comic Creative Agent",
+      "source_files": [
+        ".agent/AGENTS.md",
+        ".agent/Creative-Agent.md"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "cross-file semantic connection"
+    },
+    {
+      "source": "Comic Creative Agent",
+      "target": "Guardian Agent",
+      "source_files": [
+        ".agent/Creative-Agent.md",
+        ".agent/Guardian-Agent.md"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "cross-file semantic connection"
+    },
+    {
+      "source": "Guardian Agent",
+      "target": "Runner Agent",
+      "source_files": [
+        ".agent/Guardian-Agent.md",
+        ".agent/Runner-Agent.md"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "cross-file semantic connection"
+    }
+  ],
+  "tokens": {
+    "input": 71478,
+    "output": 11993
+  }
+}

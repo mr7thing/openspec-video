@@ -1,0 +1,45 @@
+# OpsV Input Types Registry — 漫剧制作扩展版
+#
+# 新增类型:
+#   voice — 配音/人声文件
+#   sfx   — 音效文件
+#   animatic — 动态分镜/预演视频
+#   contact_sheet — 角色多角度展示图（三视图、表情集）
+
+input_types:
+  image:
+    description: 静态图像（参考图、角色定档、场景构图、分镜首帧/尾帧）
+    extensions: [.png, .jpg, .jpeg, .webp]
+
+  video:
+    description: 视频文件（动态参考、生成镜头、预览动画）
+    extensions: [.mp4, .mov, .webm, .avi]
+
+  audio:
+    description: 音频文件（背景音乐、环境音）
+    extensions: [.mp3, .wav, .m4a, .flac, .ogg]
+
+  # --- 漫剧专用类型 ---
+  voice:
+    description: 配音/人声文件（角色对白、旁白、OS 内心独白）
+    extensions: [.mp3, .wav, .m4a, .flac, .ogg]
+
+  sfx:
+    description: 音效文件（打击、魔法、环境、UI 音效）
+    extensions: [.mp3, .wav, .ogg]
+
+  animatic:
+    description: 动态分镜/预演视频（低精度预览用）
+    extensions: [.mp4, .mov, .webm]
+
+  contact_sheet:
+    description: 角色多角度展示（三视图、表情集、服装变体）
+    extensions: [.png, .jpg, .webp]
+
+  bvh:
+    description: 动作捕捉数据（BVH 骨骼动画）
+    extensions: [.bvh]
+
+  mask:
+    description: Alpha 遮罩/分割图
+    extensions: [.png]

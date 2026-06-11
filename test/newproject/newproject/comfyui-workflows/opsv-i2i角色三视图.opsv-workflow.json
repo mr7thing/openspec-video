@@ -1,0 +1,15 @@
+{
+  "workflowId": null,
+  "workflowPath": "comfyui-workflows/opsv-i2i角色三视图_api-id-2064759680378949633.json",
+  "nodeMappings": {
+    "prompt-multiline": {
+      "nodeId": "196",
+      "fieldName": "Text"
+    },
+    "image-role": {
+      "nodeId": "202",
+      "fieldName": "image"
+    }
+  },
+  "opsvVersion": "0.11.0"
+}

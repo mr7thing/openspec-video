@@ -1,0 +1,308 @@
+---
+name: comfyui
+description: ComfyUI 工作流编译与执行技能。覆盖本地 ComfyUI 和 RunningHub 云端两种部署，精通 workflow 模板注入、节点参数匹配、梯度轮询与 crash-safe 恢复机制。
+---
+
+# ComfyUI 工作流技能
+
+## 架构概览
+
+ComfyUI 在 OpsV 中是**工作流驱动**的生成方式，与 imagen/animate 的"提示词→API"模式不同：
+
+- **imagen / animate**：prompt + 参数 → 直接调 REST API
+- **comfy**：预定义 workflow JSON 模板 + 参数注入 → 调 ComfyUI API
+
+支持两种部署，共享相同的编译逻辑，仅执行层不同：
+
+| 部署 | 模型 key | Provider | API 地址 | 认证 |
+|------|---------|----------|---------|------|
+| ComfyUI Local | `comfyui.sdxl` | `ComfyUILocalProvider` | `http://127.0.0.1:8188` | 无 |
+| RunningHub Cloud | `runninghub.default` | `RunningHubProvider` | `https://www.runninghub.cn/...` | `RUNNINGHUB_API_KEY` |
+
+两者本质都是 **submit-poll** 模式，与 Volcengine/SiliconFlow 等一致。
+
+---
+
+## 命令用法
+
+```bash
+# 编译（必须指定 --model，自动从当前工作目录或 --manifest 定位 circle）
+opsv comfy --model comfyui.sdxl
+opsv comfy --model runninghub.default
+
+# 显式指定 manifest
+opsv comfy --model comfyui.sdxl --manifest opsv-queue/videospec_circle1/_manifest.json
+
+# 指定 workflow 文件（文件名从 workflow-dir 查找）
+opsv comfy --model comfyui.sdxl --workflow ref2
+
+# 指定 workflow 文件（绝对路径）
+opsv comfy --model comfyui.sdxl --workflow /abs/path/to/workflow.json
+
+# 指定 workflow 目录（覆盖 api_config 的 defaults.templateDir）
+opsv comfy --model comfyui.sdxl --workflow-dir workflows/sdxl/
+
+# 运行时参数覆盖（JSON 格式注入到 workflow 节点）
+opsv comfy --model comfyui.sdxl --param '{"input-style":"anime","input-steps":30}'
+
+# 预览模式（不写文件）
+opsv comfy --model comfyui.sdxl --dry-run
+
+# 执行
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/@hero.json
+
+# 重试失败任务
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/ --retry
+```
+
+---
+
+## 编译流程
+
+### 1. 定位 Circle
+
+编译必须基于已存在的 Circle。通过 `--manifest` 显式指定，或从当前工作目录自动发现 `_manifest.json`。不支持指向任意目录。
+
+### 2. 筛选资产
+
+从 `_manifest.json` 的 `assets` 字段读取，过滤 `status !== 'approved'` 的资产。
+
+### 3. 构建 Job
+
+`buildComfyJob(asset, paramOverrides)` 对每个待编译资产：
+
+- `prompt = frontmatter.prompt || visual_brief || 首段文本`
+- `negative_prompt = frontmatter.negative_prompt`（通过 `node_mapping.negative_prompt` 注入）
+- `type` 值为 `'comfy'`，对应 api_config 中的模型类型
+- `--param` 的 JSON 合并到 `payload.extra`
+
+### 4. ComfyUICompiler 编译
+
+核心是**参数注入到 workflow 模板节点**：
+
+**Workflow 选取**：
+
+1. `--workflow` 指定绝对路径 → 直接使用
+2. `--workflow` 指定文件名 → 从 `--workflow-dir`（或 `defaults.templateDir`）查找
+3. 不指定 `--workflow` → 自动匹配：扫描 workflow-dir 下 `ref{N}.json` 文件，按参考图数量选择
+
+**ref(N) 自动匹配规则**：
+
+```
+1. 计算资产参考图数量 refCount = designRefs.length + externalRefs.length
+2. 扫描 workflow-dir 下所有 .json 文件，提取文件名中 ref(N) 的 N
+3. 精确匹配 N == refCount → 使用
+4. 无精确匹配 → 选 N < refCount 中最大的（多余参考图丢弃）
+5. 仍无匹配 → 选 N > refCount 中最小的（空 slot 留默认值）
+6. 目录为空或无 ref(N) 文件 → 报错跳过该资产
+```
+
+**`node_mapping` 元数据约定**：
+
+ComfyUI Local 和 RunningHub 都必须在 `api_config.yaml` 中配置 `node_mappings`，格式相同：
+
+```yaml
+node_mappings:
+  prompt: "KSampler|positive"
+  negative_prompt: "KSampler|negative"
+  seed: "KSampler|seed"
+  image1: "Load Image|image"
+  image2: "Load Image 2|image"
+```
+
+- 格式为 `"节点title|input字段名"`，用 `|` 分隔
+- `image1`, `image2`, ...：参考图按顺序注入到对应节点（仅匹配 `/^image\d+$/`，`image_quality` 等不生效）
+- `prompt` / `negative_prompt`：正/负向提示词注入
+- `seed`：种子值注入；支持 `random`（执行时解析为随机自然数 < 10¹⁶，每次运行不同）
+- 缺少 `node_mappings` 或配置为空 → 编译报错跳过
+
+**参数注入**：
+
+参考图按 `node_mappings` 中 `image1`, `image2`... 顺序注入。文本按 `prompt` / `negative_prompt` 注入。`--param` 的额外参数按 key 匹配 `node_mappings` 键名注入。未在 `node_mappings` 中声明的 key 不注入。
+
+**节点匹配规则**：
+
+`node_mappings` 中每个 key 映射到 `"节点title|input字段名"`，编译器直接定位到指定节点的指定 input 字段注入：
+
+- `prompt` / `negative_prompt`：注入文本（支持 `frontmatter.negative_prompt`）
+- `seed`：注入整数种子；`random` → 执行时解析为随机自然数 < 10¹⁶
+- `image1`, `image2`, ...：仅匹配 `/^image\d+$/` 的 key 才视为图片输入（`image_quality` 等不生效）
+- 其他 key：按 `node_mappings` 声明直接注入对应字段
+
+**参考图来源**：
+
+```
+资产参考图 = designRefs（## Design References）+ externalRefs（@assetId:variant resolved）
+```
+
+与 imagen/animate/webapp 统一，编译时自动收集。
+
+### 5. 产出
+
+```
+opsv-queue/videospec_circle1/comfyui.sdxl_001/
+  @hero.json              ← 编译后的 TaskJson（含完整 workflow + _opsv 元数据）
+  scene_forest.json
+```
+
+---
+
+## 执行流程
+
+### ComfyUI Local
+
+```
+1. POST /prompt              → 提交 workflow，获取 prompt_id
+2. GET  /history/{prompt_id} → 梯度轮询，等待 outputs 产出
+3. GET  /view?filename=...   → 下载输出图片/视频
+```
+
+**梯度轮询间隔**：
+
+| 经过时间 | 轮询间隔 |
+|---------|---------|
+| 0-5 min | 10s |
+| 5-10 min | 30s |
+| 10-30 min | 60s |
+| 30min+ | 300s |
+
+- 最大时长：4 小时
+- Crash-safe：`.log` JSONL 记录 `prompt_id`，进程中断后 `opsv run` 自动 resume
+- 错误检测：检测到 `status_str === 'error'` 时立即失败，不再无限轮询
+- 网络重试：轮询网络错误指数退避重试 3 次
+- 输出索引：按扩展名分别计数（`.png` 与 `.mp4` 不共享序号）
+
+### RunningHub Cloud
+
+```
+1. POST /task/openapi/comfyui/post          → 提交 workflow，获取 taskId
+2. POST /task/openapi/status                → 梯度轮询（body: {apiKey, taskId}）
+   返回：{code, msg, data: "QUEUED"|"RUNNING"|"SUCCESS"|"FAILED"}
+3. POST /task/openapi/outputs               → 查询结果（body: {apiKey, taskId}）
+   返回：data[] 含 fileUrl, fileType 字段
+4. 下载 fileUrl                             → 保存本地文件
+```
+
+- 请求头：`Authorization: Bearer {RUNNINGHUB_API_KEY}`
+- 状态判断：`SUCCESS` → 下载输出；`FAILED` → 报错
+- 本地引用文件预校验：提交前检查文件是否存在，不存在则抛错
+- 网络重试：轮询网络错误指数退避重试 3 次
+- 同样梯度轮询 + 4 小时超时 + crash-safe resume
+- 输出索引：按扩展名分别计数（`.png` 与 `.mp4` 不共享序号）
+
+---
+
+## .log 检查点格式
+
+每个任务执行时生成 `{id}.log`（JSONL append-only）：
+
+```jsonl
+{"event":"submitted","task_id":"abc123","ts":"2026-04-28T12:00:00Z"}
+{"event":"polling","status":"waiting","task_id":"abc123","ts":"2026-04-28T12:00:10Z"}
+{"event":"succeeded","task_id":"abc123","ts":"2026-04-28T12:02:30Z"}
+```
+
+- 进程崩溃后重启，`opsv run` 读取 `.log` 末尾的 `task_id`，跳过 submit 直接 resume 轮询
+- `succeeded` 或 `failed` 事件标记任务结束，不再轮询
+
+---
+
+## api_config.yaml 配置
+
+```yaml
+# ComfyUI Local
+comfyui.sdxl:
+  provider: local          # QueueRunner 注册键 → ComfyUILocalProvider
+  type: comfy
+  model: any               # workflow 模板文件名（不含 .json）
+  api_url: http://127.0.0.1:8188/prompt
+  node_mappings:
+    prompt: "KSampler|positive"
+    negative_prompt: "KSampler|negative"
+    seed: "KSampler|seed"
+    image1: "Load Image|image"
+    image2: "Load Image 2|image"
+  defaults:
+    templateDir: ""        # workflow JSON 模板目录路径
+    seed: random           # 可选：每次执行自动生成随机种子
+
+# RunningHub Cloud
+runninghub.default:
+  provider: runninghub     # QueueRunner 注册键 → RunningHubProvider
+  type: comfy
+  model: any
+  api_url: https://www.runninghub.cn/task/openapi/comfyui/post
+  api_status_url: https://www.runninghub.cn/task/openapi/status
+  node_mappings:
+    prompt: "CLIP Text Encode (Prompt)|text"
+    negative_prompt: "CLIP Text Encode (Negative Prompt)|text"
+    seed: "KSampler|seed"
+    image1: "Load Image|image"
+    image2: "Load Image 2|image"
+  required_env:
+    - RUNNINGHUB_API_KEY
+```
+
+- `provider: local` 映射到 `ComfyUILocalProvider`（QueueRunner 中注册键 `comfyui`）
+- `provider: runninghub` 映射到 `RunningHubProvider`
+- `type: comfy` 与 `type: imagen` / `type: video` 并列，决定输出扩展名
+- `defaults.templateDir`：Agent 从 `.agent/skills/` 找到对应 workflow，复制到 Provider 目录，注入变量
+
+---
+
+## 迭代操作
+
+与 imagen/animate 相同的命名约定。必须使用 `opsv iterate` 克隆任务：
+
+```bash
+# 克隆任务（自动清除 compiledAt，确保会被执行）
+opsv iterate opsv-queue/videospec_circle1/comfyui.sdxl_001/@hero.json
+# → 生成 @hero_2.json
+# 编辑 @hero_2.json（修改 workflow 节点参数、seed 等）
+opsv run opsv-queue/videospec_circle1/comfyui.sdxl_001/@hero_2.json
+# → 生成 @hero_2_1.png
+
+# 克隆整个目录进行批量迭代
+opsv iterate opsv-queue/videospec_circle1/comfyui.sdxl_001/
+# → 生成 comfyui.sdxl_001_it_001/（目录下所有 task JSON 被复制，名称不变）
+
+# Review approve 后：
+# - @hero_2_1.png → syncing（修改任务，Agent 需对齐文档描述字段）
+# - @hero_1.png → approved（原始任务，直接通过）
+```
+
+---
+
+## 当前局限与注意事项
+
+1. **`node_mappings` 为必填项**：ComfyUI Local 和 RunningHub 都必须在 `api_config.yaml` 中配置 `node_mappings`。缺少 `node_mappings` 会导致编译报错跳过。
+
+2. **`node_mappings` 键名与节点 title 必须对齐**：`"节点title|input字段名"` 中的 title 必须与 workflow 节点的 `_meta.title` 或 `title` 精确匹配，否则参数不会注入。
+
+3. **图片 key 严格匹配**：只有符合 `/^image\d+$/` 的 key（如 `image1`, `image2`）才被视为图片输入。`image_quality`、`image_size` 等不会作为图片注入。
+
+4. **ref(N) 文件名约定**：自动匹配依赖文件名包含 `ref{N}` 模式（如 ref0.json、ref1.json）。不符合命名的文件会被忽略。
+
+5. **`type` 字段影响输出扩展名**：`api_config.yaml` 中 `type: comfy` 默认输出 `.png`。如需生成视频，应设 `type: video`，输出为 `.mp4`。同一次运行中 `.png` 与 `.mp4` 按类型分别索引。
+
+6. **ComfyUI 必须运行**：`opsv run` 不会自动启动 ComfyUI 服务。执行前需确保 `http://127.0.0.1:8188` 可访问。
+
+7. **`--param` 覆盖范围**：`--param` 的 JSON 合并到 `job.payload.extra`，自定义参数需在 `node_mappings` 中有对应 key 才能生效。支持 `seed: random` 在运行时解析。
+
+8. **`frontmatter.negative_prompt`**：frontmatter 中支持 `negative_prompt` 字段，通过 `node_mappings.negative_prompt` 注入到对应节点。
+
+---
+
+## 关键源码文件
+
+| 文件 | 职责 |
+|------|------|
+| `src/commands/comfy.ts` | `opsv comfy` 命令入口，Job 构建 |
+| `src/core/compiler/providers/ComfyUICompiler.ts` | Workflow 模板加载 + 参数注入 |
+| `src/executor/providers/ComfyUILocalProvider.ts` | 本地 ComfyUI submit-poll 执行 |
+| `src/executor/providers/RunningHubProvider.ts` | RunningHub 云端 submit-poll 执行 |
+| `src/executor/polling.ts` | 梯度轮询 + .log 检查点（共享） |
+| `src/executor/naming.ts` | 任务/输出文件命名约定（共享） |
+| `src/core/compiler/TaskBuilder.ts` | 编译编排，路由到 ComfyUICompiler |
+| `src/executor/QueueRunner.ts` | 执行编排，路由到 ComfyUILocalProvider / RunningHubProvider |

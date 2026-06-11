@@ -1,0 +1,522 @@
+# ============================================================================
+# OpsV 漫剧制作 API 配置 (Comic Production v1.0)
+# ============================================================================
+# 覆盖 templates 默认配置，增加漫剧专用的模型组合：
+#   - 硅基流动语音合成 (CosyVoice2)
+#   - RunningHub 漫剧工作流（角色三视图 / 场景定档 / 4帧分镜）
+#   - ComfyUI Local 漫剧工作流
+# ============================================================================
+
+models:
+  # ==========================================
+  # 火山引擎 — 图像生成 (Seedream 5.0)
+  # ==========================================
+  volc.seadream5:
+    provider: volcengine
+    type: imagen
+    model: doubao-seedream-5-0-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    docs_url: https://www.volcengine.com/docs/82379/1824121
+    required_env:
+      - ARK_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      size: "2048x2048"
+      steps: 30
+      cfg_scale: 7.5
+      negative_prompt: "blurry, low quality, distorted, deformed, ugly, bad anatomy, text, watermark, signature"
+      output_format: "png"
+      response_format: "url"
+      watermark: false
+      sequential_image_generation: "auto"
+      max_images: 4
+    quality_map:
+      "1920x1080": "2560x1440"
+      "2K": "2560x1440"
+      "hd": "2560x1440"
+      "standard": "2560x1440"
+
+  # ==========================================
+  # 火山引擎 — 视频生成 (Seedance 2.0 / 2.0 Fast)
+  # 漫剧主用: 首帧+尾帧+4张参考图 → 高质量镜头
+  # ==========================================
+  volc.seedance2:
+    provider: volcengine
+    type: video
+    model: doubao-seedance-2-0-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    docs_url: https://www.volcengine.com/docs/82379/2291680
+    required_env:
+      - ARK_API_KEY
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 9
+    supports_reference_videos: true
+    max_reference_videos: 3
+    supports_reference_audios: true
+    max_reference_audios: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: content[0].text
+      first_frame:
+        source: first_frame
+        target: content[].image_url
+      last_frame:
+        source: last_frame
+        target: content[].image_url
+      image:
+        source: refs[image]
+        target: content[].image_url
+      video:
+        source: refs[video]
+        target: content[].video_url
+      audio:
+        source: refs[audio]
+        target: content[].audio_url
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+
+  volc.seedance2f:
+    provider: volcengine
+    type: video
+    model: doubao-seedance-2-0-fast-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    docs_url: https://www.volcengine.com/docs/82379/2291680
+    required_env:
+      - ARK_API_KEY
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 9
+    supports_reference_videos: true
+    max_reference_videos: 3
+    supports_reference_audios: true
+    max_reference_audios: 1
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+
+  # ==========================================
+  # 硅基流动 — 图像生成
+  # ==========================================
+  siliconflow.qimg:
+    provider: siliconflow
+    type: imagen
+    model: Qwen/Qwen-Image
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      image_size: "1664x928"
+      cfg_scale: 4.0
+      steps: 50
+      seed: 42
+
+  siliconflow.edit2509:
+    provider: siliconflow
+    type: imagen
+    model: Qwen/Qwen-Image-Edit-2509
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_reference_images: true
+    max_reference_images: 3
+    defaults:
+      image_size: "1664x928"
+      num_inference_steps: 20
+      cfg: 4
+
+  # ==========================================
+  # 硅基流动 — 视频生成 (Wan 系列)
+  # 漫剧辅助: T2V/I2V 快速预览镜头
+  # ==========================================
+  siliconflow.want2v:
+    provider: siliconflow
+    type: video
+    model: Wan-AI/Wan2.2-T2V-A14B
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
+    required_env:
+      - SILICONFLOW_API_KEY
+    concurrency: 3
+    defaults:
+      image_size: "1280x720"
+      seed: 42
+
+  siliconflow.wani2v:
+    provider: siliconflow
+    type: video
+    model: Wan-AI/Wan2.2-I2V-A14B
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_first_image: true
+    defaults:
+      image_size: "1280x720"
+      seed: 42
+
+  # ==========================================
+  # 硅基流动 — 语音合成 (CosyVoice2)
+  # 漫剧配音主引擎
+  # 文档: https://docs.siliconflow.cn/cn/api-reference/audio/cosyvoice2
+  # ==========================================
+  siliconflow.cosyvoice2:
+    provider: siliconflow
+    type: audio
+    model: FunAudioLLM/CosyVoice2-0.5B
+    api_url: https://api.siliconflow.cn/v1/audio/speech
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/audio/cosyvoice2
+    required_env:
+      - SILICONFLOW_API_KEY
+    defaults:
+      voice: "cosyvoice2"                    # 基础音色 ID
+      response_format: "mp3"
+      speed: 1.0                             # 语速 0.5~2.0
+      volume: 1.0                            # 音量 0.1~2.0
+      sample_rate: 24000
+    inputs:
+      prompt:
+        source: prompt                       # 台词文本 = prompt
+        target: input                        # API 字段: input
+      voice:
+        source: voice_profile                # frontmatter.voice_profile → 音色参数
+        target: voice
+
+  # ==========================================
+  # MiniMax
+  # ==========================================
+  minimax.img01:
+    provider: minimax
+    type: imagen
+    model: image-01
+    api_url: https://api.minimaxi.com/v1/image_generation
+    docs_url: https://platform.minimaxi.com/docs/api-reference/image-generation-t2i
+    required_env:
+      - MINIMAX_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      aspect_ratio: "16:9"
+      size: "1920x1080"
+      quality: "hd"
+
+  minimax.vid01:
+    provider: minimax
+    type: video
+    model: MiniMax-Hailuo-2.3
+    api_url: https://api.minimaxi.com/v1/video_generation
+    api_status_url: https://api.minimaxi.com/v1/query/video_generation
+    docs_url: https://platform.minimaxi.com/docs/api-reference/video-generation-t2v
+    required_env:
+      - MINIMAX_API_KEY
+    supports_first_image: true
+    max_reference_images: 1
+    defaults:
+      resolution: "1080P"
+      duration: 5
+
+  # ==========================================
+  # ComfyUI Local — 漫剧资产生成工作流
+  # ==========================================
+  comfylocal.comic:
+    provider: comfylocal
+    type: comfy
+    model: workflow
+    api_url: http://127.0.0.1:8188/
+    required_env: []
+    supports_reference_images: true
+    max_reference_images: 4
+    node_mappings:
+      prompt:
+        nodeId: "6"
+        fieldName: "text"
+      negative_prompt:
+        nodeId: "7"
+        fieldName: "text"
+      seed:
+        nodeId: "3"
+        fieldName: "seed"
+      image1:
+        nodeId: "10"
+        fieldName: "image"
+      image2:
+        nodeId: "11"
+        fieldName: "image"
+      image3:
+        nodeId: "12"
+        fieldName: "image"
+      image4:
+        nodeId: "13"
+        fieldName: "image"
+    defaults:
+      templateDir: "comfyui_workflow_templates"
+      seed: random
+
+  # ==========================================
+  # RunningHub — OPSV 漫剧工作流（8个云端 ComfyUI 工作流）
+  #
+  # Node mappings 由 OPSV comfy-node-mapping 从 ComfyUI 工作流 JSON 提取
+  # 工作流 ID 来源于文件名中的序列号
+  #
+  # Agent 在编译时通过 frontmatter.workflow_id 选择对应工作流，
+  # 通过 node_mappings 注入参数。
+  # ==========================================
+
+  # --- 1. LTX2.3 4帧合一剧情 ---
+  runninghub.ltx23-4frame:
+    provider: runninghub
+    type: comfy
+    workflowId: "2064564684220624898"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    supports_reference_images: true
+    max_reference_images: 4
+    node_mappings:
+      seconds:
+        nodeId: "59"
+        fieldName: "value"
+      seed:
+        nodeId: "40"
+        fieldName: "noise_seed"
+      image1:
+        nodeId: "187"
+        fieldName: "image"
+      image2:
+        nodeId: "188"
+        fieldName: "image"
+      image3:
+        nodeId: "189"
+        fieldName: "image"
+      image4:
+        nodeId: "190"
+        fieldName: "image"
+      prompt:
+        nodeId: "9"
+        fieldName: "text"
+    defaults:
+      addMetadata: true
+      seed: random
+
+  # --- 2. Qwen3 + TTS + 设计音色 ---
+  runninghub.qwen3-tts-sound:
+    provider: runninghub
+    type: comfy
+    workflowId: "2064565443943297026"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    node_mappings:
+      sound-design:
+        nodeId: "4"
+        fieldName: "text"
+      tts-content:
+        nodeId: "3"
+        fieldName: "text"
+      seed:
+        nodeId: "6"
+        fieldName: "seed"
+    defaults:
+      addMetadata: true
+      seed: random
+
+  # --- 3. Klein9b 生图 ---
+  runninghub.klein9b:
+    provider: runninghub
+    type: imagen
+    workflowId: "2064564933622325250"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    node_mappings:
+      prompt:
+        nodeId: "115"
+        fieldName: "prompt"
+      seed:
+        nodeId: "116"
+        fieldName: "seed"
+      lorastack:
+        nodeId: "120"
+        fieldName: "lora_stack"
+    defaults:
+      addMetadata: true
+      seed: random
+
+  # --- 4. Klein9b 镜头调度（I2V） ---
+  runninghub.klein9b-cam:
+    provider: runninghub
+    type: video
+    workflowId: "2064564081176178690"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    supports_first_image: true
+    node_mappings:
+      image1:
+        nodeId: "76"
+        fieldName: "image"
+      prompt:
+        nodeId: "177"
+        fieldName: "prompt"
+      seed:
+        nodeId: "103"
+        fieldName: "noise_seed"
+    defaults:
+      addMetadata: true
+      seed: random
+
+  # --- 5. 声音克隆 ---
+  runninghub.voice-clone:
+    provider: runninghub
+    type: audio
+    workflowId: "2064565408421736449"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    supports_reference_audios: true
+    max_reference_audios: 1
+    node_mappings:
+      sound:
+        nodeId: "7"
+        fieldName: "audio"
+      tts-content:
+        nodeId: "41"
+        fieldName: "text"
+      tts-speed:
+        nodeId: "47"
+        fieldName: "value"
+    defaults:
+      addMetadata: true
+      tts_speed: 1.0
+
+  # --- 6. 导演台 (LTXDirector) ---
+  runninghub.director:
+    provider: runninghub
+    type: video
+    workflowId: "2064565219162148866"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    node_mappings:
+      director:
+        nodeId: "46"
+        fieldName: "model"
+    defaults:
+      addMetadata: true
+
+  # --- 7. 角色定制 ---
+  # 节点无 opsv- 前缀标题，根据实际节点标题手动映射
+  runninghub.character:
+    provider: runninghub
+    type: imagen
+    workflowId: "2064565099624484866"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    supports_reference_images: true
+    max_reference_images: 5
+    node_mappings:
+      prompt:
+        nodeId: "10"
+        fieldName: "text"
+      ref_image:
+        nodeId: "31"
+        fieldName: "image"
+      role_front:
+        nodeId: "177"
+        fieldName: "prompt"
+      role_3view_fullbody:
+        nodeId: "185"
+        fieldName: "prompt"
+      role_3view_halfbody:
+        nodeId: "172"
+        fieldName: "prompt"
+    defaults:
+      addMetadata: true
+
+  # --- 8. 首尾帧 ---
+  runninghub.firstlast-frame:
+    provider: runninghub
+    type: video
+    workflowId: "2064564349775204354"
+    api_url: https://www.runninghub.cn/task/openapi/create
+    api_status_url: https://www.runninghub.cn/task/openapi/status
+    required_env:
+      - RUNNINGHUB_API_KEY
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 2
+    node_mappings:
+      firstframe:
+        nodeId: "60"
+        fieldName: "image"
+      lastframe:
+        nodeId: "62"
+        fieldName: "image"
+      prompt:
+        nodeId: "43"
+        fieldName: "value"
+    defaults:
+      addMetadata: true
+
+  # ==========================================
+  # Web App 浏览器自动化
+  # ==========================================
+  webapp.gemini:
+    provider: webapp
+    type: webapp
+    api_url: http://127.0.0.1:9700/generate
+    api_status_url: http://127.0.0.1:9700/status
+    supports_reference_images: true
+    supports_first_image: true
+    max_reference_images: 1
+    defaults:
+      target_url: "https://gemini.google.com"
+      typing_speed: "human"
+      watermark_removal: true
+      upload_method: "drag-drop"
+
+# ============================================================================
+# 全局配置
+# ============================================================================
+settings:
+  dirs:
+    videospec: videospec
+    queue: opsv-queue
+  polling:
+    intervals:
+      - thresholdMinutes: 5
+        intervalSeconds: 10
+      - thresholdMinutes: 10
+        intervalSeconds: 30
+      - thresholdMinutes: 30
+        intervalSeconds: 60
+      - thresholdMinutes: 60
+        intervalSeconds: 300

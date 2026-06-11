@@ -1,0 +1,119 @@
+{
+  "3": {
+    "inputs": {
+      "文本": [
+        "41",
+        0
+      ],
+      "参考文本": [
+        "11",
+        0
+      ],
+      "语言": "自动",
+      "自动卸载模型": false,
+      "最大生成Token数": 2048,
+      "seed": 738373188199525,
+      "语速": [
+        "47",
+        0
+      ],
+      "批量模式": false,
+      "top_p": 0.8,
+      "top_k": 50,
+      "temperature": 0.8,
+      "repetition_penalty": 1.1,
+      "启用高级采样配置": false,
+      "模型": [
+        "6",
+        0
+      ],
+      "参考音频": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "Qwen3TTSVoiceClone",
+    "_meta": {
+      "title": "Qwen3 TTS 声音克隆"
+    }
+  },
+  "6": {
+    "inputs": {
+      "模型名称": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "运行设备": "cuda",
+      "精度": "fp16"
+    },
+    "class_type": "Qwen3TTSModelLoader",
+    "_meta": {
+      "title": "Qwen3 TTS 模型加载"
+    }
+  },
+  "7": {
+    "inputs": {
+      "audio": "0c3dd06c2a72f1580f1a0e6fb1980c1e9475cc6e9c7bab2ada43102ac6fba067.mp3",
+      "audioUI": ""
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "opsv-sound"
+    }
+  },
+  "8": {
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "audioUI": "",
+      "audio": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "SaveAudio",
+    "_meta": {
+      "title": "Save Audio (FLAC) (Deprecated)"
+    }
+  },
+  "11": {
+    "inputs": {
+      "model": "whisper-large-v3",
+      "language": "Chinese",
+      "audio": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "Apply Whisper",
+    "_meta": {
+      "title": "Apply Whisper"
+    }
+  },
+  "12": {
+    "inputs": {
+      "text": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "41": {
+    "inputs": {
+      "text": "但真正的墙，不该只是颜料的容器。它应承载时间，呼吸温度，成为生活与艺术发生的现场。\n在无数选择中，迈图，一直坚持做难而正确的事。\n\n"
+    },
+    "class_type": "TextInputBasic",
+    "_meta": {
+      "title": "opsv-tts-content"
+    }
+  },
+  "47": {
+    "inputs": {
+      "value": 0.9500000000000002
+    },
+    "class_type": "Float",
+    "_meta": {
+      "title": "opsv-tts-speed"
+    }
+  }
+}
