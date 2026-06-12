@@ -17,7 +17,9 @@ import os from 'os';
 import { TaskInfo } from '../core/task';
 import { RunnerResult } from '../core/types';
 
-const BRIDGE_SOCKET = '/tmp/opsv-gemini.sock';
+const BRIDGE_SOCKET = process.platform === 'win32'
+  ? '\\\\.\\pipe\\tmp\\opsv-gemini.sock'
+  : '/tmp/opsv-gemini.sock';
 const GENERATION_TIMEOUT_MS = 180_000;  // 3 min
 const POLL_INTERVAL_MS = 2_000;
 
