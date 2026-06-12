@@ -298,6 +298,7 @@ OpsV 只有 **两个** 内置 category。其余全部由用户在项目中自定
 
 | 需要什么 | 文件 |
 |---------|------|
+| **🆕 技能包开发指南** | `references/skill_package_guide.md` |
 | Frontmatter 字段完整定义 | `references/frontmatter_schema.md` |
 | refs 编写指南 + 反例库 + 自检清单 | `references/refs_guide.md` |
 | 角色/场景/分镜文档模板 | `references/workflow_templates.md` |
