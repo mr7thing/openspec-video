@@ -1,40 +1,34 @@
-name: Publish to npm via Trusted Publisher
+name: Publish videospec to npm
 
 on:
-  # 两种触发方式：打 tag 或创建 GitHub Release
   push:
     tags:
       - 'v*'
-  release:
-    types: [created]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: publish  # 必须和你在 npm 后台配置的 Environment name 一致
+    environment: publish
     permissions:
       contents: read
-      id-token: write  # 关键！用于生成 OIDC 凭证，npm 可信发布必须要这个权限
+      id-token: write   # 必须，否则 OIDC 拿不到 token
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4  # 用最新的 v4，解决 Node 20 弃用警告
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20  # 用 v4 的 action 就不会再报 Node 20 弃用警告了
+          node-version: 24          # 关键：≥22.14
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build package (如果你的项目需要构建，就保留这步；不需要可以删掉)
+      - name: Build
         run: npm run build
 
-      - name: Publish to npm with provenance
+      - name: Publish with OIDC provenance
         run: npm publish --provenance --access public
-        env:
-          # 可信发布不需要 NPM_TOKEN，会自动通过 OIDC 认证
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
