@@ -148,6 +148,50 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     return `data:image/jpeg;base64,${buffer.toString('base64')}`;
   }
 
+  /**
+   * Resolve a single file reference: passthrough for HTTP/HTTPS/data: URLs,
+   * and invoke uploadFn for local file paths.
+   *
+   * @param value - URL or local file path
+   * @param uploadFn - async callback that uploads the local file and returns a URL
+   */
+  protected async resolveFileReference(
+    value: string,
+    uploadFn: (filePath: string) => Promise<string>
+  ): Promise<string> {
+    if (!value) return value;
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    if (value.startsWith('data:')) return value;
+    return uploadFn(value);
+  }
+
+  /**
+   * Scan specified payload fields for local file paths and resolve them via uploadFn.
+   * Supports both array fields (e.g. imageUrls[]) and singular string fields (e.g. imageUrl).
+   *
+   * @param payload - the task payload to mutate in-place
+   * @param uploadFn - async callback that uploads a local file and returns a URL
+   * @param fields - field names to scan (default: ['imageUrls', 'videoUrls', 'audioUrls', 'imageUrl'])
+   */
+  protected async resolveLocalFileFields(
+    payload: Record<string, any>,
+    uploadFn: (filePath: string) => Promise<string>,
+    fields: string[] = ['imageUrls', 'videoUrls', 'audioUrls', 'imageUrl']
+  ): Promise<void> {
+    for (const field of fields) {
+      const val = payload[field];
+      if (val === undefined || val === null) continue;
+
+      if (Array.isArray(val)) {
+        payload[field] = await Promise.all(
+          val.map((item: string) => this.resolveFileReference(item, uploadFn))
+        );
+      } else if (typeof val === 'string') {
+        payload[field] = await this.resolveFileReference(val, uploadFn);
+      }
+    }
+  }
+
   async execute(
     task: BaseTaskJson<TPayload>,
     taskPath: string,

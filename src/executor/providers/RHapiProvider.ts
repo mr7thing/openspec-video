@@ -3,7 +3,7 @@
 // RunningHub Standard Model API v2 — async submit + query via /openapi/v2/query
 // Covers: imagen (GPT Image 2, 全能图片 X, Nana Banana V2), video (Seedance 2.0, Vidu)
 //
-// File reference handling:
+// File reference handling (using BaseApiProvider helpers):
 //   1. HTTP/HTTPS URLs → passed through as-is
 //   2. Local file paths → auto-uploaded via RH media upload API
 //   3. Base64 data URIs → passed through as-is
@@ -67,15 +67,13 @@ export class RHapiProvider extends BaseApiProvider<Record<string, unknown>, RhAp
   readonly name = 'rhapi';
 
   protected buildPayload(task: BaseTaskJson<Record<string, unknown>>, _ctx?: OpsVContext): unknown {
-    // Strip internal metadata from payload before sending
     const { apiKey, ...cleanPayload } = task.payload as Record<string, any>;
     return cleanPayload;
   }
 
   /**
-   * Override execute to pre-process local file references before submission.
-   * Scans imageUrls/videoUrls/audioUrls/imageUrl for local file paths and
-   * uploads them to RunningHub's media API.
+   * Override execute to upload local file references before submission.
+   * Delegates file scanning and resolution to BaseApiProvider.resolveLocalFileFields().
    */
   async execute(
     task: BaseTaskJson<Record<string, unknown>>,
@@ -86,8 +84,7 @@ export class RHapiProvider extends BaseApiProvider<Record<string, unknown>, RhAp
     const apiKey = ctx.configLoader.getResolvedApiKey(task._opsv.modelKey);
 
     if (apiKey) {
-      // Upload local file references before submission
-      await this.uploadLocalReferences(payload, apiKey);
+      await this.resolveLocalFileFields(payload, (fp) => this.uploadFile(fp, apiKey));
     }
 
     const patched: BaseTaskJson<Record<string, unknown>> = { ...task, payload };
@@ -95,57 +92,15 @@ export class RHapiProvider extends BaseApiProvider<Record<string, unknown>, RhAp
   }
 
   /**
-   * Scan reference fields in payload and upload any local file paths.
-   * Supports: imageUrls[], videoUrls[], audioUrls[], imageUrl (singular)
-   */
-  private async uploadLocalReferences(payload: Record<string, any>, apiKey: string): Promise<void> {
-    const refFields = ['imageUrls', 'videoUrls', 'audioUrls'];
-
-    // Handle array fields (imageUrls, videoUrls, audioUrls)
-    for (const field of refFields) {
-      if (!Array.isArray(payload[field])) continue;
-      payload[field] = await Promise.all(
-        payload[field].map((val: string) => this.resolveToRhUrl(val, apiKey))
-      );
-    }
-
-    // Handle singular imageUrl (X series i2i)
-    if (typeof payload.imageUrl === 'string') {
-      payload.imageUrl = await this.resolveToRhUrl(payload.imageUrl, apiKey);
-    }
-  }
-
-  /**
-   * Resolve a value to an RH-accessible URL.
-   * - HTTP/HTTPS URLs → pass through
-   * - Base64 data URIs → pass through
-   * - Local file paths → upload to RH, return download_url
-   */
-  private async resolveToRhUrl(value: string, apiKey: string): Promise<string> {
-    if (!value) return value;
-    if (value.startsWith('http://') || value.startsWith('https://')) return value;
-    if (value.startsWith('data:')) return value;
-
-    // Local file path → upload to RH
-    try {
-      if (!fs.existsSync(value)) {
-        logger.warn(`[rhapi] Local file not found, skipping upload: ${value}`);
-        return value;
-      }
-      const uploadUrl = await this.uploadFile(value, apiKey);
-      logger.info(`[rhapi] Uploaded ${path.basename(value)} → ${uploadUrl}`);
-      return uploadUrl;
-    } catch (err: any) {
-      logger.warn(`[rhapi] Upload failed for ${value}: ${err.message}. Sending as-is.`);
-      return value;
-    }
-  }
-
-  /**
    * Upload a local file to RunningHub's media API.
    * POST multipart/form-data to /openapi/v2/media/upload/binary
    */
   private async uploadFile(filePath: string, apiKey: string): Promise<string> {
+    if (!fs.existsSync(filePath)) {
+      logger.warn(`[rhapi] Local file not found, sending as-is: ${filePath}`);
+      throw new Error(`File not found: ${filePath}`);
+    }
+
     const form = new FormData();
     form.append('file', fs.createReadStream(filePath));
 
@@ -154,8 +109,8 @@ export class RHapiProvider extends BaseApiProvider<Record<string, unknown>, RhAp
         ...form.getHeaders(),
         'Authorization': `Bearer ${apiKey}`,
       },
-      timeout: 120000, // 2min for upload
-      maxContentLength: 50 * 1024 * 1024, // 50MB
+      timeout: 120000,
+      maxContentLength: 50 * 1024 * 1024,
       maxBodyLength: 50 * 1024 * 1024,
     });
 
