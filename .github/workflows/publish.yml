@@ -21,9 +21,12 @@ jobs:
 
       - name: 安装依赖
         run: npm ci  # 比npm install更快、更稳定
-
+        
       - name: 运行测试（可选，确保包可用）
         run: npm test  # 如果没写测试，这行可以删掉
+
+      - name: 更新npm  # 新增这一步，在发布前更新npm
+        run: npm install -g npm@latest
 
       - name: 发布到npm
         run: npm publish --access public  # 公开包用public，私有包用restricted
