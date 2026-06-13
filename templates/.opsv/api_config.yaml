@@ -481,6 +481,7 @@ models:
       model: "g-4.2"
 
   # 全能图片 X 图生图（低价渠道版）
+  # 注意：X 系列 i2i 用的是单数 imageUrl（String），不是 imageUrls（Array）
   rhapi.xi2i:
     provider: rhapi
     type: imagen
@@ -492,6 +493,10 @@ models:
     max_reference_images: 1
     defaults:
       model: "g-4.2"
+    inputs:
+      ref_img:
+        source: reference_images[0]
+        target: imageUrl
 
   # 全能图片 G-2.0 图生图（低价渠道版）
   rhapi.g2i2i:
