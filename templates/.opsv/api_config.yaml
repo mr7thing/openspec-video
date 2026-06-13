@@ -369,4 +369,154 @@ models:
   #     watermark_removal: true
   #     upload_method: "paste"
 
+  # ==========================================
+  # RunningHub Standard Model API (rhapi)
+  # 直连 REST API，不走 ComfyUI workflow 模式
+  # Auth: Authorization: Bearer $RH_API_KEY
+  # 状态查询统一使用 /openapi/v2/query
+  # ==========================================
+
+  # Seedance 2.0 多模态视频（高品质）
+  # POST https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/multimodal-video
+  rhapi.seedance:
+    provider: rhapi
+    type: video
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/multimodal-video
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    supports_reference_videos: true
+    supports_reference_audios: true
+    max_reference_images: 9
+    max_reference_videos: 3
+    max_reference_audios: 3
+    defaults:
+      resolution: "720p"
+      duration: "5"
+      ratio: "adaptive"
+      generateAudio: true
+      realPersonMode: true
+      conversionSlots:
+        - "all"
+      returnLastFrame: false
+      seed: -1
+
+  # Seedance 2.0 Fast 多模态视频（高性价比）
+  rhapi.seedancefast:
+    provider: rhapi
+    type: video
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-fast/multimodal-video
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    supports_reference_videos: true
+    supports_reference_audios: true
+    max_reference_images: 9
+    max_reference_videos: 3
+    max_reference_audios: 3
+    defaults:
+      resolution: "720p"
+      duration: "5"
+      ratio: "adaptive"
+      generateAudio: true
+      realPersonMode: true
+      conversionSlots:
+        - "all"
+      returnLastFrame: false
+      seed: -1
+
+  # Vidu 参考生视频 Q2（旗舰级参考生视频）
+  rhapi.viduq2:
+    provider: rhapi
+    type: video
+    api_url: https://www.runninghub.cn/openapi/v2/vidu/reference-to-video-q2
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    max_reference_images: 7
+    defaults:
+      resolution: "720p"
+      duration: "5"
+      aspectRatio: "16:9"
+      movementAmplitude: "auto"
+
+  # 全能图片 V2 文生图（低价渠道版）
+  rhapi.v2:
+    provider: rhapi
+    type: imagen
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/text-to-image
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    defaults:
+      aspectRatio: "1:1"
+      resolution: "1k"
+
+  # 全能图片 V2 图生图（低价渠道版）
+  rhapi.v2i2i:
+    provider: rhapi
+    type: imagen
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/image-to-image
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    max_reference_images: 10
+    defaults:
+      aspectRatio: "1:1"
+      resolution: "1k"
+
+  # 全能图片 X 文生图（低价渠道版）
+  rhapi.x:
+    provider: rhapi
+    type: imagen
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g/text-to-image
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    defaults:
+      model: "g-4.2"
+
+  # 全能图片 X 图生图（低价渠道版）
+  rhapi.xi2i:
+    provider: rhapi
+    type: imagen
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g/image-to-image
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      model: "g-4.2"
+
+  # 全能图片 G-2.0 图生图（低价渠道版）
+  rhapi.g2i2i:
+    provider: rhapi
+    type: imagen
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g-2/image-to-image
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    max_reference_images: 10
+    defaults:
+      resolution: "1k"
+
+  # 全能图片 G-2 文生图（官方稳定版）
+  rhapi.g2:
+    provider: rhapi
+    type: imagen
+    api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g-2-official/text-to-image
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    required_env:
+      - RH_API_KEY
+    defaults:
+      aspectRatio: "1:1"
+      resolution: "2k"
+      quality: "medium"
+
 

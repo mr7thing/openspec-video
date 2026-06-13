@@ -15,6 +15,7 @@ import { MinimaxCompiler } from './providers/MinimaxCompiler';
 import { RunningHubCompiler } from './providers/RunningHubCompiler';
 import { ComfyUICompiler } from './providers/ComfyUICompiler';
 import { WebappCompiler } from './providers/WebappCompiler';
+import { RHapiCompiler } from './providers/RHapiCompiler';
 import { logger } from '../../utils/logger';
 import { CompilationError, ConfigError, OpsVErrorCode } from '../../errors/OpsVError';
 import { OpsVContext } from '../../container/OpsVContext';
@@ -32,6 +33,7 @@ const COMPILERS: Record<string, new () => ProviderCompiler> = {
   runninghub: RunningHubCompiler,
   comfylocal: ComfyUICompiler,
   webapp: WebappCompiler,
+  rhapi: RHapiCompiler,
 };
 
 export class TaskBuilder {
