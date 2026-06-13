@@ -150,6 +150,18 @@ export class VolcengineCompiler implements ProviderCompiler {
       }
     }
 
+    // Inject registered asset IDs from resolvedRefs (doc-level, provider-agnostic)
+    // If a referenced doc has frontmatter.asset_id, emit character_ref entries.
+    // These supplement (not replace) image_url refs — the API uses asset_id for
+    // registered characters and image_url for pose/expression guidance.
+    if (ctx.resolvedRefs) {
+      for (const ref of ctx.resolvedRefs) {
+        if (ref.assetId) {
+          payload.content.push({ type: 'character_ref', asset_id: ref.assetId });
+        }
+      }
+    }
+
     return {
       payload,
       _opsv: {

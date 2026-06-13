@@ -25,6 +25,8 @@ import { ResolvedRef } from '../../types/FrontmatterSchema';
 import { RefsByType, PromptCompileMode } from '../../types/Refs';
 import { InputTypesLoader } from '../../utils/inputTypesLoader';
 import { compilePrompt } from './PromptCompiler';
+import { getProjectDir } from '../../utils/configLoader';
+import { buildAssetDocIndex } from '../AssetDocIndex';
 
 const COMPILERS: Record<string, new () => ProviderCompiler> = {
   volcengine: VolcengineCompiler,
@@ -91,6 +93,15 @@ export class TaskBuilder {
               groupedInputs = binderResult.groupedInputs;
               for (const err of binderResult.errors) {
                 logger.warn(`TaskBuilder refs[${job.id}]: ${err}`);
+              }
+
+              // Cross-doc lookup: for external refs, check if the referenced doc has asset_id
+              for (const ref of resolvedRefs) {
+                if (ref.kind !== 'external') continue;
+                const assetId = lookupAssetId(this.ctx.projectRoot, ref.id);
+                if (assetId) {
+                  ref.assetId = assetId;
+                }
               }
             }
           }
@@ -188,4 +199,39 @@ export class TaskBuilder {
       model: modelKey.slice(dotIdx + 1),
     };
   }
+}
+
+/**
+ * Cross-doc lookup: given a project root and an @id (e.g. "yun_li_adult"),
+ * find the character doc under videospec/elements/ and read its asset_id.
+ * 
+ * Returns the asset_id string if found, undefined otherwise.
+ */
+function lookupAssetId(projectRoot: string, refId: string): string | undefined {
+  try {
+    const videospecDir = getProjectDir(projectRoot, 'videospec');
+    const elementsDir = path.join(videospecDir, 'elements');
+
+    if (!fs.existsSync(elementsDir)) return undefined;
+
+    // Fast path: try flat file first (elements/yun_li_adult.md)
+    const flatPath = path.join(elementsDir, `${refId}.md`);
+    if (fs.existsSync(flatPath)) {
+      const content = fs.readFileSync(flatPath, 'utf-8');
+      const { frontmatter } = FrontmatterParser.parseRaw(content);
+      return frontmatter.asset_id as string | undefined;
+    }
+
+    // Fallback: scan for nested docs (elements/some_dir/yun_li_adult.md)
+    const index = buildAssetDocIndex(elementsDir);
+    const entry = index.entries.get(refId);
+    if (entry) {
+      const content = fs.readFileSync(entry.filePath, 'utf-8');
+      const { frontmatter } = FrontmatterParser.parseRaw(content);
+      return frontmatter.asset_id as string | undefined;
+    }
+  } catch {
+    // Silent: asset_id is optional enrichment, failure is non-fatal
+  }
+  return undefined;
 }

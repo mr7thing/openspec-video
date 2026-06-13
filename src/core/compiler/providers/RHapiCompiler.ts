@@ -69,6 +69,16 @@ export class RHapiCompiler implements ProviderCompiler {
       payload.imageUrls = ctx.referenceImages.slice(0, maxRefs);
     }
 
+    // Inject registered asset IDs from resolvedRefs (doc-level, provider-agnostic)
+    if (ctx.resolvedRefs) {
+      const characterRefs = ctx.resolvedRefs
+        .filter(r => r.assetId)
+        .map(r => ({ id: r.key, asset_id: r.assetId }));
+      if (characterRefs.length > 0) {
+        payload.characterRefs = characterRefs;
+      }
+    }
+
     return {
       payload,
       _opsv: {
@@ -140,6 +150,16 @@ export class RHapiCompiler implements ProviderCompiler {
       if (ctx.referenceAudios && ctx.referenceAudios.length > 0) {
         const maxRefs = modelConfig.max_reference_audios || 3;
         payload.audioUrls = ctx.referenceAudios.slice(0, maxRefs);
+      }
+    }
+
+    // Inject registered asset IDs from resolvedRefs (doc-level, provider-agnostic)
+    if (ctx.resolvedRefs) {
+      const characterRefs = ctx.resolvedRefs
+        .filter(r => r.assetId)
+        .map(r => ({ id: r.key, asset_id: r.assetId }));
+      if (characterRefs.length > 0) {
+        payload.characterRefs = characterRefs;
       }
     }
 

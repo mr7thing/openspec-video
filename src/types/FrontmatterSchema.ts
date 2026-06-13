@@ -36,6 +36,13 @@ export interface ResolvedRef {
   variant?: string;
   /** Resolved file paths (at least one when validated) */
   paths: string[];
+  /**
+   * API-side asset ID, populated from the referenced doc's frontmatter.
+   * Only set when the referenced doc (e.g. elements/yun_li_adult.md) has
+   * `asset_id` in its frontmatter. Providers use this to skip file upload
+   * and pass the registered asset ID directly to the API.
+   */
+  assetId?: string;
 }
 
 export const BaseFrontmatterSchema = z.object({
@@ -45,6 +52,7 @@ export const BaseFrontmatterSchema = z.object({
   visual_detailed: z.string().optional(),
   prompt: z.string().optional(),
   negative_prompt: z.string().optional(),
+  asset_id: z.string().optional(),
   refs: RefsByTypeSchema.optional(),
   reviews: z.array(z.string()).optional(),
   workflow: z.string().optional(),              // Deprecated: use workflow_id or workflow_path
