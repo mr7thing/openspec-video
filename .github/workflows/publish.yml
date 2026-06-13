@@ -1,22 +1,29 @@
-name: Publish to npm
-
+name: 发布npm包
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]  # 当你在GitHub创建Release时自动触发
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: publish
+    permissions:
+      id-token: write  # 允许获取OIDC令牌（核心）
+      contents: read   # 允许读取仓库代码
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - run: npm run build
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          node-version: 20.x  # 推荐Node.js 20+
+          registry-url: https://registry.npmjs.org/  # npm官方仓库地址
+
+      - name: 安装依赖
+        run: npm ci  # 比npm install更快、更稳定
+
+      - name: 运行测试（可选，确保包可用）
+        run: npm test  # 如果没写测试，这行可以删掉
+
+      - name: 发布到npm
+        run: npm publish --access public  # 公开包用public，私有包用restricted
