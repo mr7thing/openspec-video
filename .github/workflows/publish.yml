@@ -1,32 +1,40 @@
-name: 发布npm包
+name: Publish to npm via Trusted Publisher
+
 on:
+  # 两种触发方式：打 tag 或创建 GitHub Release
+  push:
+    tags:
+      - 'v*'
   release:
-    types: [published]  # 当你在GitHub创建Release时自动触发
+    types: [created]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: publish  # 必须和你在 npm 后台配置的 Environment name 一致
     permissions:
-      id-token: write  # 允许获取OIDC令牌（核心）
-      contents: read   # 允许读取仓库代码
-    steps:
-      - name: 拉取代码
-        uses: actions/checkout@v4
+      contents: read
+      id-token: write  # 关键！用于生成 OIDC 凭证，npm 可信发布必须要这个权限
 
-      - name: 安装Node.js
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4  # 用最新的 v4，解决 Node 20 弃用警告
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x  # 推荐Node.js 20+
-          registry-url: https://registry.npmjs.org/  # npm官方仓库地址
+          node-version: 20  # 用 v4 的 action 就不会再报 Node 20 弃用警告了
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
 
-      - name: 安装依赖
-        run: npm ci  # 比npm install更快、更稳定
-        
-      - name: 运行测试（可选，确保包可用）
-        run: npm test  # 如果没写测试，这行可以删掉
+      - name: Install dependencies
+        run: npm ci
 
-      - name: 更新npm  # 新增这一步，在发布前更新npm
-        run: npm install -g npm@latest
+      - name: Build package (如果你的项目需要构建，就保留这步；不需要可以删掉)
+        run: npm run build
 
-      - name: 发布到npm
-        run: npm publish --access public  # 公开包用public，私有包用restricted
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          # 可信发布不需要 NPM_TOKEN，会自动通过 OIDC 认证
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
