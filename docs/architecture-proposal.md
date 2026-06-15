@@ -15,10 +15,10 @@ User's existing Chrome (already logged into Google)
        ├→ content.js  ← runs on gemini.google.com, handles automation
        └→ background.js ← receives Native Messaging commands
                               ↑
-                    ┌─────────┴──────────┐
-                    │  Native Messaging   │
-                    │  Host (Python)      │
-                    └─────────┬──────────┘
+                     ┌─────────┴──────────┐
+                     │  Native Messaging   │
+                     │  Host (JS / Node.js)│
+                     └─────────┬──────────┘
                               ↑
                     OpenCLI / OPSV pipeline
 

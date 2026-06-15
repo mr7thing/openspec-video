@@ -5,7 +5,7 @@
  *
  * Flow:
  *   task JSON → opsv run → WebappProvider → dispatch → gemini.ts
- *     → Unix socket → native-host.py bridge → WS → extension → content.js → Gemini UI
+ *     → Unix socket → native-host.js bridge → WS → extension → content.js → Gemini UI
  *
  * No Puppeteer daemon, no separate browser process.
  * Uses the user's existing Chrome with the companion extension loaded.
@@ -32,7 +32,7 @@ function log(msg: string, level = 'INFO'): void {
 // ── Unix Socket Client ────────────────────────────────────────────────────
 
 /**
- * Connect to the native-host.py bridge and send a generation command.
+ * Connect to the native-host.js bridge and send a generation command.
  * Returns the result when the extension finishes.
  */
 function sendViaBridge(payload: Record<string, any>): Promise<Record<string, any>> {
@@ -43,7 +43,7 @@ function sendViaBridge(payload: Record<string, any>): Promise<Record<string, any
     let buffer = '';
     const timeout = setTimeout(() => {
       client.destroy();
-      reject(new Error('Bridge timeout — is native-host.py running?'));
+      reject(new Error('Bridge timeout — is native-host.js running?'));
     }, GENERATION_TIMEOUT_MS + 10_000);
 
     client.connect(BRIDGE_SOCKET, () => {
@@ -83,7 +83,7 @@ function sendViaBridge(payload: Record<string, any>): Promise<Record<string, any
       clearTimeout(timeout);
       client.destroy();
       if ((err as any).code === 'ENOENT' || (err as any).code === 'ECONNREFUSED') {
-        reject(new Error(`Bridge socket not found at ${BRIDGE_SOCKET}. Start native-host.py first.`));
+        reject(new Error(`Bridge socket not found at ${BRIDGE_SOCKET}. Start native-host.js first (run 'npm run daemon').`));
       } else {
         reject(err);
       }
@@ -224,9 +224,9 @@ export async function run(taskInfo: TaskInfo): Promise<RunnerResult> {
     log(`Generation error: ${e.message}`, 'ERROR');
 
     // Helpful hints for common errors
-    if (e.message.includes('Bridge socket not found') || e.message.includes('native-host.py')) {
-      log('HINT: Start the bridge with: python3 extension/native-host.py', 'HINT');
-      log('HINT: Or use: opsv-gemini ping to check if it\'s running', 'HINT');
+    if (e.message.includes('Bridge socket not found') || e.message.includes('native-host')) {
+      log('HINT: Start the bridge daemon with: npm run daemon', 'HINT');
+      log('HINT: Or run directly: node extension/native-host.js', 'HINT');
     }
     if (e.message.includes('No Gemini tab')) {
       log('HINT: Open https://gemini.google.com in Chrome and try again', 'HINT');

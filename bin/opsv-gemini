@@ -13,7 +13,7 @@ Usage:
   opsv-gemini status
 
 Prerequisites:
-  - native-host.py must be running (start it in a terminal)
+  - native-host.js must be running (start with 'npm run daemon' or 'node extension/native-host.js')
   - Extension loaded in Chrome (chrome://extensions → Load unpacked)
   - gemini.google.com open in a tab
 """
@@ -37,11 +37,12 @@ def send_command_stream(cmd: dict, timeout: float = 120.0):
         sock.connect(SOCKET_PATH)
     except FileNotFoundError:
         print(f'Error: Socket {SOCKET_PATH} not found.', file=sys.stderr)
-        print('Make sure native-host.py is running:', file=sys.stderr)
-        print(f'  python3 {os.path.dirname(os.path.dirname(__file__))}/extension/native-host.py', file=sys.stderr)
+        print('Make sure native-host.js is running:', file=sys.stderr)
+        print(f'  node {os.path.dirname(os.path.dirname(__file__))}/extension/native-host.js', file=sys.stderr)
+        print('Or run in a terminal:\n  npm run daemon', file=sys.stderr)
         sys.exit(1)
     except ConnectionRefusedError:
-        print('Error: Connection refused. Is native-host.py running?', file=sys.stderr)
+        print('Error: Connection refused. Is native-host.js running? (Start it with: npm run daemon)', file=sys.stderr)
         sys.exit(1)
 
     # Send command

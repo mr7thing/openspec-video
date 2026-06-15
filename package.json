@@ -16,7 +16,8 @@
     "prepublishOnly": "npm run build",
     "start": "ts-node src/index.ts",
     "test": "jest --passWithNoTests",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "daemon": "node extension/native-host.js"
   },
   "files": [
     "dist",
