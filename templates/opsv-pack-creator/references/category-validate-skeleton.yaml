@@ -1,0 +1,73 @@
+# OpsV Category Validation Rules (v0.10.0) — <技能包名>
+#
+# 文档级业务规则，按 category 字段定义。
+#
+# ⚠️  运行时加载位置: videospec/_category_validate.yaml
+#     源文件: .opsv/category_validate.yaml（修改后请同步两者）
+#
+# 查找顺序:
+#   1. <projectRoot>/videospec/_category_validate.yaml
+#   2. ~/.opsv/category_validate.yaml
+#   3. 内置默认（project + shotlist）
+
+# =========================================================================
+# <技能包名> 自定义 Category 总览
+# =========================================================================
+
+# ---------------------------------------------------------------------------
+# 内置默认覆盖
+# ---------------------------------------------------------------------------
+project:
+  required_fields:
+    - status
+    - title
+  skip_prompt_check: true
+
+shotlist:
+  required_fields:
+    - status
+    - title
+  skip_prompt_check: true
+
+# ---------------------------------------------------------------------------
+# 视觉生成类（需 prompt 检查）
+# ---------------------------------------------------------------------------
+<category_A>:
+  required_fields:
+    - status
+    - title
+    - category
+    - created
+    - <field_X>
+    - refs
+  required_file_prefix: "<目录>/"
+  rules:
+    - name: <field_X> 长度检查
+      type: min_length
+      field: <field_X>
+      min: 30
+    - name: 禁止占位符
+      type: no_placeholder
+      fields: [ "<field_X>" ]
+    - name: 引用一致性
+      type: refs_in_prompt_must_match_refs
+      prompt_field: <field_X>
+      refs_field: refs
+
+# ---------------------------------------------------------------------------
+# 非视觉/分析类（跳过 prompt 检查）
+# ---------------------------------------------------------------------------
+<category_B>:
+  required_fields:
+    - status
+    - title
+    - category
+    - created
+    - <field_Z>
+  required_file_prefix: "<目录>/"
+  skip_prompt_check: true
+  rules:
+    - name: <field_Z> 非空
+      type: min_length
+      field: <field_Z>
+      min: 1
