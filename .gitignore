@@ -38,3 +38,10 @@ REASONIX.md
 test/
 FOR_Uncle7.md
 GEMINI.md
+
+# Chrome extension build artifacts and signing key (private)
+*.crx
+*.pem
+
+# Legacy test data directory
+test_data/
