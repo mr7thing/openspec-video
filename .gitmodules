@@ -1,3 +1,6 @@
 [submodule "extension"]
 	path = extension
 	url = https://github.com/mr7thing/opsv-chrome-extgension.git
+[submodule "opsv-packs"]
+	path = opsv-packs
+	url = https://github.com/mr7thing/opsv-packs.git
