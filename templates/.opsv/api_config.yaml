@@ -334,7 +334,7 @@ models:
     api_status_url: http://127.0.0.1:9700/status
     supports_reference_images: true
     supports_first_image: true
-    max_reference_images: 1
+    max_reference_images: 13
     defaults:
       target_url: "https://gemini.google.com"
       typing_speed: "human"
@@ -523,5 +523,24 @@ models:
       aspectRatio: "1:1"
       resolution: "2k"
       quality: "medium"
+
+  # # ==========================================
+  # # Seedance 2.0 ACT 角色资产注册
+  # # 文档: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/character
+  # # POST 注册角色资产，返回 asset_id 用于后续视频生成
+  # # ==========================================
+  # rhapi.act:
+  #   provider: rhapi
+  #   type: asset
+  #   api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/character
+  #   api_status_url: https://www.runninghub.cn/openapi/v2/query
+  #   required_env:
+  #     - RH_API_KEY
+  #   supports_reference_images: true
+  #   supports_reference_audios: true
+  #   max_reference_images: 5
+  #   max_reference_audios: 1
+  #   defaults:
+  #     characterName: "character"
 
 
