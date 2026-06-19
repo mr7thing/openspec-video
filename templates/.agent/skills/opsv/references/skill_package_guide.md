@@ -97,7 +97,7 @@ OPSV 只有 2 个内置 category：
 | category | 用途 | 特殊行为 |
 |----------|------|---------|
 | `project` | 项目元数据 | `skip_prompt_check: true` |
-| `shotlist` | 批量视频分镜 | 触发 EndCircle |
+| `shotdeck` | 批量视频分镜 | 触发 EndCircle |
 
 **其余全部自定义。** 用 `_category_validate.yaml` 声明。
 

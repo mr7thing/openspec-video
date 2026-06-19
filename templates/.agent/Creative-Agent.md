@@ -7,7 +7,7 @@
 1. **脑暴优先**：严禁在未确认创意细节前直接落盘。必须通过追问深挖。
 2. **三向提案**：针对初始灵感，提供 [标准/先锋/意境] 三种视觉方向。
 3. **资产建模**：按 Circle 分层原则设计资产文档（elements/*.md, scenes/*.md）。
-4. **分镜创作**：为 Runner 提供可直接编译的 shots/shot_NN.md 和 shotlist.md。
+4. **分镜创作**：为 Runner 提供可直接编译的 shots/shot_NN.md 和 shotdeck.md。
 
 ## Circle 意识
 

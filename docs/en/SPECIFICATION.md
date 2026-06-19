@@ -202,7 +202,7 @@ Circles represent dependency layers determined by topological sort. Circle names
 | `firstcircle` | Layer 2 (depends on zerocircle), or final layer when exactly 2 layers | Assets depending on zero outputs |
 | `secondcircle` | Layer 3 (when ≥4 layers) | Middle layers |
 | `thirdcircle` | Layer 4 (when ≥5 layers) | Middle layers |
-| `endcircle` | Final layer contains `shotlist.md` | Final video shot outputs (batch video generation) |
+| `endcircle` | Final layer contains `shotdeck.md` | Final video shot outputs (batch video generation) |
 
 `opsv circle create` builds the graph and creates a new circle directory (`basename.circleN`). The `--name` parameter sets the basename; `--dir` scopes creation to a specific directory. Each `circle create` increments the circle batch number (`_circle1`, `_circle2`, etc.).
 
@@ -347,4 +347,4 @@ Rules:
 
 ## Breaking Changes from v0.8.5
 
-- **`endcircle` condition clarified**: `endcircle` is only used when the final layer contains `shotlist.md`. Regular shot assets (shot-production/shot-design category) do not trigger `endcircle` naming.
+- **`endcircle` condition clarified**: `endcircle` is only used when the final layer contains `shotdeck.md`. Regular shot assets (shot-production/shot-design category) do not trigger `endcircle` naming.

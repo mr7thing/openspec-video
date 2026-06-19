@@ -65,7 +65,7 @@ opsv comfy --model comfylocal.klein9b
 
 **产出**：`opsv-queue/videospec_circle{N}/{provider}.{model}_NNN/{id}.json`
 
-> 视频生成不仅限于 shotlist。ComfyUI 工作流（`opsv comfy`）可以对**任意 category** 的文档生成视频，如 4 帧/9 帧工作流配置。`shotlist` 是内置的批量视频编排格式，适用于 prompt→API 管线。
+> 视频生成不仅限于 shotdeck。ComfyUI 工作流（`opsv comfy`）可以对**任意 category** 的文档生成视频，如 4 帧/9 帧工作流配置。`shotdeck` 是内置的批量视频编排格式，适用于 prompt→API 管线。
 
 ### 步骤 3：执行渲染
 

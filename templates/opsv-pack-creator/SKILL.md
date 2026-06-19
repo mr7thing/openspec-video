@@ -111,6 +111,20 @@ Step 3: 为每个 category 定义验证规则
 
 > **每个 category 必须有验证规则**。无验证规则的 category = 无人看管的文档 = 迟早被遗忘。
 
+### 系统保留命名
+
+以下命名已被 OPSV 引擎占用，**自定义 category 和文档文件名不得与之重叠**：
+
+| 保留项 | 类型 | 说明 |
+|--------|------|------|
+| `shotdeck` | 文档文件名 | `shotdeck.md` 是批量视频编译的入口文档，依赖图中检测到该文件时尾环自动命名为 `end_circle` |
+| `shot-design` | category 值 | 分镜设计文档类型，对应专用 `ShotDesignFrontmatterSchema`（含 `title`、`total_shots`、`style`） |
+| `shot-production` | category 值 | 分镜生成文档类型，对应专用 `ShotProductionFrontmatterSchema`（含 `frame_ref`、`first_frame`、`last_frame`、`duration`、`video_path`） |
+| `project` | category 值 | 项目元数据文档类型，对应 `ProjectFrontmatterSchema`（含 `aspect_ratio`、`resolution`、`vision`） |
+| `@FRAME:` | refs 语法 | 帧引用语法（`@FRAME:shotId_first` / `@FRAME:shotId_last`），用于引用其他文档的生成产物而非源资产，是一种特殊的引用维度 |
+
+> 这些保留项是 OPSV 引擎中尚未完全泛化的硬编码部分。在未来的重构中可能被解构为通用机制，但在此之前，自定义技能包不应侵占这些命名空间。
+
 ---
 
 ## 原则四：文档即契约 (Document-as-Contract)

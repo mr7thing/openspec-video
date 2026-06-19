@@ -139,10 +139,10 @@ opsv-queue/videospec_circle2/      仅当依赖层级结构发生变化时才新
 │  └────────┬─────────────────────────────────────────────────────┘   │
 │           │                                                         │
 │  ─ ─ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │
-│           │   Layer N: end_circle (仅 shotlist.md 存在时)           │
+│           │   Layer N: end_circle (仅 shotdeck.md 存在时)           │
 │           │                                                         │
 │  ┌────────┴─────────────────────────────────────────────────────┐   │
-│  │ shotlist.md                                                  │   │
+│  │ shotdeck.md                                                  │   │
 │  │ Shot 01: first_frame=@shot_01:first                          │   │
 │  │ Shot 02: first_frame=@FRAME:shot_01_last                     │   │
 │  └──────────────────────────────────────────────────────────────┘   │
@@ -456,7 +456,7 @@ opsv review --cloud
 | 刷新状态 | `opsv circle refresh` | Circle 已创建 |
 | 生成 Zero 层图像 | `opsv imagen --model <m>` | Circle 已创建，资产 drafting |
 | 生成 First 层图像 | `opsv imagen --model <m>` | Zero 层全部 approved（同一 circle 目录） |
-| 生成视频 | `opsv animate --model <m>` | shotlist.md 存在，上游 approved |
+| 生成视频 | `opsv animate --model <m>` | shotdeck.md 存在，上游 approved |
 | 执行渲染 | `opsv run <path>` | .json 已编译 |
 | 本地审查 | `opsv review` | 渲染产物存在 |
 | 远程审查 | `opsv review --cloud` | opsv login 已完成 |

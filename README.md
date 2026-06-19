@@ -83,7 +83,7 @@ videospec/                  # 你的创作区
   elements/@hero.md         # 角色（文件名即 @id）
   scenes/@temple.md         # 场景
   shots/shot_01.md          # 分镜
-  shots/shotlist.md         # 视频工程图纸
+  shots/shotdeck.md         # 视频工程图纸
 
 opsv-queue/                 # OpsV 生成区（只增不删）
   videospec_circle1/        # 一个 Circle 批次包含所有层级

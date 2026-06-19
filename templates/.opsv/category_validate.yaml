@@ -9,14 +9,14 @@
 # Built-in defaults — applied unless overridden.
 # Two categories have special semantics:
 #   - project:  metadata file, no generation, skip prompt checks
-#   - shotlist: video batch frontmatter, still needs prompt quality
+#   - shotdeck: video batch frontmatter, still needs prompt quality
 # ---------------------------------------------------------------------------
 
 project:
   required_fields: [status]
   skip_prompt_check: true
 
-shotlist:
+shotdeck:
   required_fields: [status, title]
   field_schema:
     prompt:

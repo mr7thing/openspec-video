@@ -160,13 +160,13 @@ refs:
 - `id` 来自文件名（`shot_01.md` → `id: shot_01`），frontmatter 不重复声明
 - prompt 中所有 `@id` 都在 refs 中有对应 key
 - prompt 描述画面而非剧情
-- `@FRAME:*` 不进入 refs——它是编译时解析的帧引用，仅在 shotlist.md 中使用
+- `@FRAME:*` 不进入 refs——它是编译时解析的帧引用，仅在 shotdeck.md 中使用
 
 ### Shotlist.md（末环）
 
 ```yaml
 ---
-category: shotlist           # 内置 category，末环视频批量生成
+category: shotdeck           # 内置 category，末环视频批量生成
 status: drafting
 title: "EP01 镜头列表"
 ---

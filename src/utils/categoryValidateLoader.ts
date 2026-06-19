@@ -32,7 +32,7 @@ const BUILTIN_DEFAULTS: CategoryRules = {
     required_fields: ['status'],
     skip_prompt_check: true,
   },
-  shotlist: {
+  shotdeck: {
     required_fields: ['status', 'title'],
     field_schema: {
       prompt: {

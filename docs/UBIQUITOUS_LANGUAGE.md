@@ -29,7 +29,7 @@ Asset 本身是 `.md` 文档。文档里通过路径引用了图片/视频，这
 | **Circle（环）** | 拓扑排序的一个批次；同批 Asset 之间无依赖，可并行执行；写入 `{name}.circle_1/` 目录。**index** 字段（0-based）标识批次序号，**name** 字段是语义名称 | layer（已废除，用 Circle + index 替代）、batch（batch 暗示无序，Circle 保留拓扑语义） |
 | **index（批次序号）** | 拓扑排序的批次号，0-based。`for (const [index, batch] of batches.entries())` 直接得出。与目录编号 `circle_1` 差一（index=0 → circle_1） | layer number、Circle ID |
 | **环名称（name）** | 环的语义名称：`zerocircle` / `firstcircle` / `secondcircle` ... / `end_circle`。ordinals 覆盖 index 0-9；超过 9 层时 fallback 为 `circle.{index}` |  |
-| **end_circle（终点环）** | shotlist.md 所在的环，生成最终视频。**注意：终点环不一定在拓扑最末尾**，中间环也可以放置其他文档和确认目录做各种类型的生成 | lastcircle |
+| **end_circle（终点环）** | shotdeck.md 所在的环，生成最终视频。**注意：终点环不一定在拓扑最末尾**，中间环也可以放置其他文档和确认目录做各种类型的生成 | lastcircle |
 | **Toposort（拓扑排序）** | 根据 refs 依赖关系将 Asset 划分为环的算法 | sorting、ordering |
 | **Cycle（循环依赖）** | Asset A → B → C → A 的闭环；系统拒绝处理 | circular dependency、loop |
 
@@ -37,7 +37,7 @@ Asset 本身是 `.md` 文档。文档里通过路径引用了图片/视频，这
 
 - `zerocircle` — 固定，零依赖，直接 prompt 生成（index=0）
 - `firstcircle` / `secondcircle` ... — 中间环，ordinals 覆盖 index 0-9（index 1-9）
-- `end_circle` — shotlist.md 所在的环，生成最终视频（固定语义标记，优先于 ordinals）
+- `end_circle` — shotdeck.md 所在的环，生成最终视频（固定语义标记，优先于 ordinals）
 - `circle.{index}` — 超过 9 层时的 fallback（dot notation，与目录名 `{basename}.circle_1` 风格一致）
 
 > ⚠️ 代码中 `ninethcircle` 拼写正确（ninth + circle，连写），ordinals 数组下标 index 直接对应 ordinals[index]。

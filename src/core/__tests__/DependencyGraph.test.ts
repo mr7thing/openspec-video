@@ -86,11 +86,11 @@ describe('DependencyGraph', () => {
       expect(circles[14].index).toBe(14);
     });
 
-    it('end_circle when last layer contains shotlist', () => {
+    it('end_circle when last layer contains shotdeck', () => {
       const graph = new DependencyGraph();
       graph.build([
         makeDoc('a', []),
-        makeDoc('shotlist', ['@a']),
+        makeDoc('shotdeck', ['@a']),
       ]);
       const circles = graph.getCircles();
       expect(circles).toHaveLength(2);
@@ -105,12 +105,12 @@ describe('DependencyGraph', () => {
         const refs = i > 0 ? [`@layer${i - 1}`] : [];
         docs.push(makeDoc(`layer${i}`, refs));
       }
-      docs.push(makeDoc('shotlist', ['@layer4']));
+      docs.push(makeDoc('shotdeck', ['@layer4']));
       graph.build(docs);
       const circles = graph.getCircles();
       const last = circles[circles.length - 1];
       expect(last.name).toBe('end_circle');
-      expect(last.assetIds).toContain('shotlist');
+      expect(last.assetIds).toContain('shotdeck');
     });
   });
 });

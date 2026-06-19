@@ -263,7 +263,7 @@ prompt 中每个 `@id` 都必须是生成结果中能被人看到的对象。不
    → 重复步骤 3d-3h
 
 5. 视频生成
-   分镜全部 approved 后 → 创建 shotlist.md
+   分镜全部 approved 后 → 创建 shotdeck.md
    → opsv animate --model <m> → opsv run → opsv review
 ```
 

@@ -8,7 +8,7 @@
 # 查找顺序:
 #   1. <projectRoot>/videospec/_category_validate.yaml
 #   2. ~/.opsv/category_validate.yaml
-#   3. 内置默认（project + shotlist）
+#   3. 内置默认（project + shotdeck）
 
 # =========================================================================
 # <技能包名> 自定义 Category 总览
@@ -23,7 +23,7 @@ project:
     - title
   skip_prompt_check: true
 
-shotlist:
+shotdeck:
   required_fields:
     - status
     - title

@@ -136,7 +136,7 @@ export class DependencyGraph {
     const { batches } = this.topologicalSort();
     const circles: CircleDefinition[] = [];
 
-    const lastBatchHasShotList = (batch: string[]): boolean => batch.includes('shotlist');
+    const lastBatchHasShotList = (batch: string[]): boolean => batch.includes('shotdeck');
 
     for (const [index, batch] of batches.entries()) {
       const isLastLayer = index === batches.length - 1;

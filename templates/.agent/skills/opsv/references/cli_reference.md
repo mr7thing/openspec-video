@@ -66,7 +66,7 @@ opsv imagen --model volcengine.seadream --status-skip none
 - 第一个参考图块 = `approvedRefs`（外部引用），第二个参考图块 = `designRefs`（内部参考）
 
 ### opsv animate
-编译 shotlist.md 为视频任务，带 `--model` 参数时**直接编译**产出可执行 `.json`，不再生成 `video_jobs.json` 中间层。
+编译 shotdeck.md 为视频任务，带 `--model` 参数时**直接编译**产出可执行 `.json`，不再生成 `video_jobs.json` 中间层。
 
 **产出目录**：`opsv-queue/videospec.circleN/volcengine.seedance/shot_01.json` 等
 
@@ -88,7 +88,7 @@ opsv animate --model volcengine.seedance --dry-run
 ```
 
 **Manifest-First**：produce 命令只从 manifest 读取，不扫描目录。
-**endcircle 条件**：`endcircle` 仅在最终层包含 `shotlist.md` 时使用。
+**endcircle 条件**：`endcircle` 仅在最终层包含 `shotdeck.md` 时使用。
 
 ### opsv comfy
 ComfyUI 工作流编译为任务描述 JSON，带 `--model` 时直接产出可执行文件。
@@ -496,6 +496,22 @@ models:
 
 ---
 
+## 系统保留命名
+
+以下命名已被 OPSV 引擎占用，自定义文档和 category 不得与之重叠：
+
+| 保留项 | 类型 | 说明 |
+|--------|------|------|
+| `shotdeck` | 文档文件名 | 批量视频编译入口，尾环自动命名为 `end_circle` |
+| `shot-design` | category | 分镜设计，专用 schema（`title`/`total_shots`/`style`） |
+| `shot-production` | category | 分镜生成，专用 schema（`frame_ref`/`duration`/`video_path`） |
+| `project` | category | 项目元数据，专用 schema（`aspect_ratio`/`resolution`/`vision`） |
+| `@FRAME:` | refs 语法 | 引用其他文档的产出物（`@FRAME:shotId_first`），不是源资产引用 |
+
+> 详见 `opsv-pack-creator` 原则三「系统保留命名」。
+
+---
+
 ## 目录结构参考
 
 ```
@@ -527,7 +543,7 @@ opsv-queue/                                    # 渲染产物目录
 7. **`opsv circle refresh`**: 刷新状态。ZeroCircle 全部 approved 后，在同一目录继续编译 FirstCircle。
 8. **`opsv imagen --model <provider.model>`**: 编译 FirstCircle 分镜图像任务。
 9. **`opsv run <paths...>`** → **`opsv review`**: 执行 + 审查。
-10. **`opsv animate --model <provider.model>`**: 如有 shotlist.md，编译 EndCircle 视频任务。
+10. **`opsv animate --model <provider.model>`**: 如有 shotdeck.md，编译 EndCircle 视频任务。
 11. **`opsv run <paths...>`**: 视频渲染。
 
 > 只有在依赖层级结构变化时（refs 改变导致资产在层间移动），才需要 `opsv circle create` 新建批次。

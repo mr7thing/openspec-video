@@ -23,7 +23,7 @@ Scans the specified `--dir` directory (e.g. `videospec/elements/` and `videospec
 Circle names:
 - Each `opsv circle create` increments the batch number: `_circle1/`, `_circle2/`, `_circle3/`
 - Circle names: `zerocircle` (index 0), `firstcircle` (index 1), `secondcircle` (index 2), etc.
-- `end_circle` only when `shotlist.md` exists in the final layer
+- `end_circle` only when `shotdeck.md` exists in the final layer
 - `--name` overrides the basename (default: derived from `--dir` path)
 
 ### Refresh Circles

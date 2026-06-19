@@ -10,7 +10,7 @@
 
 | 词 | 定义 | 示例 |
 |----|------|------|
-| **category** | 文档分类标签。内置 `project` 和 `shotlist`，其余由用户在 `_category_validate.yaml` 中自定义。决定**验证规则**。 | `character`, `scene`, `shot` |
+| **category** | 文档分类标签。内置 `project` 和 `shotdeck`，其余由用户在 `_category_validate.yaml` 中自定义。决定**验证规则**。 | `character`, `scene`, `shot` |
 | **type** | API 模型类型，在 `api_config.yaml` 中声明。决定**调用哪个 Provider 和执行方式**。 | `imagen`, `video`, `comfy`, `webapp` |
 
 **两者独立**：同一 category 的文档可以用不同 type 的模型生成（如 `shot` 可以用 `imagen` 生成静态图，也可以用 `comfy` 生成视频）。category 和 type 刻意使用不同词汇以消除歧义。
@@ -89,9 +89,9 @@
 
 资产完全就绪。可作为下游 Layer 的依赖。`approved` ⇔ 必须存在 `## Approved References`。
 
-### `shotlist`
+### `shotdeck`
 
-内置 category，末环 EndCircle 的批量视频生成文档。`opsv animate` 的编译目标。视频生成**不限于** shotlist——ComfyUI 工作流可以对任意 category 的文档生成视频。
+内置 category，末环 EndCircle 的批量视频生成文档。`opsv animate` 的编译目标。视频生成**不限于** shotdeck——ComfyUI 工作流可以对任意 category 的文档生成视频。
 
 ### `node_mapping`
 

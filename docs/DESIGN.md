@@ -24,7 +24,7 @@ The `_manifest.json` in each circle directory is a cache/manifest of all assets 
 
 **A circle is a set of documents with no mutual dependencies — they can execute in parallel.**
 
-The dependency graph does a topological sort and groups documents into batches. Each batch becomes a circle. Circle `index` is the batch number (0-based). The circle name is semantic: `zerocircle` (index 0), `firstcircle` (1), ..., or `end_circle` if the last batch contains `shotlist.md`.
+The dependency graph does a topological sort and groups documents into batches. Each batch becomes a circle. Circle `index` is the batch number (0-based). The circle name is semantic: `zerocircle` (index 0), `firstcircle` (1), ..., or `end_circle` if the last batch contains `shotdeck.md`.
 
 **Key invariant**: Documents within the same circle never reference each other. If they did, they'd be in different circles.
 
@@ -160,3 +160,28 @@ project/
 ```
 
 **Key rule**: `videospec/` is the workspace. `opsv-queue/` is the build directory — output of compilation, input to execution. The two are never confused.
+
+---
+
+## 11. Engine Provides Hooks, Agent Owns Decisions
+
+**Principle**: The CLI provides validation, resolution, and transformation primitives. It never injects semantic rules about *how* references should influence generation.
+
+This principle crystallized during comparison with ArcReel, a reference-based AI video project that hard-codes consistency rules into its engine: injection priority order (product > character > scene > prop), fidelity tail text ("logo 不得改变"), per-type prompt guards, and temporal consistency via previous-storyboard injection with segment_break control.
+
+**Why ArcReel's approach was rejected for OPSV**: ArcReel bakes consistency heuristics into the engine because it targets weak models with rigid pipelines. OPSV targets strong models (Gemini etc.) with Agent-driven workflows. The agent, guided by skill instructions, makes better injection decisions than any hard-coded rule. An engine that guesses "this ref is for identity" vs "this ref is for style" will inevitably guess wrong for some workflow.
+
+**What the CLI does**:
+- `RefBinder` resolves `@-syntax` keys to file paths and groups them by `input_type`
+- `validate` checks that every `@-token` in `prompt` has a corresponding refs entry (bidirectional), that referenced files exist, and that `input_type` values are registered — all structural, not semantic
+- `TaskBuilder` assembles `referenceImages` from `groupedInputs` — a flat array, no priority reordering, no appended instructions
+
+**What the CLI deliberately does NOT do**:
+- No injection priority ordering — the agent controls the order via how it writes `refs:` in frontmatter
+- No per-type prompt tails (e.g., "产品高保真还原") — the agent writes those in `prompt` or `visual_brief` when needed
+- No temporal consistency injection (previous shot / segment_break) — if a skill needs this, the agent explicitly includes prior outputs in the next shot's `refs:`
+- No asset semantics — `input_types.yaml` declares *what* a type is (image/video/audio) and what file extensions it covers, not *how* it should be injected
+
+**How the agent makes decisions**: The skill (`SKILL.md`) tells the agent how to use refs. `Vision Brief` describes the overall visual goal. The agent reads both, understands the intent, and writes `prompt` and `refs:` accordingly. A product fidelity workflow gets a prompt tail like "产品外观必须与参考图完全一致" because the agent wrote it, not because the engine appended it.
+
+**The implicit contract**: `input_types` keys are hooks — not rules. When a skill says "refs of type `element` should anchor identity, refs of type `style` should guide atmosphere," the agent encodes that in the prompt. The CLI ensures the refs exist and are wired correctly. The division of labor is: CLI checks *can it work*, agent decides *how to work*.

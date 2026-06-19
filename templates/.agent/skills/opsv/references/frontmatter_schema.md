@@ -11,7 +11,7 @@ OpsV 只有 **两个** 内置 category。其余全部由用户在 `.opsv/categor
 | category | 用途 | 特殊行为 |
 |----------|------|---------|
 | `project` | 项目级元数据 | 跳过 prompt 检查（无视觉生成） |
-| `shotlist` | 批量视频生成图纸，末环 EndCircle | 必含 `status`、`title` |
+| `shotdeck` | 批量视频生成图纸，末环 EndCircle | 必含 `status`、`title` |
 
 ### project.md — 项目初始化必填
 
@@ -65,13 +65,13 @@ total_episodes: 12
 
 ---
 
-### shotlist.md — 末环视频批量生成
+### shotdeck.md — 末环视频批量生成
 
-`shotlist` 类型位于 Circle 拓扑的最末端（EndCircle），用于 `opsv animate` 编译。这是一个具有**特殊格式**的文档。
+`shotdeck` 类型位于 Circle 拓扑的最末端（EndCircle），用于 `opsv animate` 编译。这是一个具有**特殊格式**的文档。
 
 ```yaml
 ---
-category: shotlist
+category: shotdeck
 status: drafting
 title: "EP01 镜头列表"
 ---
@@ -94,20 +94,20 @@ duration: "10s"
 @hero 站在 @temple 庭院中央...
 ```
 
-> ⚠️ **shotlist 不是视频生成的唯一途径**。你完全可以在 ComfyUI 工作流（4 帧/9 帧）中基于任意 category 的文档生成视频。`shotlist` 是 OpsV 内置的**批量**视频编排格式，适用于传统 prompt→API 管线。
+> ⚠️ **shotdeck 不是视频生成的唯一途径**。你完全可以在 ComfyUI 工作流（4 帧/9 帧）中基于任意 category 的文档生成视频。`shotdeck` 是 OpsV 内置的**批量**视频编排格式，适用于传统 prompt→API 管线。
 
 ---
 
 ## 用户自定义 Category
 
-除 `project` 和 `shotlist` 外，所有 category 都由用户在项目中定义。项目初始化后的 `templates/.opsv/category_validate.yaml` 提供了注释掉的示例模板。
+除 `project` 和 `shotdeck` 外，所有 category 都由用户在项目中定义。项目初始化后的 `templates/.opsv/category_validate.yaml` 提供了注释掉的示例模板。
 
 ### 配置位置与优先级
 
 ```
 1. <project>/videospec/_category_validate.yaml   # 项目级（最高优先级）
 2. ~/.opsv/category_validate.yaml                # 用户级
-3. 内置默认（project + shotlist）                 # 兜底
+3. 内置默认（project + shotdeck）                 # 兜底
 ```
 
 ### 常见自定义 Category 示例
@@ -157,7 +157,7 @@ shot:
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `category` | string | ✅ | `project` / `shotlist` / 或自定义 |
+| `category` | string | ✅ | `project` / `shotdeck` / 或自定义 |
 | `status` | string | ✅ | `drafting` / `syncing` / `approved` |
 | `title` | string | 建议 | 文档标题 |
 | `reviews` | array | — | 审查记录，由 `opsv review` 自动追加 |
