@@ -88,11 +88,11 @@ models:
     supports_first_image: true
     supports_last_image: true
     supports_reference_images: true
-    max_reference_images: 9
+    max_reference_images: 10
     supports_reference_videos: true
     max_reference_videos: 3
     supports_reference_audios: true
-    max_reference_audios: 1
+    max_reference_audios: 3
     inputs:
       # key 对齐 frontmatter ### <type> 子标题
       # source = 数据来源快捷路径, target = API payload 注入位置
@@ -132,11 +132,11 @@ models:
     supports_first_image: true
     supports_last_image: true
     supports_reference_images: true
-    max_reference_images: 9
+    max_reference_images: 10
     supports_reference_videos: true
     max_reference_videos: 3
     supports_reference_audios: true
-    max_reference_audios: 1
+    max_reference_audios: 3
     defaults:
       ratio: "16:9"
       duration: 5
@@ -388,7 +388,7 @@ models:
     supports_reference_images: true
     supports_reference_videos: true
     supports_reference_audios: true
-    max_reference_images: 9
+    max_reference_images: 10
     max_reference_videos: 3
     max_reference_audios: 3
     defaults:
@@ -413,7 +413,7 @@ models:
     supports_reference_images: true
     supports_reference_videos: true
     supports_reference_audios: true
-    max_reference_images: 9
+    max_reference_images: 10
     max_reference_videos: 3
     max_reference_audios: 3
     defaults:
