@@ -109,7 +109,7 @@ user-invocable: true
 | 命令 | 干什么 | Agent 必须知道 |
 |------|--------|---------------|
 | `opsv refs check` | 查 prompt ↔ refs 一致性 | 用了 `@id` 但 refs 没声明 → 报错 |
-| `opsv refs sync` | 自动填充 refs 路径 | 多候选留空待人工 |
+| `opsv refs fill` | 自动补齐缺失 refs key + 填充路径 | --write 写回；--dry-run 预览 |
 | `opsv image-stitch` | 拼接图片 | 横拼 `--right` / 纵拼 `--down` |
 | `opsv comfy-node-mapping` | 分析 ComfyUI 工作流 | 产出节点映射 |
 

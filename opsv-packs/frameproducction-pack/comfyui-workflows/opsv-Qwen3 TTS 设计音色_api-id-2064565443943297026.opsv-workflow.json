@@ -1,0 +1,19 @@
+{
+  "workflowId": null,
+  "workflowPath": "comfyui-workflows/opsv-Qwen3 TTS 设计音色_api-id-2064565443943297026.json",
+  "nodeMappings": {
+    "tts-content": {
+      "nodeId": "3",
+      "fieldName": "text"
+    },
+    "sound-design": {
+      "nodeId": "4",
+      "fieldName": "text"
+    },
+    "seed": {
+      "nodeId": "6",
+      "fieldName": "seed"
+    }
+  },
+  "opsvVersion": "0.11.0"
+}

@@ -1,0 +1,94 @@
+# FrameProduction Pack — Category Validation Rules
+# 对应 multi-ref-pack 的 _category_validate.yaml 规范
+
+categories:
+  # === S3: 角色资产 ===
+  frame_character_design:
+    required_fields:
+      - category
+      - status
+      - id
+      - prompt
+      - generation_type
+    severity: error
+    skip_prompt_check: false
+
+  frame_character_multiview:
+    required_fields:
+      - category
+      - status
+      - id
+      - prompt
+      - generation_type
+    severity: error
+    skip_prompt_check: false
+
+  # === S4: 场景/道具资产 ===
+  frame_klein9b_image:
+    required_fields:
+      - category
+      - status
+      - id
+      - prompt
+      - generation_type
+    severity: error
+    skip_prompt_check: false
+
+  # === S5: 声音资产 ===
+  frame_voice_clone:
+    required_fields:
+      - category
+      - status
+      - id
+      - prompt
+      - generation_type
+      - audio_duration
+    severity: error
+    skip_prompt_check: false
+
+  frame_voice_design:
+    required_fields:
+      - category
+      - status
+      - id
+      - prompt
+      - generation_type
+      - audio_duration
+    severity: error
+    skip_prompt_check: false
+
+  # === S6: 镜头调度/分镜 ===
+  frame_klein9b_camera:
+    required_fields:
+      - category
+      - status
+      - id
+      - shot_id
+      - prompt
+      - generation_type
+    severity: error
+    skip_prompt_check: false
+
+  frame_next_scene:
+    required_fields:
+      - category
+      - status
+      - id
+      - shot_id
+      - prompt
+      - generation_type
+    severity: error
+    skip_prompt_check: false
+
+  # === S7: 视频合成 ===
+  frame_video_director:
+    required_fields:
+      - category
+      - status
+      - id
+      - prompt
+      - duration
+      - generation_type
+      - refs
+    severity: error
+    skip_prompt_check: false

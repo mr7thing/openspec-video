@@ -20,6 +20,4 @@ npm-debug.log*
 # key
 .env
 
-# skills packs
-opsv-packs/
-opsv-packs
+

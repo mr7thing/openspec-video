@@ -1,0 +1,128 @@
+# Micro-lesson Pack Category Validation Rules
+# 覆盖所有 6 个技能的自定义 category
+
+# ---------------------------------------------------------------------------
+# S0: 课程剧本拆解
+# ---------------------------------------------------------------------------
+course_plan:
+  required_fields: [status, id, title, lesson_number, total_slides, slides_per_lecture]
+  field_schema:
+    id:
+      min_length: 5
+      no_placeholder: true
+    title:
+      min_length: 2
+      no_placeholder: true
+    lesson_number:
+      min_length: 1
+    total_slides:
+      min_length: 1
+
+# ---------------------------------------------------------------------------
+# S1: PPT 幻灯片元数据
+# ---------------------------------------------------------------------------
+slide:
+  required_fields: [status, id, lesson_id, lecture_number, slide_number, image, transcript, digital_human_trigger]
+  field_schema:
+    id:
+      min_length: 5
+      no_placeholder: true
+    lesson_id:
+      min_length: 5
+      no_placeholder: true
+    lecture_number:
+      min_length: 1
+    slide_number:
+      min_length: 1
+    image:
+      min_length: 1
+      no_placeholder: true
+    transcript:
+      min_length: 1
+      no_placeholder: true
+    digital_human_trigger:
+      enum: [intro, highlight, outro, none]
+
+# ---------------------------------------------------------------------------
+# S2: 数字人规划
+# ---------------------------------------------------------------------------
+dh_plan:
+  required_fields: [status, id, lesson_id, triggers, background_image, character_photo]
+  field_schema:
+    id:
+      min_length: 5
+      no_placeholder: true
+    lesson_id:
+      min_length: 5
+      no_placeholder: true
+    triggers:
+      min_length: 1
+    background_image:
+      min_length: 1
+      no_placeholder: true
+    character_photo:
+      min_length: 1
+      no_placeholder: true
+
+# ---------------------------------------------------------------------------
+# S3: 数字人生成任务
+# ---------------------------------------------------------------------------
+dh_generation_task:
+  required_fields: [status, id, slide_id, audio_file, prompt, background_image, character_photo, dh_position]
+  field_schema:
+    id:
+      min_length: 5
+      no_placeholder: true
+    slide_id:
+      min_length: 5
+      no_placeholder: true
+    audio_file:
+      min_length: 1
+      no_placeholder: true
+    prompt:
+      min_length: 10
+      no_placeholder: true
+    background_image:
+      min_length: 1
+      no_placeholder: true
+    character_photo:
+      min_length: 1
+      no_placeholder: true
+    dh_position:
+      enum: [center, right, left]
+
+# ---------------------------------------------------------------------------
+# S4: Remotion 编排配置
+# ---------------------------------------------------------------------------
+remotion_config:
+  required_fields: [status, id, lesson_id, compositions, transitions]
+  field_schema:
+    id:
+      min_length: 5
+      no_placeholder: true
+    lesson_id:
+      min_length: 5
+      no_placeholder: true
+    compositions:
+      min_length: 1
+    transitions:
+      min_length: 1
+
+# ---------------------------------------------------------------------------
+# S5: 渲染任务
+# ---------------------------------------------------------------------------
+render_task:
+  required_fields: [status, id, lesson_id, output_path, composition_id]
+  field_schema:
+    id:
+      min_length: 5
+      no_placeholder: true
+    lesson_id:
+      min_length: 5
+      no_placeholder: true
+    output_path:
+      min_length: 1
+      no_placeholder: true
+    composition_id:
+      min_length: 1
+      no_placeholder: true

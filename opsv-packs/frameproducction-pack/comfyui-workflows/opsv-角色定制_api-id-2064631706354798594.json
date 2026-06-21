@@ -1,0 +1,720 @@
+{
+  "1": {
+    "inputs": {
+      "width": 1200,
+      "height": 1808,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "2": {
+    "inputs": {
+      "seed": 692941203428930,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "8",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "4",
+        0
+      ],
+      "latent_image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "4": {
+    "inputs": {
+      "conditioning": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "5": {
+    "inputs": {
+      "unet_name": "z-image-turbo-fp16-aio.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "6": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "7": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "8": {
+    "inputs": {
+      "shift": 3,
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "9": {
+    "inputs": {
+      "samples": [
+        "2",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "10": {
+    "inputs": {
+      "text": [
+        "178",
+        0
+      ],
+      "clip": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "11": {
+    "inputs": {
+      "images": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "17": {
+    "inputs": {
+      "value": 2560
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "Int"
+    }
+  },
+  "18": {
+    "inputs": {
+      "blocks_to_swap": 16,
+      "use_non_blocking": true,
+      "offload_io_components": false
+    },
+    "class_type": "SeedVR2BlockSwap",
+    "_meta": {
+      "title": "SeedVR2 BlockSwap Config"
+    }
+  },
+  "19": {
+    "inputs": {
+      "tiled_vae": true,
+      "vae_tile_size": 512,
+      "vae_tile_overlap": 64,
+      "preserve_vram": false,
+      "cache_model": false,
+      "enable_debug": false
+    },
+    "class_type": "SeedVR2ExtraArgs",
+    "_meta": {
+      "title": "SeedVR2 Extra Args"
+    }
+  },
+  "21": {
+    "inputs": {
+      "model": "seedvr2_ema_3b_fp16.safetensors",
+      "seed": 891875314,
+      "new_resolution": [
+        "17",
+        0
+      ],
+      "batch_size": 1,
+      "images": [
+        "9",
+        0
+      ],
+      "block_swap_config": [
+        "18",
+        0
+      ],
+      "extra_args": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "SeedVR2",
+    "_meta": {
+      "title": "SeedVR2 Video Upscaler"
+    }
+  },
+  "22": {
+    "inputs": {
+      "filename_prefix": "mofashusheng",
+      "images": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "24": {
+    "inputs": {
+      "seed": 447947825489690,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "dpmpp_2m_sde_gpu",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "26",
+        0
+      ],
+      "positive": [
+        "47",
+        0
+      ],
+      "negative": [
+        "43",
+        0
+      ],
+      "latent_image": [
+        "45",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "26": {
+    "inputs": {
+      "strength": 1,
+      "pre_cfg": false,
+      "model": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "27": {
+    "inputs": {
+      "shift": 3,
+      "model": [
+        "28",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "28": {
+    "inputs": {
+      "lora_name": "qwen-image-edit-2511多角度.safetensors",
+      "strength_model": 1,
+      "model": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "31": {
+    "inputs": {
+      "image": "pasted/8cd29062cec71d0e97ba8f6532df89982c83be6099eeb550dd66684be18247a4.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "image-role-ref"
+    }
+  },
+  "32": {
+    "inputs": {
+      "lora_name": "Qwen-Image-Lightning-8steps-V2.0 bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "33",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "33": {
+    "inputs": {
+      "unet_name": "qwen_image_edit2511满血版.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "34": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "35": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "40": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "42": {
+    "inputs": {
+      "samples": [
+        "24",
+        0
+      ],
+      "vae": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "43": {
+    "inputs": {
+      "conditioning": [
+        "47",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "45": {
+    "inputs": {
+      "width": 2048,
+      "height": 1008,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "47": {
+    "inputs": {
+      "prompt": [
+        "182",
+        0
+      ],
+      "clip": [
+        "34",
+        0
+      ],
+      "vae": [
+        "35",
+        0
+      ],
+      "image1": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus"
+    }
+  },
+  "122": {
+    "inputs": {
+      "seed": 834030900380978,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "dpmpp_2m_sde_gpu",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "26",
+        0
+      ],
+      "positive": [
+        "126",
+        0
+      ],
+      "negative": [
+        "125",
+        0
+      ],
+      "latent_image": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "123": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "124",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "124": {
+    "inputs": {
+      "samples": [
+        "122",
+        0
+      ],
+      "vae": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "125": {
+    "inputs": {
+      "conditioning": [
+        "126",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "126": {
+    "inputs": {
+      "prompt": [
+        "186",
+        0
+      ],
+      "clip": [
+        "34",
+        0
+      ],
+      "vae": [
+        "35",
+        0
+      ],
+      "image1": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus"
+    }
+  },
+  "127": {
+    "inputs": {
+      "width": 1536,
+      "height": 2208,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "168": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "200",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "172": {
+    "inputs": {
+      "prompt": "，（杰作，最佳品质，超高清晰度，8K），RAW原始照片，电影感）\n注意保证人物头身比例为1:9, 头部显得非常小，身体非常高挑修长。\n写真风格，摄影作品，人像摄影，影棚灯光，高细节皮肤纹理，角色在所有视角中保持绝对一致。\n无文字，无标题，无水印，无标识，无额外装饰。"
+    },
+    "class_type": "CR Prompt Text",
+    "_meta": {
+      "title": "role-3view-halfbody"
+    }
+  },
+  "177": {
+    "inputs": {
+      "prompt": "，半身，正面照，标准姿态，8k 细节，纯灰色无缝背景。\n"
+    },
+    "class_type": "CR Prompt Text",
+    "_meta": {
+      "title": "role-front"
+    }
+  },
+  "178": {
+    "inputs": {
+      "separator": "",
+      "text1": [
+        "192",
+        0
+      ],
+      "text2": [
+        "177",
+        0
+      ]
+    },
+    "class_type": "CR Text Concatenate",
+    "_meta": {
+      "title": "🔤 CR Text Concatenate"
+    }
+  },
+  "182": {
+    "inputs": {
+      "separator": "",
+      "text1": [
+        "193",
+        0
+      ],
+      "text2": [
+        "172",
+        0
+      ]
+    },
+    "class_type": "CR Text Concatenate",
+    "_meta": {
+      "title": "🔤 CR Text Concatenate"
+    }
+  },
+  "185": {
+    "inputs": {
+      "prompt": "，（杰作，最佳品质，超高清晰度，8K），RAW原始照片，电影感）\n注意保证人物头身比例 正常。\n写真风格，摄影作品，人像摄影，影棚灯光，高细节皮肤纹理，角色在所有视角中保持绝对一致。\n无文字，无标题，无水印，无标识，无额外装饰。"
+    },
+    "class_type": "CR Prompt Text",
+    "_meta": {
+      "title": "role-3view-fullbody"
+    }
+  },
+  "186": {
+    "inputs": {
+      "separator": "",
+      "text1": [
+        "194",
+        0
+      ],
+      "text2": [
+        "185",
+        0
+      ]
+    },
+    "class_type": "CR Text Concatenate",
+    "_meta": {
+      "title": "🔤 CR Text Concatenate"
+    }
+  },
+  "187": {
+    "inputs": {
+      "text": "角色设定图：一位高挑的年轻女性，多角度正交视图。三张全身图：左侧为正面全身照，中间为45度侧面全身照，右侧为背面全身照，公主发髻，珠翠妆点，穿着绣有金凤的黑色皇女袍服, 汉服裙摆几乎及地，只露出一点穿着红底金色云纹布面官靴的脚尖，汉代风格，（杰作，最佳品质，超高清晰度，8K），RAW原始照片，电影感）\n注意保证人物头身比例 正常。\n写真风格，摄影作品，人像摄影，影棚灯光，高细节皮肤纹理，角色在所有视角中保持绝对一致。\n无文字，无标题，无水印，无标识，无额外装饰。",
+      "anything": [
+        "186",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "188": {
+    "inputs": {
+      "text": "角色设定图：一位高挑的年轻女性，多角度正交视图。三张肩部以上的头部特写：左侧为正面头部特写，中间为45度侧面头部特写，右侧为头部背面特写。公主发髻，珠翠妆点，穿着绣有金凤的黑色皇女袍服，汉代风格，（杰作，最佳品质，超高清晰度，8K），RAW原始照片，电影感）\n注意保证人物头身比例为1:9, 头部显得非常小，身体非常高挑修长。\n写真风格，摄影作品，人像摄影，影棚灯光，高细节皮肤纹理，角色在所有视角中保持绝对一致。\n无文字，无标题，无水印，无标识，无额外装饰。",
+      "anything": [
+        "182",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "189": {
+    "inputs": {
+      "text": "一位年轻的中国古装美女，额头一点梅花印，公主发髻，珠翠妆点，穿着绣有金凤的黑色皇女袍服。汉代风格，半身，正面照，标准姿态，8k 细节，纯灰色无缝背景。\n",
+      "anything": [
+        "178",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "192": {
+    "inputs": {
+      "index": 0,
+      "any": [
+        "196",
+        0
+      ]
+    },
+    "class_type": "easy indexAnything",
+    "_meta": {
+      "title": "Index Any"
+    }
+  },
+  "193": {
+    "inputs": {
+      "index": 1,
+      "any": [
+        "196",
+        0
+      ]
+    },
+    "class_type": "easy indexAnything",
+    "_meta": {
+      "title": "Index Any"
+    }
+  },
+  "194": {
+    "inputs": {
+      "index": 2,
+      "any": [
+        "196",
+        0
+      ]
+    },
+    "class_type": "easy indexAnything",
+    "_meta": {
+      "title": "Index Any"
+    }
+  },
+  "196": {
+    "inputs": {
+      "Text": "一位年轻的中国古装美女，额头一点梅花印，公主发髻，珠翠妆点，穿着绣有金凤的皇女袍服。宋代风格\n角色设定图：一位高挑的年轻女性，多角度正交视图。三张肩部以上的头部特写：左侧为正面头部特写，中间为45度侧面头部特写，右侧为头部背面特写。公主发髻，珠翠妆点，穿着绣有金凤的皇女袍服，宋代风格\n角色设定图：一位高挑的年轻女性，多角度正交视图。三张全身图：左侧为正面全身照，中间为45度侧面全身照，右侧为背面全身照，公主发髻，珠翠妆点，穿着绣有金凤的皇女袍服, 汉服裙摆几乎及地，只露出一点穿着红底金色云纹布面官靴的脚尖，宋代风格"
+    },
+    "class_type": "KepStringListFromNewline",
+    "_meta": {
+      "title": "String List From Newline"
+    }
+  },
+  "200": {
+    "inputs": {
+      "direction": "down",
+      "match_image_size": true,
+      "spacing_width": 0,
+      "spacing_color": "white",
+      "image1": [
+        "42",
+        0
+      ],
+      "image2": [
+        "124",
+        0
+      ]
+    },
+    "class_type": "ImageStitch",
+    "_meta": {
+      "title": "Stitch Images"
+    }
+  }
+}

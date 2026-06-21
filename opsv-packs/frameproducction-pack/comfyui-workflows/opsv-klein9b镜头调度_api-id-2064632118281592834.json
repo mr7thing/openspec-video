@@ -1,0 +1,380 @@
+{
+  "76": {
+    "inputs": {
+      "image": "77a35e8d79de503f094e28c5e85415fd9c03b8b14366ae6e903a0dd712e5cff6.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "opsv-image1"
+    }
+  },
+  "99": {
+    "inputs": {
+      "unet_name": "flux-2-klein-9b-fp8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "100": {
+    "inputs": {
+      "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "101": {
+    "inputs": {
+      "text": [
+        "175",
+        0
+      ],
+      "clip": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "102": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "103": {
+    "inputs": {
+      "noise_seed": 865816361310933
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "opsv-seed"
+    }
+  },
+  "104": {
+    "inputs": {
+      "width": [
+        "184",
+        0
+      ],
+      "height": [
+        "184",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "107": {
+    "inputs": {
+      "conditioning": [
+        "101",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "108": {
+    "inputs": {
+      "samples": [
+        "109",
+        0
+      ],
+      "vae": [
+        "102",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "109": {
+    "inputs": {
+      "noise": [
+        "103",
+        0
+      ],
+      "guider": [
+        "110",
+        0
+      ],
+      "sampler": [
+        "111",
+        0
+      ],
+      "sigmas": [
+        "112",
+        0
+      ],
+      "latent_image": [
+        "104",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "110": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "170",
+        0
+      ],
+      "positive": [
+        "124",
+        0
+      ],
+      "negative": [
+        "123",
+        0
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG Guider"
+    }
+  },
+  "111": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "112": {
+    "inputs": {
+      "steps": 4,
+      "width": [
+        "184",
+        0
+      ],
+      "height": [
+        "184",
+        1
+      ]
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {
+      "title": "Flux2Scheduler"
+    }
+  },
+  "123": {
+    "inputs": {
+      "conditioning": [
+        "107",
+        0
+      ],
+      "latent": [
+        "125",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "124": {
+    "inputs": {
+      "conditioning": [
+        "101",
+        0
+      ],
+      "latent": [
+        "125",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "125": {
+    "inputs": {
+      "pixels": [
+        "165",
+        0
+      ],
+      "vae": [
+        "102",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "156": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "108",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "165": {
+    "inputs": {
+      "longer_edge": 1920,
+      "images": [
+        "76",
+        0
+      ]
+    },
+    "class_type": "ResizeImagesByLongerEdge",
+    "_meta": {
+      "title": "Resize Images by Longer Edge (DEPRECATED)"
+    }
+  },
+  "166": {
+    "inputs": {
+      "images": [
+        "165",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "170": {
+    "inputs": {
+      "lora_name": "klein9b-Camera-Blocking.safetensors",
+      "strength_model": 1,
+      "model": [
+        "99",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "174": {
+    "inputs": {
+      "a": [
+        "177",
+        0
+      ],
+      "b": [
+        "178",
+        0
+      ]
+    },
+    "class_type": "JWStringConcat",
+    "_meta": {
+      "title": "String Concatenate"
+    }
+  },
+  "175": {
+    "inputs": {
+      "prompt": [
+        "176",
+        0
+      ],
+      "start_index": 0,
+      "max_rows": 100
+    },
+    "class_type": "easy promptLine",
+    "_meta": {
+      "title": "PromptLine"
+    }
+  },
+  "176": {
+    "inputs": {
+      "text": "push in to extreme close-up",
+      "anything": [
+        "181",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "177": {
+    "inputs": {
+      "prompt": "镜头zoom in，聚焦在教堂大门的门框一部分，表现材质细节"
+    },
+    "class_type": "CR Prompt Text",
+    "_meta": {
+      "title": "opsv-prompt"
+    }
+  },
+  "178": {
+    "inputs": {
+      "text": "你是专业镜头分析师，我将上传图片，仅从我提供的镜头术语中选择最优组合，只分行输出英文镜头提示词，无任何多余文字、解释、标题、序号。\n可用镜头术语\nfrontal upward shotextreme low angle shot from the frontfront lower body shotlow angle shot from 45 degrees to the rightlow angle shot from 45 degrees to the leftultra-low angle upward shot at 30 degrees from the rightultra-low angle upward shot at 30 degrees from the leftultra-low angle upward shot at 135 degrees from the rightultra-low angle upward shot at 135 degrees from the leftlow angle back shot looking up45-degree overhead shot from the right45-degree overhead shot from the left135-degree high angle downward shot from the right side135-degree high angle downward shot from the lefthigh-angle downward shot from the backhigh-angle shottop-down shotbird's-eye viewThe lens rises to waist heightThe lens rises to chest heightThe lens descends to knee heightThe camera pans down to the groundcamera horizontal translation leftcamera horizontal translation rightthe camera tilts downthe camera pans to the rightthe camera pans to the leftpush in to wide shotpush in to medium-wide shotpush in to medium shotpush in to medium close-uppush in to close-uppush in to extreme close-upclose-up of hands in a push-in shotthe camera pulls back to a wide shotright-tilted compositionleft-tilted compositionfirst-person perspectivethe lens tilts 45 degrees to the rightthe lens tilts 80 degrees to the rightthe lens tilts 45 degrees to the leftthe lens tilts 80 degrees to the leftback shot45-degree lens on the left70-degree lens on the left90-degree lens on the left135-degree lens on the left160-degree lens on the left45-degree lens on the right70-degree lens on the right90-degree lens on the right135-degree lens on the right160 degree lens on the right\n输出规则\n只输出英文镜头提示词，每个镜头一行\n无中文、无分析、无格式、无多余内容"
+    },
+    "class_type": "Text Multiline",
+    "_meta": {
+      "title": "Text Multiline"
+    }
+  },
+  "181": {
+    "inputs": {
+      "text": [
+        "174",
+        0
+      ],
+      "model": "Qwen3-VL-4B-Instruct-FP8",
+      "quantization": "none",
+      "keep_model_loaded": false,
+      "temperature": 0.7,
+      "max_new_tokens": 2048,
+      "min_pixels": 200704,
+      "max_pixels": 1003520,
+      "seed": 1780,
+      "attention": "eager"
+    },
+    "class_type": "Qwen3_VQA",
+    "_meta": {
+      "title": "Qwen3 VQA"
+    }
+  },
+  "184": {
+    "inputs": {
+      "image": [
+        "165",
+        0
+      ]
+    },
+    "class_type": "DF_Get_image_size",
+    "_meta": {
+      "title": "Get image size"
+    }
+  }
+}

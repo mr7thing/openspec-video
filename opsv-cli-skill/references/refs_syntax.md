@@ -164,7 +164,7 @@ v0.10.0 起（`src/commands/refs.ts:106` 注释），`refs check` **只扫描 fr
 
 ---
 
-## 8. refs check / sync 命令
+## 8. refs check / fill 命令
 
 ### `opsv refs check <file>`
 
@@ -174,15 +174,17 @@ opsv refs check videospec/shots/S01-Shot01.md
 
 只比对 `prompt` 字段。报告 `missingInRefs`（exit 1）和 `unusedInPrompt`（警告）。
 
-### `opsv refs sync <file>`
+### `opsv refs fill <file>`
 
 ```bash
-opsv refs sync videospec/shots/S01-Shot01.md          # 打印到 stdout
-opsv refs sync videospec/shots/S01-Shot01.md --write  # 写回文件
+opsv refs fill videospec/shots/S01-Shot01.md           # 打印到 stdout
+opsv refs fill videospec/shots/S01-Shot01.md --write   # 写回文件
+opsv refs fill videospec/shots/S01-Shot01.md --dry-run # 预览
 ```
 
-- 自动从 ApprovedRefReader 查 approved 变体填充路径
-- 多候选（同 `@id` 多个 approved 变体）→ 路径数组留空，待人工/review 裁决
-- `@:key`（doc ref）→ 在本文件 `## Design References` 区按 alt 文本查图
+- 自动补齐缺失的 refs key + 填充路径。取代旧 `refs sync`
+- 缺失的 key：从 AssetDocIndex 查找文件，自动添加
+- 已有空路径的 key：补全路径
+- input_type 按文件扩展名推断，默认 `image`
 
 > 命令详情见 `cli_reference.md` §6。

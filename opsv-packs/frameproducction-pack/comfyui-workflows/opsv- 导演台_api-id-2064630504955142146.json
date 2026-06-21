@@ -1,0 +1,441 @@
+{
+  "3": {
+    "inputs": {
+      "vae_name": "LTX23_video_vae_bf16.safetensors",
+      "device": "main_device",
+      "weight_dtype": "bf16"
+    },
+    "class_type": "VAELoaderKJ",
+    "_meta": {
+      "title": "Video VAELoader"
+    }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "LTX23_audio_vae_bf16.safetensors",
+      "device": "main_device",
+      "weight_dtype": "bf16"
+    },
+    "class_type": "VAELoaderKJ",
+    "_meta": {
+      "title": "Audio VAELoader"
+    }
+  },
+  "5": {
+    "inputs": {
+      "frame_rate": [
+        "46",
+        5
+      ],
+      "positive": [
+        "46",
+        1
+      ],
+      "negative": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": {
+      "title": "LTXVConditioning"
+    }
+  },
+  "7": {
+    "inputs": {
+      "video_latent": [
+        "8",
+        2
+      ],
+      "audio_latent": [
+        "46",
+        3
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "LTXVConcatAVLatent"
+    }
+  },
+  "8": {
+    "inputs": {
+      "scale_by": 1.0000000000000002,
+      "upscale_method": "bicubic",
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "5",
+        1
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "latent": [
+        "46",
+        2
+      ],
+      "guide_data": [
+        "46",
+        4
+      ]
+    },
+    "class_type": "LTXDirectorGuide",
+    "_meta": {
+      "title": "LTX Director Guide"
+    }
+  },
+  "9": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "46",
+        0
+      ],
+      "positive": [
+        "8",
+        0
+      ],
+      "negative": [
+        "8",
+        1
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG Guider"
+    }
+  },
+  "10": {
+    "inputs": {
+      "noise": [
+        "28",
+        0
+      ],
+      "guider": [
+        "9",
+        0
+      ],
+      "sampler": [
+        "29",
+        0
+      ],
+      "sigmas": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "11": {
+    "inputs": {
+      "scheduler": "linear_quadratic",
+      "steps": 8,
+      "denoise": 1,
+      "model": [
+        "46",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "13": {
+    "inputs": {
+      "av_latent": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "LTXVSeparateAVLatent"
+    }
+  },
+  "26": {
+    "inputs": {
+      "conditioning": [
+        "46",
+        1
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "28": {
+    "inputs": {
+      "noise_seed": 12
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "29": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "46": {
+    "inputs": {
+      "global_prompt": "",
+      "duration_frames": 120,
+      "duration_seconds": 5.000000000000001,
+      "timeline_data": "{\"segments\":[{\"id\":\"1780388237663rfc76\",\"start\":0,\"length\":24,\"prompt\":\"女人推开宫殿门走进去\",\"type\":\"image\",\"imageFile\":\"34eb1230da99129fc467a4c984d1d2f7af6d81e277508aa8b050dea335314a7f.png\",\"imageB64\":\"/view?filename=34eb1230da99129fc467a4c984d1d2f7af6d81e277508aa8b050dea335314a7f.png&type=input&subfolder=&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiNTI2ZTBhNTgxNDMwMDAwOWRiZmQyNWRhNTJiMTZkYSIsInNpZ25FeHBpcmUiOjE3ODA5OTE0NjQwOTMsInRzIjoxNzgwMzg2NjY0MDkzLCJzaWduIjoiYTUxOTQ4NzQ5MTc1NWFhZjg3YzY3MjZhNmQ5ZjUwOGUifQ==&Rh-Identify=b526e0a5814300009dbfd25da52b16da\"},{\"id\":\"1780388246202hqnff\",\"start\":24,\"length\":24,\"prompt\":\"女人走向宫殿里的石碑\",\"type\":\"image\",\"imageFile\":\"11dfee288be5333fa3be9f874986d21b54ab3542bd1943bbbe1185647c20ed2a.png\",\"imageB64\":\"/view?filename=11dfee288be5333fa3be9f874986d21b54ab3542bd1943bbbe1185647c20ed2a.png&type=input&subfolder=&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiNTI2ZTBhNTgxNDMwMDAwOWRiZmQyNWRhNTJiMTZkYSIsInNpZ25FeHBpcmUiOjE3ODA5OTE0NjQwOTMsInRzIjoxNzgwMzg2NjY0MDkzLCJzaWduIjoiYTUxOTQ4NzQ5MTc1NWFhZjg3YzY3MjZhNmQ5ZjUwOGUifQ==&Rh-Identify=b526e0a5814300009dbfd25da52b16da\"},{\"id\":\"1780388251383xm3ml\",\"start\":48,\"length\":24,\"prompt\":\"女人触碰石碑\",\"type\":\"image\",\"imageFile\":\"205f393ba5cc6c796b9ffe86d029cd9272413b39cac8a48a1a6cd0150d7a197d.png\",\"imageB64\":\"/view?filename=205f393ba5cc6c796b9ffe86d029cd9272413b39cac8a48a1a6cd0150d7a197d.png&type=input&subfolder=&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiNTI2ZTBhNTgxNDMwMDAwOWRiZmQyNWRhNTJiMTZkYSIsInNpZ25FeHBpcmUiOjE3ODA5OTE0NjQwOTMsInRzIjoxNzgwMzg2NjY0MDkzLCJzaWduIjoiYTUxOTQ4NzQ5MTc1NWFhZjg3YzY3MjZhNmQ5ZjUwOGUifQ==&Rh-Identify=b526e0a5814300009dbfd25da52b16da\"},{\"id\":\"17803882551910km1v\",\"start\":72.57198095759907,\"length\":24,\"prompt\":\"镜头切换，女人在石碑前面等待\",\"type\":\"image\",\"imageFile\":\"81c7adeacf674794fddbfb19f07a0ae9e9bb419bb422b71ee1bcb9eb8aab00b0.png\",\"imageB64\":\"/view?filename=81c7adeacf674794fddbfb19f07a0ae9e9bb419bb422b71ee1bcb9eb8aab00b0.png&type=input&subfolder=&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiNTI2ZTBhNTgxNDMwMDAwOWRiZmQyNWRhNTJiMTZkYSIsInNpZ25FeHBpcmUiOjE3ODA5OTE0NjQwOTMsInRzIjoxNzgwMzg2NjY0MDkzLCJzaWduIjoiYTUxOTQ4NzQ5MTc1NWFhZjg3YzY3MjZhNmQ5ZjUwOGUifQ==&Rh-Identify=b526e0a5814300009dbfd25da52b16da\"},{\"id\":\"1780388269003zuxfm\",\"start\":96.57198095759907,\"length\":24,\"prompt\":\"女人转过身，身后亮起一片凤凰羽翼\",\"type\":\"image\",\"imageFile\":\"307c4635ecee9c69108d509a7d927e8b231ad0effb15682346478f5f7196820a.png\",\"imageB64\":\"/view?filename=307c4635ecee9c69108d509a7d927e8b231ad0effb15682346478f5f7196820a.png&type=input&subfolder=&Rh-Comfy-Auth=eyJ1c2VySWQiOiJiNTI2ZTBhNTgxNDMwMDAwOWRiZmQyNWRhNTJiMTZkYSIsInNpZ25FeHBpcmUiOjE3ODA5OTE0NjQwOTMsInRzIjoxNzgwMzg2NjY0MDkzLCJzaWduIjoiYTUxOTQ4NzQ5MTc1NWFhZjg3YzY3MjZhNmQ5ZjUwOGUifQ==&Rh-Identify=b526e0a5814300009dbfd25da52b16da\"}],\"audioSegments\":[]}",
+      "local_prompts": "女人推开宫殿门走进去 | 女人走向宫殿里的石碑 | 女人触碰石碑 | 镜头切换，女人在石碑前面等待 | 女人转过身，身后亮起一片凤凰羽翼",
+      "segment_lengths": "24,24,24.571980957599067,24,23.428019042400933",
+      "epsilon": 0.5000000000000001,
+      "guide_strength": "1.00,1.00,1.00,1.00,1.00",
+      "use_custom_audio": true,
+      "frame_rate": 24,
+      "display_mode": "seconds",
+      "custom_width": 1920,
+      "custom_height": 1080,
+      "resize_method": "crop",
+      "divisible_by": 32,
+      "img_compression": 18,
+      "timeline_ui": "",
+      "model": [
+        "111",
+        0
+      ],
+      "clip": [
+        "84",
+        0
+      ],
+      "audio_vae": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "LTXDirector",
+    "_meta": {
+      "title": "opsv-director"
+    }
+  },
+  "78": {
+    "inputs": {
+      "vae_name": "taeltx2_3.safetensors",
+      "device": "main_device",
+      "weight_dtype": "bf16"
+    },
+    "class_type": "VAELoaderKJ",
+    "_meta": {
+      "title": "Tiny VAELoader KJ"
+    }
+  },
+  "79": {
+    "inputs": {
+      "preview_rate": 24,
+      "model": [
+        "110",
+        0
+      ],
+      "latent_upscale_model": [
+        "116",
+        0
+      ],
+      "vae": [
+        "78",
+        0
+      ]
+    },
+    "class_type": "LTX2SamplingPreviewOverride",
+    "_meta": {
+      "title": "LTX2 Sampling Preview Override"
+    }
+  },
+  "84": {
+    "inputs": {
+      "clip_name1": "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+      "clip_name2": "ltx-2.3_text_projection_bf16.safetensors",
+      "type": "ltxv",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "96": {
+    "inputs": {
+      "samples": [
+        "112",
+        2
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "97": {
+    "inputs": {
+      "samples": [
+        "13",
+        1
+      ],
+      "audio_vae": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": {
+      "title": "LTXV Audio VAE Decode"
+    }
+  },
+  "98": {
+    "inputs": {
+      "frame_rate": [
+        "46",
+        5
+      ],
+      "loop_count": 0,
+      "filename_prefix": "director",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "no_preview": false,
+      "images": [
+        "96",
+        0
+      ],
+      "audio": [
+        "46",
+        6
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "110": {
+    "inputs": {
+      "unet_name": "ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "111": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": false,
+      "model": [
+        "79",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "112": {
+    "inputs": {
+      "positive": [
+        "8",
+        0
+      ],
+      "negative": [
+        "8",
+        1
+      ],
+      "latent": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "LTXVCropGuides",
+    "_meta": {
+      "title": "LTXVCropGuides"
+    }
+  },
+  "116": {
+    "inputs": {
+      "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+    },
+    "class_type": "LatentUpscaleModelLoader",
+    "_meta": {
+      "title": "Load Latent Upscale Model"
+    }
+  },
+  "118": {
+    "inputs": {
+      "fps": [
+        "46",
+        5
+      ],
+      "images": [
+        "96",
+        0
+      ],
+      "audio": [
+        "46",
+        6
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "121": {
+    "inputs": {
+      "filename_prefix": "opsv-dr",
+      "format": "auto",
+      "codec": "auto",
+      "fw_video_preview": "",
+      "video": [
+        "118",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "💾 Save Video"
+    }
+  },
+  "122": {
+    "inputs": {
+      "zip_filename": "",
+      "zip": [
+        "118",
+        0
+      ]
+    },
+    "class_type": "solarL_SaveImagesToZip",
+    "_meta": {
+      "title": "保存Zip格式"
+    }
+  }
+}

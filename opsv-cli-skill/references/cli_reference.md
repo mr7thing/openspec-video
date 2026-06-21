@@ -17,8 +17,7 @@ opsv init --dir <project>     # 新建项目目录并初始化
 ```
 
 - **源码**：`src/commands/init.ts:25`
-- **模板来源**：从包内 `templates/` 拷贝（`init.ts:17-18` 解析路径为 `<package>/templates/`）
-- **缺失模板**：`copyTemplateFile()`（`init.ts:147-153`）会警告并跳过，不报错
+- **模板来源**：init 只创建目录结构 + `.gitignore`，不再复制配置文件。配置由 CLI 内置默认 + `~/.opsv/` + 项目 `.opsv/` 三层覆盖提供。
 
 ### `opsv validate`
 
@@ -200,7 +199,7 @@ opsv iterate <queue-dir>          # 目录模式 → 克隆整个队列目录
 
 - **源码**：`src/commands/iterate.ts:18`
 - **文件模式**：剥离已有 `_mN` 后缀得 base，扫描目录找下一个序号，产出 `{base}_m{nextSeq}.json`（`iterate.ts:48-79`）。克隆时清除 `_opsv.compiledAt` 和 `_opsv.resumeTaskId`（`iterate.ts:181-195`）
-- **目录模式**：剥离尾部 `_N` 得 base，产出 `{baseName}_{nextSeq}/`（`iterate.ts:85-130`）
+- **目录模式**：剥离尾部 `_mN` 得 base，产出 `{baseName}_m{nextSeq}/`（`iterate.ts:85-130`）
 - **后缀正则**：`^(.+)_m(\d+)$`（小写 m，`naming.ts:34`）
 - **禁止**：手改产物名/任务名，命名完全由命令管
 
@@ -274,18 +273,19 @@ opsv refs check <file>
   - `missingInRefs`（红，exit 1）：prompt 用了 `@id` 但 refs 没声明
   - `unusedInPrompt`（黄）：refs 声明了但 prompt 没用
 
-### `opsv refs sync <file>`
+### `opsv refs fill <file>`
 
-自动填充 refs 路径（从 ApprovedRefReader 查 approved 变体）。
+扫描 prompt 中 `@id` 引用，自动补齐缺失的 refs 键 + 填充路径。取代旧 `refs sync`。
 
 ```bash
-opsv refs sync <file>          # 打印计算结果到 stdout
-opsv refs sync <file> --write  # 写回文件
+opsv refs fill <file>           # 打印计算结果到 stdout
+opsv refs fill <file> --write   # 写回文件
+opsv refs fill <file> --dry-run # 预览不改文件
 ```
 
-- **源码**：`src/commands/refs.ts:70`
-- **多候选留空**：同一 `@id` 有多个 approved 变体时，路径数组留空待人工/review 裁决（`refs.ts:137-175`）
-- **`@:key`（doc ref）**：在本文件 body 的 `## Design References` 区按 alt 文本查图（`findDesignRefByAlt`，`refs.ts:181-189`）
+- **源码**：`src/commands/refsFill.ts:24`
+- **行为**：缺失的 key 自动添加 + 已有空路径的 key 补全路径 + 已有路径的 key 跳过
+- **input_type 推断**：从 AssetDocIndex 按文件扩展名推断（image/video/audio/bvh/mask），默认 `image`
 
 ### `opsv image-stitch <inputs...>`
 
@@ -333,4 +333,4 @@ opsv image-stitch <imgs...> -o <out> --down     # 纵向拼接
 
 入口 `src/cli.ts:77-102`，注册顺序见 `cli.ts`。Provider 注册（`cli.ts:69-75`）：volcengine / siliconflow / minimax / runninghub / comfylocal / webapp / rhapi。
 
-> 注：`cli.ts:83` 注释写"Register all 11 commands"，但实际注册了 18 个（含子命令）。这是注释滞后，非 bug。
+> 注：`cli.ts:83` 注释为 "Register all commands"（v0.11.0 已修正数字）。
