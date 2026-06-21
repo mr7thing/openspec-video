@@ -79,7 +79,7 @@ async function iterateFile(filePath: string): Promise<void> {
 }
 
 // --------------------------------------------------------------------------
-// Directory mode: comfylocal.zit_001/ → comfylocal.zit_001_it_001/
+// Directory mode: comfylocal.zit_m1/ → comfylocal.zit_m2/
 // --------------------------------------------------------------------------
 
 async function iterateDirectory(dirPath: string): Promise<void> {
@@ -87,7 +87,7 @@ async function iterateDirectory(dirPath: string): Promise<void> {
   const sourceName = path.basename(dirPath);
   const baseName = resolveDirBase(sourceName);
   const nextSeq = findNextDirSeq(parentDir, baseName);
-  const destName = `${baseName}_${nextSeq}`;
+  const destName = `${baseName}_m${nextSeq}`;
   const destPath = path.join(parentDir, destName);
 
   fs.mkdirSync(destPath, { recursive: true });
@@ -141,8 +141,8 @@ function resolveTaskBase(filename: string): string {
 }
 
 function resolveDirBase(dirName: string): string {
-  // Strip trailing _N where N >= 1 (always trace back to the original base)
-  const match = dirName.match(/^(.*)_(\d+)$/);
+  // Strip trailing _mN where N >= 1 (unified with file-mode _mN suffix)
+  const match = dirName.match(/^(.*)_m(\d+)$/);
   if (match && parseInt(match[2], 10) >= 1) {
     return match[1];
   }
@@ -166,7 +166,7 @@ function findNextTaskSeq(dir: string, base: string): number {
 function findNextDirSeq(parentDir: string, sourceName: string): number {
   if (!fs.existsSync(parentDir)) return 1;
   const entries = fs.readdirSync(parentDir, { withFileTypes: true });
-  const pattern = new RegExp(`^${escapeRegex(sourceName)}_(\\d+)$`);
+  const pattern = new RegExp(`^${escapeRegex(sourceName)}_m(\\d+)$`);
   let maxN = 0;
   for (const e of entries) {
     if (!e.isDirectory()) continue;

@@ -80,7 +80,7 @@ program
   .version(VERSION)
   .description(`OpenSpec-Video v${VERSION} — Cinematic AI Automation CLI`);
 
-// Register all 11 commands
+// Register all commands
 registerInitCommand(program, VERSION);
 registerValidateCommand(program, VERSION);
 registerCircleCommands(program);
