@@ -44,8 +44,8 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   app.post('/api/review/approve', express.json(), reviewApproveCtrl.execute);
   app.post('/api/approve/:circle/:assetId', express.json(), approveCtrl.execute);
 
-  // Serve static review UI from templates/review-ui/
-  const publicDir = path.join(__dirname, '..', '..', 'templates', 'review-ui');
+  // Serve static review UI from cli/review-ui/
+  const publicDir = path.join(__dirname, '..', '..', 'review-ui');
   if (fs.existsSync(publicDir)) {
     app.use(express.static(publicDir));
   } else {

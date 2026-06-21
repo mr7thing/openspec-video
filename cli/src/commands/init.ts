@@ -15,7 +15,7 @@ interface InitCommandOptions {
 
 // Resolve templates directory relative to the compiled dist/ directory
 const PKG_ROOT = path.resolve(__dirname, '..');
-const TEMPLATES_DIR = path.join(PKG_ROOT, '..', 'templates');
+const TEMPLATES_DIR = path.join(PKG_ROOT, '..');
 
 export function registerInitCommand(program: Command, version: string): void {
   program

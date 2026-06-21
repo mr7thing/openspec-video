@@ -28,6 +28,7 @@ coverage/*
 # key
 
 .env
+!cli/.env
 
 # ensure templates
 !templates
