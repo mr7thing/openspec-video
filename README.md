@@ -36,14 +36,16 @@ OPSV is **designed for AI agents**. Define validation contracts per document typ
 ## Install
 
 ```bash
-git clone https://github.com/mr7thing/openspec-video.git
-cd openspec-video/cli
-npm install
-npm run build
-npm link                    # makes `opsv` available globally
+npm install -g videospec
 ```
 
-> The CLI lives in `cli/`. Skills and packs are at the repo root — the agent reads them directly.
+Or from source:
+
+```bash
+git clone https://github.com/mr7thing/openspec-video.git
+cd openspec-video/cli
+npm install && npm run build && npm link
+```
 
 ---
 
@@ -159,11 +161,67 @@ my-project/                    ← created by opsv init
 
 ---
 
-## Skill Packs
+## Customize Your Pipeline with Skill Packs
 
-Skill Packs define production workflows — stages, validation rules, prompt frameworks, and agent instructions. They live in `opsv-packs/` and are symlinked as needed. The repo ships with:
+OPSV doesn't force one pipeline. Skill Packs let you define **your own** production workflow — stages, document types, validation rules, prompt frameworks, and agent instructions. Compose packs like libraries: swap storyboard styles, change character design rules, add new stages.
 
-- `opsv-cli-skill/` — Operator manual for AI agents using the OPSV CLI
+### Anatomy of a Skill Pack
+
+```
+my-pack/
+├── .agent/skills/            # Agent instructions per stage
+│   ├── opsv-ref-pipeline/    #   Pipeline navigator (S0)
+│   ├── beat-script/          #   Script breakdown (S1)
+│   ├── create-elements/      #   Asset generation (S2)
+│   ├── shot-storyboard/      #   Storyboard design (S3)
+│   └── shotgen/              #   Video production (S4)
+├── videospec/
+│   └── _category_validate.yaml  # Per-category validation contracts
+├── SKILL_SPEC.md                 # Skill authoring spec
+└── README.md
+```
+
+### Per-category validation
+
+Define what "done" means for each document type:
+
+```yaml
+# _category_validate.yaml
+project:
+  required_fields: [status]
+  skip_prompt_check: true
+
+character:
+  required_fields: [prompt, visual_brief, refs]
+  field_schema:
+    prompt:
+      min_length: 50
+      no_placeholder: true
+```
+
+### Stage skills
+
+Each stage is a self-contained SKILL.md that tells the agent **what to produce, how to produce it, and what rules to follow**. The agent reads the pack, understands the pipeline, and executes stage by stage — invoking `opsv` commands for validation, compilation, and execution.
+
+### Multi-Ref Pack (example 8-stage pipeline)
+
+A reference implementation showing the full capability — from drama graph extraction through final video production:
+
+```
+S0: Pipeline Navigator     S4: Asset Creation
+S1: Drama Graph            S5: Shot Reference
+S2: Beat Script            S5.5: Storyboard
+S3: Shortlist              S6: Video Generation
+```
+
+### Get started
+
+1. Symlink a pack into your project as `.agent/skills/`
+2. The agent discovers the pipeline and executes stage by stage
+3. Customize `_category_validate.yaml` to match your quality standards
+4. Add new stages by creating new skill directories
+
+> The repo includes `opsv-cli-skill/` — the operator manual AI agents use to drive the CLI. It's the base layer every pack builds on.
 
 ---
 

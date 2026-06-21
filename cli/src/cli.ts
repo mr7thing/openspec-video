@@ -43,7 +43,7 @@ if (fs.existsSync(rootEnvPath)) {
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../package.json');
-let VERSION = '0.9.0';
+let VERSION = '0.12.0';
 try {
   if (fs.existsSync(pkgPath)) {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
