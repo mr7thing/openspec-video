@@ -17,13 +17,10 @@
     "start": "ts-node src/index.ts",
     "test": "jest --passWithNoTests",
     "lint": "eslint src/**/*.ts",
-    "daemon": "node extension/native-host.js"
+    "daemon": "node ../extension/native-host.js"
   },
   "files": [
-    "dist",
-    "templates",
-    "README.md",
-    "LICENSE"
+    "dist"
   ],
   "keywords": [
     "videospec",
