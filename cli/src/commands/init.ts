@@ -61,22 +61,6 @@ export function registerInitCommand(program: Command, version: string): void {
           fs.mkdirSync(dir, { recursive: true });
         }
 
-        // Write project.md
-        const projectMd = `---
-category: project
-status: drafting
-vision: "${projectName} — a cinematic narrative project"
-aspect_ratio: "16:9"
-resolution: "1920x1080"
----
-
-# ${projectName}
-
-Describe your project vision here.
-`;
-
-        fs.writeFileSync(path.join(targetDir, 'videospec', 'project.md'), projectMd);
-
         // Copy template files from templates/ directory
         copyTemplateFile(
           path.join(TEMPLATES_DIR, '.opsv', 'api_config.yaml'),
