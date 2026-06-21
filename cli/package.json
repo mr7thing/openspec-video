@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework: structured narrative specs → production-ready media via multi-provider pipeline.",
   "main": "dist/index.js",
   "bin": {
@@ -20,7 +20,8 @@
     "daemon": "node ../extension/native-host.js"
   },
   "files": [
-    "dist"
+    "dist",
+    ".opsv"
   ],
   "keywords": [
     "videospec",
