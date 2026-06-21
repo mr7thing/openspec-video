@@ -44,6 +44,8 @@ export interface TaskInfo {
   modelKey: string;
   site: string;
   targetUrl: string;
+  queueDir: string;
+  taskPath: string;
   frameRef: { first?: string | null; last?: string | null } | null;
   raw: Record<string, unknown>;
 }
@@ -84,6 +86,9 @@ export function parseTask(taskPath: string): TaskInfo {
   // Derive site name: "webapp.gemini" → "gemini"
   const site = modelKey.includes('.') ? modelKey.split('.').pop()! : modelKey;
 
+  const absPath = path.resolve(taskPath);
+  const queueDir = path.dirname(absPath);
+
   return {
     shotId,
     prompt,
@@ -93,6 +98,8 @@ export function parseTask(taskPath: string): TaskInfo {
     modelKey,
     site,
     targetUrl,
+    queueDir,
+    taskPath: absPath,
     frameRef: payload.frame_ref || null,
     raw,
   };
