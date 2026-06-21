@@ -11,8 +11,6 @@ import { RunnerResult } from './types';
 // Adding a new site = add an entry here + create runners/<site>.ts
 const RUNNER_MAP: Record<string, string> = {
   'webapp.gemini': '../runners/gemini',
-  'webapp.jimeng': '../runners/jimeng',
-  'webapp.qianwen': '../runners/qianwen',
   'webapp.wan': '../runners/wan',
 };
 

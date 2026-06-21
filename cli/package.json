@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework: structured narrative specs → production-ready media via multi-provider pipeline.",
   "main": "dist/index.js",
   "bin": {
@@ -35,7 +35,6 @@
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@jackwener/opencli": "^1.8.3",
     "axios": "^1.13.6",
     "chalk": "^4.1.2",
     "commander": "^13.1.0",

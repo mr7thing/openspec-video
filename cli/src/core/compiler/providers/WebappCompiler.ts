@@ -1,6 +1,6 @@
 // ============================================================================
 // OpsV Webapp Provider Compiler
-// Browser automation: gemini, wan, jimeng, etc.
+// Browser automation: gemini, wan, etc.
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';

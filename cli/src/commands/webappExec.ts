@@ -1,7 +1,7 @@
 /**
  * opsv webapp-exec — Execute webapp generation tasks
  *
- * Routes compiled task JSONs to site-specific runners (gemini, jimeng, etc.)
+ * Routes compiled task JSONs to site-specific runners (gemini, wan, etc.)
  * and handles post-processing (watermark, result saving).
  */
 

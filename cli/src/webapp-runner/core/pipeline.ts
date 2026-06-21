@@ -18,8 +18,6 @@ import { execSync } from 'child_process';
 
 const WATERMARK_TOOLS: Record<string, string | null> = {
   gemini: 'gwr',
-  jimeng: null,
-  qianwen: null,
   wan: null,
   default: null,
 };
