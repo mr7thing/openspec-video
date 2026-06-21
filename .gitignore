@@ -20,4 +20,8 @@ npm-debug.log*
 # key
 .env
 
+# private packs (symlinked)
+opsv-packs/*
+!opsv-packs/multi-ref-pack/
+
 
