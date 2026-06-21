@@ -13,10 +13,6 @@ interface InitCommandOptions {
   dir?: string;
 }
 
-// Resolve templates directory relative to the compiled dist/ directory
-const PKG_ROOT = path.resolve(__dirname, '..');
-const TEMPLATES_DIR = path.join(PKG_ROOT, '..');
-
 export function registerInitCommand(program: Command, version: string): void {
   program
     .command('init [name]')
@@ -40,9 +36,9 @@ export function registerInitCommand(program: Command, version: string): void {
         }
 
         // Guard: prevent overwriting existing project
-        const existingMarker = path.join(targetDir, '.opsv', 'api_config.yaml');
+        const existingMarker = path.join(targetDir, 'videospec');
         if (fs.existsSync(existingMarker)) {
-          console.error(chalk.red(`OpsV project already exists in ${targetDir}`));
+          console.error(chalk.red(`videospec/ already exists in ${targetDir}`));
           process.exit(1);
         }
 
@@ -59,33 +55,6 @@ export function registerInitCommand(program: Command, version: string): void {
 
         for (const dir of dirs) {
           fs.mkdirSync(dir, { recursive: true });
-        }
-
-        // Copy template files from templates/ directory
-        copyTemplateFile(
-          path.join(TEMPLATES_DIR, '.opsv', 'api_config.yaml'),
-          path.join(targetDir, '.opsv', 'api_config.yaml')
-        );
-
-        copyTemplateFile(
-          path.join(TEMPLATES_DIR, '.opsv', 'input_types.yaml'),
-          path.join(targetDir, '.opsv', 'input_types.yaml')
-        );
-
-        copyTemplateFile(
-          path.join(TEMPLATES_DIR, '.opsv', 'category_validate.yaml'),
-          path.join(targetDir, 'videospec', '_category_validate.yaml')
-        );
-
-        copyTemplateFile(
-          path.join(TEMPLATES_DIR, '.env'),
-          path.join(targetDir, '.env')
-        );
-
-        // Copy .agent/ directory (skills, agent configs)
-        const agentSrc = path.join(TEMPLATES_DIR, '.agent');
-        if (fs.existsSync(agentSrc)) {
-          copyDirRecursive(agentSrc, path.join(targetDir, '.agent'));
         }
 
         // Write .gitignore
@@ -126,30 +95,4 @@ opsv-queue/
         process.exit(1);
       }
     });
-}
-
-function copyTemplateFile(src: string, dest: string): void {
-  if (!fs.existsSync(src)) {
-    console.warn(chalk.yellow(`Template file not found: ${src} (skipping)`));
-    return;
-  }
-  fs.copyFileSync(src, dest);
-}
-
-function copyDirRecursive(src: string, dest: string): void {
-  if (!fs.existsSync(src)) return;
-
-  fs.mkdirSync(dest, { recursive: true });
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      copyDirRecursive(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
 }

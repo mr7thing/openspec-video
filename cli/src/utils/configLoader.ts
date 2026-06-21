@@ -4,6 +4,7 @@
 // ============================================================================
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
 import { logger } from './logger';
@@ -102,26 +103,53 @@ export class ConfigLoader {
     this.config = { models: {} };
   }
 
+  /**
+   * Three-tier config lookup:
+   *   1. Built-in: cli/.opsv/api_config.yaml (shipped with CLI)
+   *   2. User:     ~/.opsv/api_config.yaml
+   *   3. Project:  ./.opsv/api_config.yaml
+   * Each tier shallow-merges over the previous.
+   */
   loadConfig(projectRoot: string, options?: { silent?: boolean }): ApiConfig {
-    const configPath = path.join(projectRoot, '.opsv', 'api_config.yaml');
+    // Tier 1 — built-in (shipped with the CLI package)
+    const builtinPath = path.join(__dirname, '..', '..', '.opsv', 'api_config.yaml');
+    let merged: ApiConfig = { models: {} };
+    const builtin = this.tryLoadYaml(builtinPath, options);
+    if (builtin) merged = builtin;
 
-    if (!fs.existsSync(configPath)) {
-      if (!options?.silent) {
-        logger.warn(`API config not found at ${configPath}, using empty config`);
-      }
-      this.config = { models: {} };
-      return this.config;
-    }
+    // Tier 2 — user-level override
+    const userPath = path.join(os.homedir(), '.opsv', 'api_config.yaml');
+    const userConfig = this.tryLoadYaml(userPath, options);
+    if (userConfig) merged = this.shallowMerge(merged, userConfig);
 
+    // Tier 3 — project-level override (highest priority)
+    const projectPath = path.join(projectRoot, '.opsv', 'api_config.yaml');
+    const projectConfig = this.tryLoadYaml(projectPath, options);
+    if (projectConfig) merged = this.shallowMerge(merged, projectConfig);
+
+    this.config = merged;
+    return this.config;
+  }
+
+  private tryLoadYaml(filePath: string, options?: { silent?: boolean }): ApiConfig | null {
+    if (!fs.existsSync(filePath)) return null;
     try {
-      const raw = fs.readFileSync(configPath, 'utf8');
-      this.config = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as ApiConfig;
-      return this.config;
+      const raw = fs.readFileSync(filePath, 'utf8');
+      return yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as ApiConfig;
     } catch (e: any) {
-      logger.error(`Failed to load api_config.yaml`, { error: e.message });
-      this.config = { models: {} };
-      return this.config;
+      if (!options?.silent) {
+        logger.warn(`Failed to load ${filePath}: ${e.message}`);
+      }
+      return null;
     }
+  }
+
+  /** Shallow-merge override over base (models keys merged at top level). */
+  private shallowMerge(base: ApiConfig, override: ApiConfig): ApiConfig {
+    return {
+      models: { ...base.models, ...override.models },
+      settings: override.settings ?? base.settings,
+    };
   }
 
   getModelConfig(modelName: string): ModelConfig | undefined {

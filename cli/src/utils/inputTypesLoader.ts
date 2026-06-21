@@ -4,6 +4,7 @@
 // ============================================================================
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
 import { logger } from './logger';
@@ -34,31 +35,48 @@ export class InputTypesLoader {
     this.registry = BUILTIN_DEFAULTS;
   }
 
+  /**
+   * Three-tier lookup: built-in → ~/.opsv/ → ./.opsv/
+   */
   load(projectRoot: string, options?: { silent?: boolean }): InputTypesRegistry {
-    const configPath = path.join(projectRoot, '.opsv', 'input_types.yaml');
+    // Tier 1 — built-in defaults
+    let merged: InputTypesRegistry = {
+      input_types: { ...BUILTIN_DEFAULTS.input_types },
+    };
 
-    if (!fs.existsSync(configPath)) {
-      if (!options?.silent) {
-        logger.debug(`input_types.yaml not found at ${configPath}, using built-in defaults`);
-      }
-      this.registry = BUILTIN_DEFAULTS;
-      return this.registry;
+    // Tier 2 — user-level override
+    const userPath = path.join(os.homedir(), '.opsv', 'input_types.yaml');
+    const userConfig = this.tryLoad(userPath, options);
+    if (userConfig) {
+      merged.input_types = { ...merged.input_types, ...userConfig.input_types };
     }
 
+    // Tier 3 — project-level override (highest priority)
+    const projectPath = path.join(projectRoot, '.opsv', 'input_types.yaml');
+    const projectConfig = this.tryLoad(projectPath, options);
+    if (projectConfig) {
+      merged.input_types = { ...merged.input_types, ...projectConfig.input_types };
+    }
+
+    this.registry = merged;
+    return this.registry;
+  }
+
+  private tryLoad(filePath: string, options?: { silent?: boolean }): InputTypesRegistry | null {
+    if (!fs.existsSync(filePath)) return null;
     try {
-      const raw = fs.readFileSync(configPath, 'utf8');
+      const raw = fs.readFileSync(filePath, 'utf8');
       const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as InputTypesRegistry;
       if (!parsed || typeof parsed !== 'object' || !parsed.input_types) {
-        logger.warn(`input_types.yaml malformed, using built-in defaults`);
-        this.registry = BUILTIN_DEFAULTS;
-        return this.registry;
+        logger.warn(`${filePath} malformed, skipping`);
+        return null;
       }
-      this.registry = parsed;
-      return this.registry;
+      return parsed;
     } catch (e: any) {
-      logger.error(`Failed to load input_types.yaml: ${e.message}`);
-      this.registry = BUILTIN_DEFAULTS;
-      return this.registry;
+      if (!options?.silent) {
+        logger.warn(`Failed to load ${filePath}: ${e.message}`);
+      }
+      return null;
     }
   }
 
