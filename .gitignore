@@ -7,7 +7,6 @@ node_modules/
 dist/
 *.tgz
 
-
 # Test & Debug
 test/
 test-*/
@@ -18,29 +17,9 @@ npm-debug.log*
 .vscode/
 .idea/
 
-# audit/ fix note
-docs/audit
-
-.reports/*
-.report/*
-coverage/*
-
 # key
-
 .env
-docs/0.8.7audit_report.md
-REASONIX.md
-.reasonix/
 
-test/
-FOR_Uncle7.md
-GEMINI.md
-
-# Chrome extension build artifacts and signing key (private)
-*.crx
-*.pem
-
-# Legacy test data directory
-test_data/
-opsv-packs/*
-TODO.md
+# skills packs
+opsv-packs/
+opsv-packs
