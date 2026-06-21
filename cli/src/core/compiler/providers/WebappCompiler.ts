@@ -1,6 +1,6 @@
 // ============================================================================
 // OpsV Webapp Provider Compiler
-// Browser automation: gemini, wan, etc.
+// Browser automation via Chrome Extension bridge (Gemini)
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';

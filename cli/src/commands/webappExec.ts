@@ -1,7 +1,7 @@
 /**
  * opsv webapp-exec — Execute webapp generation tasks
  *
- * Routes compiled task JSONs to site-specific runners (gemini, wan, etc.)
+ * Routes compiled task JSONs to the Gemini Chrome Extension runner
  * and handles post-processing (watermark, result saving).
  */
 
