@@ -124,10 +124,10 @@ opsv iterate path/to/queue_dir
 - 产出 `{baseName}_{nextSeq}/`，克隆目录内每个 task JSON
 
 ```
-queue_001/      → iterate → queue_002/
+queue_001/      → iterate --dir → queue_m1/
 ```
 
-> **注意**：当前目录模式后缀是纯数字 `_N`，与文件模式的 `_m{N}` **不一致**。这是待优化项（见仓库根 AUDIT_FINDINGS.md 的 Fix 计划 #1），目标是统一为 `_m{N}`。
+> **已统一**：目录模式和文件模式后缀一致，均使用 `_mN`。
 
 ### 2.2 克隆逻辑（`cloneTaskJson`，`iterate.ts:181-195`）
 

@@ -8,6 +8,7 @@ dist/
 *.tgz
 
 # Test & Debug
+test
 test/
 test-*/
 *.log
