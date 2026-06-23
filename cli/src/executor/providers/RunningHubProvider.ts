@@ -1,12 +1,21 @@
 // ============================================================================
 // OpsV RunningHub Executor Provider
+// Supports:
+//   - upload_method: "base64" → encodes local images to base64 data URIs
+//   - timeline_data auto-upload → uploads local imageFile paths to RH media API
 // ============================================================================
 
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import FormData from 'form-data';
 import { BaseTaskJson } from '../../types/Job';
 import { BaseApiProvider } from './BaseApiProvider';
 import { HttpClient } from '../HttpClient';
 import { OpsVContext } from '../../container/OpsVContext';
 import { ProviderResult } from '../QueueRunner';
+import { logger } from '../../utils/logger';
+import { appendLog } from '../polling';
 
 interface RhSubmitResponse {
   id?: string;
@@ -46,8 +55,40 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
     ctx: OpsVContext
   ): Promise<ProviderResult> {
     const payload = { ...task.payload } as Record<string, any>;
+    const apiKey = ctx ? ctx.configLoader.getResolvedApiKey(task._opsv.modelKey) : undefined;
 
-    // Support upload_method: "base64" — auto-preprocess local image paths in nodeInfoList
+    // Auto-upload local image paths in timeline_data to RH media API
+    if (apiKey && Array.isArray(payload.nodeInfoList)) {
+      payload.nodeInfoList = await Promise.all(
+        payload.nodeInfoList.map(async (item: any) => {
+          if (item.fieldName !== 'timeline_data' || typeof item.fieldValue !== 'string') {
+            return item;
+          }
+          try {
+            const td = JSON.parse(item.fieldValue);
+            const segments = td.segments || [];
+            let changed = false;
+            for (const seg of segments) {
+              if (seg.imageFile && typeof seg.imageFile === 'string' && !seg.imageFile.startsWith('openapi/')) {
+                const localPath = seg.imageFile;
+                const fileName = await this.uploadFile(localPath, apiKey);
+                appendLog(taskPath, { event: 'upload', task_id: task._opsv?.shotId, file: localPath, fileName });
+                seg.imageFile = fileName;
+                changed = true;
+              }
+            }
+            if (changed) {
+              return { ...item, fieldValue: JSON.stringify(td) };
+            }
+          } catch (err: any) {
+            logger.warn(`[runninghub] Failed to process timeline_data: ${err.message}`);
+          }
+          return item;
+        })
+      );
+    }
+
+    // Support upload_method: "base64" — legacy base64 encoding for flat nodeInfoList fields
     if (payload.upload_method === 'base64' && Array.isArray(payload.nodeInfoList)) {
       payload.nodeInfoList = await Promise.all(
         payload.nodeInfoList.map(async (item: any) => {
@@ -61,6 +102,43 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
 
     const patched: BaseTaskJson<Record<string, unknown>> = { ...task, payload };
     return super.execute(patched, taskPath, ctx);
+  }
+
+  /**
+   * Upload a local file to RunningHub's media API.
+   * POST multipart/form-data to /openapi/v2/media/upload/binary
+   * Returns the fileName for use in timeline_data or nodeInfoList.
+   */
+  private async uploadFile(filePath: string, apiKey: string): Promise<string> {
+    if (!fs.existsSync(filePath)) {
+      logger.warn(`[runninghub] Local file not found, sending as-is: ${filePath}`);
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    const form = new FormData();
+    form.append('file', fs.createReadStream(filePath));
+
+    const res = await axios.post<{ code: number; data?: { fileName: string; download_url?: string } }>(
+      'https://www.runninghub.cn/openapi/v2/media/upload/binary',
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        timeout: 120000,
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024,
+      }
+    );
+
+    if (res.data.code !== 0 || !res.data.data?.fileName) {
+      throw new Error(`RH upload failed: code=${res.data.code}`);
+    }
+
+    const { fileName, download_url } = res.data.data;
+    logger.info(`[runninghub] Uploaded ${path.basename(filePath)} → fileName=${fileName}`);
+    return fileName;
   }
 
   protected parseTaskId(res: RhSubmitResponse): string | undefined {

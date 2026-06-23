@@ -20,11 +20,14 @@ import fs from 'fs';
 import path from 'path';
 
 export interface PollLogEntry {
-  event: 'submitted' | 'polling' | 'succeeded' | 'failed';
+  event: 'submitted' | 'polling' | 'succeeded' | 'failed' | 'upload';
   task_id?: string;
   status?: string;
   output?: string;
   error?: string;
+  file?: string;          // local file path (upload events)
+  fileName?: string;       // remote fileName (upload events)
+  downloadUrls?: string[]; // source download URLs (succeeded events)
   ts?: string; // auto-filled by appendLog
 }
 

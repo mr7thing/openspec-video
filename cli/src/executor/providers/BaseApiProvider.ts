@@ -316,7 +316,7 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
       await downloadFile(urls[i], outputPath);
       outputPaths.push(outputPath);
     }
-    appendLog(taskPath, { event: 'succeeded', task_id: taskId || 'sync', output: outputPaths.join(', ') });
+    appendLog(taskPath, { event: 'succeeded', task_id: taskId || 'sync', output: outputPaths.join(', '), downloadUrls: urls });
     return {
       taskPath,
       shotId,
