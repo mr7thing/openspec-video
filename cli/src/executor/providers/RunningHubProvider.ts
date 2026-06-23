@@ -57,31 +57,28 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
     const payload = { ...task.payload } as Record<string, any>;
     const apiKey = ctx ? ctx.configLoader.getResolvedApiKey(task._opsv.modelKey) : undefined;
 
-    // Auto-upload local image paths in timeline_data to RH media API
+    // Auto-upload local image paths embedded in nodeInfoList string fields.
+    // Handles: timeline_data (JSON with segments[].imageFile), or any field
+    // whose string value is JSON containing file paths. Non-JSON direct paths
+    // are handled by the upload_method: "base64" branch below.
     if (apiKey && Array.isArray(payload.nodeInfoList)) {
       payload.nodeInfoList = await Promise.all(
         payload.nodeInfoList.map(async (item: any) => {
-          if (item.fieldName !== 'timeline_data' || typeof item.fieldValue !== 'string') {
-            return item;
-          }
+          if (typeof item.fieldValue !== 'string') return item;
+
+          // Try parsing as JSON — may contain embedded file paths
+          let parsed: any;
           try {
-            const td = JSON.parse(item.fieldValue);
-            const segments = td.segments || [];
-            let changed = false;
-            for (const seg of segments) {
-              if (seg.imageFile && typeof seg.imageFile === 'string' && !seg.imageFile.startsWith('openapi/')) {
-                const localPath = seg.imageFile;
-                const fileName = await this.uploadFile(localPath, apiKey);
-                appendLog(taskPath, { event: 'upload', task_id: task._opsv?.shotId, file: localPath, fileName });
-                seg.imageFile = fileName;
-                changed = true;
-              }
-            }
-            if (changed) {
-              return { ...item, fieldValue: JSON.stringify(td) };
-            }
-          } catch (err: any) {
-            logger.warn(`[runninghub] Failed to process timeline_data: ${err.message}`);
+            parsed = JSON.parse(item.fieldValue);
+          } catch {
+            return item; // plain string, not JSON — skip
+          }
+          if (typeof parsed !== 'object' || parsed === null) return item;
+
+          // Recursively scan for local file paths, upload them
+          const changed = await this.resolveLocalPaths(parsed, apiKey, taskPath, task._opsv?.shotId);
+          if (changed) {
+            return { ...item, fieldValue: JSON.stringify(parsed) };
           }
           return item;
         })
@@ -102,6 +99,47 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
 
     const patched: BaseTaskJson<Record<string, unknown>> = { ...task, payload };
     return super.execute(patched, taskPath, ctx);
+  }
+
+  /**
+   * Recursively walk a parsed JSON object and upload any local file paths found.
+   * Handles nested structures like timeline_data.segments[].imageFile.
+   * Returns true if any path was uploaded.
+   */
+  private async resolveLocalPaths(obj: any, apiKey: string, taskPath: string, shotId?: string): Promise<boolean> {
+    let changed = false;
+
+    async function walk(this: RunningHubProvider, val: any): Promise<any> {
+      if (typeof val === 'string') {
+        // Check if it looks like a local file path (not already uploaded or URL)
+        if (val.startsWith('openapi/') || val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:')) {
+          return val;
+        }
+        if (fs.existsSync(val)) {
+          const fileName = await this.uploadFile(val, apiKey);
+          appendLog(taskPath, { event: 'upload', task_id: shotId, file: val, fileName });
+          changed = true;
+          return fileName;
+        }
+        return val;
+      }
+      if (Array.isArray(val)) {
+        for (let i = 0; i < val.length; i++) {
+          val[i] = await walk.call(this, val[i]);
+        }
+        return val;
+      }
+      if (val && typeof val === 'object') {
+        for (const key of Object.keys(val)) {
+          val[key] = await walk.call(this, val[key]);
+        }
+        return val;
+      }
+      return val;
+    }
+
+    await walk.call(this, obj);
+    return changed;
   }
 
   /**
