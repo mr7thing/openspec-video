@@ -37,7 +37,7 @@ opsv validate --skip-category-rules        # 跳过分类规则，只做基础 s
 ```
 
 - **源码**：`src/commands/validate.ts:43`
-- **加载顺序**：builtin(`project`/`shotdeck`) → `~/.opsv/category_validate.yaml` → `videospec/_category_validate.yaml`（项目级最高）
+- **加载顺序**：builtin(`project`/`shotdeck`) → `~/.opsv/category_validate.yaml` → `.opsv/category_validate.yaml`（项目级最高）
 - **退出码**：有 error/dead ref/缺失图片/状态不一致/类别 error（`--strict` 含 warning）→ 非零
 - **检测项**：① schema 校验 ② refs 结构（`RefBinder`）③ 分类字段 ④ `@id` 死链 ⑤ body 图片链接存在性 ⑥ manifest 与 frontmatter 状态一致性
 

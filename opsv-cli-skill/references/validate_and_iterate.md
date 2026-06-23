@@ -15,7 +15,7 @@ builtin 内置规则
    ↓ 覆盖
 ~/.opsv/category_validate.yaml          （用户级）
    ↓ 覆盖
-<project>/videospec/_category_validate.yaml   （项目级，最高）
+<project>/.opsv/category_validate.yaml         （项目级，最高）
 ```
 
 合并方式：`Object.assign` 逐层覆盖（`categoryValidateLoader.ts:58-68`），后加载的覆盖前者。
@@ -31,14 +31,14 @@ builtin 内置规则
 
 ### 1.3 自定义类别
 
-OPSV 只内置 `project` 和 `shotdeck` 两个类别（见 §1.2），其余类别均由用户在 `videospec/_category_validate.yaml` 中自定义。
+OPSV 只内置 `project` 和 `shotdeck` 两个类别（见 §1.2），其余类别均由用户在 `.opsv/category_validate.yaml` 中自定义。
 
 这意味着**类别体系是项目相关的**——不同项目可以定义完全不同的类别集合。Agent 写文档前必须先查看项目的 `_category_validate.yaml`，`category` 字段取值必须在该文件中注册（或使用内置的 `project`/`shotdeck`），否则 validate 的类别注册检查（§1.5 第 3 步）会报错。
 
 #### 自定义类别示例
 
 ```yaml
-# videospec/_category_validate.yaml
+# .opsv/category_validate.yaml
 concept_art:
   required_fields:
     - status
