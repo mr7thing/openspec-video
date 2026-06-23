@@ -54,10 +54,6 @@ export interface OpsvWorkflowMeta {
   opsvVersion: string;
 }
 
-const FIELD_PRIORITY = [
-  'text', 'image', 'video', 'audio', 'seed', 'width', 'height',
-];
-
 export function registerComfyNodeMappingCommand(program: Command): void {
   program
     .command('comfy-node-mapping <workflow-file>')
@@ -140,6 +136,9 @@ export function registerComfyNodeMappingCommand(program: Command): void {
 function extractMappings(workflow: Record<string, any>, prefix: string): MappingResult {
   const mappings: MappingResult = {};
 
+  // Fields that carry semantic content (not internal controls)
+  const skipFields = new Set(['strip_newlines', 'seed']);
+
   for (const nodeId in workflow) {
     if (nodeId === '_opsv_workflow') continue;
 
@@ -155,28 +154,24 @@ function extractMappings(workflow: Record<string, any>, prefix: string): Mapping
       continue;
     }
 
-    const fieldName = inferFieldName(node);
-    if (!fieldName) {
-      logger.warn(`Skipping node ${nodeId} ("${title}"): could not infer fieldName from inputs`);
+    const inputs = node.inputs;
+    if (!inputs || typeof inputs !== 'object') {
+      logger.warn(`Skipping node ${nodeId} ("${title}"): no inputs`);
       continue;
     }
 
-    mappings[mappingKey] = { nodeId, fieldName };
+    const inputKeys = Object.keys(inputs).filter(k => !skipFields.has(k));
+    if (inputKeys.length === 0) {
+      logger.warn(`Skipping node ${nodeId} ("${title}"): no configurable inputs`);
+      continue;
+    }
+
+    // Output each input field as a separate mapping entry
+    for (const fieldName of inputKeys) {
+      const entryKey = inputKeys.length === 1 ? mappingKey : `${mappingKey}.${fieldName}`;
+      mappings[entryKey] = { nodeId, fieldName };
+    }
   }
 
   return mappings;
-}
-
-function inferFieldName(node: any): string | null {
-  const inputs = node.inputs;
-  if (!inputs || typeof inputs !== 'object') return null;
-
-  const keys = Object.keys(inputs);
-  if (keys.length === 0) return null;
-
-  for (const priority of FIELD_PRIORITY) {
-    if (keys.includes(priority)) return priority;
-  }
-
-  return keys[0];
 }

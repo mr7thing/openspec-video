@@ -49,6 +49,9 @@ export function validateModelConfig(
     if (config.required_env && config.required_env.length > 0) {
       errors.push('comfylocal does not use required_env — remove this field');
     }
+    if (!config.workflow) {
+      errors.push('workflow is required for comfylocal (path to .json workflow file)');
+    }
     // Default api_url for local ComfyUI
     if (!config.api_url) {
       config.api_url = 'http://127.0.0.1:8188/';

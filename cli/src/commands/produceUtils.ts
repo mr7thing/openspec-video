@@ -67,7 +67,6 @@ export interface ImageProduceCommandOptions extends ProduceCommandOptions {
 /** ComfyUI-specific (extends ImageProduceCommandOptions) */
 export interface ComfyCommandOptions extends ImageProduceCommandOptions {
   workflow?: string;
-  workflowDir?: string;
   param?: string;
   forceApiMapping?: boolean;
 }

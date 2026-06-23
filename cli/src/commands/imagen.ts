@@ -88,7 +88,7 @@ export function registerImagenCommand(program: Command): void {
         const ctx = OpsVContext.create(cwd);
         const builder = new TaskBuilder(ctx);
 
-        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun, undefined, undefined, undefined, options.promptMode);
+        const results = await builder.compileToDir(jobs, modelKey, outputDir, options.dryRun, undefined, undefined, options.promptMode);
 
         if (options.dryRun) {
           console.log(chalk.cyan('\n[dry-run] Compiled tasks:'));

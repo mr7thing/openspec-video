@@ -29,8 +29,7 @@ export function registerComfyCommand(program: Command): void {
     .option('--category <cat>', 'Filter assets by category')
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved, use "none" to skip nothing)')
     .option('--file <id>', 'Run specific asset by id (from manifest)')
-    .option('--workflow <file>', 'Specific workflow file (absolute path or filename in workflow-dir)')
-    .option('--workflow-dir <dir>', 'Workflow template directory (overrides api_config workflowdir)')
+    .option('--workflow <file>', 'Workflow JSON file path (absolute or relative to project root)')
     .option('--param <json>', 'Override workflow parameters as JSON')
     .option('--force-api-mapping', 'Force use api_config.node_mappings, ignore frontmatter node_mapping')
     .option('--prompt-mode <mode>', 'Prompt @-token compile mode: keep | index | name')
@@ -79,7 +78,6 @@ export function registerComfyCommand(program: Command): void {
         }
 
         const workflowPath: string | undefined = options.workflow;
-        const workflowDir: string | undefined = options.workflowDir;
 
         const jobs: Job[] = [];
         const errors: string[] = [];
@@ -117,7 +115,7 @@ export function registerComfyCommand(program: Command): void {
 
         const results = await builder.compileToDir(
           jobs, modelKey, outputDir, options.dryRun,
-          workflowPath, workflowDir, options.forceApiMapping, options.promptMode
+          workflowPath, options.forceApiMapping, options.promptMode
         );
 
         if (options.dryRun) {

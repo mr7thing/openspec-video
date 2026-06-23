@@ -258,7 +258,7 @@ models:
       negative_prompt:
         nodeId: "7"
         fieldName: "text"
-    workflowdir: "comfyui_workflow_templates"
+    workflow: "comfyui_workflow_templates/ref2.json"
 
   # ==========================================
   # RunningHub (ComfyUI Cloud) — v2 API

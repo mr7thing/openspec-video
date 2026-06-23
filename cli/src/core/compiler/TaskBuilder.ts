@@ -56,7 +56,6 @@ export class TaskBuilder {
     outputDir: string,
     dryRun = false,
     workflowPath?: string,
-    workflowDir?: string,
     forceApiMapping?: boolean,
     promptCompileMode?: PromptCompileMode,
   ): Promise<BaseTaskJson<unknown>[]> {
@@ -149,7 +148,6 @@ export class TaskBuilder {
         projectRoot: this.ctx.projectRoot,
         workflowPath: workflowPath || job.workflow_path || job.workflow_id || job.workflow,
         forceApiMapping,
-        workflowDir,
         referenceImages: refImages,
         referenceVideos: refVideos,
         referenceAudios: refAudios,

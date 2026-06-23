@@ -53,7 +53,8 @@ export interface ModelConfig {
   model?: string;
   api_url?: string;
   api_status_url?: string;
-  workflowdir?: string;                       // comfylocal: 工作流模板文件目录
+  workflowdir?: string;                       // [deprecated] use workflow instead
+  workflow?: string;                          // comfylocal: 工作流 JSON 文件路径（相对 projectRoot 或绝对路径）
   workflowId?: string;                        // runninghub: 云端工作流 ID
   required_env?: string[];
   fallback_env?: string[];
