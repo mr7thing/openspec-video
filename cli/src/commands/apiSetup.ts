@@ -20,6 +20,7 @@ interface ApiSetupOptions {
   list?: boolean;
   setKey?: string;
   addModel?: string;
+  addModelFile?: string;
   syncEnv?: boolean;
 }
 
@@ -272,7 +273,9 @@ export function registerApiSetupCommand(program: Command): void {
     .description('Configure API providers and keys')
     .option('--list', 'List all models and their key status (JSON output)')
     .option('--set-key <kv>', 'Set/update an API key (e.g. RH_API_KEY=sk-xxx)')
-    .option('--add-model <json>', 'Add a new comfylocal or runninghub model config (JSON)')
+    .option('--add-model <json>', 'Add a new comfylocal or runninghub model config (JSON string)')
+    .option('--add-model-file <path>', 'Add a new model config from a JSON file')
+    .option('--sync-env', 'Scan api_config and add missing keys to .env as placeholders')
     .option('--sync-env', 'Scan api_config and add missing keys to .env as placeholders')
     .action(async (options: ApiSetupOptions) => {
       try {
@@ -284,6 +287,13 @@ export function registerApiSetupCommand(program: Command): void {
           listMode(ctx);
         } else if (options.setKey) {
           setKeyMode(ctx, options.setKey);
+        } else if (options.addModelFile) {
+          const filePath = path.resolve(options.addModelFile);
+          if (!fs.existsSync(filePath)) {
+            console.error(chalk.red(`File not found: ${filePath}`));
+            process.exit(1);
+          }
+          addModelMode(ctx, fs.readFileSync(filePath, 'utf-8'));
         } else if (options.addModel) {
           addModelMode(ctx, options.addModel);
         } else if (options.syncEnv) {
