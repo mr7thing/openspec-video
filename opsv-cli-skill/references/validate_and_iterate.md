@@ -29,28 +29,31 @@ builtin 内置规则
 | `project` | `status` | `skip_prompt_check: true` |
 | `shotdeck` | `status`, `title` | prompt `min_length: 10` + `no_placeholder: true` |
 
-### 1.3 项目级类别清单
+### 1.3 自定义类别
 
-来自 `videospec/_category_validate.yaml`（multi-ref-pack 实际配置）。Agent 写文档时 category 必须是下列之一（或内置的 project/shotdeck，或用户自定义）：
+OPSV 只内置 `project` 和 `shotdeck` 两个类别（见 §1.2），其余类别均由用户在 `videospec/_category_validate.yaml` 中自定义。
 
-| 类别 | 阶段 | required_fields |
-|------|------|-----------------|
-| `multi_ref_breakdown` | S2 剧本拆解 | status, id, sequence, scene, shot_type, camera_movement, character, action, duration_est, prompt |
-| `multi_ref_design` | 定档设计（旧） | status, id, type, prompt |
-| `shortlist` | S3 | status, id, title, shot_count, shots, characters, scenes, props |
-| `character` | S4 资产 | status, id, type, generation_type |
-| `prop` | S4 资产 | status, id, type, generation_type |
-| `scene` | S4 资产 | status, id, type, generation_type |
-| `character_multi_view` | S4.5 | status, id, generation_type, refs, prompt |
-| `scene_multi_view` | S4.5 | status, id, generation_type, refs, prompt |
-| `shot_ref` | S5 镜头参考帧 | status, id, shot_id, generation_type, prompt, refs |
-| `shot_storyboard` | S5.5 分镜 | status, id, shot_id, prompt, refs |
-| `shot_production` | S6 视频 | status, id, shot_id, prompt, duration, refs |
-| `voice` | 声音 | status, id, prompt |
-| `bgm` | 声音 | status, id, prompt |
-| `sound_effect` | 声音 | status, id, prompt, shot_id |
+这意味着**类别体系是项目相关的**——不同项目可以定义完全不同的类别集合。Agent 写文档前必须先查看项目的 `_category_validate.yaml`，`category` 字段取值必须在该文件中注册（或使用内置的 `project`/`shotdeck`），否则 validate 的类别注册检查（§1.5 第 3 步）会报错。
 
-> **共 16 个合法类别**（14 项目级 + 2 内置）。用别的 category 名 → validate 报错。
+#### 自定义类别示例
+
+```yaml
+# videospec/_category_validate.yaml
+concept_art:
+  required_fields:
+    - status
+    - id
+    - prompt
+    - style
+  field_schema:
+    prompt:
+      min_length: 20
+      no_placeholder: true
+    style:
+      allowed_values: ["realistic", "anime", "pixel"]
+```
+
+上例定义了一个 `concept_art` 类别，要求文档必须有 `status`/`id`/`prompt`/`style` 字段，且 prompt 不少于 20 字符、不能有占位符，style 只能取三个值之一。
 
 ### 1.4 校验规则结构（`categoryValidateLoader.ts:21-26`）
 
@@ -185,5 +188,5 @@ opsv approved --file "@S01-Shot01" --action approve
 | 手动改产物文件名 | 产物名由 `run` 按 `{task}_{index}.ext` 自动管 |
 | 迭代后直接手改源 `.md` | 改任务 JSON；源文档同步走 syncing 回写 |
 | 用大写 `_M1` 命名 | 小写 `_m1`（正则只认小写） |
-| 用 `_category_validate.yaml` 里没有的 category | 只能用注册过的 16 个类别 |
+| 用 `_category_validate.yaml` 里没有的 category | 只能用注册过的类别（内置 + 项目自定义） |
 | `validate` 报错就改代码绕过 | 改文档让格式合规 |

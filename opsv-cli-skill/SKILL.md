@@ -1,6 +1,6 @@
 ---
 name: opsv-cli
-description: OPSV 命令操作员手册 — 教 Agent 如何使用 opsv CLI 管理视频项目。当用户想初始化项目、写/校验/编译/执行/审阅/迭代任何 OPSV 文档时，或询问"opsv 怎么用""这个命令要什么参数""文档 frontmatter 该怎么写"时使用。本技能只讲命令用法与文档规范，不涉及生产流程（S0-S7 见 multi-ref-pack）。
+description: OPSV 命令操作员手册 — 教 Agent 如何使用 opsv CLI 管理视频项目。当用户想初始化项目、写/校验/编译/执行/审阅/迭代任何 OPSV 文档时，或询问"opsv 怎么用""这个命令要什么参数""文档 frontmatter 该怎么写"时使用。本技能只讲命令用法与文档规范，不涉及生产流程的具体阶段划分。
 disable-model-invocation: false
 user-invocable: true
 ---
@@ -8,7 +8,7 @@ user-invocable: true
 # opsv-cli — OPSV 命令操作员手册
 
 > **定位**：你加载这个技能，就具备了驱动整个 OPSV 管线的能力——知道有哪些命令、每条命令要求文档按什么规范写、哪些事绝对不能做。
-> **不讲**：生产流程（做哪一步、产出什么）——那是 multi-ref-pack 各阶段技能的事。
+> **不讲**：生产流程（做哪一步、产出什么）——那是各阶段技能的事。
 
 ---
 
