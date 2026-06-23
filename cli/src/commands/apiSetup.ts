@@ -276,7 +276,6 @@ export function registerApiSetupCommand(program: Command): void {
     .option('--add-model <json>', 'Add a new comfylocal or runninghub model config (JSON string)')
     .option('--add-model-file <path>', 'Add a new model config from a JSON file')
     .option('--sync-env', 'Scan api_config and add missing keys to .env as placeholders')
-    .option('--sync-env', 'Scan api_config and add missing keys to .env as placeholders')
     .action(async (options: ApiSetupOptions) => {
       try {
         const ctx = OpsVContext.create(process.cwd());
