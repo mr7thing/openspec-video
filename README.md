@@ -55,7 +55,10 @@ npm install && npm run build && npm link
 opsv init my-project
 cd my-project
 
-# Setup your API keys in ~/.opsv/.env
+# Setup your API keys
+cp .env.sample .env           # then edit .env with your keys
+# Or: opsv api-setup          # interactive guided setup
+
 # Write your documents in videospec/
 opsv validate
 opsv circle create --dir videospec
@@ -74,9 +77,11 @@ opsv review
 validate → circle create → compile (imagen/animate) → run → review → approve (or iterate)
 ```
 
-### `opsv init` — scaffold only
+### `opsv init` — scaffold project
 
-Creates the directory skeleton. No config files are copied — OPSV uses a **three-tier config** system:
+Creates the directory skeleton, copies built-in configs as `.sample` files (rename to activate), and generates `.env.sample` with all required API key placeholders.
+
+Config is loaded from a **three-tier config** system:
 
 | Tier | Location | Purpose |
 |------|----------|---------|
@@ -113,7 +118,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 
 | Command | What it does |
 |---------|-------------|
-| `opsv init` | Create project skeleton (dirs + .gitignore only) |
+| `opsv init` | Create project skeleton (dirs + `.sample` configs + `.env.sample`) |
 | `opsv validate` | Check documents against category rules |
 | `opsv circle create` | Analyze deps, build execution DAG |
 | `opsv circle refresh` | Refresh status without re-creating circles |
@@ -124,6 +129,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 | `opsv review` | Visual review & approve / reject |
 | `opsv approved` | Agent-driven batch approval |
 | `opsv iterate` | Clone task for retry with modified params |
+| `opsv api-setup` | Configure API keys and providers (interactive + agent mode) |
 | `opsv refs check` | Diagnose prompt ↔ refs alignment |
 | `opsv refs fill` | Auto-fill missing refs keys + paths |
 | `opsv login / logout` | OPSV Cloud auth |

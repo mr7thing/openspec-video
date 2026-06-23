@@ -25,6 +25,7 @@ export interface ProviderResult {
 export class QueueRunner {
   private container: Container;
   private ctx: OpsVContext;
+  private forceMode = false;
 
   constructor(container: Container, ctx: OpsVContext) {
     this.container = container;
@@ -33,9 +34,10 @@ export class QueueRunner {
 
   async runPaths(
     paths: string[],
-    options: { retry?: boolean; dryRun?: boolean; concurrency?: number } = {}
+    options: { retry?: boolean; force?: boolean; dryRun?: boolean; concurrency?: number } = {}
   ): Promise<ProviderResult[]> {
-    const tasks = this.collectTasks(paths, options.retry);
+    this.forceMode = options.force || false;
+    const tasks = this.collectTasks(paths, options.retry, this.forceMode);
 
     if (tasks.length === 0) {
       if (options.retry) {
@@ -131,6 +133,14 @@ export class QueueRunner {
     handler: ProviderExecutor,
     results: ProviderResult[]
   ): Promise<void> {
+    // force: clean up checkpoint and error log so task starts fresh
+    if (this.forceMode) {
+      const logFile = taskPath.replace(/\.json$/, '.log');
+      if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
+      const errorLog = taskPath.replace(/\.json$/, '_error.log');
+      if (fs.existsSync(errorLog)) fs.unlinkSync(errorLog);
+    }
+
     try {
       console.log(chalk.cyan(`  [${handler.name}] Running ${task._opsv.shotId}...`));
       const result = await handler.execute(task, taskPath, this.ctx);
@@ -202,7 +212,8 @@ export class QueueRunner {
 
   private collectTasks(
     paths: string[],
-    retry?: boolean
+    retry?: boolean,
+    force?: boolean
   ): Array<{ task: BaseTaskJson<unknown>; path: string }> {
     const results: Array<{ task: BaseTaskJson<unknown>; path: string }> = [];
 
@@ -213,6 +224,11 @@ export class QueueRunner {
         try {
           const task = JSON.parse(fs.readFileSync(resolved, 'utf-8'));
           if (task._opsv) {
+            // force: skip all checks, include unconditionally
+            if (force) {
+              results.push({ task, path: resolved });
+              continue;
+            }
             if (retry) {
               const errorLog = resolved.replace(/\.json$/, '_error.log');
               if (fs.existsSync(errorLog)) {
@@ -228,7 +244,7 @@ export class QueueRunner {
           logger.warn(`Failed to parse task JSON: ${resolved}`);
         }
       } else if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-        this.collectFromDir(resolved, results, retry);
+        this.collectFromDir(resolved, results, retry, force);
       }
     }
 
@@ -238,7 +254,8 @@ export class QueueRunner {
   private collectFromDir(
     dir: string,
     results: Array<{ task: BaseTaskJson<unknown>; path: string }>,
-    retry?: boolean
+    retry?: boolean,
+    force?: boolean
   ): void {
     const entries = fs.readdirSync(dir);
     const outputFiles = new Set(entries.filter((e) => !e.endsWith('.json') && !e.endsWith('.log') && !e.startsWith('_')));
@@ -248,11 +265,16 @@ export class QueueRunner {
       const stat = fs.statSync(fullPath);
 
       if (stat.isDirectory()) {
-        this.collectFromDir(fullPath, results, retry);
+        this.collectFromDir(fullPath, results, retry, force);
       } else if (entry.endsWith('.json') && !entry.startsWith('_')) {
         try {
           const task = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
           if (task._opsv) {
+            // force: skip all checks, include unconditionally
+            if (force) {
+              results.push({ task, path: fullPath });
+              continue;
+            }
             if (retry) {
               const base = entry.replace(/\.json$/, '');
               const errorLog = path.join(dir, `${base}_error.log`);

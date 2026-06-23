@@ -9,7 +9,7 @@
 
 ### `opsv init`
 
-初始化项目骨架，创建 `.opsv/`（api_config / input_types）+ `videospec/`（elements/scenes/shots）。
+初始化项目骨架，创建 `videospec/`（elements/scenes/shots）+ `.opsv/` 目录。
 
 ```bash
 opsv init [name]              # 在当前目录初始化
@@ -17,7 +17,12 @@ opsv init --dir <project>     # 新建项目目录并初始化
 ```
 
 - **源码**：`src/commands/init.ts:25`
-- **模板来源**：init 只创建目录结构 + `.gitignore`，不再复制配置文件。配置由 CLI 内置默认 + `~/.opsv/` + 项目 `.opsv/` 三层覆盖提供。
+- **初始化内容**：
+  - 创建 `videospec/{elements,scenes,shots}/`、`opsv-queue/`、`.opsv/` 目录
+  - 写入 `.gitignore`
+  - 初始化 git 仓库
+  - 复制内置 `.opsv/` 中的 `api_config.yaml`、`category_validate.yaml`、`input_types.yaml` 到项目 `.opsv/`，加 `.sample` 后缀（用户按需修改后移除 `.sample` 即可激活）
+  - 扫描内置配置中所有模型的 `required_env`，去重生成 `.env.sample` 文件
 
 ### `opsv validate`
 
@@ -123,15 +128,21 @@ opsv comfy [options]
   --category <cat>
   --status-skip <statuses>
   --file <id>
-  --workflow <file>        # ComfyUI 工作流 JSON
-  --workflow-dir <dir>     # 工作流目录
+  --workflow <file>        # ComfyUI 工作流 JSON（绝对路径，或 workflow-dir 下的文件名）
+  --workflow-dir <dir>     # 工作流模板目录（覆盖 api_config 中的 workflowdir）
   --param <json>           # 注入参数
-  --force-api-mapping      # 强制重新生成 API 映射
+  --force-api-mapping      # 强制重新生成 API 映射（忽略 frontmatter 的 node_mapping）
   --prompt-mode <mode>
   --dry-run
 ```
 
 - **源码**：`src/commands/comfy.ts:38`
+- **工作流模板（workflowdir）**：在 `api_config.yaml` 中通过 `workflowdir` 字段指定模板目录路径。目录下的 `.json` 文件按引用图片数量命名：
+  - `ref0.json` — 0 张参考图（纯文本生成）
+  - `ref1.json` — 1 张参考图（图生图）
+  - `ref2.json` — 2 张参考图
+  - 编译时根据 `refs` 中的图片数量自动匹配最合适的模板
+- **node_mappings**：定义 OPSV 参数注入到 ComfyUI 节点的映射关系，在 `api_config.yaml` 的 model 级别配置，或在文档 frontmatter 的 `node_mapping` 字段中配置。优先级：frontmatter > api_config
 
 ### `opsv comfy-node-mapping <workflow-file>`
 
@@ -145,6 +156,17 @@ opsv comfy-node-mapping <workflow-file>
 ```
 
 - **源码**：`src/commands/comfyNodeMapping.ts:68`
+- **用法**：给定 ComfyUI 工作流 JSON，自动扫描所有节点，识别 CLIPTextEncode / KSampler / LoadImage 等常见节点，建议 node_mappings 配置
+- **输出示例**：
+  ```yaml
+  node_mappings:
+    prompt:
+      nodeId: "6"
+      fieldName: "text"
+    seed:
+      nodeId: "25"
+      fieldName: "noise_seed"
+  ```
 
 ### `opsv webapp`
 
@@ -178,7 +200,8 @@ opsv webapp [options]
 
 ```bash
 opsv run <task.json...>
-  --retry                  # 重试失败任务
+  --retry                  # 重试失败任务（仅跑有 _error.log 的）
+  --force                  # 强制重跑所有任务，忽略成功/失败/审批状态（输出增量保存，不覆盖）
   --dry-run                # 不真正调 API
   -c, --concurrency <n>    # 并发数（覆盖 api_config 的 concurrency）
 ```
@@ -305,7 +328,41 @@ opsv image-stitch <imgs...> -o <out> --down     # 纵向拼接
 
 ---
 
-## 7. 登录相关（OpsV Cloud）
+## 7. API 配置
+
+### `opsv api-setup`
+
+配置 API Provider 和 API Key。支持交互模式和 Agent 编程模式。
+
+```bash
+opsv api-setup                        # 交互模式：扫描所有模型，显示 key 状态，引导补全缺失 key
+opsv api-setup --list                 # JSON 输出（Agent 友好），含每个模型的 key 状态
+opsv api-setup --set-key KEY=VALUE    # 设置/更新单个 key 到 .env
+opsv api-setup --add-model <json>     # 追加 comfylocal 或 runninghub 模型配置
+opsv api-setup --sync-env             # 扫描 api_config，补全 .env 中缺失的 key 占位
+```
+
+- **源码**：`src/commands/apiSetup.ts:25`
+- **`--add-model` JSON 格式**（仅支持 `comfylocal` 和 `runninghub`，必须包含 `node_mappings`）：
+
+```json
+// comfylocal 示例：含 workflowdir（本地工作流模板目录）
+{"modelKey":"comfylocal.myflux","config":{"provider":"comfylocal","workflowdir":"comfyui_workflow_templates","node_mappings":{"prompt":{"nodeId":"6","fieldName":"text"},"seed":{"nodeId":"25","fieldName":"noise_seed"}}}} 
+
+// runninghub 示例：含 workflowId（云端工作流 ID）
+{"modelKey":"runninghub.myvideo","config":{"provider":"runninghub","workflowId":"wf_abc123","api_url":"https://www.runninghub.cn/task/openapi/create","api_status_url":"https://www.runninghub.cn/task/openapi/status","node_mappings":{"prompt":{"nodeId":"6","fieldName":"text"},"image1":{"nodeId":"10","fieldName":"image"}}}}
+{"modelKey":"runninghub.myvideo","config":{"provider":"runninghub","workflowId":"wf_abc123","api_url":"https://www.runninghub.cn/task/openapi/create","api_status_url":"https://www.runninghub.cn/task/openapi/status","node_mappings":{"prompt":{"nodeId":"6","fieldName":"text"}}}}
+```
+
+- **`--add-model` 验证规则**：
+  - `comfylocal`：`node_mappings` 必填；不允许 `required_env`；`api_url` 默认 `http://127.0.0.1:8188/`
+  - `runninghub`：`workflowId` + `node_mappings` + `api_url` + `api_status_url` 必填；自动追加 `required_env: ["RUNNINGHUB_API_KEY"]`
+- **`--set-key`**：如 `opsv api-setup --set-key RUNNINGHUB_API_KEY=sk-xxx`，写入项目 `.env`
+- **`--sync-env`**：扫描所有模型的 `required_env`，将缺失的变量以 `your_key_here` 占位追加到 `.env`
+
+---
+
+## 8. 登录相关（OpsV Cloud）
 
 > 仅云审阅/云同步场景使用，生产管线默认本地。
 

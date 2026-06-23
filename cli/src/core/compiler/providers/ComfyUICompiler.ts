@@ -43,7 +43,7 @@ export class ComfyUICompiler implements ProviderCompiler {
       if (path.isAbsolute(workflowPath)) {
         workflowFile = workflowPath;
       } else {
-        const dir = workflowDir || modelConfig.defaults?.templateDir;
+        const dir = workflowDir || modelConfig.workflowdir;
         if (!dir) {
           throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, `Cannot resolve --workflow "${workflowPath}": no workflow directory specified`);
         }
@@ -51,9 +51,9 @@ export class ComfyUICompiler implements ProviderCompiler {
       }
     } else {
       // Auto-match by ref(N) pattern
-      const dir = workflowDir || modelConfig.defaults?.templateDir;
+      const dir = workflowDir || modelConfig.workflowdir;
       if (!dir) {
-        throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, 'No workflow directory specified. Use --workflow-dir or set defaults.templateDir in api_config.yaml');
+        throw new CompilationError(OpsVErrorCode.COMPILATION_WORKFLOW_NOT_FOUND, 'No workflow directory specified. Use --workflow-dir or set workflowdir in api_config.yaml');
       }
       workflowFile = this.resolveWorkflow(resolveWorkflowDir(dir), refCount || 0, job.id);
     }

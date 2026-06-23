@@ -12,6 +12,7 @@ interface RunCommandOptions {
   retry?: boolean;
   dryRun?: boolean;
   concurrency?: number;
+  force?: boolean;
 }
 
 export function registerRunCommand(program: Command): void {
@@ -19,6 +20,7 @@ export function registerRunCommand(program: Command): void {
     .command('run <paths...>')
     .description('Execute compiled task .json files by path')
     .option('--retry', 'Retry failed tasks')
+    .option('--force', 'Force re-run all tasks, ignoring previous success')
     .option('--dry-run', 'Show execution plan without running')
     .option('-c, --concurrency <number>', 'Max concurrent tasks per provider (overrides api_config)', (v) => parseInt(v, 10))
     .action(async (paths: string[], options: RunCommandOptions) => {
@@ -26,6 +28,7 @@ export function registerRunCommand(program: Command): void {
         const runner = new QueueRunner(container, ctx);
         const results = await runner.runPaths(paths, {
           retry: options.retry || false,
+          force: options.force || false,
           dryRun: options.dryRun || false,
           concurrency: options.concurrency,
         });

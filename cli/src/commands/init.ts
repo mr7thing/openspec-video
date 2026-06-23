@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
+import yaml from 'js-yaml';
 import { logger } from '../utils/logger';
 
 interface InitCommandOptions {
@@ -78,6 +79,49 @@ opsv-queue/
           logger.debug(`git init failed: ${err.message}`);
         }
 
+        // Copy built-in .opsv configs as .sample files
+        const builtinOpsvDir = path.join(__dirname, '..', '..', '.opsv');
+        const projectOpsvDir = path.join(targetDir, '.opsv');
+        const sampleFiles = ['api_config.yaml', 'category_validate.yaml', 'input_types.yaml'];
+
+        for (const file of sampleFiles) {
+          const src = path.join(builtinOpsvDir, file);
+          if (fs.existsSync(src)) {
+            const dest = path.join(projectOpsvDir, `${file}.sample`);
+            fs.copyFileSync(src, dest);
+            console.log(chalk.gray(`  Created ${path.relative(targetDir, dest)}`));
+          }
+        }
+
+        // Generate .env.sample with all required_env vars extracted from built-in api_config
+        const apiConfigPath = path.join(builtinOpsvDir, 'api_config.yaml');
+        if (fs.existsSync(apiConfigPath)) {
+          const raw = fs.readFileSync(apiConfigPath, 'utf8');
+          const parsed = yaml.load(raw) as any;
+          const models = parsed?.models || {};
+          const envVars = new Set<string>();
+          for (const modelKey of Object.keys(models)) {
+            const req = models[modelKey]?.required_env;
+            if (Array.isArray(req)) {
+              req.forEach((v: string) => envVars.add(v));
+            }
+          }
+
+          if (envVars.size > 0) {
+            const envSampleLines = [
+              '# .env.sample — 由 opsv init 自动生成',
+              '# 复制为 .env 并填入你的 API Key',
+              '',
+            ];
+            for (const envVar of envVars) {
+              envSampleLines.push(`${envVar}=your_key_here`);
+            }
+            envSampleLines.push('');
+            fs.writeFileSync(path.join(targetDir, '.env.sample'), envSampleLines.join('\n'));
+            console.log(chalk.gray('  Created .env.sample'));
+          }
+        }
+
         console.log(chalk.green(`\nProject initialized at ${targetDir}`));
         if (gitInitFailed) {
           console.log(chalk.yellow('Warning: git init failed. Run "git init" manually to enable version control.'));
@@ -86,7 +130,7 @@ opsv-queue/
         if (name) {
           console.log(`  cd ${name}`);
         }
-        console.log('  Edit .env to add your API keys');
+        console.log('  cp .env.sample .env        # Edit to add your API keys');
         console.log('  opsv circle create --dir videospec');
         console.log('  opsv imagen --model volcengine.seadream');
         console.log('  opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/');

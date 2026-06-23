@@ -41,6 +41,11 @@ export interface InputBinding {
   target?: string;
 }
 
+export interface NodeMapping {
+  nodeId: string;
+  fieldName: string;
+}
+
 export interface ModelConfig {
   provider: string;
   type?: 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
@@ -48,10 +53,12 @@ export interface ModelConfig {
   model?: string;
   api_url?: string;
   api_status_url?: string;
+  workflowdir?: string;                       // comfylocal: 工作流模板文件目录
+  workflowId?: string;                        // runninghub: 云端工作流 ID
   required_env?: string[];
   fallback_env?: string[];
   features?: string[];
-  defaults?: Record<string, any>;
+  defaults?: Record<string, any>;             // 生成参数默认值 (seed, size, cfg_scale...)
   max_size?: { width: number; height: number };
   max_batch?: number;
   quality_map?: Record<string, any>;
@@ -67,8 +74,7 @@ export interface ModelConfig {
   supports_audio?: boolean;
   supports_video_ref?: boolean;
   concurrency?: number;
-  workflowId?: string;
-  node_mappings?: Record<string, { nodeId: string; fieldName: string }>;
+  node_mappings?: Record<string, NodeMapping>;  // 节点映射
   inputs?: Record<string, InputBinding>;
   prompt_compile_mode?: 'keep' | 'index' | 'name';
   timeout?: TimeoutConfig;

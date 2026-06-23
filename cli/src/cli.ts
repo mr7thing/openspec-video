@@ -26,6 +26,7 @@ import { registerLoginCommand } from './commands/login';
 import { registerIterateCommand } from './commands/iterate';
 import { registerRefsCommand } from './commands/refs';
 import { registerImageStitchCommand } from './commands/imageStitch';
+import { registerApiSetupCommand } from './commands/apiSetup';
 import { resolveProjectRoot } from './utils/projectResolver';
 
 // Load .env from the resolved project root (not just cwd)
@@ -98,5 +99,6 @@ registerIterateCommand(program);
 registerApprovedCommand(program);
 registerRefsCommand(program);
 registerImageStitchCommand(program);
+registerApiSetupCommand(program);
 
 program.parse(process.argv);
