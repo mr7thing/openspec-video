@@ -11,6 +11,8 @@ import { RunnerResult } from './types';
 // Adding a new site = add an entry here + create runners/<site>.ts
 const RUNNER_MAP: Record<string, string> = {
   'webapp.gemini': '../runners/gemini',
+  'webapp.gemini-cdp': '../runners/gemini-cdp',
+  'webapp.gemini-opencli': '../runners/gemini-opencli',
 };
 
 /**

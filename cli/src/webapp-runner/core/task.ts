@@ -48,6 +48,7 @@ export interface TaskInfo {
   taskPath: string;
   frameRef: { first?: string | null; last?: string | null } | null;
   raw: Record<string, unknown>;
+  chatId?: string;        // Optional: reuse existing Gemini chat
 }
 
 export interface QueueStatus {
@@ -102,6 +103,7 @@ export function parseTask(taskPath: string): TaskInfo {
     taskPath: absPath,
     frameRef: payload.frame_ref || null,
     raw,
+    chatId: (meta.chatId || '') as string,
   };
 }
 
