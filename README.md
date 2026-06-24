@@ -175,16 +175,18 @@ OPSV doesn't force one pipeline. Skill Packs let you define **your own** product
 
 ```
 my-pack/
-├── .agent/skills/            # Agent instructions per stage
-│   ├── opsv-ref-pipeline/    #   Pipeline navigator (S0)
-│   ├── beat-script/          #   Script breakdown (S1)
-│   ├── create-elements/      #   Asset generation (S2)
-│   ├── shot-storyboard/      #   Storyboard design (S3)
-│   └── shotgen/              #   Video production (S4)
-├── videospec/
-│   └── _category_validate.yaml  # Per-category validation contracts
-├── SKILL_SPEC.md                 # Skill authoring spec
-└── README.md
+├── SKILL_PACK.md                 # Standard pack descriptor (agent framework entry)
+├── README.md                     # Install & usage guide
+├── manifest.json                 # OPSV runtime metadata (optional)
+├── SKILL.md                      # Entry skill (pack navigator)
+├── guides/                       # Shared prompt frameworks
+├── references/                   # Shared reference docs (CLI, refs, file specs)
+├── .opsv/
+│   └── _category_validate.yaml   # Per-category validation contracts
+└── skills/                       # Stage skills (one dir per stage)
+    ├── opsv-<stage-1>/           #   SKILL.md + references per stage
+    ├── opsv-<stage-2>/
+    └── ...
 ```
 
 ### Per-category validation
@@ -209,25 +211,30 @@ character:
 
 Each stage is a self-contained SKILL.md that tells the agent **what to produce, how to produce it, and what rules to follow**. The agent reads the pack, understands the pipeline, and executes stage by stage — invoking `opsv` commands for validation, compilation, and execution.
 
-### Multi-Ref Pack (example 8-stage pipeline)
+### Multi-Ref Pack (9-stage short-drama pipeline)
 
-A reference implementation showing the full capability — from drama graph extraction through final video production:
+A reference implementation: from drama graph extraction through to editable video clips — an S0→S6 production pipeline.
 
 ```
-S0: Pipeline Navigator     S4: Asset Creation
-S1: Drama Graph            S5: Shot Reference
-S2: Beat Script            S5.5: Storyboard
-S3: Shortlist              S6: Video Generation
+S0: Pipeline Navigator     S4: Asset Creation (characters + scenes)
+S1: Drama Graph            S5: Shot Reference Frames
+S2: Beat Script            S5.5: Storyboard (6-color motion annotation)
+S3: Shotlist               S6: Video Clips (4-shot / 12s)
 ```
+
+The pipeline goes up to **asset/clip generation**. Final editing, sound mixing, color grading, and mastering are handled by human editors or dedicated editing skills downstream.
 
 ### Get started
 
-1. Symlink a pack into your project as `.agent/skills/`
-2. The agent discovers the pipeline and executes stage by stage
+1. **Mount a pack** into your project's agent skills discovery path:
+   ```bash
+   cp -r my-pack  <project>/.agents/skills/my-pack
+   ```
+2. The agent discovers the entry skill and executes stage by stage
 3. Customize `_category_validate.yaml` to match your quality standards
-4. Add new stages by creating new skill directories
+4. Add new stages by creating new skill directories under `skills/`
 
-> The repo includes `opsv-cli-skill/` — the operator manual AI agents use to drive the CLI. It's the base layer every pack builds on.
+> The repo includes `opsv-cli-skill/` — the CLI operator skill (standard agent format). It teaches agents opsv commands, document specs, and antipatterns. It's the foundation layer any pipeline pack builds on — **installed independently** as a separate skill.
 
 ---
 
