@@ -117,7 +117,8 @@ user-invocable: true
 
 | 命令 | 干什么 | Agent 必须知道 |
 |------|--------|---------------|
-| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub；`--sync-env` 补齐占位 |
+| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub/**webapp**；`--sync-env` 补齐占位 |
+| `opsv webapp --model <key>` | 编译 webapp 类任务（用浏览器自动化的 provider，比如 `webapp.gemini-opencli`） | 跟 `opsv imagen` 同位置，差别是走 `cli/src/webapp-runner/` 路由 |
 
 ---
 
@@ -223,6 +224,184 @@ opsv api-setup --add-model '{
 ```
 
 添加后即可用 `opsv comfy --model comfylocal.txt2img` 编译。
+
+---
+
+## 4A. WebApp Provider — Gemini via OpenCLI
+
+> **定位**：用 OpenCLI 浏览器自动化（Browser Bridge Extension + daemon）跑 Gemini 出图任务。**比 CDP 直连稳**——opencli daemon 接管 Chrome，runner 只发命令不用管浏览器底层。
+>
+> **使用时机**：你想用 Gemini 跑图、想把 Gemini 当作一个可调度的 provider，但又不想手动开 tab。
+
+### 4A.1 前置条件（一次性）
+
+1. **Chrome 已装 OpenCLI Browser Bridge extension**
+   - 路径：`chrome://extensions` → 加载已解压的扩展程序
+   - 源码一般在 `~/.opencli/extension/` 或 opencli npm 包的 `dist/extension/`
+2. **opencli daemon 在跑**（端口 19825）：`opencli daemon start` 或 `npm install -g @jackwener/opencli`
+3. **Chrome 已被 opencli 接管**：手动开一次 Chrome（用平时的 user-data-dir）→ daemon 自动连 → `opencli profile list` 看到 `default — connected`
+4. **Gemini 已登录**到你日常 user-data-dir
+
+### 4A.2 注册 Provider
+
+```bash
+# webapp.gemini-opencli 是固定 modelKey，runner 写死在 cli/src/webapp-runner/runners/gemini-opencli.ts
+opsv api-setup --add-model '{
+  "modelKey": "webapp.gemini-opencli",
+  "config": {
+    "provider": "webapp",
+    "runner": "gemini-opencli",
+    "opencli_session": "work",
+    "download_dir": "~/下载"
+  }
+}'
+```
+
+### 4A.3 编译任务
+
+```bash
+# webapp 类的编译入口
+opsv webapp --model webapp.gemini-opencli videospec/scenes/S01-Shot05.md
+# 输出：opsv-queue/videospec_circle1/webapp.gemini_NNN/storyboard_S01-Shot05.json
+```
+
+task JSON 结构跟 ComfyUI 类**完全同构**（顶层 `payload` + `_opsv`），差别只在 `_opsv.modelKey`：
+
+```json
+{
+  "payload": {
+    "task_id": "storyboard_S01-Shot05",
+    "target_url": "https://gemini.google.com",
+    "prompt": "...",
+    "reference_files": ["...png", "...png"]
+  },
+  "_opsv": {
+    "provider": "webapp",
+    "modelKey": "webapp.gemini-opencli",   ← 唯一差别
+    "type": "webapp",
+    "shotId": "storyboard_S01-Shot05",
+    "compiledAt": "..."
+  }
+}
+```
+
+### 4A.4 执行任务
+
+```bash
+# 跑单个 task JSON
+node cli/dist/webapp-runner/runners/gemini-opencli.js \
+  opsv-queue/videospec_circle1/webapp.gemini_NNN/storyboard_S01-Shot05.json
+
+# 或走 opsv run（推荐：自动找 manifest + 串行跑）
+opsv run opsv-queue/videospec_circle1/webapp.gemini_NNN/
+```
+
+### 4A.5 chatId 复用（关键：避免每次新建对话）
+
+Runner 在 `queue_dir/chat_state.json` 记录**当前 batch 用的 Gemini chat ID**：
+
+```json
+{
+  "shot": "webapp.gemini_027",
+  "chatId": "95da971bb5b61572",
+  "chatUrl": "https://gemini.google.com/app/95da971bb5b61572",
+  "createdAt": "...",
+  "updatedAt": "...",
+  "tasks": [
+    {"taskId": "storyboard_S01-Shot05", "imagePath": "...", "md5": "...", "successAt": "..."},
+    {"taskId": "storyboard_S01-Shot06", "imagePath": "...", "md5": "...", "successAt": "..."}
+  ]
+}
+```
+
+**解析优先级**（每次 runner 启动）：
+1. `task._opsv.chatId`（task JSON 自带，最显式）
+2. `queue_dir/chat_state.json`（同 batch 复用）
+3. `https://gemini.google.com/app`（fresh chat）
+
+**好处**：N 个 shot 跑下来**都累积在同一个 Gemini 对话里**，可以传前一张图当下一次的 ref。
+
+### 4A.6 OS Picker 问题与恢复（重要警告）
+
+**症状**：runner 上传完文件后，Gemini 的 "上传和工具" menuitem click 会**触发原生 OS 文件选择对话框**（GTK/Qt 进程级 dialog）。
+
+**为什么**：
+- runner 用 `evalJS` 把 file 注入到 `input.files`（chunked base64 → DataTransfer）
+- **但** Gemini 的 menuitem click handler **内部 click hidden input** → 弹 OS picker
+- OS picker 是独立进程，**CDP 看不到**，`opencli browser eval` / `dialog dismiss` 都关不掉
+
+**最有效的恢复（手动 SOP）**：
+
+```bash
+# 1. 关掉 opencli 控制的 Chrome 进程
+pkill -9 -f "/opt/google/chrome/chrome"
+# （daemon 不死，它会保持 WebSocket 监听）
+
+# 2. 等几秒（daemon 检测到 Chrome 没了，profile disconnected）
+
+# 3. 重新手动开 Chrome（带日常 user-data-dir）
+google-chrome-stable --user-data-dir=/home/uncle7/.config/google-chrome \
+                     --profile-directory=Default \
+                     "https://gemini.google.com/app/<chatId>"
+# ← 关键是 **带 chatId 打开 URL**，让浏览器直接恢复那个对话
+
+# 4. 等 extension 自动连回 daemon
+sleep 3 && opencli profile list
+# 看到 default connected 即可
+
+# 5. 重新跑任务（runner 读 chat_state.json 自动续对话）
+opsv run opsv-queue/.../webapp.gemini_NNN/
+```
+
+**为什么这个流程有效**：
+- Chat 状态在 Google 账号服务端，**换 Chrome/进程都不影响**
+- 带 chatId 打开 URL 直接续对话，**prompt + AI 图都在**
+- OS picker 是 Chrome 进程内的，**杀进程 = 杀 picker**
+
+### 4A.7 端到端示例（027 Shot05+06 跑通版）
+
+```bash
+# 1. 编译两个 shot
+opsv webapp --model webapp.gemini-opencli videospec/scenes/S01-Shot05.md
+opsv webapp --model webapp.gemini-opencli videospec/scenes/S01-Shot06.md
+
+# 2. 跑 Shot06（fresh chat）
+node cli/dist/webapp-runner/runners/gemini-opencli.js \
+  opsv-queue/.../webapp.gemini_027/storyboard_S01-Shot06.json
+# → 新建 chat, chatId 写入 chat_state.json
+
+# 3. 跑 Shot05（自动复用 Shot06 的 chat）
+node cli/dist/webapp-runner/runners/gemini-opencli.js \
+  opsv-queue/.../webapp.gemini_027/storyboard_S01-Shot05.json
+# → runner 读 chat_state.json → open 同一个 chat URL
+# → 同一对话里累积 2 张图
+```
+
+### 4A.8 Runner 实现细节
+
+源码：`cli/src/webapp-runner/runners/gemini-opencli.ts`
+
+核心函数：
+- `preflight()` — `which opencli` + `doctor` + `profile list` + `bind work` + `open https://gemini.google.com/app`
+- `uploadFiles()` — **chunked base64 eval 注入到 `window.__upload_b64_N`**，最后一次性 `input.files = dt.files` + dispatch `change`/`input` event（绕开 OS picker）
+- `sendPrompt()` — `keys Escape` 兜底 + click "发送" + 等 URL 跳到 `/app/{chatId}`
+- `waitForImages()` — 轮询 `img[alt*='AI 生成']` + `naturalWidth >= 512`
+- `downloadImages()` — click `[aria-label="下载完整尺寸的图片"]` + 等 ~/下载/ 出现新 png
+- `retryOnFailure()` — 包裹主循环，失败时按等级升级（Escape → 重新 open URL → 杀 Chrome → 重试 3 次）
+- `recordChatSuccess()` — 把 chatId + 任务结果写进 `chat_state.json`
+
+### 4A.9 已知坑（v0.13.5 实测）
+
+| 坑 | 表现 | 修法 |
+|---|---|---|
+| E2BIG | `node` 进程命令行参数 > 128 KiB | chunked eval 拼装 base64 到 `window` |
+| OS picker 锁 composer | menuitem click 触发 hidden input | 注入 files 但不 click input；真卡了就杀 Chrome 重建 |
+| `opencli browser press` 子命令不存在 | `press Escape` 报错 | 用 `keys Escape`（文档上写的是 `keys` 不是 `press`） |
+| `dialog dismiss` 只处理 JS | 不能 dismiss OS picker | 杀 Chrome 重建是唯一稳的 |
+| URL 跳变时机 | click 发送后 5-15s 跳到 `/app/{id}` | runner 轮询 20s 等跳变；没跳就 throw 触发 retry |
+| chatId 不复用 | 每次重置 chat | chat_state.json 持久化（自动） |
+| Brave / Chrome 共存 | OS picker 可能是别 Chrome 弹的 | 用 ps 区分 opencli 控制的 Chrome PID |
+| `img[alt*="AI 生成"]` selector | alt 里是中文逗号 `，AI 生成` | substring 匹配可以，**别用 JSON.stringify 转义**会破坏 selector |
 
 ---
 
@@ -339,6 +518,8 @@ opsv run opsv-queue/.../S01-Shot01_m1.json
 - 用户说"审批/审阅/review" → §3.5
 - 用户说"API key/配置/添加模型" → §3.7 + §4
 - 用户说"ComfyUI 工作流/node mapping" → §4
+- 用户说"用 Gemini 跑图/webapp provider/opencli" → §4A（完整 OpenCLI 章节）
+- 用户问"OS picker 关不掉/Chrome 杀不掉/Gemini 卡死" → §4A.6（SOP 恢复流程）
 - 用户问"refs 怎么写""@ 语法""这个错什么意思" → references/refs_syntax.md
 - 用户问"状态是什么意思/syncing/approved" → references/lifecycle_and_status.md
 - 用户问某个命令的参数 → references/cli_reference.md
@@ -351,3 +532,6 @@ opsv run opsv-queue/.../S01-Shot01_m1.json
 - `references/lifecycle_and_status.md` — 三状态、syncing 回写、产物命名规则
 - `references/refs_syntax.md` — `@` 引用语法、refs 字典结构、refs check/sync
 - `references/validate_and_iterate.md` — validate 加载顺序、类别机制、iterate 迭代命名
+- `references/opencli_cheatsheet.md` — OpenCLI 常用命令速查（参考用，详细命令看 `opencli browser --help`）
+
+> **WebApp / OpenCLI 章节已在主 SKILL.md §4A**，不需要单独 reference 文件。
