@@ -14,7 +14,7 @@ user-invocable: true
 
 ## 1. 核心原则（不可违背）
 
-这三条是 OPSV 的宪法，来自 `rule.md`，任何操作都要服从：
+这三条是 OPSV 的宪法，任何操作都要服从：
 
 1. **有产物必有文档** — 每一个 AI 生成的产物（图/视频/音频）都必须有一个文档描述其生成过程（prompt + 参数 + refs）。没有文档的产物不存在。
 2. **文档是绝对真相** — 所有生成所需的参数都写在文档 frontmatter 里。代码、API key、生成产物都从文档派生，不能反过来。
@@ -59,7 +59,7 @@ user-invocable: true
                   └───────────────┘
 ```
 
-**一句话**：Agent 永远在"写文档 → 让命令处理 → 看反馈 → 改文档/迭代任务"的循环里，不碰 API、不碰产物名。
+**一句话**：Agent 永远在"写文档 → 让命令处理 → 看反馈 → 改文档/迭代任务"的循环里，不碰 API、不碰产物名（除非用户强烈要求）。
 
 ---
 
@@ -77,7 +77,7 @@ user-invocable: true
 | 命令 | 干什么 | Agent 必须知道 |
 |------|--------|---------------|
 | `opsv circle create` | 从 `refs` 依赖建 DAG、分层、写 manifest | **只在依赖关系变化时**用；不是每步都跑 |
-| `opsv circle refresh` | 刷新状态、不动文件 | 日常迭代用；检测到拓扑变化会报错让用 create |
+| `opsv circle refresh` | 检查文档状态，刷新任务环文档状态统计、不动文件 | 日常迭代用；检测到拓扑变化会报错让你用 create |
 
 ### 3.3 编译
 
@@ -86,7 +86,7 @@ user-invocable: true
 | `opsv imagen` | 编译图像任务 → task.json | `--model` 必填；只编译不执行 |
 | `opsv animate` | 编译视频任务 → task.json | `--model` 必填；同上 |
 | `opsv comfy` | 编译 ComfyUI 工作流任务 | 需要 workflow 文件 |
-| `opsv webapp` | 编译浏览器自动化任务 | 多站点 runner |
+| `opsv webapp` | 编译浏览器自动化任务 | 多站点 runner （目前仅支持Gemini） |
 
 > 编译命令**只产出 task.json**，真正的 API 调用在 `run` 里。
 
