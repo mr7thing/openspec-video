@@ -1,5 +1,6 @@
 // ============================================================================
-// OpsV opsv validate (v0.10.0)
+// OpsV opsv validate (v0.11.0)
+// Multi-dir scan, maxDepth, exclude, skip dot-dirs
 // ============================================================================
 
 import { Command } from 'commander';
@@ -26,34 +27,29 @@ import { bindRefs } from '../core/RefBinder';
 import { parseKey } from '../core/RefBinder';
 
 interface ValidateCommandOptions {
-  dir: string;
+  dir?: string[];
   category?: string;
   strict?: boolean;
   skipCategoryRules?: boolean;
+  exclude?: string[];
+  maxDepth?: string;
 }
 
 export function registerValidateCommand(program: Command, version: string): void {
   program
     .command('validate')
     .description('Validate project documents and frontmatter')
-    .option('--dir <path>', 'Target directory to validate (default: videospec)', 'videospec')
+    .option('--dir <paths...>', 'Target directories to validate (default: videospec/scenes videospec/shots videospec/elements)')
+    .option('--exclude <patterns...>', 'Exclude paths matching these patterns (relative to project root)')
+    .option('--max-depth <number>', 'Max scan depth (default: 1, -1=unlimited, 0=root only)', (v) => v)
     .option('--category <cat>', 'Only validate documents of this category')
     .option('--strict', 'Treat warnings as errors (non-zero exit)')
     .option('--skip-category-rules', 'Skip category_validate.yaml rule checks')
     .action(async (options: ValidateCommandOptions) => {
       try {
         const projectRoot = resolveProjectRoot(process.cwd());
-        const targetDir = path.resolve(projectRoot, options.dir);
-
-        if (!fs.existsSync(targetDir)) {
-          console.error(chalk.red(`Target directory not found: ${targetDir}`));
-          process.exit(1);
-        }
-
-        if (!fs.statSync(targetDir).isDirectory()) {
-          console.error(chalk.red(`Target is not a directory: ${targetDir}`));
-          process.exit(1);
-        }
+        const dirs = options.dir ?? ['videospec/scenes', 'videospec/shots', 'videospec/elements'];
+        const maxDepth = options.maxDepth !== undefined ? parseInt(options.maxDepth, 10) : 1;
 
         // Load category rules + input_types registry
         const catLoader = new CategoryValidateLoader();
@@ -61,20 +57,50 @@ export function registerValidateCommand(program: Command, version: string): void
         const inputTypes = new InputTypesLoader();
         inputTypes.load(projectRoot, { silent: true });
 
-        // Build asset index recursively (supports deep nesting)
-        const index = buildAssetDocIndex(targetDir);
-        const { entries, duplicates } = index;
+        // Build index per directory, merge results
+        const allEntries = new Map<string, { id: string; filePath: string; relativePath: string }>();
+        const allDuplicates: string[] = [];
+        const scannedDirs: string[] = [];
 
-        if (entries.size === 0) {
-          console.log(chalk.yellow(`No .md files found in ${targetDir}`));
+        for (const rawDir of dirs) {
+          const targetDir = path.resolve(projectRoot, rawDir);
+
+          if (!fs.existsSync(targetDir)) {
+            console.log(chalk.yellow(`Directory not found, skipping: ${targetDir}`));
+            continue;
+          }
+
+          if (!fs.statSync(targetDir).isDirectory()) {
+            console.log(chalk.yellow(`Not a directory, skipping: ${targetDir}`));
+            continue;
+          }
+
+          const index = buildAssetDocIndex(targetDir, {
+            maxDepth,
+            excludePatterns: options.exclude,
+            projectRoot,
+          });
+
+          for (const [id, entry] of index.entries) {
+            allEntries.set(id, entry);
+          }
+          allDuplicates.push(...index.duplicates);
+          scannedDirs.push(rawDir);
+
+          console.log(chalk.cyan(`  ${chalk.bold(rawDir)}: ${index.entries.size} document(s)`));
+        }
+
+        if (allEntries.size === 0) {
+          console.log(chalk.yellow(`No .md files found in any target directory.`));
           return;
         }
 
-        console.log(chalk.cyan(`Asset index: ${entries.size} document(s) in ${targetDir}`));
+        console.log(chalk.cyan(`\nTotal: ${allEntries.size} document(s) across ${scannedDirs.length} director(ies)`));
 
-        if (duplicates.length > 0) {
-          console.log(chalk.yellow(`\n${duplicates.length} duplicate assetId(s) found:`));
-          for (const id of duplicates) {
+        if (allDuplicates.length > 0) {
+          const uniqueDups = [...new Set(allDuplicates)];
+          console.log(chalk.yellow(`\n${uniqueDups.length} duplicate assetId(s) found:`));
+          for (const id of uniqueDups) {
             console.log(chalk.yellow(`  "${id}"`));
           }
         }
@@ -87,7 +113,7 @@ export function registerValidateCommand(program: Command, version: string): void
         const statusIssues: Array<{ file: string; docStatus: string; manifestStatus: string }> = [];
         const categoryIssues: Array<{ file: string; issue: ValidationIssue }> = [];
 
-        for (const [assetId, entry] of entries) {
+        for (const [assetId, entry] of allEntries) {
           // Only validate files in subdirectories (not root level)
           if (path.dirname(entry.relativePath) !== '.') {
             totalFiles++;
@@ -139,7 +165,7 @@ export function registerValidateCommand(program: Command, version: string): void
                 const parsed = parseKey(key);
                 if (!parsed) continue;
                 if (parsed.kind === 'doc') continue; // local doc refs not in asset index
-                if (!entries.has(parsed.id)) {
+                if (!allEntries.has(parsed.id)) {
                   deadRefs.push({ file: entry.relativePath, ref: parsed.id, relPath: entry.relativePath });
                 }
               }
@@ -149,12 +175,14 @@ export function registerValidateCommand(program: Command, version: string): void
           }
         }
 
-        // Image ref existence check
-        const imageDir = path.resolve(projectRoot, options.dir);
-        const foundMissingImages = findMissingImageRefs(imageDir);
-        missingImages.push(...foundMissingImages);
+        // Image ref existence check (scan all scanned directories)
+        for (const rawDir of scannedDirs) {
+          const imageDir = path.resolve(projectRoot, rawDir);
+          const foundMissingImages = findMissingImageRefs(imageDir);
+          missingImages.push(...foundMissingImages);
+        }
 
-        // Status consistency check: manifest status vs document frontmatter status
+        // Status consistency check
         const foundStatusIssues = findStatusInconsistencies(projectRoot);
         statusIssues.push(...foundStatusIssues);
 
@@ -297,7 +325,6 @@ export function findStatusInconsistencies(
       if (!manifestStatus) continue;
 
       // Find the corresponding document file using recursive search
-      // (asset may be in subdirectory, not just root level)
       const docPath = AssetManager.findAssetFilePathUnder(videospecDir, assetId);
       if (!docPath) continue;
 
@@ -332,7 +359,6 @@ export function findStatusInconsistencies(
  */
 export function extractImageRefsFromBody(content: string): string[] {
   const refs: string[] = [];
-  // Match ![alt](path) where path is NOT an http/https URL
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   let match;
   while ((match = imageRegex.exec(content)) !== null) {
@@ -365,7 +391,6 @@ export function findMissingImageRefs(docDir: string): Array<{ file: string; ref:
         const content = fs.readFileSync(fullPath, 'utf-8');
         const imageRefs = extractImageRefsFromBody(content);
         for (const ref of imageRefs) {
-          // Resolve relative to the document's directory
           const resolved = path.isAbsolute(ref)
             ? ref
             : path.resolve(path.dirname(fullPath), ref);

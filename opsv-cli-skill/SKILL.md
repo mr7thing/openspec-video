@@ -70,7 +70,7 @@ user-invocable: true
 | 命令 | 干什么 | Agent 必须知道 |
 |------|--------|---------------|
 | `opsv init` | 建项目骨架 | 会创建 `.opsv/` + `videospec/`，复制内置配置为 `.sample` 文件，生成 `.env.sample` |
-| `opsv validate` | 读文档做格式守门 | 文档 `category` 必须在 `_category_validate.yaml` 注册过；不评判质量，只查格式 |
+| `opsv validate` | 读文档做格式守门 | 默认扫 `videospec/scenes`、`videospec/shots`、`videospec/elements` 三个目录（多值 `--dir` 可覆盖）；支持 `--exclude` 按路径排除子目录、`--max-depth` 控制深度（默认 1，`-1`=无限）；点目录自动跳过；文档 `category` 必须在 `_category_validate.yaml` 注册过；不评判质量，只查格式 |
 
 ### 3.2 任务环
 
@@ -485,7 +485,7 @@ opsv init
 # 写好文档 frontmatter（category/status/prompt/refs）
 
 # 1. 守门
-opsv validate --dir videospec
+opsv validate
 opsv refs check videospec/shots/S01-Shot01.md
 
 # 2. 建依赖（依赖变化时才跑）

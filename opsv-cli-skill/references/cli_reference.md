@@ -28,13 +28,33 @@ opsv init --dir <project>     # 新建项目目录并初始化
 
 读取文档做格式守门——按 `_category_validate.yaml` 的规则查 frontmatter 字段、refs 死链、图片引用存在性、状态一致性。**不评判质量**。
 
+默认扫描 `videospec/scenes`、`videospec/shots`、`videospec/elements` 三个目录，深度 1 层（仅子目录一层），自动跳过点目录。
+
 ```bash
-opsv validate                              # 默认 --dir videospec
-opsv validate --dir <path>                 # 校验指定目录
-opsv validate --category <cat>             # 按分类校验
-opsv validate --strict                     # warning 也当 error
-opsv validate --skip-category-rules        # 跳过分类规则，只做基础 schema 检查
+opsv validate                                            # 默认扫三个目录，深度 1
+opsv validate --dir videospec/scenes videospec/shots     # 多值，自定义扫描目录
+opsv validate --max-depth -1                             # 无限递归（含全部子目录）
+opsv validate --max-depth 0                              # 仅根层文件
+opsv validate --exclude videospec/scenes/archive         # 按项目根路径排除子目录
+opsv validate --dir videospec --max-depth -1             # 兼容旧用法（单目录无限深度）
+opsv validate --category <cat>                           # 按分类校验
+opsv validate --strict                                   # warning 也当 error
+opsv validate --skip-category-rules                      # 跳过分类规则，只做基础 schema 检查
 ```
+
+**`validate` 专属参数**（v0.11.0 起）：
+
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `--dir <paths...>` | `string[]` | `videospec/scenes videospec/shots videospec/elements` | 多值，指定一个或多个扫描目录 |
+| `--exclude <patterns...>` | `string[]` | `[]` | 排除路径模式（相对项目根），匹配的目录及其子目录跳过 |
+| `--max-depth <number>` | `int` | `1` | 扫描深度：`-1`=无限，`0`=仅根层，`N`=最多 N 层子目录 |
+
+**行为变化**（与 v0.10.0 相比）：
+- `--dir` 从单值变为多值，默认从 `videospec` 改为 `videospec/scenes videospec/shots videospec/elements`
+- 目录不存在时跳过并提示黄色警告（不再报错退出）
+- 自动跳过 `.` 开头的隐藏目录
+- 跨目录相同 `assetId` 去重（后扫到的覆盖前面的）
 
 - **源码**：`src/commands/validate.ts:43`
 - **加载顺序**：builtin(`project`/`shotdeck`) → `~/.opsv/category_validate.yaml` → `.opsv/category_validate.yaml`（项目级最高）
