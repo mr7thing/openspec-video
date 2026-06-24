@@ -12,14 +12,14 @@ import { parseIterationSuffix } from '../executor/naming';
 import { escapeRegex } from '../utils/string';
 
 interface IterateOptions {
-  inject?: string;
+  inject?: string[];
 }
 
 export function registerIterateCommand(program: Command): void {
   program
     .command('iterate <path>')
     .description('Clone a task JSON or an entire model queue directory for iteration')
-    .option('--inject <key=value>', 'Inject a field value into cloned task(s) (dot-notation, e.g. modelParams.cfgScale=7.5)')
+    .option('-i, --inject <key=value>', 'Inject a field value into cloned task(s) (dot-notation, e.g. modelParams.cfgScale=7.5). Can be specified multiple times.', (val, prev: string[] = []) => [...prev, val], [])
     .action(async (inputPath: string, options: IterateOptions) => {
       try {
         const resolved = path.resolve(inputPath);
@@ -30,11 +30,12 @@ export function registerIterateCommand(program: Command): void {
         }
 
         const stat = fs.statSync(resolved);
+        const injections = options.inject || [];
 
         if (stat.isFile()) {
-          await iterateFile(resolved, options.inject);
+          await iterateFile(resolved, injections);
         } else if (stat.isDirectory()) {
-          await iterateDirectory(resolved, options.inject);
+          await iterateDirectory(resolved, injections);
         } else {
           console.error(chalk.red(`Unsupported path type: ${resolved}`));
           process.exit(1);
@@ -50,7 +51,7 @@ export function registerIterateCommand(program: Command): void {
 // File mode: script_01.json → script_01_2.json, script_01_2.json → script_01_3.json
 // --------------------------------------------------------------------------
 
-async function iterateFile(filePath: string, injectSpec?: string): Promise<void> {
+async function iterateFile(filePath: string, injections: string[]): Promise<void> {
   const dir = path.dirname(filePath);
   const filename = path.basename(filePath);
 
@@ -80,8 +81,8 @@ async function iterateFile(filePath: string, injectSpec?: string): Promise<void>
   const destPath = path.join(dir, destName);
 
   cloneTaskJson(filePath, destPath);
-  if (injectSpec) {
-    injectTaskField(destPath, injectSpec);
+  for (const spec of injections) {
+    injectTaskField(destPath, spec);
   }
   console.log(chalk.green(destPath));
 }
@@ -90,7 +91,7 @@ async function iterateFile(filePath: string, injectSpec?: string): Promise<void>
 // Directory mode: comfylocal.zit_m1/ → comfylocal.zit_m2/
 // --------------------------------------------------------------------------
 
-async function iterateDirectory(dirPath: string, injectSpec?: string): Promise<void> {
+async function iterateDirectory(dirPath: string, injections: string[]): Promise<void> {
   const parentDir = path.dirname(dirPath);
   const sourceName = path.basename(dirPath);
   const baseName = resolveDirBase(sourceName);
@@ -124,8 +125,8 @@ async function iterateDirectory(dirPath: string, injectSpec?: string): Promise<v
 
     const destFile = path.join(destPath, entry);
     cloneTaskJson(srcFile, destFile);
-    if (injectSpec) {
-      injectTaskField(destFile, injectSpec);
+    for (const spec of injections) {
+      injectTaskField(destFile, spec);
     }
     copied++;
   }
