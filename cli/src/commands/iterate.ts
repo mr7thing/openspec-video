@@ -11,11 +11,16 @@ import { logger } from '../utils/logger';
 import { parseIterationSuffix } from '../executor/naming';
 import { escapeRegex } from '../utils/string';
 
+interface IterateOptions {
+  inject?: string;
+}
+
 export function registerIterateCommand(program: Command): void {
   program
     .command('iterate <path>')
     .description('Clone a task JSON or an entire model queue directory for iteration')
-    .action(async (inputPath: string) => {
+    .option('--inject <key=value>', 'Inject a field value into cloned task(s) (dot-notation, e.g. modelParams.cfgScale=7.5)')
+    .action(async (inputPath: string, options: IterateOptions) => {
       try {
         const resolved = path.resolve(inputPath);
 
@@ -27,9 +32,9 @@ export function registerIterateCommand(program: Command): void {
         const stat = fs.statSync(resolved);
 
         if (stat.isFile()) {
-          await iterateFile(resolved);
+          await iterateFile(resolved, options.inject);
         } else if (stat.isDirectory()) {
-          await iterateDirectory(resolved);
+          await iterateDirectory(resolved, options.inject);
         } else {
           console.error(chalk.red(`Unsupported path type: ${resolved}`));
           process.exit(1);
@@ -45,7 +50,7 @@ export function registerIterateCommand(program: Command): void {
 // File mode: script_01.json → script_01_2.json, script_01_2.json → script_01_3.json
 // --------------------------------------------------------------------------
 
-async function iterateFile(filePath: string): Promise<void> {
+async function iterateFile(filePath: string, injectSpec?: string): Promise<void> {
   const dir = path.dirname(filePath);
   const filename = path.basename(filePath);
 
@@ -75,6 +80,9 @@ async function iterateFile(filePath: string): Promise<void> {
   const destPath = path.join(dir, destName);
 
   cloneTaskJson(filePath, destPath);
+  if (injectSpec) {
+    injectTaskField(destPath, injectSpec);
+  }
   console.log(chalk.green(destPath));
 }
 
@@ -82,7 +90,7 @@ async function iterateFile(filePath: string): Promise<void> {
 // Directory mode: comfylocal.zit_m1/ → comfylocal.zit_m2/
 // --------------------------------------------------------------------------
 
-async function iterateDirectory(dirPath: string): Promise<void> {
+async function iterateDirectory(dirPath: string, injectSpec?: string): Promise<void> {
   const parentDir = path.dirname(dirPath);
   const sourceName = path.basename(dirPath);
   const baseName = resolveDirBase(sourceName);
@@ -116,6 +124,9 @@ async function iterateDirectory(dirPath: string): Promise<void> {
 
     const destFile = path.join(destPath, entry);
     cloneTaskJson(srcFile, destFile);
+    if (injectSpec) {
+      injectTaskField(destFile, injectSpec);
+    }
     copied++;
   }
 
@@ -192,4 +203,52 @@ function cloneTaskJson(srcPath: string, destPath: string): void {
     delete meta.resumeTaskId;
   }
   fs.writeFileSync(destPath, JSON.stringify(task, null, 2));
+}
+
+/**
+ * Inject a field value into a task JSON at a dot-notation path.
+ * e.g. injectTaskField("task.json", "modelParams.cfgScale=7.5")
+ *      → sets task.modelParams.cfgScale = 7.5
+ *
+ * Value type auto-detection:
+ *   numeric literals → number, "true"/"false" → boolean, "null" → null
+ *   JSON arrays/objects → parsed, everything else → string
+ */
+function injectTaskField(filePath: string, injectSpec: string): void {
+  const eqIdx = injectSpec.indexOf('=');
+  if (eqIdx === -1) {
+    console.error(chalk.red(`Invalid inject format (expected key=value): ${injectSpec}`));
+    process.exit(1);
+  }
+
+  const keyPath = injectSpec.substring(0, eqIdx);
+  const rawValue = injectSpec.substring(eqIdx + 1);
+
+  // Parse value type
+  let value: unknown = rawValue;
+  if (/^-?\d+(\.\d+)?$/.test(rawValue)) {
+    value = rawValue.includes('.') ? parseFloat(rawValue) : parseInt(rawValue, 10);
+  } else if (rawValue === 'true') {
+    value = true;
+  } else if (rawValue === 'false') {
+    value = false;
+  } else if (rawValue === 'null') {
+    value = null;
+  } else if (/^[[{]/.test(rawValue) && /[\]}]$/.test(rawValue)) {
+    try { value = JSON.parse(rawValue); } catch { /* keep as string */ }
+  }
+
+  // Read task, inject, write back
+  const task = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const keys = keyPath.split('.');
+  let obj: Record<string, unknown> = task;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!(keys[i] in obj) || typeof obj[keys[i]] !== 'object' || obj[keys[i]] === null) {
+      obj[keys[i]] = {};
+    }
+    obj = obj[keys[i]] as Record<string, unknown>;
+  }
+  obj[keys[keys.length - 1]] = value;
+
+  fs.writeFileSync(filePath, JSON.stringify(task, null, 2));
 }

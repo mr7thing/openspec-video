@@ -228,16 +228,20 @@ opsv run <task.json...>
 
 ### `opsv iterate <path>`
 
-克隆任务做迭代。两种模式：
+克隆任务做迭代，支持在克隆时注入指定字段值。两种模式：
 
 ```bash
-opsv iterate <task.json>          # 文件模式 → {base}_m{N}.json
-opsv iterate <queue-dir>          # 目录模式 → 克隆整个队列目录
+opsv iterate <task.json>                          # 文件模式 → {base}_m{N}.json
+opsv iterate <queue-dir>                          # 目录模式 → 克隆整个队列目录
+opsv iterate <task.json> --inject modelParams.cfgScale=7.5    # 注入数字
+opsv iterate <task.json> --inject promptPrefix="high quality"  # 注入字符串
+opsv iterate <task.json> --inject steps.mode="{\"fast\":true}" # 注入 JSON 对象
 ```
 
 - **源码**：`src/commands/iterate.ts:18`
 - **文件模式**：剥离已有 `_mN` 后缀得 base，扫描目录找下一个序号，产出 `{base}_m{nextSeq}.json`（`iterate.ts:48-79`）。克隆时清除 `_opsv.compiledAt` 和 `_opsv.resumeTaskId`（`iterate.ts:181-195`）
 - **目录模式**：剥离尾部 `_mN` 得 base，产出 `{baseName}_m{nextSeq}/`（`iterate.ts:85-130`）
+- **`--inject <key=value>`**：克隆后在副本中注入字段值，`key` 支持点号路径（如 `modelParams.cfgScale`），`value` 自动识别类型：纯数字→number、`true`/`false`→boolean、`null`→null、JSON 对象/数组→解析、其他→string（`iterate.ts:198-237`）
 - **后缀正则**：`^(.+)_m(\d+)$`（小写 m，`naming.ts:34`）
 - **禁止**：手改产物名/任务名，命名完全由命令管
 
