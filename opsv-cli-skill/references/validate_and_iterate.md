@@ -1,6 +1,6 @@
 # validate 与 iterate (validate_and_iterate)
 
-> 真相基准：`src/commands/validate.ts`、`src/utils/categoryValidateLoader.ts`、`src/core/CategoryValidator.ts`、`src/commands/iterate.ts`、`src/executor/naming.ts`
+> 真相基准：`src/commands/validate.ts`、`src/utils/categoryValidateLoader.ts`、`src/core/CategoryValidator.ts`、`src/commands/iterate.ts`、`src/executor/naming.ts`、`src/commands/produceUtils.ts`
 
 ---
 
@@ -88,7 +88,21 @@ interface FieldCheck {
 5. 图片引用存在性：body 里 `![alt](path)` 的文件必须存在（`findMissingImageRefs`，`validate.ts:351-382`）
 6. 状态一致性：manifest 与 frontmatter 的 status 必须一致（`findStatusInconsistencies`，`validate.ts:258-327`）
 
-### 1.6 退出码
+### 1.6 编译前验证（`animate` / `imagen` / `comfy` / `webapp`）
+
+v0.13.8 起，`validateRefStatuses`（`produceUtils.ts:144-239`）在编译前做资产引用验证，逻辑与 manifest 解耦：
+
+| 检查 | 结果 |
+|------|------|
+| `@id` 的 descriptor 在 `videospec/` 下存在吗？ | ❌ error |
+| descriptor 有 `## Approved References` 吗？ | ❌ error |
+| 匹配的 `![alt](path)` 条目存在吗？ | ❌ error（变体不匹配） |
+| 引用的文件在磁盘上存在吗？ | ❌ error（产物被删或路径错） |
+| 文件存在但 descriptor 状态不是 `approved`？ | ⚠️ warning（drafting/syncing，可能忘了更新状态） |
+
+**跨 circle 支持**：验证不再依赖当前 circle 的 manifest——clips_circle1 引用 storyboard_circle2 的产出，只要磁盘上有文件就通过。
+
+### 1.7 退出码
 
 非零条件：有 error / dead ref / 缺失图片 / 状态不一致 / 类别 error。`--strict` 时类别 warning 也算非零。
 

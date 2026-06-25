@@ -136,17 +136,21 @@ refs:
 
 ---
 
-## 6. 双向对应规则
+## 6. 引用验证规则（v0.13.8）
 
-**prompt 里每个 `@id` 必须在 refs 声明，refs 里每个声明最好在 prompt 用到。**
+**`opsv animate` / `imagen` / `comfy` 编译前验证**：每个 `@id` 引用的资产，编译前验证会检查：
 
-- prompt 用 `@LuRan` 但 refs 没声明 → `opsv refs check` 报 `missingInRefs`（红，exit 1）
-- refs 声明了但 prompt 没用 → 报 `unusedInPrompt`（黄，警告）
-- 被引用的文档必须存在且 `status: approved`，否则 `validate` 报死链
+| 检查项 | 结果 | 说明 |
+|--------|------|------|
+| descriptor 是否在 `videospec/` 下存在 | ❌ error | 拼写错误或文件缺失 |
+| descriptor 是否有 `## Approved References` | ❌ error | 引用的资产尚未审批 |
+| 匹配的 `![alt](path)` 条目是否存在 | ❌ error | 变体名不匹配或尚未审批 |
+| 引用的图片/视频文件在磁盘上是否存在 | ❌ error | 审批后产物被删除或路径错误 |
+| 文件存在但 descriptor 状态不是 `approved` | ⚠️ warning | 文档状态可能忘了更新（drafting/syncing） |
 
-### 6.1 注意：refs check 只比对 prompt 字段
+**跨 circle 引用**：v0.13.8 起，编译前验证不依赖当前 circle 的 manifest。clips_circle1 可以引用 storyboard_circle2 的产出——只要 `videospec/` 下有 descriptor，且 `## Approved References` 指向的文件在磁盘上存在，就通过。
 
-v0.10.0 起（`src/commands/refs.ts:106` 注释），`refs check` **只扫描 frontmatter 的 `prompt` 字段**，不看 `visual_brief` / `visual_detailed` / body 正文。如果 `@id` 写在 body 里，refs check 不会检测。
+**`validate` 命令的死链检查**：从 manifest 检查改为磁盘文件检查（v0.13.8 起）。
 
 ---
 
@@ -182,9 +186,14 @@ opsv refs fill videospec/shots/S01-Shot01.md --write   # 写回文件
 opsv refs fill videospec/shots/S01-Shot01.md --dry-run # 预览
 ```
 
-- 自动补齐缺失的 refs key + 填充路径。取代旧 `refs sync`
-- 缺失的 key：从 AssetDocIndex 查找文件，自动添加
-- 已有空路径的 key：补全路径
-- input_type 按文件扩展名推断，默认 `image`
+自动补齐 refs，逻辑按引用类型区分：
+
+| 引用类型 | 解析方式 |
+|---------|---------|
+| `@id` / `@id:variant`（外部引用） | 从 `videospec/` 找 `id.md` → 读它的 `## Approved References` 区 → 取已审批的产出图片路径 |
+| `@:key`（文档内设计引用 v0.13.8+） | 从**当前文档**的 `## Design References` 区找 `![key](path)` → 取路径 |
+| 未解析（找不到文件） | 留空数组 `[]`，后续 `validate` 会报错 |
+
+取代旧 `refs sync`。
 
 > 命令详情见 `cli_reference.md` §6。

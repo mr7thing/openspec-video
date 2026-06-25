@@ -60,6 +60,7 @@ opsv validate --skip-category-rules                      # 跳过分类规则，
 - **加载顺序**：builtin(`project`/`shotdeck`) → `~/.opsv/category_validate.yaml` → `.opsv/category_validate.yaml`（项目级最高）
 - **退出码**：有 error/dead ref/缺失图片/状态不一致/类别 error（`--strict` 含 warning）→ 非零
 - **检测项**：① schema 校验 ② refs 结构（`RefBinder`）③ 分类字段 ④ `@id` 死链 ⑤ body 图片链接存在性 ⑥ manifest 与 frontmatter 状态一致性
+- **编译前验证**（v0.13.8+）：`animate` / `imagen` / `comfy` / `webapp` 在编译前独立做资产引用验证，不依赖当前 circle 的 manifest，支持跨 circle 引用。
 
 > 详情见 `validate_and_iterate.md`。
 
@@ -327,6 +328,9 @@ opsv refs fill <file> --dry-run # 预览不改文件
 
 - **源码**：`src/commands/refsFill.ts:24`
 - **行为**：缺失的 key 自动添加 + 已有空路径的 key 补全路径 + 已有路径的 key 跳过
+- **引用类型**：
+  - `@id` / `@id:variant`：从 `videospec/` 找 descriptor → 读 `## Approved References` → 取已审批图片路径
+  - `@:key`（v0.13.8+）：从**当前文档**的 `## Design References` 区找 `![key](path)` → 取路径
 - **input_type 推断**：从 AssetDocIndex 按文件扩展名推断（image/video/audio/bvh/mask），默认 `image`
 
 ### `opsv image-stitch <inputs...>`

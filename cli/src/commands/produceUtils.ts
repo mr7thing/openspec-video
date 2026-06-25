@@ -141,10 +141,11 @@ export interface AssetRefStatus {
   status: string;
 }
 
-export function validateRefStatuses(
+export async function validateRefStatuses(
   asset: CircleAssetEntry,
-  manifestAssets: Record<string, { status: string }>
-): string[] {
+  manifestAssets: Record<string, { status: string }>,
+  projectRoot: string,
+): Promise<string[]> {
   const errors: string[] = [];
   const filePath = asset.filePath;
 
@@ -154,27 +155,90 @@ export function validateRefStatuses(
 
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const { frontmatter } = FrontmatterParser.parseRaw(content);
+    const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
     const refs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
+    const videospecDir = getProjectDir(projectRoot, 'videospec');
+
     for (const typeMap of Object.values(refs)) {
       if (!typeMap || typeof typeMap !== 'object') continue;
       for (const key of Object.keys(typeMap)) {
-        if (!key.startsWith('@') || key.startsWith('@:')) continue;
-        let refId = key.slice(1);
-        const colonIdx = refId.indexOf(':');
-        if (colonIdx > 0) refId = refId.slice(0, colonIdx);
+        // --- @:key — document-internal design reference ---
+        if (key.startsWith('@:')) {
+          const designId = key.slice(2);
+          const designSection = body.match(
+            /##\s*Design\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i,
+          );
+          if (!designSection) {
+            errors.push(`${key} — ## Design References section not found in document`);
+            continue;
+          }
+          const imgRe = new RegExp(`!\\[${escapeRegex(designId)}\\]\\(([^)]+)\\)`);
+          const imgMatch = designSection[1].match(imgRe);
+          if (!imgMatch) {
+            errors.push(`${key} — ![${designId}](path) not found in ## Design References`);
+            continue;
+          }
+          const resolvedPath = path.resolve(path.dirname(filePath), imgMatch[1]);
+          if (!fs.existsSync(resolvedPath)) {
+            errors.push(`${key} — file not found: ${imgMatch[1]}`);
+          }
+          continue;
+        }
 
-        const refAsset = manifestAssets[refId];
-        if (!refAsset) {
-          errors.push(`@${refId} not found in manifest`);
-        } else if (refAsset.status !== 'approved') {
-          errors.push(`@${refId} is ${refAsset.status}, must be approved`);
+        // --- @id or @id:variant — external asset reference ---
+        if (!key.startsWith('@')) continue;
+        let refId = key.slice(1);
+        let variant: string | undefined;
+        const colonIdx = refId.indexOf(':');
+        if (colonIdx > 0) {
+          variant = refId.slice(colonIdx + 1);
+          refId = refId.slice(0, colonIdx);
+        }
+
+        // Find the descriptor document
+        const descPath = AssetManager.findAssetFilePathUnder(videospecDir, refId);
+        if (!descPath) {
+          errors.push(`@${refId} — descriptor not found under videospec/`);
+          continue;
+        }
+
+        // Read ## Approved References from the descriptor
+        const descContent = fs.readFileSync(descPath, 'utf-8');
+        const descBody = FrontmatterParser.extractBody(descContent);
+        const approvedSection = descBody.match(
+          /##\s*Approved\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i,
+        );
+        if (!approvedSection) {
+          errors.push(`@${refId} — ## Approved References section not found in descriptor`);
+          continue;
+        }
+
+        // Find matching image entry
+        const approvedImgRe = variant
+          ? new RegExp(`!\\[${escapeRegex(variant)}\\]\\(([^)]+)\\)`)
+          : /!\[([^\]]*)\]\(([^)]+)\)/;
+        const approvedMatch = approvedSection[1].match(approvedImgRe);
+        if (!approvedMatch) {
+          const detail = variant ? ` ![${variant}](path)` : '';
+          errors.push(`@${refId}${detail ? ':' + variant : ''} — no matching approved output in ## Approved References`);
+          continue;
+        }
+        const approvedPath = approvedMatch[variant ? 1 : 2];
+        const resolvedApproved = path.resolve(path.dirname(descPath), approvedPath);
+        if (!fs.existsSync(resolvedApproved)) {
+          errors.push(`@${refId}${variant ? ':' + variant : ''} — approved file not found: ${approvedPath}`);
+        } else {
+          // Warning: descriptor is not approved but already has approved outputs
+          const { frontmatter: descFm } = FrontmatterParser.parseRaw(descContent);
+          if (descFm.status && descFm.status !== 'approved') {
+            errors.push(`@${refId} — descriptor status is "${descFm.status}" but has approved output files; consider updating to "approved"`);
+          }
         }
       }
     }
-  } catch {
-    // Skip validation errors, compilation will handle them
+  } catch (e: any) {
+    errors.push(`Error validating refs: ${e.message}`);
   }
 
   return errors;

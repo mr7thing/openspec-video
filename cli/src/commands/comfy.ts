@@ -84,7 +84,7 @@ export function registerComfyCommand(program: Command): void {
 
         for (const asset of targetAssets) {
           // Validate ref statuses - all refs must be approved
-          const refErrors = validateRefStatuses(asset, manifestAssets);
+          const refErrors = await validateRefStatuses(asset, manifestAssets, projectRoot);
           if (refErrors.length > 0) {
             errors.push(`  ${asset.id}: ${refErrors.join(', ')}`);
             continue;
