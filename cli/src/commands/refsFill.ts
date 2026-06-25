@@ -37,7 +37,7 @@ export function registerRefsFillCommand(refs: Command): void {
         const content = fs.readFileSync(filePath, 'utf-8');
         const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
-        const result = await fillRefs(frontmatter, body, projectRoot);
+        const result = await fillRefs(frontmatter, body, projectRoot, filePath);
 
         // Print summary
         console.log(chalk.cyan(`\n${path.basename(filePath)}:`));
@@ -83,10 +83,36 @@ export interface FillResult {
  * - Existing key with path                       → leave as-is
  * - Unresolved (file not found)                  → leave empty, count as unresolved
  */
+/**
+ * Parse `## Design References` section from body text and extract ![alt](path) entries.
+ */
+function parseDesignRefsFromBody(body: string, docDir: string): Map<string, string> {
+  const refs = new Map<string, string>();
+  const sectionMatch = body.match(
+    /##\s*Design\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i,
+  );
+  if (!sectionMatch) return refs;
+
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = imgRegex.exec(sectionMatch[1])) !== null) {
+    const [, alt, filePath] = match;
+    if (!alt || !filePath) continue;
+    const absPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(docDir, filePath);
+    if (fs.existsSync(absPath)) {
+      refs.set(alt, absPath);
+    }
+  }
+  return refs;
+}
+
 export async function fillRefs(
   frontmatter: Record<string, any>,
   body: string,
   projectRoot: string,
+  docFilePath?: string,
 ): Promise<FillResult> {
   const prompt = String(frontmatter.prompt ?? '');
   const tokens = extractAllRefs(prompt);
@@ -96,11 +122,36 @@ export async function fillRefs(
   const videospecDir = getProjectDir(projectRoot, 'videospec');
   const index = buildAssetDocIndex(videospecDir);
 
+  // Pre-parse ## Design References for @:key resolution
+  const docDir = docFilePath ? path.dirname(docFilePath) : projectRoot;
+  const designRefs = parseDesignRefsFromBody(body, docDir);
+
   let added = 0;
   let updated = 0;
   let unresolved = 0;
 
   for (const token of tokens) {
+    // @:key — document-internal design reference
+    if (token.kind === 'doc') {
+      const type = 'image';
+      if (!out[type]) out[type] = {};
+
+      const existingPath = out[type][token.key];
+      const hasPath = Array.isArray(existingPath) && existingPath.length > 0;
+      if (hasPath) continue;
+
+      const designPath = designRefs.get(token.id);
+      if (designPath) {
+        out[type][token.key] = [designPath];
+        added++;
+      } else {
+        out[type][token.key] = [];
+        added++;
+        unresolved++;
+      }
+      continue;
+    }
+
     // Default input_type to 'image' — user can adjust later
     const type = inferInputType(token.id, index.entries) ?? 'image';
 

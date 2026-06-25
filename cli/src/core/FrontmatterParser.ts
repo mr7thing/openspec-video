@@ -50,12 +50,35 @@ export class FrontmatterParser {
     return FrontmatterParser.split(content).body;
   }
 
+  /**
+   * Replace (or append) a top-level YAML field using text-level surgery.
+   *
+   * Only the targeted field's block is re-serialized; all other fields,
+   * comments, and formatting in the YAML frontmatter are preserved exactly
+   * as-is. This avoids the data-loss problems of full-parse + full-dump.
+   */
   static updateField(content: string, field: string, value: any): string {
     const { rawYaml, body } = FrontmatterParser.split(content);
-    const parsed = yaml.load(rawYaml) as Record<string, any>;
-    parsed[field] = value;
-    const newYaml = yaml.dump(parsed, { lineWidth: -1, noRefs: true }).trim();
-    return `---\n${newYaml}\n---\n${body}`;
+    const serialized = yaml
+      .dump({ [field]: value }, { indent: 2, lineWidth: -1, noRefs: true })
+      .trim();
+
+    // Match the field block from its start-of-line key to the next top-level
+    // key (line starting with non-whitespace that is not a comment), or end
+    // of the YAML string.  The "$" anchor is end-of-string (no /m flag).
+    const pattern = new RegExp(
+      `(?:^|\\n)${field}:([\\s\\S]*?)(?=\\n(?!\\s|#|\\$)|\\n?\\$)`,
+    );
+    const match = rawYaml.match(pattern);
+
+    if (match) {
+      const keepNewline = match[0].startsWith('\n') ? '\n' : '';
+      const replaced = keepNewline + serialized;
+      return `---\n${rawYaml.replace(pattern, replaced)}\n---\n${body}`;
+    }
+
+    // Field not found in YAML — append before the closing `---`
+    return `---\n${rawYaml}\n${serialized}\n---\n${body}`;
   }
 
   static appendReview(content: string, reviewEntry: string | ReviewEntry): string {
