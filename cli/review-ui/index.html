@@ -640,7 +640,7 @@
                             ${fm.title ? `<div class="fm-title">${fm.title}</div>` : ''}
                             <div class="fm-meta">${metaHtml}</div>
                         </div>
-                        <div class="md-content">${renderMarkdown(body)}</div>
+                        <div class="md-content">${renderMarkdown(body, currentDoc.docPath)}</div>
                     </div>
                 </div>
                 <div class="asset-section">
@@ -674,7 +674,9 @@
         }
 
         // ── Markdown Renderer ─────────────────────────────────────────────────
-        function renderMarkdown(content) {
+        function renderMarkdown(content, docPath) {
+            const base = API || '';
+            const encode = encodeURIComponent;
             return content
                 .replace(/^### (.+)$/gm, '<h3>$1</h3>')
                 .replace(/^## (.+)$/gm, '<h2>$1</h2>')
@@ -684,7 +686,15 @@
                 .replace(/`(.+?)`/g, '<code>$1</code>')
                 .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
                 .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-                .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" onclick="openPreview(\'$2\')">')
+                .replace(/!\[(.+?)\]\((.+?)\)/g, (match, alt, src) => {
+                    // Resolve filesystem-relative image paths through the server
+                    // so they work in VSCode/GitHub (relative from .md) AND in
+                    // the review UI (via /api/files/resolve).
+                    if (docPath && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('data:')) {
+                        src = `${base}/api/files/resolve?docPath=${encode(docPath)}&imagePath=${encode(src)}`;
+                    }
+                    return `<img src="${src}" alt="${alt}" onclick="openPreview('${src.replace(/'/g, "\\'")}')">`;
+                })
                 .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
                 .replace(/^---$/gm, '<hr>')
                 .split('\n\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')

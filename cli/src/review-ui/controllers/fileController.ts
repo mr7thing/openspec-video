@@ -22,7 +22,21 @@ function getMimeType(filePath: string): string {
   return mimeTypes[ext] || 'application/octet-stream';
 }
 
-export function createFileController(queueRoot: string) {
+function serveFile(filePath: string, res: Response): void {
+  if (!fs.existsSync(filePath)) {
+    res.status(404).send('File not found');
+    return;
+  }
+  const stat = fs.statSync(filePath);
+  const mimeType = getMimeType(filePath);
+  res.writeHead(200, {
+    'Content-Type': mimeType,
+    'Content-Length': stat.size,
+  });
+  fs.createReadStream(filePath).pipe(res);
+}
+
+export function createFileController(queueRoot: string, projectRoot: string) {
   return {
     serve(req: Request, res: Response): void {
       const raw = req.params['filePath'];
@@ -38,17 +52,41 @@ export function createFileController(queueRoot: string) {
         res.status(403).send('Forbidden');
         return;
       }
-      if (fs.existsSync(filePath)) {
-        const stat = fs.statSync(filePath);
-        const mimeType = getMimeType(filePath);
-        res.writeHead(200, {
-          'Content-Type': mimeType,
-          'Content-Length': stat.size,
-        });
-        fs.createReadStream(filePath).pipe(res);
-      } else {
-        res.status(404).send('File not found');
+      serveFile(filePath, res);
+    },
+
+    /**
+     * Resolve an image path relative to a document and serve the file.
+     *
+     * Query params:
+     *   docPath   — absolute path to the .md document
+     *   imagePath — relative path from the markdown, e.g. "../../opsv-queue/c/file.png"
+     *
+     * Used by renderMarkdown in the review UI to display inline markdown images
+     * that are stored as filesystem-relative paths (for VSCode/GitHub preview).
+     */
+    resolve(req: Request, res: Response): void {
+      const docPath = req.query.docPath as string | undefined;
+      const imagePath = req.query.imagePath as string | undefined;
+
+      if (!docPath || !imagePath) {
+        res.status(400).send('Missing docPath or imagePath');
+        return;
       }
+
+      // Resolve the image path relative to the document's directory
+      const absProjectRoot = path.resolve(projectRoot);
+      const resolved = path.resolve(path.dirname(docPath), imagePath);
+      const normalised = path.normalize(resolved);
+
+      // Security: must be within the project root
+      const prefix = absProjectRoot.endsWith(path.sep) ? absProjectRoot : absProjectRoot + path.sep;
+      if (!normalised.startsWith(prefix)) {
+        res.status(403).send('Forbidden');
+        return;
+      }
+
+      serveFile(normalised, res);
     },
   };
 }

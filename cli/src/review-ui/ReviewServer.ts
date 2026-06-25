@@ -32,7 +32,7 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   const circleCtrl = createCircleController(strategy);
   const approveCtrl = createApproveController(projectRoot, queueRoot, manifestReader);
   const reviewApproveCtrl = createReviewApproveController(projectRoot, queueRoot);
-  const fileCtrl = createFileController(queueRoot);
+  const fileCtrl = createFileController(queueRoot, projectRoot);
 
   app.get('/api/documents', docCtrl.listDocuments);
   app.get('/api/documents/by-id/:docId', docCtrl.getDocumentById);
@@ -41,14 +41,24 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   app.get('/api/circles', circleCtrl.listCircles);
   app.get('/api/circles/:name/assets', circleCtrl.listCircleAssets);
   app.get('/api/files/*filePath', fileCtrl.serve);
+  app.get('/api/files/resolve', fileCtrl.resolve);
   app.post('/api/review/approve', express.json(), reviewApproveCtrl.execute);
   app.post('/api/approve/:circle/:assetId', express.json(), approveCtrl.execute);
 
-  // Serve static review UI from cli/review-ui/
+  // Serve static review UI — check dist-level (post-build copy) first, then package root
+  const localDir = path.join(__dirname, 'review-ui');
   const publicDir = path.join(__dirname, '..', '..', 'review-ui');
-  if (fs.existsSync(publicDir)) {
+
+  let served = false;
+  if (fs.existsSync(localDir)) {
+    app.use(express.static(localDir));
+    served = true;
+  } else if (fs.existsSync(publicDir)) {
     app.use(express.static(publicDir));
-  } else {
+    served = true;
+  }
+
+  if (!served) {
     app.get('/', (_req, res) => {
       res.send(`
         <html><body>

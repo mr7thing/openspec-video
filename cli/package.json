@@ -12,7 +12,7 @@
   },
   "homepage": "https://github.com/mr7thing/openspec-video#readme",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-ui-assets.js",
     "prepublishOnly": "npm run build",
     "start": "ts-node src/index.ts",
     "test": "jest --passWithNoTests",
@@ -21,7 +21,8 @@
   },
   "files": [
     "dist",
-    ".opsv"
+    ".opsv",
+    "review-ui"
   ],
   "keywords": [
     "videospec",

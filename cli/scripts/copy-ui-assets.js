@@ -2,20 +2,26 @@ const fs = require('fs-extra');
 const path = require('path');
 
 async function copyUIAssets() {
-    const src = path.join(__dirname, '../src/review-ui/public');
-    const dest = path.join(__dirname, '../dist/review-ui/public');
+    const root = path.join(__dirname, '..');
+
+    // Source: cli/review-ui/index.html (the SPA)
+    const src = path.join(root, 'review-ui');
+    // Dest 1: cli/dist/review-ui/ (for running from dist)
+    const destDist = path.join(root, 'dist', 'review-ui');
+    // Dest 2: package root (already in place when developing from source)
 
     try {
         if (fs.existsSync(src)) {
-            await fs.ensureDir(path.dirname(dest));
-            await fs.copy(src, dest);
-            console.log('✅ Review UI assets copied to dist successfully.');
+            // Copy to dist/review-ui so it's co-located with compiled ReviewServer.js
+            await fs.ensureDir(destDist);
+            await fs.copy(src, destDist);
+            console.log('✅ Review UI copied to dist/review-ui/');
         } else {
-            console.error('❌ Source Review UI assets not found at:', src);
+            console.error('❌ Source Review UI not found at:', src);
             process.exit(1);
         }
     } catch (err) {
-        console.error('❌ Failed to copy Review UI assets:', err);
+        console.error('❌ Failed to copy Review UI:', err);
         process.exit(1);
     }
 }
