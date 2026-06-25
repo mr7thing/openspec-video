@@ -62,7 +62,9 @@ function collectOutputsFromDir(
           circle: circleName,
           provider: providerTop,
           filename: entry.name,
-          path: path.join(circleName, relPath),
+          // Normalise to forward slashes so the path can be used as a URL
+          // component regardless of the host OS (Windows uses \).
+          path: path.join(circleName, relPath).replace(/\\/g, '/'),
         });
       } else {
         (results as string[]).push(relPath);

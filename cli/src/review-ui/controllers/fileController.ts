@@ -30,8 +30,10 @@ export function createFileController(queueRoot: string) {
         res.status(400).send('Bad request');
         return;
       }
-      const segments = Array.isArray(raw) ? raw : raw.split('/');
-      const filePath = resolveWithin(queueRoot, ...segments);
+      // Normalise backslashes to forward slashes for Windows compatibility,
+      // then split into individual path segments for security validation.
+      const normalised = Array.isArray(raw) ? raw : raw.replace(/\\/g, '/').split('/');
+      const filePath = resolveWithin(queueRoot, ...normalised);
       if (!filePath) {
         res.status(403).send('Forbidden');
         return;
