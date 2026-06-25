@@ -1,7 +1,7 @@
 // ============================================================================
 // OpsV API Config Writer
 // Validate and append model configs to .opsv/api_config.yaml
-// Only supports comfylocal and runninghub provider types.
+// Supports: comfylocal, runninghub, rhapi
 // ============================================================================
 
 import fs from 'fs';
@@ -30,8 +30,8 @@ export function validateModelConfig(
     return errors;
   }
 
-  if (!['comfylocal', 'runninghub'].includes(provider)) {
-    errors.push(`provider must be "comfylocal" or "runninghub", got "${provider}"`);
+  if (!['comfylocal', 'runninghub', 'rhapi'].includes(provider)) {
+    errors.push(`provider must be "comfylocal", "runninghub", or "rhapi", got "${provider}"`);
     return errors;
   }
 
@@ -39,9 +39,11 @@ export function validateModelConfig(
     errors.push('modelKey is required and must be a non-empty string');
   }
 
-  // Common required
-  if (!config.node_mappings || Object.keys(config.node_mappings).length === 0) {
-    errors.push('node_mappings is required with at least one entry');
+  // Common required — except rhapi (direct REST, no node mapping)
+  if (provider !== 'rhapi') {
+    if (!config.node_mappings || Object.keys(config.node_mappings).length === 0) {
+      errors.push('node_mappings is required with at least one entry');
+    }
   }
 
   // Provider-specific checks
@@ -77,6 +79,24 @@ export function validateModelConfig(
     }
     if (!config.type) {
       config.type = 'comfy';
+    }
+  }
+
+  if (provider === 'rhapi') {
+    if (!config.api_url) {
+      errors.push('api_url is required for rhapi (submit endpoint)');
+    }
+    if (!config.api_status_url) {
+      config.api_status_url = 'https://www.runninghub.cn/openapi/v2/query';
+    }
+    if (!config.required_env || config.required_env.length === 0) {
+      config.required_env = ['RH_API_KEY'];
+    }
+    if (config.type && !['imagen', 'video'].includes(config.type)) {
+      errors.push('rhapi type must be "imagen" or "video" if specified');
+    }
+    if (!config.type) {
+      config.type = 'video';
     }
   }
 

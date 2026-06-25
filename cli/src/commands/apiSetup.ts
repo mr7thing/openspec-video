@@ -220,11 +220,12 @@ function addModelMode(ctx: OpsVContext, jsonStr: string): void {
   if (result.success) {
     console.log(chalk.green(`✅ ${result.message}`));
 
-    // If runninghub, remind user about API key
-    if (input.config.provider === 'runninghub') {
+    // If runninghub or rhapi, remind user about API key
+    const provider = input.config.provider;
+    if (provider === 'runninghub' || provider === 'rhapi') {
+      const missingKey = provider === 'runninghub' ? 'RUNNINGHUB_API_KEY' : 'RH_API_KEY';
       const envPath = resolveEnvPath(ctx.projectRoot);
       const env = readEnvFile(envPath);
-      const missingKey = 'RUNNINGHUB_API_KEY';
       if (!env[missingKey]) {
         console.log(chalk.yellow(`⚠  ${missingKey} not set in .env. Run:`));
         console.log(chalk.yellow(`   opsv api-setup --set-key ${missingKey}=your_key`));

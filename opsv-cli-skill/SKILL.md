@@ -182,7 +182,7 @@ rm -rf opsv-queue/videospec_circleN   # 不要这样做
 
 | 命令 | 干什么 | Agent 必须知道 |
 |------|--------|---------------|
-| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub/**webapp**；`--sync-env` 补齐占位 |
+| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub/**rhapi**/webapp；`--sync-env` 补齐占位 |
 | `opsv webapp --model <key>` | 编译 webapp 类任务（用浏览器自动化的 provider，比如 `webapp.gemini-opencli`） | 跟 `opsv imagen` 同位置，差别是走 `cli/src/webapp-runner/` 路由 |
 
 ---
@@ -256,6 +256,8 @@ opsv comfy --model comfylocal.myworkflow --manifest ... --workflow /path/to/othe
 | node_mappings | 必填 | 必填 |
 | 添加方式 | `api-setup --add-model` | `api-setup --add-model` |
 
+> `rhapi`（RunningHub Standard Model API）不是 ComfyUI 模式，而是直连 REST API。不需要 `node_mappings` 或 `workflowId`，见下方 4.6 节。
+
 ### 4.5 用 api-setup 添加新工作流
 
 ```bash
@@ -286,9 +288,30 @@ opsv api-setup --add-model '{
     }
   }
 }'
+
+# 添加 RHapi 直连模型（RunningHub Standard Model API）
+# 不需要 node_mappings，api_status_url 和 required_env 自动填充
+opsv api-setup --add-model '{
+  "modelKey": "rhapi.seedance2mini",
+  "config": {
+    "provider": "rhapi",
+    "api_url": "https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-mini/multimodal-video",
+    "type": "video",
+    "supports_reference_images": true,
+    "supports_reference_videos": true,
+    "max_reference_images": 9,
+    "defaults": {
+      "resolution": "720p",
+      "duration": "5"
+    }
+  }
+}'
 ```
 
-添加后即可用 `opsv comfy --model comfylocal.txt2img` 编译。
+添加后即可用对应命令编译：
+- `comfylocal` → `opsv comfy --model comfylocal.txt2img`
+- `runninghub` → `opsv comfy --model runninghub.myvideo`
+- `rhapi` → `opsv animate --model rhapi.seedance2mini`（或 `opsv imagen --model`）
 
 ---
 
