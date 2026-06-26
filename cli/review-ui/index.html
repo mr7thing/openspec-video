@@ -1369,21 +1369,54 @@
               body: JSON.stringify({ docPath: doc.docPath, outputFiles: [], action: 'revise_prompt', note: note || undefined })
             });
           } catch(_) {}
-          // Remove from display
-          if (pendingRemove.type === 'approved') {
-            const body = docContents[doc.docId]?.content || '';
-            const bm = body.match(/^---[\s\S]*?---\n*([\s\S]*)$/);
-            const clean = bm ? bm[1] : '';
-            const sections = clean.split(/\n(?=## )/);
-            const apSection = sections.find(s => s.trim().match(/^##\s*Approved\s*References/im));
-            if (apSection) {
-              const imgs = [...apSection.matchAll(/!\[.*?\]\((.+?)\)/g)];
-              if (imgs[pendingRemove.idx]) removedApproved.add(imgs[pendingRemove.idx][1]);
+          // Modify the actual markdown file via PATCH
+          try {
+            if (pendingRemove.type === 'ref') {
+              // Re-read fresh content, parse refs, remove one, write back
+              const fresh = await (await fetch(`${API}/api/documents/by-id/${doc.docId}`)).json();
+              const fm = parseFM(fresh.content || '');
+              const refs = extractRefs(fm);
+              if (refs[pendingRemove.idx]) {
+                refs.splice(pendingRemove.idx, 1);
+                await fetch(`${API}/api/documents/by-id/${doc.docId}`, {
+                  method: 'PATCH',
+                  headers: {'Content-Type':'application/json'},
+                  body: JSON.stringify({ refs })
+                });
+              }
+            } else if (pendingRemove.type === 'approved') {
+              const fresh = await (await fetch(`${API}/api/documents/by-id/${doc.docId}`)).json();
+              const clean = (fresh.content || '').replace(/^---[\s\S]*?---\n*/, '');
+              const sections = clean.split(/\n(?=## )/);
+              const apSection = sections.find(s => s.trim().match(/^##\s*Approved\s*References/im));
+              if (apSection) {
+                const lines = apSection.split('\n');
+                let imgCount = 0;
+                const replacements = [];
+                for (const line of lines) {
+                  if (/!\[.*?\]\(/.test(line)) {
+                    if (imgCount === pendingRemove.idx) {
+                      replacements.push({ search: line, replace: '' });
+                      removedApproved.add(line.match(/!\[.*?\]\((.+?)\)/)[1]);
+                    }
+                    imgCount++;
+                  }
+                }
+                if (replacements.length > 0) {
+                  await fetch(`${API}/api/documents/by-id/${doc.docId}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ bodyReplacements: replacements })
+                  });
+                }
+              }
             }
-          }
+          } catch(_) {}
         }
         pendingRemove = null;
         closeModal();
+        // Reload doc to reflect changes
+        delete docContents[doc.docId];
         loadDoc(curDocIdx);
         showToast('已提交反馈，参考图已移除', 'ok');
         return;

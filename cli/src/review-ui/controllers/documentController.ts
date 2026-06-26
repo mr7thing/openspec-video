@@ -44,6 +44,14 @@ export function createDocumentController(strategy: ReviewStrategy) {
       if (body.title) {
         updated = FrontmatterParser.updateField(updated, 'title', body.title);
       }
+      if (body.refs) {
+        updated = FrontmatterParser.updateField(updated, 'refs', body.refs);
+      }
+      if (body.bodyReplacements && Array.isArray(body.bodyReplacements)) {
+        for (const r of body.bodyReplacements) {
+          if (r.search) updated = updated.replace(r.search, r.replace ?? '');
+        }
+      }
       fs.writeFileSync(doc.docPath, updated, 'utf-8');
       res.json({ success: true, docId, updatedFields: Object.keys(body) });
     },
