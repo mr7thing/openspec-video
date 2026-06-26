@@ -42,8 +42,19 @@ export class FrontmatterParser {
 
   static parseRaw(content: string): { frontmatter: Record<string, any>; body: string } {
     const { rawYaml, body } = FrontmatterParser.split(content);
-    const parsed = yaml.load(rawYaml) as Record<string, any>;
-    return { frontmatter: parsed || {}, body };
+    try {
+      const parsed = yaml.load(rawYaml) as Record<string, any>;
+      return { frontmatter: parsed || {}, body };
+    } catch (e: any) {
+      console.warn(`[FrontmatterParser] YAML warning: ${e.message}`);
+      // Fallback: simple regex extract for top-level fields
+      const fm: Record<string, any> = {};
+      for (const line of rawYaml.split('\n')) {
+        const m = line.match(/^(\w[\w_]*):\s*(.*)$/);
+        if (m) fm[m[1]] = m[2].trim();
+      }
+      return { frontmatter: fm, body };
+    }
   }
 
   static extractBody(content: string): string {

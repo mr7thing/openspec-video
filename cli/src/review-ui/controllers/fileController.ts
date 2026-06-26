@@ -76,8 +76,17 @@ export function createFileController(queueRoot: string, projectRoot: string) {
 
       // Resolve the image path relative to the document's directory
       const absProjectRoot = path.resolve(projectRoot);
-      const resolved = path.resolve(path.dirname(docPath), imagePath);
-      const normalised = path.normalize(resolved);
+      let resolved = path.resolve(path.dirname(docPath), imagePath);
+      let normalised = path.normalize(resolved);
+
+      // If path starts with ./ and file not found, try from project root
+      if (!fs.existsSync(normalised) && imagePath.startsWith('./')) {
+        const altResolved = path.resolve(absProjectRoot, imagePath.slice(2));
+        const altNormalised = path.normalize(altResolved);
+        if (fs.existsSync(altNormalised)) {
+          normalised = altNormalised;
+        }
+      }
 
       // Security: must be within the project root
       const prefix = absProjectRoot.endsWith(path.sep) ? absProjectRoot : absProjectRoot + path.sep;
