@@ -842,10 +842,19 @@
             return `<div class="cat-item" data-cat="${c}" onclick="pickCat('${c}')">${c}<span class="cat-count">${n}</span></div>`;
           }).join('');
 
+        // Restore navigation position
+        const savedCat = localStorage.getItem('opsv-nav-cat');
+        const savedIdx = parseInt(localStorage.getItem('opsv-nav-idx') || '0', 10);
+        currentCat = (savedCat && cats.includes(savedCat)) ? savedCat : '';
+        if (currentCat) {
+          document.querySelector('#catList .cat-item.active')?.classList.remove('active');
+          document.querySelector(`#catList .cat-item[data-cat="${currentCat}"]`)?.classList.add('active');
+        }
+
         document.getElementById('loadingView').style.display = 'none';
         document.getElementById('contentView').style.display = 'flex';
 
-        applyFilter('');
+        applyFilter(currentCat, savedIdx);
       } catch (e) {
         document.getElementById('loadingView').style.display = 'none';
         document.getElementById('errorView').style.display = 'flex';
@@ -861,10 +870,11 @@
         el.classList.toggle('active', el.dataset.cat === cat);
       });
       currentCat = cat;
+      localStorage.setItem('opsv-nav-cat', cat);
       applyFilter(cat);
     }
 
-    function applyFilter(cat) {
+    function applyFilter(cat, restoredIdx) {
       const docs = cat ? allDocs.filter(d => (d.category||'unknown') === cat) : [...allDocs];
       filteredDocs = docs;
 
@@ -891,9 +901,11 @@
         </div>`;
       }).join('');
 
-      curDocIdx = 0;
+      curDocIdx = Math.min(restoredIdx || 0, docs.length - 1);
       updateProgress();
-      loadDoc(0);
+      loadDoc(curDocIdx);
+      // Highlight restored doc in sidebar
+      document.querySelectorAll('#docList .doc-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === curDocIdx));
       // Desktop: show doc panel by default
       if (window.innerWidth >= 768) openDocPanel();
     }
@@ -901,6 +913,8 @@
     function pickDoc(idx) {
       pauseAllVideos();
       curDocIdx = idx;
+      localStorage.setItem('opsv-nav-idx', idx);
+      localStorage.setItem('opsv-nav-cat', currentCat);
       document.querySelectorAll('#docList .doc-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
       // Scroll carousel
       const slides = document.getElementById('docCarousel');
@@ -977,8 +991,7 @@
           const imgRegex = /!\[.*?\]\((.+?)\)/g;
           let m;
           while ((m = imgRegex.exec(apSection)) !== null) {
-            const src = m[1];
-            if (!removedApproved.has(src)) approvedImages.push(src);
+            approvedImages.push(m[1]);
           }
         }
       }
@@ -1247,9 +1260,9 @@
       if (!doc) return;
 
       try {
-        const r = await fetch(`${API}/api/review/approve`, {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ docPath: doc.docPath, outputFiles: [], action: 'design_feedback', note })
+        const r = await fetch(`${API}/api/documents/by-id/${doc.docId}`, {
+          method: 'PATCH', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ appendComment: note })
         });
         const j = await r.json();
         if (j.success) {
@@ -1314,8 +1327,10 @@
         fetch(`${API}/api/review/approve`, {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ docPath: doc.docPath, outputFiles: [out.path], action: 'approve' })
-        }).then(r => r.json()).then(j => {
-          showToast(j.success ? '已提交通过请求' : '操作失败', j.success ? 'ok' : 'err');
+        }).then(async r => {
+          const j = await r.json();
+          if (r.ok && j.success) showToast('已提交通过请求', 'ok');
+          else showToast(j.error || '操作失败', 'err');
         }).catch(e => showToast('提交失败: '+e.message, 'err'));
         return;
       }
@@ -1372,17 +1387,43 @@
           // Modify the actual markdown file via PATCH
           try {
             if (pendingRemove.type === 'ref') {
-              // Re-read fresh content, parse refs, remove one, write back
+              // Re-read fresh content, parse full frontmatter with js-yaml
               const fresh = await (await fetch(`${API}/api/documents/by-id/${doc.docId}`)).json();
               const fm = parseFM(fresh.content || '');
-              const refs = extractRefs(fm);
-              if (refs[pendingRemove.idx]) {
-                refs.splice(pendingRemove.idx, 1);
-                await fetch(`${API}/api/documents/by-id/${doc.docId}`, {
-                  method: 'PATCH',
-                  headers: {'Content-Type':'application/json'},
-                  body: JSON.stringify({ refs })
-                });
+              if (fm && fm.refs) {
+                // Walk the refs structure, find nth string path, remove it
+                let count = 0;
+                let removed = false;
+                const walkAndRemove = (obj) => {
+                  if (removed || !obj) return;
+                  if (Array.isArray(obj)) {
+                    for (let i = obj.length - 1; i >= 0; i--) {
+                      if (typeof obj[i] === 'string') {
+                        if (count === pendingRemove.idx) {
+                          obj.splice(i, 1);
+                          removed = true;
+                          return;
+                        }
+                        count++;
+                      } else {
+                        walkAndRemove(obj[i]);
+                      }
+                    }
+                  } else if (typeof obj === 'object') {
+                    for (const val of Object.values(obj)) {
+                      walkAndRemove(val);
+                      if (removed) return;
+                    }
+                  }
+                };
+                walkAndRemove(fm.refs);
+                if (removed) {
+                  await fetch(`${API}/api/documents/by-id/${doc.docId}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ refs: fm.refs })
+                  });
+                }
               }
             } else if (pendingRemove.type === 'approved') {
               const fresh = await (await fetch(`${API}/api/documents/by-id/${doc.docId}`)).json();
@@ -1415,9 +1456,10 @@
         }
         pendingRemove = null;
         closeModal();
-        // Reload doc to reflect changes
+        // Short delay for server write to flush, then force reload
+        await new Promise(r => setTimeout(r, 200));
         delete docContents[doc.docId];
-        loadDoc(curDocIdx);
+        await loadDoc(curDocIdx);
         showToast('已提交反馈，参考图已移除', 'ok');
         return;
       }
@@ -1432,9 +1474,15 @@
       const amap = { feedback: 'design_feedback', revise: 'revise_prompt' };
 
       try {
+        const isRevise = pendingAction === 'revise';
         const r = await fetch(`${API}/api/review/approve`, {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ docPath: doc.docPath, outputFiles: [out.path], action: amap[pendingAction], note: note||undefined })
+          body: JSON.stringify({
+            docPath: doc.docPath,
+            outputFiles: isRevise ? [] : [out.path],
+            action: amap[pendingAction],
+            note: note||undefined
+          })
         });
         const j = await r.json();
         if (j.success) {

@@ -52,6 +52,18 @@ export function createDocumentController(strategy: ReviewStrategy) {
           if (r.search) updated = updated.replace(r.search, r.replace ?? '');
         }
       }
+      if (body.appendComment) {
+        const date = new Date().toISOString().slice(0, 10);
+        const commitLine = `- ${date}: ${body.appendComment}`;
+        // Check if ## Commit section already exists
+        if (/^## Commit$/m.test(updated)) {
+          // Append to existing section
+          updated = updated.replace(/(## Commit\n+)/, `$1${commitLine}\n`);
+        } else {
+          // Create new section at end
+          updated = updated.replace(/\s*$/, '') + `\n\n## Commit\n\n${commitLine}\n`;
+        }
+      }
       fs.writeFileSync(doc.docPath, updated, 'utf-8');
       res.json({ success: true, docId, updatedFields: Object.keys(body) });
     },

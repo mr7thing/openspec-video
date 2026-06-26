@@ -46,9 +46,13 @@ function validateAbsolutePath(value: string, fieldName: string, projectRoot: str
   return normalized;
 }
 
-function validateOutputFiles(values: unknown, fieldName: string): string[] {
-  if (!Array.isArray(values) || values.length === 0) {
-    throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} must be a non-empty array`);
+function validateOutputFiles(values: unknown, fieldName: string, action: string): string[] {
+  if (!Array.isArray(values)) {
+    throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} must be an array`);
+  }
+  // Only approve and design_feedback require output files
+  if ((action === 'approve' || action === 'design_feedback') && values.length === 0) {
+    throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} must be a non-empty array for ${action}`);
   }
   return values.map((v: any) => {
     if (typeof v !== 'string') {
@@ -102,8 +106,8 @@ export function createReviewApproveController(projectRoot: string, queueRoot: st
       try {
         const body = req.body as ReviewApproveRequest;
         const docPath = validateAbsolutePath(body.docPath, 'docPath', projectRoot);
-        const outputFiles = validateOutputFiles(body.outputFiles, 'outputFiles');
         const action: ReviewAction = body.action || 'approve';
+        const outputFiles = validateOutputFiles(body.outputFiles, 'outputFiles', action);
 
         if (!VALID_ACTIONS.includes(action)) {
           throw new ValidationError(
