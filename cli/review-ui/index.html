@@ -1,886 +1,1434 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OpsV Review</title>
-    <style>
-        :root {
-            --bg: #0a0a0c;
-            --surface: #141418;
-            --card: #1e1e24;
-            --accent: #6366f1;
-            --green: #22c55e;
-            --yellow: #eab308;
-            --red: #ef4444;
-            --blue: #3b82f6;
-            --purple: #a855f7;
-            --orange: #f97316;
-            --text: #f1f5f9;
-            --muted: #64748b;
-            --border: rgba(255,255,255,0.06);
-            --radius: 10px;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            height: 100vh;
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            font-size: 15px;
-            line-height: 1.6;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>OpsV Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    /* ================================================================
+       Design Tokens
+       ================================================================ */
+    :root, [data-theme="dark"] {
+      --bg: #1a1a1e;
+      --surface: #212126;
+      --surface-alt: #27272c;
+      --card: #2a2a30;
+      --card-hover: #323238;
+      --border: rgba(255,255,255,0.06);
+      --text: #e4e4e7;
+      --text-dim: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #6366f1;
+      --accent-bg: rgba(99,102,241,0.1);
+      --green: #22c55e;
+      --green-bg: rgba(34,197,94,0.1);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245,158,11,0.1);
+      --red: #ef4444;
+      --overlay: rgba(0,0,0,0.6);
 
-        /* ===================== TOP NAVIGATION ===================== */
-        .top-nav {
-            background: var(--surface);
-            padding: 10px 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-            position: relative;
-            z-index: 100;
-        }
-        .nav-dropdowns {
-            display: flex;
-            gap: 10px;
-            flex: 1;
-        }
-        .nav-dropdown {
-            flex: 1;
-            background: var(--card);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            cursor: pointer;
-            appearance: none;
-            -webkit-appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            padding-right: 30px;
-        }
-        .nav-dropdown:focus { border-color: var(--accent); }
+      --sidebar-w: 240px;
+      --topbar-h: 44px;
+      --actionbar-h: 52px;
+    }
+    [data-theme="light"] {
+      --bg: #ffffff;
+      --surface: #fafafa;
+      --surface-alt: #f4f4f5;
+      --card: #f4f4f5;
+      --card-hover: #e9e9eb;
+      --border: rgba(0,0,0,0.06);
+      --text: #18181b;
+      --text-dim: #52525b;
+      --text-muted: #a1a1aa;
+      --accent: #6366f1;
+      --accent-bg: rgba(99,102,241,0.08);
+      --green: #16a34a;
+      --green-bg: rgba(22,163,74,0.08);
+      --amber: #d97706;
+      --amber-bg: rgba(217,119,6,0.08);
+      --red: #dc2626;
+      --overlay: rgba(0,0,0,0.3);
+    }
 
-        /* ===================== DOC ACTION BUTTONS ===================== */
-        .doc-actions {
-            background: var(--surface);
-            padding: 8px 16px;
-            display: flex;
-            gap: 8px;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-            flex-wrap: wrap;
-        }
-        .doc-btn {
-            padding: 8px 14px;
-            border: 1px solid var(--border);
-            background: var(--card);
-            color: var(--text);
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .doc-btn:hover { border-color: var(--accent); background: rgba(99,102,241,0.1); }
-        .doc-btn:active { transform: scale(0.97); }
-        .doc-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .doc-btn.primary:hover { background: #5558e3; }
-        .doc-btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
-        .doc-btn.danger:hover { background: #dc2626; }
-        .doc-btn.success { background: var(--green); border-color: var(--green); color: #000; }
-        .doc-btn.success:hover { background: #16a34a; }
-        .doc-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 14px; line-height: 1.5;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+    }
 
-        /* ===================== MAIN CONTENT ===================== */
-        .main-content {
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 90px;
-        }
-        .main-content::-webkit-scrollbar { width: 6px; }
-        .main-content::-webkit-scrollbar-track { background: transparent; }
-        .main-content::-webkit-scrollbar-thumb { background: var(--card); border-radius: 3px; }
+    /* ================================================================
+       Top Bar
+       ================================================================ */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 12px; gap: 8px;
+      z-index: 100;
+    }
+    .topbar .menu-btn {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border: none; border-radius: 6px;
+      background: transparent;
+      color: var(--text-dim); font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .topbar .menu-btn:hover { background: var(--card); }
+    .topbar .top-title {
+      flex: 1; font-size: 13px; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .topbar .top-progress {
+      font-size: 12px; color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .topbar .theme-btn {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border: none; border-radius: 6px;
+      background: transparent;
+      color: var(--text-dim); font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .topbar .theme-btn:hover { background: var(--card); }
 
-        /* ===================== DOC BLOCK (expandable) ===================== */
-        .doc-block {
-            background: var(--surface);
-            margin: 12px 16px;
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            overflow: hidden;
-        }
-        .doc-block-header {
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            user-select: none;
-        }
-        .doc-block-header:hover { background: rgba(255,255,255,0.02); }
-        .doc-block-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text);
-        }
-        .doc-block-meta {
-            font-size: 12px;
-            color: var(--muted);
-            margin-top: 2px;
-        }
-        .doc-block-chevron {
-            font-size: 12px;
-            color: var(--muted);
-            transition: transform 0.2s;
-        }
-        .doc-block.expanded .doc-block-chevron { transform: rotate(180deg); }
+    /* ================================================================
+       Sidebar
+       ================================================================ */
+    .sidebar-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: var(--overlay);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
 
-        .doc-block-body {
-            display: none;
-            border-top: 1px solid var(--border);
-        }
-        .doc-block.expanded .doc-block-body { display: block; }
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      z-index: 301;
+      display: flex; flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+    }
+    .sidebar.open { transform: translateX(0); }
 
-        .fm-card {
-            background: var(--card);
-            margin: 12px 16px;
-            padding: 14px 16px;
-            border-radius: var(--radius);
-        }
-        .fm-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 8px;
-        }
-        .fm-tag {
-            font-size: 11px;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        .fm-tag.scene { background: rgba(59,130,246,0.15); color: var(--blue); }
-        .fm-tag.character { background: rgba(34,197,94,0.15); color: var(--green); }
-        .fm-tag.prop { background: rgba(249,115,22,0.15); color: var(--orange); }
-        .fm-tag.shot { background: rgba(168,85,247,0.15); color: var(--purple); }
-        .fm-tag.status-draft { background: rgba(100,116,139,0.15); color: var(--muted); }
-        .fm-tag.status-approved { background: rgba(34,197,94,0.15); color: var(--green); }
-        .fm-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-top: 6px;
-        }
-        .fm-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 8px;
-            font-size: 12px;
-            color: var(--muted);
-        }
-        .fm-meta span {
-            background: rgba(255,255,255,0.04);
-            padding: 2px 8px;
-            border-radius: 4px;
-        }
+    .sidebar-header {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sidebar-header .s-title {
+      flex: 1; font-size: 14px; font-weight: 600;
+    }
+    .sidebar-header .s-close {
+      width: 28px; height: 28px;
+      border: none; border-radius: 6px;
+      background: transparent;
+      color: var(--text-dim); font-size: 16px;
+      cursor: pointer;
+      display: none; align-items: center; justify-content: center;
+    }
+    .sidebar-header .s-close:hover { background: var(--card); }
 
-        .md-content {
-            padding: 0 16px 16px;
-            font-size: 15px;
-            line-height: 1.65;
-        }
-        .md-content h1 { font-size: 20px; margin: 24px 0 12px; color: var(--text); }
-        .md-content h2 { font-size: 17px; margin: 20px 0 10px; color: var(--text); scroll-margin-top: 60px; }
-        .md-content h3 { font-size: 15px; margin: 16px 0 8px; color: var(--text); }
-        .md-content p { margin-bottom: 10px; color: #94a3b8; }
-        .md-content strong { color: var(--text); }
-        .md-content pre {
-            background: var(--card);
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 13px;
-            overflow-x: auto;
-            margin: 10px 0;
-            -webkit-overflow-scrolling: touch;
-        }
-        .md-content code {
-            background: var(--card);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 13px;
-            color: #a5b4fc;
-        }
-        .md-content pre code { background: none; padding: 0; }
-        .md-content blockquote {
-            border-left: 3px solid var(--accent);
-            padding-left: 12px;
-            color: var(--muted);
-            font-style: italic;
-            margin: 10px 0;
-        }
-        .md-content ul, .md-content ol { margin: 8px 0 10px 20px; color: #94a3b8; }
-        .md-content li { margin-bottom: 4px; }
-        .md-content img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
-        .md-content table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
-        .md-content th, .md-content td { padding: 8px; border: 1px solid var(--border); }
-        .md-content th { background: var(--card); }
-        .md-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .sidebar-body {
+      flex: 1; overflow-y: auto;
+      padding: 8px 0;
+    }
+    .sidebar-body::-webkit-scrollbar { width: 4px; }
+    .sidebar-body::-webkit-scrollbar-thumb { background: var(--card); border-radius: 2px; }
 
-        /* ===================== ASSET GRID ===================== */
-        .asset-section {
-            padding: 0 16px 20px;
-        }
-        .asset-title {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 12px;
-        }
-        .asset-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 10px;
-        }
-        /* Responsive breakpoints */
-        @media (max-width: 767px) {
-            .asset-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 200px)); }
-        }
-        @media (min-width: 768px) and (max-width: 1199px) {
-            .asset-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 240px)); }
-        }
-        @media (min-width: 1200px) {
-            .asset-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 280px)); }
-        }
+    .sidebar .sec-title {
+      padding: 8px 16px 4px;
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
 
-        .asset-card {
-            background: var(--card);
-            border-radius: var(--radius);
-            overflow: hidden;
-            border: 2px solid transparent;
-            cursor: pointer;
-            position: relative;
-            transition: border-color 0.15s;
-        }
-        .asset-card.selected { border-color: var(--green); }
-        .asset-card img {
-            width: 100%;
-            aspect-ratio: 1;
-            object-fit: cover;
-            display: block;
-            background: #000;
-        }
-        .asset-card .asset-overlay {
-            position: absolute;
-            top: 6px; right: 6px;
-            background: var(--green);
-            color: #000;
-            width: 22px; height: 22px;
-            border-radius: 50%;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .asset-card.selected .asset-overlay { display: flex; }
-        .asset-card .asset-name {
-            padding: 8px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+    .cat-item, .doc-item {
+      padding: 7px 16px;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px;
+      color: var(--text-dim);
+      transition: all 0.1s;
+    }
+    .cat-item:hover, .doc-item:hover { background: var(--card); color: var(--text); }
+    .cat-item.active, .doc-item.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+    }
+    .cat-item .cat-count {
+      margin-left: auto;
+      font-size: 11px; color: var(--text-muted);
+      background: var(--card); padding: 0 6px; border-radius: 4px;
+    }
+    .cat-item.active .cat-count { background: var(--accent-bg); color: var(--accent); }
+    .doc-item .doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-item .doc-badge {
+      font-size: 10px; width: 18px; height: 18px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .doc-item .doc-badge.approved { background: var(--green-bg); color: var(--green); }
+    .doc-item .doc-badge.feedback { background: var(--amber-bg); color: var(--amber); }
 
-        /* ===================== BOTTOM IMAGE ACTIONS ===================== */
-        .img-actions {
-            position: fixed;
-            bottom: 0;
-            left: 0; right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
-            padding: 10px 16px 24px;
-            display: flex;
-            gap: 8px;
-            z-index: 200;
-        }
-        .img-btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: var(--radius);
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.15s;
-        }
-        .img-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .img-btn.approve { background: var(--green); color: #000; }
-        .img-btn.approve:not(:disabled):hover { background: #16a34a; }
-        .img-btn.feedback { background: var(--yellow); color: #000; }
-        .img-btn.feedback:not(:disabled):hover { background: #ca8a04; }
-        .img-btn.revise { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-        .img-btn.revise:not(:disabled):hover { border-color: var(--accent); }
+    /* Desktop: sidebar always visible */
+    @media (min-width: 768px) {
+      .topbar .menu-btn { display: none; }
+      .sidebar-overlay { display: none !important; }
+      .sidebar { transform: translateX(0); }
+      .sidebar-header .s-close { display: none !important; }
+      .topbar { padding-left: calc(var(--sidebar-w) + 12px); }
+    }
 
-        /* ===================== MODALS ===================== */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.85);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 20px;
-        }
-        .modal-overlay.active { display: flex; }
-        .modal-box {
-            background: var(--surface);
-            border-radius: var(--radius);
-            padding: 24px;
-            width: 100%;
-            max-width: 360px;
-            border: 1px solid var(--border);
-        }
-        .modal-box h2 { font-size: 16px; margin-bottom: 4px; }
-        .modal-box .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
-        .modal-box textarea {
-            width: 100%;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            padding: 10px 12px;
-            font-size: 14px;
-            font-family: inherit;
-            resize: vertical;
-            min-height: 80px;
-            outline: none;
-        }
-        .modal-box textarea:focus { border-color: var(--accent); }
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-        }
-        .modal-actions .btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-        }
-        .modal-actions .btn-cancel { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-        .modal-actions .btn-confirm { background: var(--green); color: #000; }
+    /* Mobile: sidebar close button visible */
+    @media (max-width: 767px) {
+      .sidebar-header .s-close { display: flex; }
+    }
 
-        /* ===================== IMAGE PREVIEW ===================== */
-        .img-preview {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.95);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        .img-preview.active { display: flex; }
-        .img-preview img { max-width: 95%; max-height: 85vh; object-fit: contain; }
-        .img-preview .close-btn {
-            position: absolute;
-            top: 16px; right: 16px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
+    /* ================================================================
+       Main Content
+       ================================================================ */
+    .main-area {
+      position: fixed;
+      top: var(--topbar-h); left: 0; right: 0; bottom: var(--actionbar-h);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    @media (min-width: 768px) {
+      .main-area { left: var(--sidebar-w); }
+    }
 
-        /* ===================== TOAST ===================== */
-        .toast {
-            position: fixed;
-            top: 60px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-20px);
-            background: var(--card);
-            border: 1px solid var(--border);
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-size: 13px;
-            z-index: 2000;
-            opacity: 0;
-            transition: all 0.2s;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .toast.success { border-color: var(--green); }
-        .toast.error { border-color: var(--red); }
+    /* Document strip (mobile) */
+    .doc-strip {
+      flex-shrink: 0;
+      padding: 8px 16px;
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .doc-strip:active { background: var(--surface-alt); }
+    .doc-strip .ds-icon { font-size: 14px; flex-shrink: 0; }
+    .doc-strip .ds-info { flex: 1; min-width: 0; }
+    .doc-strip .ds-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-strip .ds-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 6px; margin-top: 1px; }
+    .doc-strip .ds-meta .tag { padding: 0 6px; border-radius: 4px; font-weight: 500; font-size: 10px; }
+    .doc-strip .ds-meta .tag.character { background: var(--green-bg); color: var(--green); }
+    .doc-strip .ds-meta .tag.scene { background: var(--accent-bg); color: var(--accent); }
+    .doc-strip .ds-meta .tag.prop { background: var(--amber-bg); color: var(--amber); }
+    .doc-strip .ds-arrow { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
 
-        /* ===================== EMPTY STATE ===================== */
-        .empty-state {
-            padding: 60px 20px;
-            text-align: center;
-            color: var(--muted);
-        }
-        .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
-        .empty-state p { font-size: 14px; }
+    @media (min-width: 768px) {
+      .doc-strip { display: none; }
+    }
 
-        /* ===================== NO DOC SELECTED STATE ===================== */
-        .no-doc-placeholder {
-            padding: 40px 20px;
-            text-align: center;
-            color: var(--muted);
-        }
-        .no-doc-placeholder .icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
-        .no-doc-placeholder p { font-size: 13px; }
-    </style>
+    /* Asset carousel (vertical swipe) */
+    .asset-wrap {
+      flex: 1; overflow: hidden; position: relative;
+      background: var(--bg);
+    }
+    .asset-carousel {
+      height: 100%; width: 100%;
+      overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      display: flex;
+    }
+    .asset-carousel::-webkit-scrollbar { display: none; }
+    .asset-slide {
+      flex: 0 0 100%; height: 100%;
+      scroll-snap-align: start;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+    }
+    .asset-slide img {
+      max-width: 100%; max-height: 100%;
+      object-fit: contain; display: block;
+    }
+    .asset-slide .empty-msg {
+      color: var(--text-muted); font-size: 13px;
+      text-align: center; padding: 20px;
+    }
+
+    /* Asset info bar */
+    .asset-info {
+      flex-shrink: 0;
+      padding: 6px 16px;
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      min-height: 30px;
+    }
+    .asset-info .ai-provider {
+      flex: 1; font-size: 11px; color: var(--text-muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .asset-info .ai-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+    }
+    .asset-info .ai-badge.done { background: var(--green-bg); color: var(--green); }
+    .asset-info .ai-badge.feedback { background: var(--amber-bg); color: var(--amber); }
+    .asset-info .ai-badge.pending { background: var(--card); color: var(--text-muted); }
+
+    /* Thumbnail strip */
+    .thumb-strip {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      overflow-x: auto; overflow-y: hidden;
+      display: flex; gap: 5px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .thumb-strip::-webkit-scrollbar { display: none; }
+
+    .thumb {
+      flex: 0 0 40px; width: 40px; height: 40px;
+      border-radius: 4px; overflow: hidden;
+      border: 2px solid transparent;
+      cursor: pointer; position: relative;
+      background: var(--card);
+      transition: border-color 0.15s;
+    }
+    .thumb.cur { border-color: var(--accent); }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .thumb .tb {
+      position: absolute; top: -2px; right: -2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      font-size: 7px; display: none; align-items: center; justify-content: center;
+      font-weight: 700;
+    }
+    .thumb.done .tb { display: flex; background: var(--green); color: #fff; }
+    .thumb.feedback .tb { display: flex; background: var(--amber); color: #000; }
+
+    /* ================================================================
+       Action Bar
+       ================================================================ */
+    .actionbar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--actionbar-h);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 12px;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+      z-index: 100;
+    }
+    @media (min-width: 768px) {
+      .actionbar { left: var(--sidebar-w); }
+    }
+
+    .act-btn {
+      flex: 1; height: 36px;
+      border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.12s;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .act-btn:active { transform: scale(0.97); }
+    .act-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
+    .act-btn.approve { background: var(--green); color: #fff; }
+    .act-btn.approve:hover:not(:disabled) { filter: brightness(1.08); }
+    .act-btn.feedback { background: var(--amber); color: #000; }
+    .act-btn.feedback:hover:not(:disabled) { filter: brightness(1.08); }
+    .act-btn.revise { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .act-btn.revise:hover:not(:disabled) { background: var(--card-hover); }
+
+    /* ================================================================
+       Doc Panel (bottom slide-up)
+       ================================================================ */
+    .doc-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: var(--overlay);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .doc-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .doc-panel {
+      position: fixed; bottom: 0; left: 0; right: 0; max-height: 85vh;
+      background: var(--surface);
+      border-radius: 12px 12px 0 0;
+      z-index: 501;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+    }
+    .doc-panel.open { transform: translateY(0); }
+
+    .dp-header {
+      flex-shrink: 0;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .dp-header .handle {
+      width: 32px; height: 4px; border-radius: 2px;
+      background: var(--card); margin: 0 auto 10px;
+    }
+    .dp-title-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dp-title-row .dp-title { flex: 1; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dp-title-row .dp-close {
+      width: 28px; height: 28px; flex-shrink: 0;
+      border: none; border-radius: 6px;
+      background: transparent; color: var(--text-dim); font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .dp-title-row .dp-close:hover { background: var(--card); }
+
+    .dp-tags {
+      display: flex; gap: 4px; margin-top: 6px;
+    }
+    .dp-tags .t {
+      font-size: 10px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px;
+    }
+    .dp-tags .t.character { background: var(--green-bg); color: var(--green); }
+    .dp-tags .t.scene { background: var(--accent-bg); color: var(--accent); }
+    .dp-tags .t.prop { background: var(--amber-bg); color: var(--amber); }
+    .dp-tags .t.approved { background: var(--green-bg); color: var(--green); }
+    .dp-tags .t.drafting { background: var(--card); color: var(--text-muted); }
+
+    .dp-body {
+      flex: 1; overflow-y: auto; padding: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .dp-body .fm-meta {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+    }
+    .dp-body .fm-meta span {
+      font-size: 12px; color: var(--text-dim);
+      background: var(--card); padding: 2px 8px; border-radius: 4px;
+    }
+
+    /* Markdown body */
+    .md h1 { font-size: 20px; margin: 24px 0 12px; font-weight: 700; }
+    .md h2 { font-size: 17px; margin: 20px 0 10px; font-weight: 600; }
+    .md h3 { font-size: 15px; margin: 16px 0 8px; font-weight: 600; }
+    .md p { margin-bottom: 8px; color: var(--text-dim); line-height: 1.7; }
+    .md strong { color: var(--text); font-weight: 600; }
+    .md pre {
+      background: var(--card); border-radius: 6px;
+      padding: 12px; font-size: 13px;
+      overflow-x: auto; margin: 8px 0;
+    }
+    .md code {
+      background: var(--card); padding: 1px 5px;
+      border-radius: 4px; font-size: 13px;
+      color: var(--accent);
+    }
+    .md pre code { background: none; padding: 0; color: var(--text-dim); }
+    .md blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 12px; color: var(--text-muted);
+      font-style: italic; margin: 8px 0;
+    }
+    .md ul, .md ol { margin: 6px 0 8px 18px; color: var(--text-dim); }
+    .md li { margin-bottom: 3px; }
+    .md img { max-width: 100%; border-radius: 6px; margin: 8px 0; }
+    .md table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+    .md th, .md td { padding: 6px 8px; border: 1px solid var(--border); }
+    .md th { background: var(--card); font-weight: 600; }
+    .md hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+    .dp-comment {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex; gap: 8px;
+      align-items: flex-end;
+    }
+    .dp-comment textarea {
+      flex: 1; background: var(--card);
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 7px 10px;
+      font-size: 13px; font-family: inherit;
+      resize: none; min-height: 32px; max-height: 72px;
+      outline: none; line-height: 1.4;
+    }
+    .dp-comment textarea:focus { border-color: var(--accent); }
+    .dp-comment .cmt-btn {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border: none; border-radius: 6px;
+      background: var(--accent); color: #fff;
+      font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dp-comment .cmt-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* Desktop doc panel */
+    @media (min-width: 768px) {
+      .doc-overlay { display: none; }
+      .doc-panel {
+        position: static; transform: none; border-radius: 0;
+        max-height: none; height: 100%;
+        border-left: 1px solid var(--border);
+        display: flex; flex-direction: column;
+      }
+      .doc-panel:not(.open) { display: none; }
+      .doc-panel.open { transform: none; }
+      .dp-header .handle { display: none; }
+    }
+
+    /* Desktop split: main area has doc panel on right */
+    @media (min-width: 768px) {
+      .main-area-inner {
+        display: flex; flex: 1; overflow: hidden;
+      }
+      .main-area-inner .asset-col {
+        flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      }
+      .main-area-inner .doc-col {
+        flex: 0 0 360px; overflow: hidden; display: flex; flex-direction: column;
+      }
+      .main-area-inner .doc-col.collapsed { flex: 0 0 0; }
+    }
+
+    /* ================================================================
+       Image Preview Overlay
+       ================================================================ */
+    .img-preview {
+      position: fixed; inset: 0; z-index: 600;
+      background: var(--overlay);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .img-preview.open { display: flex; }
+    .img-preview img { max-width: 95%; max-height: 90vh; object-fit: contain; border-radius: 4px; }
+    .img-preview .ip-close {
+      position: absolute; top: 12px; right: 12px;
+      width: 36px; height: 36px;
+      border: none; border-radius: 8px;
+      background: var(--card); color: var(--text);
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ================================================================
+       Modal
+       ================================================================ */
+    .modal {
+      position: fixed; inset: 0; z-index: 700;
+      background: var(--overlay);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border-radius: 10px;
+      padding: 20px; width: 100%; max-width: 320px;
+    }
+    .modal-box .m-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .modal-box .m-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+    .modal-box textarea {
+      width: 100%; background: var(--card);
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 8px 10px;
+      font-size: 13px; font-family: inherit;
+      resize: vertical; min-height: 72px; outline: none;
+    }
+    .modal-box textarea:focus { border-color: var(--accent); }
+    .modal-box .m-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .modal-box .m-actions button {
+      flex: 1; height: 36px;
+      border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .modal-box .m-actions .btn-cancel { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .modal-box .m-actions .btn-ok { background: var(--accent); color: #fff; }
+
+    /* ================================================================
+       Toast
+       ================================================================ */
+    .toast {
+      position: fixed; top: 56px; left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 6px;
+      font-size: 13px; z-index: 800;
+      opacity: 0; transition: all 0.2s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.ok { border-color: var(--green); color: var(--green); }
+    .toast.err { border-color: var(--red); color: var(--red); }
+    .toast.info { border-color: var(--accent); color: var(--accent); }
+
+    /* ================================================================
+       Loading / Empty / Error
+       ================================================================ */
+    .loading-area {
+      position: fixed; top: var(--topbar-h); left: 0; right: 0; bottom: var(--actionbar-h);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; padding: 40px;
+    }
+    @media (min-width: 768px) { .loading-area { left: var(--sidebar-w); } }
+    .loading-area .pulse {
+      width: 70%; height: 14px;
+      background: var(--card); border-radius: 4px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .loading-area .pulse:nth-child(2) { width: 50%; animation-delay: 0.15s; }
+    .loading-area .pulse:nth-child(3) { width: 60%; animation-delay: 0.3s; }
+    @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 0.6; } }
+
+    .empty-area, .error-area {
+      position: fixed; top: var(--topbar-h); left: 0; right: 0; bottom: var(--actionbar-h);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; padding: 40px; text-align: center;
+      color: var(--text-muted);
+    }
+    @media (min-width: 768px) { .empty-area, .error-area { left: var(--sidebar-w); } }
+    .empty-area .icon, .error-area .icon { font-size: 36px; opacity: 0.4; }
+    .error-area .retry {
+      margin-top: 10px; padding: 6px 16px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--card); color: var(--text);
+      font-size: 13px; cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <!-- Top Navigation: Two-level dropdowns -->
-    <div class="top-nav">
-        <div class="nav-dropdowns">
-            <select class="nav-dropdown" id="categorySelect" onchange="onCategoryChange(this.value)">
-                <option value="">全部</option>
-            </select>
-            <select class="nav-dropdown" id="docSelect" onchange="onDocChange(this.value)">
-                <option value="">请选择文档</option>
-            </select>
-        </div>
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
+    <span class="top-title" id="topTitle">OpsV Review</span>
+    <span class="top-progress" id="topProgress">-/-</span>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <!-- Sidebar Overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="s-title" id="sidebarTitle">OpsV Review</span>
+      <button class="s-close" onclick="toggleSidebar()">✕</button>
+    </div>
+    <div class="sidebar-body">
+      <div class="sec-title">分类</div>
+      <div id="catList"></div>
+      <div class="sec-title" style="margin-top:8px;">文档</div>
+      <div id="docList"></div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-area" id="mainArea">
+    <div class="loading-area" id="loadingView">
+      <div class="pulse"></div>
+      <div class="pulse"></div>
+      <div class="pulse"></div>
     </div>
 
-    <!-- Doc Action Buttons -->
-    <div class="doc-actions" id="docActions" style="display:none;">
-        <button class="doc-btn" id="btnValidate" onclick="doValidate()">Validate</button>
-        <button class="doc-btn" id="btnDocRevise" onclick="doDocRevise()">修订</button>
-        <button class="doc-btn success" id="btnApproveDoc" onclick="doApproveDoc()">设为Approved</button>
-        <button class="doc-btn" id="btnRefresh" onclick="doRefresh()">刷新</button>
+    <div class="empty-area" id="emptyView" style="display:none;">
+      <div class="icon">📋</div>
+      <p>暂无文档</p>
     </div>
 
-    <!-- Main Content Area -->
-    <div class="main-content" id="mainContent">
-        <div class="empty-state" id="emptyState">
-            <div class="icon">📋</div>
-            <p>加载中...</p>
-        </div>
+    <div class="error-area" id="errorView" style="display:none;">
+      <div class="icon">⚠️</div>
+      <p id="errorMsg"></p>
+      <button class="retry" onclick="init()">重试</button>
     </div>
 
-    <!-- Bottom Image Action Buttons -->
-    <div class="img-actions" id="imgActions">
-        <button class="img-btn approve" id="btnImgApprove" disabled onclick="submitImgAction('approve')">✓ 通过</button>
-        <button class="img-btn feedback" id="btnImgFeedback" disabled onclick="submitImgAction('feedback')">✎ 反馈</button>
-        <button class="img-btn revise" id="btnImgRevise" onclick="submitImgAction('revise')">✏ 修订</button>
-    </div>
-
-    <!-- Review Modal -->
-    <div class="modal-overlay" id="reviewModal">
-        <div class="modal-box">
-            <h2 id="modalTitle">操作确认</h2>
-            <p class="subtitle" id="modalSubtitle"></p>
-            <textarea id="modalNote" placeholder="输入备注（可选）..."></textarea>
-            <div class="modal-actions">
-                <button class="btn btn-cancel" onclick="closeModal()">取消</button>
-                <button class="btn btn-confirm" id="modalConfirmBtn" onclick="confirmAction()">确认</button>
+    <!-- Actual content (hidden until loaded) -->
+    <div id="contentView" style="display:none;flex-direction:column;overflow:hidden;">
+      <div class="main-area-inner" id="mainInner">
+        <div class="asset-col">
+          <!-- Doc strip (mobile) -->
+          <div class="doc-strip" id="docStrip" onclick="openDocPanel()">
+            <span class="ds-icon">📄</span>
+            <div class="ds-info">
+              <div class="ds-title" id="dsTitle">-</div>
+              <div class="ds-meta"><span class="tag" id="dsTag"></span><span id="dsCount">0个资产</span></div>
             </div>
+            <span class="ds-arrow">▲</span>
+          </div>
+
+          <!-- Asset carousel -->
+          <div class="asset-wrap">
+            <div class="asset-carousel" id="assetCarousel"></div>
+          </div>
+
+          <!-- Asset info -->
+          <div class="asset-info" id="assetInfo">
+            <span class="ai-provider" id="aiProvider">-</span>
+            <span class="ai-badge pending" id="aiBadge">待审阅</span>
+          </div>
+
+          <!-- Thumbnails -->
+          <div class="thumb-strip" id="thumbStrip"></div>
         </div>
+        <!-- Doc panel column (desktop) -->
+        <div class="doc-col" id="docCol">
+          <div class="doc-panel" id="docPanel">
+            <div class="dp-header">
+              <div class="handle"></div>
+              <div class="dp-title-row">
+                <span class="dp-title" id="dpTitle">文档</span>
+                <button class="dp-close" id="dpCloseBtn" onclick="closeDocPanel()">✕</button>
+              </div>
+              <div class="dp-tags" id="dpTags"></div>
+            </div>
+            <div class="dp-body" id="dpBody"></div>
+            <div class="dp-comment">
+              <textarea id="cmtInput" placeholder="添加评论…" rows="1"></textarea>
+              <button class="cmt-btn" id="cmtBtn" onclick="submitComment()" disabled>↵</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- Image Preview -->
-    <div class="img-preview" id="imgPreview" onclick="closePreview()">
-        <button class="close-btn">✕</button>
-        <img id="previewImg" src="" alt="">
+  <!-- Action Bar -->
+  <div class="actionbar" id="actionBar">
+    <button class="act-btn approve" id="btnApprove" onclick="doAction('approve')">✓ 通过</button>
+    <button class="act-btn feedback" id="btnFeedback" onclick="doAction('feedback')">✎ 反馈</button>
+    <button class="act-btn revise" id="btnRevise" onclick="doAction('revise')">✏ 修订</button>
+  </div>
+
+  <!-- Doc Panel Overlay (mobile) -->
+  <div class="doc-overlay" id="docOverlay" onclick="closeDocPanel()"></div>
+
+  <!-- Image Preview -->
+  <div class="img-preview" id="imgPreview" onclick="closePreview(event)">
+    <button class="ip-close">✕</button>
+    <img id="previewImg" src="" alt="">
+  </div>
+
+  <!-- Modal -->
+  <div class="modal" id="reviewModal">
+    <div class="modal-box">
+      <div class="m-title" id="modalTitle">操作</div>
+      <div class="m-sub" id="modalSub"></div>
+      <textarea id="modalNote" placeholder="输入备注（可选）…"></textarea>
+      <div class="m-actions">
+        <button class="btn-cancel" onclick="closeModal()">取消</button>
+        <button class="btn-ok" id="modalOk" onclick="confirmModal()">确认</button>
+      </div>
     </div>
+  </div>
 
-    <div class="toast" id="toast"></div>
+  <div class="toast" id="toast"></div>
 
-    <script>
-        const API = '';
-        let allDocuments = [];
-        let currentDoc = null;
-        let selectedAssets = new Set();
-        let pendingAction = null;
+  <script>
+    // ================================================================
+    // State
+    // ================================================================
+    const API = '';
+    let allDocs = [];
+    let filteredDocs = [];
+    let docContents = {};
+    let reviewState = {};
+    let curDocIdx = 0;
+    let curAssetIdx = 0;
+    let pendingAction = null;
+    let currentCat = '';
 
-        // ── Init ──────────────────────────────────────────────────────────────
-        async function init() {
-            try {
-                const res = await fetch(`${API}/api/documents`);
-                allDocuments = await res.json();
-                populateCategorySelect();
-                updateDocSelect('');
-                document.getElementById('emptyState').innerHTML =
-                    '<div class="icon">📋</div><p>请从上方选择文档</p>';
-            } catch (e) {
-                showToast('加载失败: ' + e.message, 'error');
+    // ================================================================
+    // Theme
+    // ================================================================
+    function toggleTheme() {
+      const html = document.documentElement;
+      const dark = html.getAttribute('data-theme') !== 'light';
+      html.setAttribute('data-theme', dark ? 'light' : 'dark');
+      document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
+      localStorage.setItem('opsv-theme', dark ? 'light' : 'dark');
+    }
+    (() => {
+      const s = localStorage.getItem('opsv-theme');
+      if (s) {
+        document.documentElement.setAttribute('data-theme', s);
+        document.getElementById('themeBtn').textContent = s === 'light' ? '☀️' : '🌙';
+      }
+    })();
+
+    // ================================================================
+    // Sidebar
+    // ================================================================
+    function toggleSidebar() {
+      const sb = document.getElementById('sidebar');
+      const ov = document.getElementById('sidebarOverlay');
+      const open = sb.classList.toggle('open');
+      ov.classList.toggle('open', open);
+    }
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarOverlay').classList.remove('open');
+    }
+
+    // ================================================================
+    // Init
+    // ================================================================
+    async function init() {
+      try {
+        const res = await fetch(`${API}/api/documents`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        allDocs = await res.json();
+
+        try {
+          const s = localStorage.getItem('opsv-review-state');
+          if (s) reviewState = JSON.parse(s);
+        } catch (_) {}
+
+        if (allDocs.length === 0) {
+          document.getElementById('loadingView').style.display = 'none';
+          document.getElementById('emptyView').style.display = 'flex';
+          return;
+        }
+
+        // Project name
+        if (allDocs[0].docPath) {
+          const p = allDocs[0].docPath.split('/');
+          let vi = p.indexOf('videospec');
+          if (vi === -1) vi = p.indexOf('opsv-queue');
+          if (vi >= 1) {
+            const name = p[vi - 1];
+            document.getElementById('topTitle').textContent = name;
+            document.getElementById('sidebarTitle').textContent = name;
+          }
+        }
+
+        // Categories
+        const cats = [...new Set(allDocs.map(d => d.category || 'unknown').filter(Boolean))].sort();
+        const cl = document.getElementById('catList');
+        cl.innerHTML = `<div class="cat-item active" data-cat="" onclick="pickCat('')">全部<span class="cat-count">${allDocs.length}</span></div>` +
+          cats.map(c => {
+            const n = allDocs.filter(d => (d.category||'unknown') === c).length;
+            return `<div class="cat-item" data-cat="${c}" onclick="pickCat('${c}')">${c}<span class="cat-count">${n}</span></div>`;
+          }).join('');
+
+        document.getElementById('loadingView').style.display = 'none';
+        document.getElementById('contentView').style.display = 'flex';
+
+        applyFilter('');
+      } catch (e) {
+        document.getElementById('loadingView').style.display = 'none';
+        document.getElementById('errorView').style.display = 'flex';
+        document.getElementById('errorMsg').textContent = e.message;
+      }
+    }
+
+    // ================================================================
+    // Category / Filter
+    // ================================================================
+    function pickCat(cat) {
+      document.querySelectorAll('#catList .cat-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.cat === cat);
+      });
+      currentCat = cat;
+      applyFilter(cat);
+    }
+
+    function applyFilter(cat) {
+      const docs = cat ? allDocs.filter(d => (d.category||'unknown') === cat) : [...allDocs];
+      filteredDocs = docs;
+
+      if (docs.length === 0) {
+        document.getElementById('assetCarousel').innerHTML = '<div class="asset-slide"><div class="empty-msg">该分类暂无文档</div></div>';
+        document.getElementById('thumbStrip').innerHTML = '';
+        document.getElementById('docList').innerHTML = '';
+        document.getElementById('topProgress').textContent = '0/0';
+        return;
+      }
+
+      // Doc list in sidebar
+      const dl = document.getElementById('docList');
+      dl.innerHTML = docs.map((d, i) => {
+        const r = reviewState[d.docId];
+        const allOut = (d.outputs||[]).length;
+        const doneOut = r ? Object.keys(r).filter(k => r[k].action === 'approve').length : 0;
+        let badge = '';
+        if (allOut > 0 && doneOut === allOut) badge = 'approved';
+        else if (r && Object.keys(r).length > 0) badge = 'feedback';
+        return `<div class="doc-item${i===0?' active':''}" data-idx="${i}" onclick="pickDoc(${i})">
+          <span class="doc-name">${d.docId}</span>
+          ${badge ? `<span class="doc-badge ${badge}">${badge==='approved'?'✓':'✎'}</span>` : ''}
+        </div>`;
+      }).join('');
+
+      curDocIdx = 0;
+      updateProgress();
+      loadDoc(0);
+      // Desktop: show doc panel by default
+      if (window.innerWidth >= 768) openDocPanel();
+    }
+
+    function pickDoc(idx) {
+      curDocIdx = idx;
+      document.querySelectorAll('#docList .doc-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+      // Scroll carousel
+      const slides = document.getElementById('docCarousel');
+      // We don't use carousel anymore - just load the doc
+      loadDoc(idx);
+      updateProgress();
+      if (window.innerWidth < 768) closeSidebar();
+    }
+
+    function updateProgress() {
+      document.getElementById('topProgress').textContent = `${curDocIdx+1}/${filteredDocs.length}`;
+    }
+
+    // ================================================================
+    // Load Document
+    // ================================================================
+    async function loadDoc(idx) {
+      const docs = filteredDocs;
+      const doc = docs[idx];
+      if (!doc) return;
+
+      if (!docContents[doc.docId]) {
+        try {
+          const r = await fetch(`${API}/api/documents/by-id/${doc.docId}`);
+          if (r.ok) {
+            const d = await r.json();
+            docContents[doc.docId] = { content: d.content || '' };
+          }
+        } catch (_) {}
+      }
+
+      const raw = docContents[doc.docId]?.content || '';
+      const fm = parseFM(raw);
+      const body = stripFM(raw);
+      const cat = (fm && fm.category) || doc.category || 'unknown';
+      const status = (fm && fm.status) || doc.status || 'drafting';
+      const title = (fm && fm.title) || doc.title || doc.docId;
+
+      // Update doc strip
+      document.getElementById('dsTitle').textContent = title;
+      document.getElementById('dsTag').className = `tag ${cat}`;
+      document.getElementById('dsTag').textContent = cat;
+      document.getElementById('dsCount').textContent = `${(doc.outputs||[]).length}个资产`;
+
+      // Desktop doc panel
+      document.getElementById('dpTitle').textContent = title;
+      document.getElementById('dpTags').innerHTML = `<span class="t ${cat}">${cat}</span><span class="t ${status}">${status}</span>`;
+
+      // Build meta fields
+      const metaKeys = ['scene_location','time_period','age_group','role','episode'];
+      let metaHtml = '';
+      if (fm) {
+        metaHtml = metaKeys.filter(k => fm[k]).map(k => `<span>${fm[k]}</span>`).join('');
+      }
+      // Render markdown with image path fixing — wrap in try-catch to never break UI
+      let mdHtml = '<p style="color:var(--text-muted);">无内容</p>';
+      try {
+        if (body) mdHtml = fixMdImages(renderMd(body), doc.docPath);
+      } catch(_) { mdHtml = '<p style="color:var(--text-muted);">渲染失败</p>'; }
+      try {
+        document.getElementById('dpBody').innerHTML = `
+          <div class="fm-meta">${metaHtml}</div>
+          <div class="md">${mdHtml}</div>
+        `;
+      } catch(_) {
+        document.getElementById('dpBody').innerHTML = '<p style="color:var(--text-muted);padding:20px;">文档内容加载异常</p>';
+      }
+
+      // Update comment
+      document.getElementById('cmtInput').value = '';
+      document.getElementById('cmtBtn').disabled = true;
+
+      // Render assets
+      renderAssets(doc);
+
+      // Highlight in sidebar doc list
+      document.querySelectorAll('#docList .doc-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+    }
+
+    // ================================================================
+    // Render Assets
+    // ================================================================
+    function renderAssets(doc) {
+      const outputs = doc.outputs || [];
+      const carousel = document.getElementById('assetCarousel');
+      const strip = document.getElementById('thumbStrip');
+
+      if (outputs.length === 0) {
+        carousel.innerHTML = '<div class="asset-slide"><div class="empty-msg">暂无资产</div></div>';
+        strip.innerHTML = '';
+        document.getElementById('aiProvider').textContent = '-';
+        document.getElementById('aiBadge').className = 'ai-badge pending';
+        document.getElementById('aiBadge').textContent = '无资产';
+        updateActions();
+        return;
+      }
+
+      // Build slides
+      carousel.innerHTML = outputs.map((o, i) => {
+        const src = `${API}/api/files/${o.path}`;
+        const isVideo = o.path.match(/\.(mp4|webm|mov)$/i);
+        if (isVideo) {
+          return `<div class="asset-slide" data-idx="${i}"><video src="${src}" controls autoplay loop muted playsinline style="max-width:100%;max-height:100%;object-fit:contain;"></video></div>`;
+        }
+        return `<div class="asset-slide" data-idx="${i}"><img src="${src}" loading="lazy" alt="${o.filename}" onclick="openPreview('${src.replace(/'/g,"\\'")}')"></div>`;
+      }).join('');
+
+      // Thumbnails
+      strip.innerHTML = outputs.map((o, i) => {
+        const src = `${API}/api/files/${o.path}`;
+        const rv = reviewState[doc.docId]?.[o.path];
+        const cls = rv ? (rv.action === 'approve' ? 'done' : 'feedback') : '';
+        const isVideo = o.path.match(/\.(mp4|webm|mov)$/i);
+        return `<div class="thumb${cls}${i===0?' cur':''}" data-idx="${i}" onclick="pickAsset(${i})">
+          ${isVideo ? '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:16px;">▶</span>' : `<img src="${src}" alt="">`}
+          <span class="tb">${rv?(rv.action==='approve'?'✓':'✎'):''}</span>
+        </div>`;
+      }).join('');
+
+      // Scroll listener for asset carousel
+      let ticking = false;
+      carousel.removeEventListener('scroll', onAssetScroll);
+      carousel.addEventListener('scroll', onAssetScroll, { passive: true });
+
+      curAssetIdx = 0;
+      updateAssetInfo(0, doc);
+      updateActions(doc);
+    }
+
+    function onAssetScroll() {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const carousel = document.getElementById('assetCarousel');
+          const slides = carousel.querySelectorAll('.asset-slide');
+          const cw = carousel.clientWidth || 1;
+          const scrollLeft = carousel.scrollLeft;
+          let ai = Math.round(scrollLeft / cw);
+          if (ai < 0) ai = 0;
+          if (ai >= slides.length) ai = slides.length - 1;
+          if (ai !== curAssetIdx) {
+            curAssetIdx = ai;
+            const doc = filteredDocs[curDocIdx];
+            if (doc) {
+              updateAssetInfo(ai, doc);
+              updateActions(doc);
+              highlightThumb(ai);
             }
-        }
-
-        // ── Dropdowns ─────────────────────────────────────────────────────────
-        function populateCategorySelect() {
-            const categories = [...new Set(allDocuments.map(d => d.category || 'unknown'))].sort();
-            const sel = document.getElementById('categorySelect');
-            sel.innerHTML = '<option value="">全部</option>' +
-                categories.map(c => `<option value="${c}">${c}</option>`).join('');
-        }
-
-        function onCategoryChange(cat) {
-            updateDocSelect(cat);
-        }
-
-        function updateDocSelect(category) {
-            const docs = category ? allDocuments.filter(d => d.category === category) : allDocuments;
-            const sel = document.getElementById('docSelect');
-            sel.innerHTML = '<option value="">请选择文档</option>' +
-                docs.map(d => {
-                    const count = (d.outputs || []).length;
-                    return `<option value="${d.docId}">${d.title || d.docId} (${count})</option>`;
-                }).join('');
-        }
-
-        function onDocChange(docId) {
-            if (!docId) {
-                currentDoc = null;
-                document.getElementById('docActions').style.display = 'none';
-                document.getElementById('mainContent').innerHTML =
-                    '<div class="no-doc-placeholder"><div class="icon">📋</div><p>请选择文档</p></div>';
-                return;
-            }
-            const cat = document.getElementById('categorySelect').value;
-            const docs = cat ? allDocuments.filter(d => d.category === cat) : allDocuments;
-            selectDoc(docs.find(d => d.docId === docId));
-        }
-
-        // ── Load Document ─────────────────────────────────────────────────────
-        async function selectDoc(doc) {
-            if (!doc) return;
-            currentDoc = doc;
-            selectedAssets.clear();
-            updateImgButtons();
-            document.getElementById('docActions').style.display = 'flex';
-
-            try {
-                const res = await fetch(`${API}/api/documents/by-id/${doc.docId}`);
-                const data = await res.json();
-                renderDoc(data);
-            } catch (e) {
-                showToast('加载文档失败', 'error');
-            }
-        }
-
-        // ── Render ────────────────────────────────────────────────────────────
-        function renderDoc(data) {
-            const content = data.content || '';
-            const frontmatter = parseFrontmatter(content);
-            const body = stripFrontmatter(content);
-            const fm = frontmatter || {};
-
-            const status = fm.status || 'drafting';
-            const cat = fm.category || currentDoc.category || 'unknown';
-            const catClass = cat.toLowerCase();
-            const statusClass = status === 'approved' ? 'status-approved' : 'status-draft';
-
-            let metaFields = ['scene_location', 'time_period', 'age_group', 'role', 'prop_type', 'episode', 'scene_num', 'location', 'shot_type'];
-            let metaHtml = metaFields.filter(f => fm[f]).map(f => `<span>${fm[f]}</span>`).join('');
-
-            const outputs = currentDoc.outputs || [];
-            const outputsHtml = outputs.map(out => {
-                const key = out.path;
-                const selected = selectedAssets.has(key);
-                const src = `${API}/api/files/${out.path}`;
-                return `
-                    <div class="asset-card ${selected ? 'selected' : ''}"
-                         onclick="toggleAsset('${key.replace(/'/g, "\\'")}')"
-                         ondblclick="openPreview('${src.replace(/'/g, "\\'")}')"
-                         data-key="${key}">
-                        <div class="asset-overlay">✓</div>
-                        <img src="${src}" loading="lazy" alt="${out.filename}">
-                        <div class="asset-name">${out.filename}</div>
-                    </div>
-                `;
-            }).join('');
-
-            const html = `
-                <div class="doc-block expanded" id="docBlock">
-                    <div class="doc-block-header" onclick="toggleDocBlock()">
-                        <div>
-                            <div class="doc-block-title">${fm.title || currentDoc.docId}</div>
-                            <div class="doc-block-meta">${cat} · ${outputs.length} 个资产</div>
-                        </div>
-                        <span class="doc-block-chevron">▼</span>
-                    </div>
-                    <div class="doc-block-body">
-                        <div class="fm-card">
-                            <div class="fm-tags">
-                                <span class="fm-tag ${catClass}">${cat}</span>
-                                <span class="fm-tag ${statusClass}">${status}</span>
-                            </div>
-                            ${fm.title ? `<div class="fm-title">${fm.title}</div>` : ''}
-                            <div class="fm-meta">${metaHtml}</div>
-                        </div>
-                        <div class="md-content">${renderMarkdown(body, currentDoc.docPath)}</div>
-                    </div>
-                </div>
-                <div class="asset-section">
-                    <div class="asset-title">资产 (${outputs.length})</div>
-                    <div class="asset-grid">${outputsHtml || '<div class="empty-state"><p>暂无资产</p></div>'}</div>
-                </div>
-            `;
-
-            document.getElementById('mainContent').innerHTML = html;
-        }
-
-        // ── Doc Block Toggle ──────────────────────────────────────────────────
-        function toggleDocBlock() {
-            document.getElementById('docBlock').classList.toggle('expanded');
-        }
-
-        // ── Frontmatter Helpers ───────────────────────────────────────────────
-        function parseFrontmatter(content) {
-            const match = content.match(/^---\n([\s\S]*?)\n---/);
-            if (!match) return null;
-            const fm = {};
-            for (const line of match[1].split('\n')) {
-                const m = line.match(/^([\w_]+):\s*(.*)$/);
-                if (m) fm[m[1]] = m[2].trim();
-            }
-            return fm;
-        }
-
-        function stripFrontmatter(content) {
-            return content.replace(/^---[\s\S]*?---\n*/, '');
-        }
-
-        // ── Markdown Renderer ─────────────────────────────────────────────────
-        function renderMarkdown(content, docPath) {
-            const base = API || '';
-            const encode = encodeURIComponent;
-            return content
-                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                .replace(/`(.+?)`/g, '<code>$1</code>')
-                .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-                .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-                .replace(/!\[(.+?)\]\((.+?)\)/g, (match, alt, src) => {
-                    // Resolve filesystem-relative image paths through the server
-                    // so they work in VSCode/GitHub (relative from .md) AND in
-                    // the review UI (via /api/files/resolve).
-                    if (docPath && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('data:')) {
-                        src = `${base}/api/files/resolve?docPath=${encode(docPath)}&imagePath=${encode(src)}`;
-                    }
-                    return `<img src="${src}" alt="${alt}" onclick="openPreview('${src.replace(/'/g, "\\'")}')">`;
-                })
-                .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
-                .replace(/^---$/gm, '<hr>')
-                .split('\n\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')
-                .replace(/<p>(<h\d|<pre|<blockquote|<table|<hr|<ul|<ol)/g, '$1')
-                .replace(/(<\/h\d>|<\/pre>|<\/blockquote>|<\/table>|<\/ul>|<\/ol>)<\/p>/g, '$1')
-                .replace(/<p><\/p>/g, '');
-        }
-
-        // ── Asset Selection ──────────────────────────────────────────────────
-        function toggleAsset(key) {
-            if (selectedAssets.has(key)) {
-                selectedAssets.delete(key);
-            } else {
-                selectedAssets.add(key);
-            }
-            document.querySelectorAll('.asset-card').forEach(card => {
-                card.classList.toggle('selected', selectedAssets.has(card.dataset.key));
-            });
-            updateImgButtons();
-        }
-
-        function updateImgButtons() {
-            const hasSel = selectedAssets.size > 0;
-            document.getElementById('btnImgApprove').disabled = !hasSel;
-            document.getElementById('btnImgFeedback').disabled = !hasSel;
-        }
-
-        // ── Image Preview ────────────────────────────────────────────────────
-        function openPreview(src) {
-            document.getElementById('previewImg').src = src;
-            document.getElementById('imgPreview').classList.add('active');
-        }
-
-        function closePreview() {
-            document.getElementById('imgPreview').classList.remove('active');
-        }
-
-        // ── Doc Actions ─────────────────────────────────────────────────────
-        function doValidate() {
-            if (!currentDoc) return;
-            showToast(`请在终端运行: opsv validate "${currentDoc.docPath}"`, 'error');
-        }
-
-        function doDocRevise() {
-            if (!currentDoc) return;
-            pendingAction = 'doc_revise';
-            document.getElementById('modalTitle').textContent = '✏ 修订';
-            document.getElementById('modalSubtitle').textContent = '输入文档修订意见（写入 reviews 字段）';
-            document.getElementById('modalNote').value = '';
-            document.getElementById('reviewModal').classList.add('active');
-        }
-
-        async function doApproveDoc() {
-            if (!currentDoc) return;
-            try {
-                const res = await fetch(`${API}/api/documents/by-id/${currentDoc.docId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'approved' })
-                });
-                const json = await res.json();
-                if (json.success || res.ok) {
-                    showToast('已设为 Approved', 'success');
-                    currentDoc.status = 'approved';
-                    // Refresh doc to update UI
-                    const docRes = await fetch(`${API}/api/documents/by-id/${currentDoc.docId}`);
-                    const data = await docRes.json();
-                    renderDoc(data);
-                } else {
-                    showToast('操作失败', 'error');
-                }
-            } catch (e) {
-                showToast('操作失败: ' + e.message, 'error');
-            }
-        }
-
-        function doRefresh() {
-            if (!currentDoc) return;
-            selectedAssets.clear();
-            updateImgButtons();
-            selectDoc(currentDoc);
-        }
-
-        // ── Image Actions ─────────────────────────────────────────────────────
-        function submitImgAction(action) {
-            if ((action === 'approve' || action === 'feedback') && selectedAssets.size === 0) return;
-            pendingAction = action;
-
-            const titles = { approve: '✓ 通过', feedback: '✎ 反馈', revise: '✏ 修订' };
-            const subtitles = {
-                approve: '确认通过选中的资产？',
-                feedback: '对选中资产提供反馈',
-                revise: '请求修订选中资产'
-            };
-
-            document.getElementById('modalTitle').textContent = titles[action];
-            document.getElementById('modalSubtitle').textContent = subtitles[action];
-            document.getElementById('modalNote').value = '';
-            document.getElementById('reviewModal').classList.add('active');
-        }
-
-        // ── Modal ─────────────────────────────────────────────────────────────
-        function closeModal() {
-            document.getElementById('reviewModal').classList.remove('active');
-            pendingAction = null;
-        }
-
-        async function confirmAction() {
-            if (!pendingAction || !currentDoc) return;
-            const note = document.getElementById('modalNote').value.trim();
-            const action = pendingAction;
-
-            // doc revise -> POST /api/review/approve with action doc_revise
-            if (action === 'doc_revise') {
-                try {
-                    const res = await fetch(`${API}/api/review/approve`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            docPath: currentDoc.docPath,
-                            outputFiles: [],
-                            action: 'revise_prompt',
-                            note: note || undefined
-                        })
-                    });
-                    const json = await res.json();
-                    if (json.success) {
-                        showToast('修订意见已提交', 'success');
-                    } else {
-                        showToast('提交失败', 'error');
-                    }
-                } catch (e) {
-                    showToast('提交失败: ' + e.message, 'error');
-                }
-                closeModal();
-                return;
-            }
-
-            // image actions
-            const actionMap = { approve: 'approve', feedback: 'design_feedback', revise: 'revise_prompt' };
-            const outputFiles = [...selectedAssets];
-
-            try {
-                const res = await fetch(`${API}/api/review/approve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        docPath: currentDoc.docPath,
-                        outputFiles,
-                        action: actionMap[action],
-                        note: note || undefined
-                    })
-                });
-                const json = await res.json();
-                if (json.success) {
-                    showToast('操作成功', 'success');
-                    selectedAssets.clear();
-                    updateImgButtons();
-                    closeModal();
-                    // Reload current doc to refresh state
-                    setTimeout(() => selectDoc(currentDoc), 600);
-                } else {
-                    showToast('操作失败', 'error');
-                }
-            } catch (e) {
-                showToast('提交失败: ' + e.message, 'error');
-            }
-        }
-
-        // ── Toast ─────────────────────────────────────────────────────────────
-        function showToast(msg, type) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.className = 'toast show ' + type;
-            setTimeout(() => toast.classList.remove('show'), 2500);
-        }
-
-        // ── Keyboard ───────────────────────────────────────────────────────────
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closePreview();
-                closeModal();
-            }
+          }
+          ticking = false;
         });
+        ticking = true;
+      }
+    }
 
-        init();
-    </script>
+    function pickAsset(ai) {
+      const carousel = document.getElementById('assetCarousel');
+      const slides = carousel.querySelectorAll('.asset-slide');
+      if (slides[ai]) {
+        slides[ai].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+      }
+      curAssetIdx = ai;
+      const doc = filteredDocs[curDocIdx];
+      if (doc) {
+        updateAssetInfo(ai, doc);
+        updateActions(doc);
+        highlightThumb(ai);
+      }
+    }
+
+    function highlightThumb(ai) {
+      document.querySelectorAll('#thumbStrip .thumb').forEach((t, i) => {
+        t.classList.toggle('cur', i === ai);
+        if (i === ai) t.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      });
+    }
+
+    function updateAssetInfo(ai, doc) {
+      const out = (doc.outputs||[])[ai];
+      if (!out) {
+        document.getElementById('aiProvider').textContent = '-';
+        document.getElementById('aiBadge').className = 'ai-badge pending';
+        document.getElementById('aiBadge').textContent = '无资产';
+        return;
+      }
+      document.getElementById('aiProvider').textContent = `${out.circle} / ${out.provider}`;
+      const rv = reviewState[doc.docId]?.[out.path];
+      const badge = document.getElementById('aiBadge');
+      if (rv && rv.action === 'approve') {
+        badge.textContent = `✓ 已通过${rv.timestamp?' · '+rv.timestamp:''}`;
+        badge.className = 'ai-badge done';
+      } else if (rv && rv.action === 'feedback') {
+        badge.textContent = '✎ 已反馈';
+        badge.className = 'ai-badge feedback';
+      } else {
+        badge.textContent = '待审阅';
+        badge.className = 'ai-badge pending';
+      }
+    }
+
+    function updateActions(doc) {
+      const btnA = document.getElementById('btnApprove');
+      const btnF = document.getElementById('btnFeedback');
+      const btnR = document.getElementById('btnRevise');
+
+      const out = doc ? (doc.outputs||[])[curAssetIdx] : null;
+      if (!doc || !out) {
+        btnA.disabled = true; btnF.disabled = true; btnR.disabled = true;
+        return;
+      }
+      btnR.disabled = false;
+
+      const rv = reviewState[doc.docId]?.[out.path];
+      const isDone = rv && rv.action === 'approve';
+      btnA.disabled = false;
+      btnA.textContent = isDone ? '↩ 取消' : '✓ 通过';
+      btnF.disabled = isDone;  // can't feedback an already approved asset
+    }
+
+    // ================================================================
+    // Document Panel (slide up mobile, side panel desktop)
+    // ================================================================
+    function openDocPanel() {
+      if (window.innerWidth >= 768) {
+        document.getElementById('docCol').classList.remove('collapsed');
+      } else {
+        document.getElementById('docOverlay').classList.add('open');
+        document.getElementById('docPanel').classList.add('open');
+      }
+    }
+
+    function closeDocPanel() {
+      if (window.innerWidth >= 768) {
+        document.getElementById('docCol').classList.add('collapsed');
+      } else {
+        document.getElementById('docOverlay').classList.remove('open');
+        document.getElementById('docPanel').classList.remove('open');
+      }
+    }
+
+    // Comment
+    document.getElementById('cmtInput').addEventListener('input', function() {
+      document.getElementById('cmtBtn').disabled = !this.value.trim();
+    });
+
+    async function submitComment() {
+      const input = document.getElementById('cmtInput');
+      const note = input.value.trim();
+      if (!note) return;
+      const doc = filteredDocs[curDocIdx];
+      if (!doc) return;
+
+      try {
+        const r = await fetch(`${API}/api/review/approve`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ docPath: doc.docPath, outputFiles: [], action: 'design_feedback', note })
+        });
+        const j = await r.json();
+        if (j.success) {
+          showToast('评论已提交', 'ok');
+          input.value = '';
+          document.getElementById('cmtBtn').disabled = true;
+        } else {
+          showToast('提交失败', 'err');
+        }
+      } catch(e) { showToast('提交失败: '+e.message, 'err'); }
+    }
+
+    // ================================================================
+    // Image Preview
+    // ================================================================
+    function openPreview(src) {
+      document.getElementById('previewImg').src = src;
+      document.getElementById('imgPreview').classList.add('open');
+    }
+    function closePreview(e) {
+      if (e && e.target !== e.currentTarget && !e.target.classList.contains('ip-close')) return;
+      document.getElementById('imgPreview').classList.remove('open');
+    }
+
+    // ================================================================
+    // Review Actions
+    // ================================================================
+    function doAction(action) {
+      const doc = filteredDocs[curDocIdx];
+      if (!doc) return;
+      const out = (doc.outputs||[])[curAssetIdx];
+      if (!out) return;
+
+      const rv = reviewState[doc.docId]?.[out.path];
+      const isDone = rv && rv.action === 'approve';
+
+      if (action === 'approve') {
+        if (isDone) {
+          // Unapprove
+          delete reviewState[doc.docId][out.path];
+          if (Object.keys(reviewState[doc.docId]).length === 0) delete reviewState[doc.docId];
+          saveState();
+          refreshUI();
+          showToast('已取消通过', 'info');
+          return;
+        }
+        // Approve directly
+        doApprove(doc, out);
+        return;
+      }
+
+      // feedback / revise: show modal
+      pendingAction = action;
+      const titles = { feedback: '✎ 反馈', revise: '✏ 修订' };
+      const subs = { feedback: `对 "${out.filename}" 提供反馈意见`, revise: `请求修订 "${out.filename}"` };
+      document.getElementById('modalTitle').textContent = titles[action];
+      document.getElementById('modalSub').textContent = subs[action];
+      document.getElementById('modalNote').value = '';
+      document.getElementById('reviewModal').classList.add('open');
+    }
+
+    async function doApprove(doc, out) {
+      try {
+        const r = await fetch(`${API}/api/review/approve`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ docPath: doc.docPath, outputFiles: [out.path], action: 'approve' })
+        });
+        const j = await r.json();
+        if (j.success) {
+          if (!reviewState[doc.docId]) reviewState[doc.docId] = {};
+          reviewState[doc.docId][out.path] = { action: 'approve', timestamp: new Date().toLocaleDateString('zh-CN'), note: '' };
+          saveState();
+          refreshUI();
+          showToast('已通过', 'ok');
+        } else { showToast('操作失败', 'err'); }
+      } catch(e) { showToast('操作失败: '+e.message, 'err'); }
+    }
+
+    // ================================================================
+    // Modal
+    // ================================================================
+    function closeModal() {
+      document.getElementById('reviewModal').classList.remove('open');
+      pendingAction = null;
+    }
+
+    async function confirmModal() {
+      if (!pendingAction) return;
+      const doc = filteredDocs[curDocIdx];
+      if (!doc) return;
+      const out = (doc.outputs||[])[curAssetIdx];
+      if (!out) return;
+
+      const note = document.getElementById('modalNote').value.trim();
+      const amap = { feedback: 'design_feedback', revise: 'revise_prompt' };
+
+      try {
+        const r = await fetch(`${API}/api/review/approve`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ docPath: doc.docPath, outputFiles: [out.path], action: amap[pendingAction], note: note||undefined })
+        });
+        const j = await r.json();
+        if (j.success) {
+          if (!reviewState[doc.docId]) reviewState[doc.docId] = {};
+          reviewState[doc.docId][out.path] = { action: pendingAction, timestamp: new Date().toLocaleDateString('zh-CN'), note };
+          saveState();
+          refreshUI();
+          showToast(pendingAction === 'feedback' ? '反馈已提交' : '修订请求已提交', 'ok');
+        } else { showToast('操作失败', 'err'); }
+      } catch(e) { showToast('提交失败: '+e.message, 'err'); }
+      closeModal();
+    }
+
+    // ================================================================
+    // State Persistence & UI Refresh
+    // ================================================================
+    function saveState() {
+      try { localStorage.setItem('opsv-review-state', JSON.stringify(reviewState)); } catch(_) {}
+    }
+
+    function refreshUI() {
+      const doc = filteredDocs[curDocIdx];
+      if (!doc) return;
+      updateAssetInfo(curAssetIdx, doc);
+      updateActions(doc);
+      // Refresh thumb badges
+      const strip = document.getElementById('thumbStrip');
+      (doc.outputs||[]).forEach((o, i) => {
+        const t = strip.querySelector(`.thumb[data-idx="${i}"]`);
+        if (!t) return;
+        const rv = reviewState[doc.docId]?.[o.path];
+        const cls = rv ? (rv.action==='approve'?'done':'feedback') : '';
+        const label = rv ? (rv.action==='approve'?'✓':'✎') : '';
+        t.className = `thumb${cls}${t.classList.contains('cur')?' cur':''}`;
+        const tb = t.querySelector('.tb');
+        if (tb) tb.textContent = label;
+      });
+      // Refresh sidebar doc badges
+      document.querySelectorAll('#docList .doc-item').forEach(el => {
+        const i = parseInt(el.dataset.idx);
+        const d = filteredDocs[i];
+        if (!d) return;
+        const r = reviewState[d.docId];
+        const allOut = (d.outputs||[]).length;
+        const doneOut = r ? Object.keys(r).filter(k=>r[k].action==='approve').length : 0;
+        let badge = '';
+        if (allOut>0 && doneOut===allOut) badge = 'approved';
+        else if (r && Object.keys(r).length>0) badge = 'feedback';
+        const existing = el.querySelector('.doc-badge');
+        if (badge) {
+          if (existing) { existing.className = `doc-badge ${badge}`; existing.textContent = badge==='approved'?'✓':'✎'; }
+          else el.insertAdjacentHTML('beforeend', `<span class="doc-badge ${badge}">${badge==='approved'?'✓':'✎'}</span>`);
+        } else if (existing) { existing.remove(); }
+      });
+    }
+
+    // ================================================================
+    // Markdown & Image Path Fix
+    // ================================================================
+    function renderMd(content) {
+      if (!content) return '';
+      // Try marked (CDN) first, fallback to simple renderer
+      try {
+        if (typeof marked !== 'undefined' && marked.parse) {
+          return marked.parse(content, { breaks: true, gfm: true });
+        }
+      } catch(_) {}
+      // Inline fallback — handles headings, bold, code, images, links, lists, tables
+      let h = content
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" style="max-width:100%">')
+        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
+        .replace(/^---$/gm, '<hr>');
+      // Wrap consecutive non-empty lines in <p>
+      const lines = h.split('\n');
+      let inP = false, out = [];
+      for (const ln of lines) {
+        const trimmed = ln.trim();
+        if (!trimmed) { if (inP) { out.push('</p>'); inP = false; } continue; }
+        if (trimmed.startsWith('<h')||trimmed.startsWith('<pre')||trimmed.startsWith('<bl')||trimmed.startsWith('<hr')||trimmed.startsWith('<ul')||trimmed.startsWith('<ol')||trimmed.startsWith('<table')||trimmed.startsWith('<img')||trimmed.startsWith('<a')) {
+          if (inP) { out.push('</p>'); inP = false; }
+          out.push(trimmed);
+        } else {
+          if (!inP) { out.push('<p>'); inP = true; }
+          else out.push('<br>');
+          out.push(trimmed);
+        }
+      }
+      if (inP) out.push('</p>');
+      return out.join('\n');
+    }
+
+    function fixMdImages(html, docPath) {
+      if (!docPath) return html;
+      try {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        div.querySelectorAll('img').forEach(img => {
+          const src = img.getAttribute('src') || '';
+          if (src.startsWith('http') || src.startsWith('data:') || src.startsWith('/api/')) return;
+          img.setAttribute('src', `${API}/api/files/resolve?docPath=${encodeURIComponent(docPath)}&imagePath=${encodeURIComponent(src)}`);
+        });
+        return div.innerHTML;
+      } catch(_) { return html; }
+    }
+
+    // ================================================================
+    // Frontmatter
+    // ================================================================
+    function parseFM(content) {
+      const m = content.match(/^---\n([\s\S]*?)\n---/);
+      if (!m) return null;
+      const fm = {};
+      for (const line of m[1].split('\n')) {
+        const kv = line.match(/^([\w_]+):\s*(.*)$/);
+        if (kv) fm[kv[1]] = kv[2].trim();
+      }
+      return fm;
+    }
+    function stripFM(content) {
+      return content.replace(/^---[\s\S]*?---\n*/, '');
+    }
+
+    // ================================================================
+    // Toast
+    // ================================================================
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (type||'');
+      clearTimeout(t._t);
+      t._t = setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ================================================================
+    // Doc Strip Touch Swipe (mobile: vertical swipe switches doc)
+    // ================================================================
+    let touchStartY = 0;
+    document.getElementById('docStrip').addEventListener('touchstart', e => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    document.getElementById('docStrip').addEventListener('touchend', e => {
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dy) > 40) {
+        if (dy > 0 && curDocIdx > 0) pickDoc(curDocIdx - 1);
+        else if (dy < 0 && curDocIdx < filteredDocs.length - 1) pickDoc(curDocIdx + 1);
+      }
+    }, { passive: true });
+
+    // ================================================================
+    // Keyboard
+    // ================================================================
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closePreview({ target: document.getElementById('imgPreview'), currentTarget: document.getElementById('imgPreview') });
+        closeModal();
+        if (window.innerWidth < 768) { closeDocPanel(); closeSidebar(); }
+        return;
+      }
+      // Determine focus: sidebar or main review area
+      const active = document.activeElement;
+      const inSidebar = active && (active.closest('#sidebar') || active.closest('#catList') || active.closest('#docList'));
+      if (inSidebar || window.innerWidth < 768) {
+        // Sidebar/mobile: up/down switches doc, left/right switches asset
+        if (e.key === 'ArrowUp' && curDocIdx > 0) { e.preventDefault(); pickDoc(curDocIdx - 1); }
+        if (e.key === 'ArrowDown' && curDocIdx < filteredDocs.length - 1) { e.preventDefault(); pickDoc(curDocIdx + 1); }
+        if (e.key === 'ArrowLeft' && curAssetIdx > 0) { e.preventDefault(); pickAsset(curAssetIdx - 1); }
+        if (e.key === 'ArrowRight') {
+          const doc = filteredDocs[curDocIdx];
+          if (doc && curAssetIdx < (doc.outputs||[]).length - 1) { e.preventDefault(); pickAsset(curAssetIdx + 1); }
+        }
+      } else {
+        // Review area: left/right switches asset, up/down switches doc
+        if (e.key === 'ArrowLeft' && curAssetIdx > 0) { e.preventDefault(); pickAsset(curAssetIdx - 1); }
+        if (e.key === 'ArrowRight') {
+          const doc = filteredDocs[curDocIdx];
+          if (doc && curAssetIdx < (doc.outputs||[]).length - 1) { e.preventDefault(); pickAsset(curAssetIdx + 1); }
+        }
+        if (e.key === 'ArrowUp' && curDocIdx > 0) { e.preventDefault(); pickDoc(curDocIdx - 1); }
+        if (e.key === 'ArrowDown' && curDocIdx < filteredDocs.length - 1) { e.preventDefault(); pickDoc(curDocIdx + 1); }
+      }
+    });
+
+    // ================================================================
+    // Boot
+    // ================================================================
+    init();
+  </script>
 </body>
 </html>

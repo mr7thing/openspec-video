@@ -285,9 +285,9 @@ export class DependencyGraph {
           ? frontmatterStatus
           : (existingStatus || 'drafting');
 
-        const c = this.categoryMap.get(id) || existingAsset?.category;
+        const c = this.categoryMap.get(id) || existingAsset?.category || '';
         status[id] = s;
-        assets[id] = { status: s, index: circle.index, ...(c && { category: c }) };
+        assets[id] = { status: s, index: circle.index, category: c };
       }
 
       circlesData.push({

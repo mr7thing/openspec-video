@@ -40,8 +40,8 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   app.get('/api/documents/:circle/:docId', docCtrl.getDocument);
   app.get('/api/circles', circleCtrl.listCircles);
   app.get('/api/circles/:name/assets', circleCtrl.listCircleAssets);
-  app.get('/api/files/*filePath', fileCtrl.serve);
   app.get('/api/files/resolve', fileCtrl.resolve);
+  app.get('/api/files/*filePath', fileCtrl.serve);
   app.post('/api/review/approve', express.json(), reviewApproveCtrl.execute);
   app.post('/api/approve/:circle/:assetId', express.json(), approveCtrl.execute);
 
