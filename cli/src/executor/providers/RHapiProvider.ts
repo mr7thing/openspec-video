@@ -19,6 +19,7 @@ import { HttpClient } from '../HttpClient';
 import { OpsVContext } from '../../container/OpsVContext';
 import { ProviderResult } from '../QueueRunner';
 import { logger } from '../../utils/logger';
+import { appendLog } from '../polling';
 
 interface RhApiSubmitResponse {
   taskId?: string;
@@ -84,7 +85,20 @@ export class RHapiProvider extends BaseApiProvider<Record<string, unknown>, RhAp
     const apiKey = ctx.configLoader.getResolvedApiKey(task._opsv.modelKey);
 
     if (apiKey) {
-      await this.resolveLocalFileFields(payload, (fp) => this.uploadFile(fp, apiKey));
+      try {
+        await this.resolveLocalFileFields(payload, (fp) => this.uploadFile(fp, apiKey));
+      } catch (err: any) {
+        // Ensure .log is written even when upload fails before super.execute(),
+        // otherwise the .log stays stale and getResumeTaskId() returns wrong state.
+        appendLog(taskPath, { event: 'failed', task_id: 'unknown', error: err.message });
+        return {
+          taskPath,
+          shotId: task._opsv.shotId,
+          provider: this.name,
+          success: false,
+          error: `File upload failed: ${err.message}`,
+        };
+      }
     }
 
     const patched: BaseTaskJson<Record<string, unknown>> = { ...task, payload };
@@ -109,7 +123,7 @@ export class RHapiProvider extends BaseApiProvider<Record<string, unknown>, RhAp
         ...form.getHeaders(),
         'Authorization': `Bearer ${apiKey}`,
       },
-      timeout: 120000,
+      timeout: 300000,
       maxContentLength: 50 * 1024 * 1024,
       maxBodyLength: 50 * 1024 * 1024,
     });

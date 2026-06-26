@@ -6,9 +6,12 @@
  */
 
 import { Command } from 'commander';
+import fs from 'fs';
+import path from 'path';
 import chalk from 'chalk';
 import { parseTask, findPendingTasks, scanQueueStatus } from '../webapp-runner/core/task';
 import { executeTask, executeBatch } from '../webapp-runner/index';
+import { readLastLogEntry } from '../executor/polling';
 import { logger } from '../utils/logger';
 
 export function registerWebappExecCommand(program: Command): void {
@@ -40,25 +43,23 @@ export function registerWebappExecCommand(program: Command): void {
           const queueDir = options.queueDir || options.dir;
           const summary = await executeBatch(options.dir, enableWm, options.retry);
 
-          // Handle retry tasks (those with error logs)
+          // Handle retry tasks (those with failed .log entries)
           if (options.retry) {
-            const fs = require('fs');
-            const path = require('path');
             const qp = path.resolve(options.dir);
-            const errorLogs = fs.readdirSync(qp).filter((f: string) => f.endsWith('_error.log')).sort();
-            for (const errLog of errorLogs) {
-              const shotId = errLog.replace('_error.log', '');
-              const taskJson = path.join(qp, `${shotId}.json`);
-              if (fs.existsSync(taskJson)) {
-                try {
-                  const result = await executeTask(taskJson, queueDir, enableWm);
-                  summary.results.push(result);
-                  if (result.status === 'completed') summary.success++;
-                  else summary.failed++;
-                } catch (e: any) {
-                  logger.error(`Retry ${shotId} exception: ${e.message}`);
-                  summary.failed++;
-                }
+            const taskJsons = fs.readdirSync(qp).filter((f: string) => f.endsWith('.json')).sort();
+            for (const jf of taskJsons) {
+              const taskPath = path.join(qp, jf);
+              const last = readLastLogEntry(taskPath);
+              if (!last || last.event !== 'failed') continue;
+              const shotId = path.basename(jf, '.json');
+              try {
+                const result = await executeTask(taskPath, queueDir, enableWm);
+                summary.results.push(result);
+                if (result.status === 'completed') summary.success++;
+                else summary.failed++;
+              } catch (e: any) {
+                logger.error(`Retry ${shotId} exception: ${e.message}`);
+                summary.failed++;
               }
             }
           }

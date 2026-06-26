@@ -82,10 +82,11 @@ describe('QueueRunner', () => {
     expect(results).toHaveLength(0);
   });
 
-  it('retry only includes tasks with error logs', async () => {
+  it('retry only includes tasks with failed .log entries', async () => {
     container.registerExecutor('mock', MockExecutor);
     const taskPath = writeTask('a', 'mock');
-    fs.writeFileSync(taskPath.replace('.json', '_error.log'), JSON.stringify({ error: 'fail' }));
+    const logPath = taskPath.replace('.json', '.log');
+    fs.writeFileSync(logPath, JSON.stringify({ event: 'failed', error: 'mock fail', ts: new Date().toISOString() }) + '\n');
 
     const results = await runner.runPaths([tmpDir], { retry: true });
     expect(results).toHaveLength(1);

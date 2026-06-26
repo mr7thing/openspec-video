@@ -96,6 +96,9 @@ export interface DirSettings {
 export interface ProjectSettings {
   dirs?: DirSettings;
   polling?: PollingSettings;
+  timeout?: TimeoutConfig;
+  max_poll_duration?: number;
+  retry?: RetryConfig;
 }
 
 export interface ApiConfig {
@@ -151,11 +154,18 @@ export class ConfigLoader {
     }
   }
 
-  /** Shallow-merge override over base (models keys merged at top level). */
+  /** Merge settings fields, not whole-object replace. */
   private shallowMerge(base: ApiConfig, override: ApiConfig): ApiConfig {
     return {
       models: { ...base.models, ...override.models },
-      settings: override.settings ?? base.settings,
+      settings: {
+        ...base.settings,
+        ...override.settings,
+        dirs: { ...base.settings?.dirs, ...override.settings?.dirs },
+        polling: { ...base.settings?.polling, ...override.settings?.polling },
+        timeout: { ...base.settings?.timeout, ...override.settings?.timeout },
+        retry: { ...base.settings?.retry, ...override.settings?.retry },
+      },
     };
   }
 

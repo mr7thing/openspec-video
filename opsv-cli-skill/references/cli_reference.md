@@ -216,7 +216,7 @@ opsv webapp [options]
 
 ```bash
 opsv run <task.json...>
-  --retry                  # 重试失败任务（仅跑有 _error.log 的）
+  --retry                  # 重试失败任务（读 .log 最后事件判断）
   --force                  # 强制重跑所有任务，忽略成功/失败/审批状态（输出增量保存，不覆盖）
   --dry-run                # 不真正调 API
   -c, --concurrency <n>    # 并发数（覆盖 api_config 的 concurrency）

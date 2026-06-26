@@ -160,15 +160,13 @@ export function saveResults(
   return { outputPaths };
 }
 
-// ── Error Logging ──────────────────────────────────────────────────────────
-
-export function writeErrorLog(queueDir: string, shotId: string, errorInfo: Record<string, any>): void {
-  const errPath = path.join(queueDir, `${shotId}_error.log`);
-  fs.writeFileSync(errPath, JSON.stringify(errorInfo, null, 2));
-  log(`Error log written: ${errPath}`, 'WARN');
+// ── Error Logging (deprecated — use .log JSONL via polling.appendLog) ──────
+// Kept as no-ops for backward compat; callers should migrate to appendLog().
+/** @deprecated Use appendLog(taskJsonPath, { event: 'failed', ... }) */
+export function writeErrorLog(_queueDir: string, _shotId: string, _errorInfo: Record<string, any>): void {
+  // no-op
 }
-
-export function clearErrorLog(queueDir: string, shotId: string): void {
-  const errPath = path.join(queueDir, `${shotId}_error.log`);
-  if (fs.existsSync(errPath)) fs.unlinkSync(errPath);
+/** @deprecated No longer needed — .log is self-cleaning on next run */
+export function clearErrorLog(_queueDir: string, _shotId: string): void {
+  // no-op
 }

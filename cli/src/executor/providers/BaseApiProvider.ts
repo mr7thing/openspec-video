@@ -106,12 +106,13 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
 
   protected buildHttpClient(ctx: OpsVContext, modelKey: string): HttpClient {
     const config = ctx.configLoader.getModelConfig(modelKey);
+    const settings = ctx.configLoader.getSettings();
     const apiKey = ctx.configLoader.getResolvedApiKey(modelKey);
     return new HttpClient({
       apiKey,
-      timeout: config?.timeout?.submit || 300000,
-      maxRetries: config?.retry?.max_retries ?? 3,
-      retryDelayCap: config?.retry?.delay_cap ?? 30000,
+      timeout: config?.timeout?.submit ?? settings?.timeout?.submit ?? 300000,
+      maxRetries: config?.retry?.max_retries ?? settings?.retry?.max_retries ?? 3,
+      retryDelayCap: config?.retry?.delay_cap ?? settings?.retry?.delay_cap ?? 30000,
     });
   }
 
@@ -200,7 +201,8 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     const meta = task._opsv;
     const shotId = meta.shotId;
     const modelConfig = this.getModelConfig(ctx, meta.modelKey);
-    const maxDuration = modelConfig?.max_poll_duration || 4 * 60 * 60 * 1000;
+    const settings = ctx.configLoader.getSettings();
+    const maxDuration = modelConfig?.max_poll_duration ?? settings?.max_poll_duration ?? 4 * 60 * 60 * 1000;
     const ext = this.getOutputExtension(task);
 
     let taskId: string | null = getResumeTaskId(taskPath);
@@ -267,7 +269,7 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
           client,
           meta,
           taskId,
-          modelConfig?.timeout?.status || 120000,
+          modelConfig?.timeout?.status ?? settings?.timeout?.status ?? 300000,
           ctx
         );
 

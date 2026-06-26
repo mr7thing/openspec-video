@@ -72,6 +72,12 @@ export function isTaskCompleted(taskPath: string): boolean {
   return last?.event === 'succeeded' || last?.event === 'failed';
 }
 
+/** Check if the last .log entry is 'failed' (task ended with error). */
+export function isTaskFailed(taskPath: string): boolean {
+  const last = readLastLogEntry(taskPath);
+  return last?.event === 'failed';
+}
+
 export function cleanupLog(taskPath: string): void {
   const lp = logPath(taskPath);
   if (fs.existsSync(lp)) {

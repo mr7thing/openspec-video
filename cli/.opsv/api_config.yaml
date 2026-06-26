@@ -40,6 +40,14 @@
 #             intervalSeconds: 60
 #           - thresholdMinutes: 60
 #             intervalSeconds: 300
+#       timeout:               # 全局超时默认值 (model 级别同名 key 覆盖)
+#         submit: 300000       # 提交 HTTP 超时 (ms), 默认 5min
+#         status: 300000       # 状态查询 HTTP 超时 (ms), 默认 5min
+#         download: 30000      # 下载超时 (ms), 默认 30s
+#       max_poll_duration: 14400000  # 总轮询时长上限 (ms), 默认 4h
+#       retry:
+#         max_retries: 3
+#         delay_cap: 30000     # 重试延迟上限 (ms)
 
 models:
   # ==========================================

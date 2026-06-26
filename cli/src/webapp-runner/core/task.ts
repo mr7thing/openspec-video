@@ -32,6 +32,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { readLastLogEntry } from '../../executor/polling';
 
 export const DEFAULT_RATIO = '16:9';
 
@@ -123,8 +124,8 @@ export function isTaskJson(filePath: string): boolean {
 /**
  * Find all pending task JSONs in a queue directory.
  *
- * "Pending" = task JSON exists but no output images (or has error log).
- * If retry=true, also include tasks with _error.log.
+ * "Pending" = task JSON exists but no output images (or has failed log).
+ * If retry=true, also include tasks with failed .log entry.
  */
 export function findPendingTasks(queueDir: string, retry = false): string[] {
   const qp = path.resolve(queueDir);
@@ -139,10 +140,11 @@ export function findPendingTasks(queueDir: string, retry = false): string[] {
 
     const shotId = path.basename(f, '.json');
     const hasOutput = fs.readdirSync(qp).some(e => e.startsWith(`${shotId}_`) && e.endsWith('.png'));
-    const hasError = fs.existsSync(path.join(qp, `${shotId}_error.log`));
+    const lastLog = readLastLogEntry(fullPath);
+    const isFailed = lastLog?.event === 'failed';
 
-    if (hasOutput && !hasError) continue; // already completed
-    if (hasError && !retry) continue;     // failed, skip unless retry
+    if (hasOutput && !isFailed) continue; // already completed
+    if (isFailed && !retry) continue;     // failed, skip unless retry
 
     pending.push(fullPath);
   }
@@ -172,9 +174,10 @@ export function scanQueueStatus(queueDir: string): QueueStatus {
     total++;
     const shotId = path.basename(f, '.json');
     const hasOutput = fs.readdirSync(qp).some(e => e.startsWith(`${shotId}_`) && e.endsWith('.png'));
-    const hasError = fs.existsSync(path.join(qp, `${shotId}_error.log`));
+    const lastLog = readLastLogEntry(fullPath);
+    const isFailed = lastLog?.event === 'failed';
 
-    if (hasError) failed++;
+    if (isFailed) failed++;
     else if (hasOutput) completed++;
     else pending++;
   }

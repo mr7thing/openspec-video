@@ -164,7 +164,7 @@ export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>,
           ...form.getHeaders(),
           'Authorization': `Bearer ${apiKey}`,
         },
-        timeout: 120000,
+        timeout: 300000,
         maxContentLength: 50 * 1024 * 1024,
         maxBodyLength: 50 * 1024 * 1024,
       }

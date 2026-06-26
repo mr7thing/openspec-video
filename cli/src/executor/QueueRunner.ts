@@ -8,7 +8,7 @@ import path from 'path';
 import chalk from 'chalk';
 import { BaseTaskJson } from '../types/Job';
 import { logger } from '../utils/logger';
-import { isTaskCompleted, getResumeTaskId } from './polling';
+import { isTaskCompleted, isTaskFailed, getResumeTaskId, appendLog } from './polling';
 import { Container, ProviderExecutor } from '../container/Container';
 import { OpsVContext } from '../container/OpsVContext';
 
@@ -133,12 +133,10 @@ export class QueueRunner {
     handler: ProviderExecutor,
     results: ProviderResult[]
   ): Promise<void> {
-    // force: clean up checkpoint and error log so task starts fresh
+    // force: clean up checkpoint so task starts fresh
     if (this.forceMode) {
       const logFile = taskPath.replace(/\.json$/, '.log');
       if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
-      const errorLog = taskPath.replace(/\.json$/, '_error.log');
-      if (fs.existsSync(errorLog)) fs.unlinkSync(errorLog);
     }
 
     try {
@@ -148,14 +146,8 @@ export class QueueRunner {
 
       if (result.success) {
         console.log(chalk.green(`  [${handler.name}] ${task._opsv.shotId} ✓`));
-        const errorLog = taskPath.replace(/\.json$/, '_error.log');
-        if (fs.existsSync(errorLog)) {
-          fs.unlinkSync(errorLog);
-        }
       } else {
         console.log(chalk.red(`  [${handler.name}] ${task._opsv.shotId} ✗: ${result.error}`));
-        const errorLog = taskPath.replace(/\.json$/, '_error.log');
-        fs.writeFileSync(errorLog, JSON.stringify({ error: result.error, timestamp: new Date().toISOString() }));
       }
     } catch (err: any) {
       const result: ProviderResult = {
@@ -167,8 +159,8 @@ export class QueueRunner {
       };
       results.push(result);
       console.log(chalk.red(`  [${handler.name}] ${task._opsv.shotId} ✗: ${err.message}`));
-      const errorLog = taskPath.replace(/\.json$/, '_error.log');
-      fs.writeFileSync(errorLog, JSON.stringify({ error: err.message, timestamp: new Date().toISOString() }));
+      // Safety net: provider didn't write .log (it threw), do it here
+      appendLog(taskPath, { event: 'failed', task_id: 'unknown', error: err.message });
     }
   }
 
@@ -230,8 +222,7 @@ export class QueueRunner {
               continue;
             }
             if (retry) {
-              const errorLog = resolved.replace(/\.json$/, '_error.log');
-              if (fs.existsSync(errorLog)) {
+              if (isTaskFailed(resolved)) {
                 results.push({ task, path: resolved });
               }
               continue;
@@ -276,9 +267,7 @@ export class QueueRunner {
               continue;
             }
             if (retry) {
-              const base = entry.replace(/\.json$/, '');
-              const errorLog = path.join(dir, `${base}_error.log`);
-              if (fs.existsSync(errorLog)) {
+              if (isTaskFailed(fullPath)) {
                 results.push({ task, path: fullPath });
               }
               continue;
