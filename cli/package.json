@@ -1,6 +1,6 @@
 {
   "name": "videospec",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "OpenSpec-Video (videospec) - A cinematic AI automation framework: structured narrative specs → production-ready media via multi-provider pipeline.",
   "main": "dist/index.js",
   "bin": {
@@ -14,6 +14,7 @@
   "scripts": {
     "build": "tsc && node scripts/copy-ui-assets.js",
     "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.js",
     "start": "ts-node src/index.ts",
     "test": "jest --passWithNoTests",
     "lint": "eslint src/**/*.ts",
