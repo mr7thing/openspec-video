@@ -1,6 +1,8 @@
 import { bindRefs, parseKey } from '../RefBinder';
 import { RefsByType } from '../../types/Refs';
 import { InputTypesLoader } from '../../utils/inputTypesLoader';
+import path from 'path';
+import fs from 'fs';
 
 describe('RefBinder (v0.10.0)', () => {
   describe('parseKey', () => {
@@ -26,7 +28,41 @@ describe('RefBinder (v0.10.0)', () => {
   });
 
   describe('bindRefs', () => {
-    const inputTypes = new InputTypesLoader();
+    const os = require('os');
+    let tmpDir: string;
+    let inputTypes: InputTypesLoader;
+
+    beforeAll(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-refbinder-test-'));
+      fs.mkdirSync(path.join(tmpDir, '.opsv'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, '.opsv', 'input_types.yaml'),
+        `
+input_types:
+  image:
+    description: Static image
+    extensions: [.png, .jpg]
+  audio:
+    description: Audio file
+    extensions: [.mp3, .wav]
+`,
+        'utf8'
+      );
+      inputTypes = new InputTypesLoader();
+      inputTypes.load(tmpDir, { silent: true });
+    });
+
+    afterAll(() => {
+      function rimraf(dir: string) {
+        if (!fs.existsSync(dir)) return;
+        for (const entry of fs.readdirSync(dir)) {
+          const p = path.join(dir, entry);
+          fs.statSync(p).isDirectory() ? rimraf(p) : fs.unlinkSync(p);
+        }
+        fs.rmdirSync(dir);
+      }
+      rimraf(tmpDir);
+    });
 
     it('resolves grouped refs into ResolvedRef[]', () => {
       const raw: RefsByType = {

@@ -1,6 +1,7 @@
 // ============================================================================
 // OpsV Input Types Loader (v0.10.0)
 // Loads .opsv/input_types.yaml; defines the registry of allowed input_type keys.
+// Lookup: user (~/.opsv/) → project (.opsv/)
 // ============================================================================
 
 import fs from 'fs';
@@ -18,40 +19,28 @@ export interface InputTypesRegistry {
   input_types: Record<string, InputTypeDef>;
 }
 
-const BUILTIN_DEFAULTS: InputTypesRegistry = {
-  input_types: {
-    image: { description: 'Static image', extensions: ['.png', '.jpg', '.jpeg', '.webp'] },
-    video: { description: 'Video file', extensions: ['.mp4', '.mov', '.webm'] },
-    audio: { description: 'Audio file', extensions: ['.mp3', '.wav', '.m4a'] },
-    bvh:   { description: 'Motion capture', extensions: ['.bvh'] },
-    mask:  { description: 'Alpha/segmentation mask', extensions: ['.png'] },
-  },
-};
-
 export class InputTypesLoader {
   private registry: InputTypesRegistry;
 
   constructor() {
-    this.registry = BUILTIN_DEFAULTS;
+    this.registry = { input_types: {} };
   }
 
   /**
-   * Three-tier lookup: built-in → ~/.opsv/ → ./.opsv/
+   * Two-tier lookup: user → project
    */
   load(projectRoot: string, options?: { silent?: boolean }): InputTypesRegistry {
-    // Tier 1 — built-in defaults
-    let merged: InputTypesRegistry = {
-      input_types: { ...BUILTIN_DEFAULTS.input_types },
-    };
+    // Start with empty registry — all types come from config files
+    let merged: InputTypesRegistry = { input_types: {} };
 
-    // Tier 2 — user-level override
+    // Tier 1 — user-level override
     const userPath = path.join(os.homedir(), '.opsv', 'input_types.yaml');
     const userConfig = this.tryLoad(userPath, options);
     if (userConfig) {
       merged.input_types = { ...merged.input_types, ...userConfig.input_types };
     }
 
-    // Tier 3 — project-level override (highest priority)
+    // Tier 2 — project-level override (highest priority)
     const projectPath = path.join(projectRoot, '.opsv', 'input_types.yaml');
     const projectConfig = this.tryLoad(projectPath, options);
     if (projectConfig) {

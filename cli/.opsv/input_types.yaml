@@ -5,6 +5,14 @@
 #   - ### <type> subsection headings in ## Design References
 #
 # Compilation will error if any of the above references an input_type not defined here.
+#
+# Lookup order:
+#   1. ~/.opsv/input_types.yaml (user-level global fallback)
+#   2. <projectRoot>/.opsv/input_types.yaml (project-level, highest priority)
+#
+# The loader starts from an empty registry. All types come from config files.
+# Recommended defaults are defined below.
+# Copy this file to ~/.opsv/input_types.yaml or .opsv/input_types.yaml.
 
 input_types:
   image:
