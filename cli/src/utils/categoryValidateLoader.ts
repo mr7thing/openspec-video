@@ -1,7 +1,7 @@
 // ============================================================================
 // OpsV Category Validate Loader (v0.10.0)
 // Loads per-category validation rules.
-// Lookup: project (videospec/_category_validate.yaml) → user (~/.opsv/) → builtin
+// Lookup: user (~/.opsv/) → project (.opsv/)
 // ============================================================================
 
 import fs from 'fs';
@@ -27,37 +27,21 @@ export interface CategoryRule {
 
 export type CategoryRules = Record<string, CategoryRule>;
 
-const BUILTIN_DEFAULTS: CategoryRules = {
-  project: {
-    required_fields: ['status'],
-    skip_prompt_check: true,
-  },
-  shotdeck: {
-    required_fields: ['status', 'title'],
-    field_schema: {
-      prompt: {
-        min_length: 10,
-        no_placeholder: true,
-      },
-    },
-  },
-};
-
 export class CategoryValidateLoader {
   private rules: CategoryRules;
 
   constructor() {
-    this.rules = BUILTIN_DEFAULTS;
+    this.rules = {};
   }
 
   load(projectRoot: string, options?: { silent?: boolean }): CategoryRules {
-    const projectPath = path.join(projectRoot, 'videospec', '_category_validate.yaml');
+    const projectPath = path.join(projectRoot, '.opsv', 'category_validate.yaml');
     const userPath = path.join(os.homedir(), '.opsv', 'category_validate.yaml');
 
-    // Start with built-in defaults
-    const merged: CategoryRules = JSON.parse(JSON.stringify(BUILTIN_DEFAULTS));
+    // Start with empty rules — all defaults come from config files
+    const merged: CategoryRules = {};
 
-    // Apply user-level overlay
+    // Apply user-level overlay (global fallback)
     const userRules = this.tryLoad(userPath, options);
     if (userRules) Object.assign(merged, userRules);
 

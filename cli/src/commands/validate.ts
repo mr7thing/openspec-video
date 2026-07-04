@@ -20,6 +20,8 @@ import { logger } from '../utils/logger';
 import { resolveProjectRoot } from '../utils/projectResolver';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
 import { AssetManager } from '../core/AssetManager';
+import { ManifestReader } from '../core/ManifestReader';
+import { CircleManifest } from '../types/ManifestSchema';
 import { CategoryValidateLoader } from '../utils/categoryValidateLoader';
 import { InputTypesLoader } from '../utils/inputTypesLoader';
 import { validateCategory, ValidationIssue } from '../core/CategoryValidator';
@@ -33,6 +35,7 @@ interface ValidateCommandOptions {
   skipCategoryRules?: boolean;
   exclude?: string[];
   maxDepth?: string;
+  circle?: string;
 }
 
 export function registerValidateCommand(program: Command, version: string): void {
@@ -45,6 +48,7 @@ export function registerValidateCommand(program: Command, version: string): void
     .option('--category <cat>', 'Only validate documents of this category')
     .option('--strict', 'Treat warnings as errors (non-zero exit)')
     .option('--skip-category-rules', 'Skip category_validate.yaml rule checks')
+    .option('--circle [path]', 'Validate only documents in a specific circle. Accepts circle dir or manifest path. Auto-discovers latest if omitted.')
     .action(async (options: ValidateCommandOptions) => {
       try {
         const projectRoot = resolveProjectRoot(process.cwd());
@@ -57,37 +61,73 @@ export function registerValidateCommand(program: Command, version: string): void
         const inputTypes = new InputTypesLoader();
         inputTypes.load(projectRoot, { silent: true });
 
-        // Build index per directory, merge results
+        let circleManifest: CircleManifest | null = null;
+        let circleName: string | null = null;
+        let circleTargetRoot: string | null = null;
         const allEntries = new Map<string, { id: string; filePath: string; relativePath: string }>();
         const allDuplicates: string[] = [];
         const scannedDirs: string[] = [];
 
-        for (const rawDir of dirs) {
-          const targetDir = path.resolve(projectRoot, rawDir);
+        // Circle mode: load documents from Circle manifest
+        if (options.circle !== undefined) {
+          const manifestReader = new ManifestReader();
+          const circleInfo = manifestReader.resolveForReview(projectRoot, options.circle);
+          if (!circleInfo) {
+            console.error(chalk.red(`No circle manifest found. Run "opsv circle create" first.`));
+            process.exit(1);
+          }
+          circleManifest = circleInfo.manifest;
+          circleName = circleInfo.circleName;
+          scannedDirs.push(circleInfo.circleName);
 
-          if (!fs.existsSync(targetDir)) {
-            console.log(chalk.yellow(`Directory not found, skipping: ${targetDir}`));
-            continue;
+          const assetsMap = circleInfo.manifest.assets || {};
+          const assetIds = Object.keys(assetsMap);
+          const targetRoot = path.resolve(projectRoot, circleInfo.manifest.target || 'videospec');
+          circleTargetRoot = targetRoot;
+
+          console.log(chalk.cyan(`Circle: ${circleInfo.circleName} (${assetIds.length} assets)`));
+          console.log(chalk.cyan(`  Target: ${targetRoot}`));
+
+          for (const assetId of assetIds) {
+            const docPath = AssetManager.findAssetFilePathUnder(targetRoot, assetId);
+            if (!docPath) {
+              console.log(chalk.yellow(`  ${assetId}: document file not found, skipping`));
+              continue;
+            }
+            const relativePath = path.relative(projectRoot, docPath);
+            allEntries.set(assetId, { id: assetId, filePath: docPath, relativePath });
           }
 
-          if (!fs.statSync(targetDir).isDirectory()) {
-            console.log(chalk.yellow(`Not a directory, skipping: ${targetDir}`));
-            continue;
+          console.log(chalk.cyan(`  Documents found: ${allEntries.size}/${assetIds.length}`));
+        } else {
+          // Build index per directory, merge results
+          for (const rawDir of dirs) {
+            const targetDir = path.resolve(projectRoot, rawDir);
+
+            if (!fs.existsSync(targetDir)) {
+              console.log(chalk.yellow(`Directory not found, skipping: ${targetDir}`));
+              continue;
+            }
+
+            if (!fs.statSync(targetDir).isDirectory()) {
+              console.log(chalk.yellow(`Not a directory, skipping: ${targetDir}`));
+              continue;
+            }
+
+            const index = buildAssetDocIndex(targetDir, {
+              maxDepth,
+              excludePatterns: options.exclude,
+              projectRoot,
+            });
+
+            for (const [id, entry] of index.entries) {
+              allEntries.set(id, entry);
+            }
+            allDuplicates.push(...index.duplicates);
+            scannedDirs.push(rawDir);
+
+            console.log(chalk.cyan(`  ${chalk.bold(rawDir)}: ${index.entries.size} document(s)`));
           }
-
-          const index = buildAssetDocIndex(targetDir, {
-            maxDepth,
-            excludePatterns: options.exclude,
-            projectRoot,
-          });
-
-          for (const [id, entry] of index.entries) {
-            allEntries.set(id, entry);
-          }
-          allDuplicates.push(...index.duplicates);
-          scannedDirs.push(rawDir);
-
-          console.log(chalk.cyan(`  ${chalk.bold(rawDir)}: ${index.entries.size} document(s)`));
         }
 
         if (allEntries.size === 0) {
@@ -95,7 +135,11 @@ export function registerValidateCommand(program: Command, version: string): void
           return;
         }
 
-        console.log(chalk.cyan(`\nTotal: ${allEntries.size} document(s) across ${scannedDirs.length} director(ies)`));
+        if (circleName) {
+          console.log(chalk.cyan(`\nTotal: ${allEntries.size} document(s) in circle "${circleName}"`));
+        } else {
+          console.log(chalk.cyan(`\nTotal: ${allEntries.size} document(s) across ${scannedDirs.length} director(ies)`));
+        }
 
         if (allDuplicates.length > 0) {
           const uniqueDups = [...new Set(allDuplicates)];
@@ -114,8 +158,11 @@ export function registerValidateCommand(program: Command, version: string): void
         const categoryIssues: Array<{ file: string; issue: ValidationIssue }> = [];
 
         for (const [assetId, entry] of allEntries) {
-          // Only validate files in subdirectories (not root level)
-          if (path.dirname(entry.relativePath) !== '.') {
+          // Circle mode: validate all files; global mode: skip root-level documents
+          const isRootLevel = path.dirname(entry.relativePath) === '.';
+          if (!circleManifest && isRootLevel) {
+            continue;
+          }
             totalFiles++;
             try {
               const content = fs.readFileSync(entry.filePath, 'utf-8');
@@ -148,11 +195,26 @@ export function registerValidateCommand(program: Command, version: string): void
                 }
               }
 
+              // Circle mode: check manifest status vs frontmatter status
+              if (circleManifest && circleManifest.assets) {
+                const manifestEntry = circleManifest.assets[assetId];
+                if (manifestEntry && frontmatter.status) {
+                  const manifestStatus = manifestEntry.status;
+                  const docStatus = frontmatter.status;
+                  if (docStatus !== manifestStatus) {
+                    statusIssues.push({
+                      file: entry.relativePath,
+                      docStatus,
+                      manifestStatus,
+                    });
+                  }
+                }
+              }
+
               validFiles++;
             } catch (err: any) {
               errors.push({ file: entry.relativePath, message: err.message });
             }
-          }
 
           // Dead link detection: refs target docs must exist
           try {
@@ -175,16 +237,24 @@ export function registerValidateCommand(program: Command, version: string): void
           }
         }
 
-        // Image ref existence check (scan all scanned directories)
-        for (const rawDir of scannedDirs) {
-          const imageDir = path.resolve(projectRoot, rawDir);
-          const foundMissingImages = findMissingImageRefs(imageDir);
+        // Image ref existence check
+        if (circleManifest && circleTargetRoot) {
+          // Circle mode: scan the target directory where circle documents live
+          const foundMissingImages = findMissingImageRefs(circleTargetRoot);
           missingImages.push(...foundMissingImages);
+        } else {
+          for (const rawDir of scannedDirs) {
+            const imageDir = path.resolve(projectRoot, rawDir);
+            const foundMissingImages = findMissingImageRefs(imageDir);
+            missingImages.push(...foundMissingImages);
+          }
         }
 
-        // Status consistency check
-        const foundStatusIssues = findStatusInconsistencies(projectRoot);
-        statusIssues.push(...foundStatusIssues);
+        // Status consistency check (global mode only — circle mode checks inline)
+        if (!circleManifest) {
+          const foundStatusIssues = findStatusInconsistencies(projectRoot);
+          statusIssues.push(...foundStatusIssues);
+        }
 
         console.log(chalk.cyan(`\nValidated: ${validFiles}/${totalFiles} files`));
 

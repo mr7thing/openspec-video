@@ -1,13 +1,15 @@
 # OpsV Category Validation Rules (v0.10.0)
 # Document-level business rules by `category` field.
 # Lookup order:
-#   1. <projectRoot>/videospec/_category_validate.yaml (project-level, overrides)
-#   2. ~/.opsv/category_validate.yaml (user-level fallback)
-#   3. Built-in defaults below
+#   1. ~/.opsv/category_validate.yaml (user-level global fallback)
+#   2. <projectRoot>/.opsv/category_validate.yaml (project-level, highest priority)
+#
+# The loader starts from an empty rule set. All rules come from config files.
+# Recommended defaults for `project` and `shotdeck` categories are defined below.
+# Copy this file to ~/.opsv/category_validate.yaml or .opsv/category_validate.yaml.
 
 # ---------------------------------------------------------------------------
-# Built-in defaults — applied unless overridden.
-# Two categories have special semantics:
+# Default rules for built-in categories:
 #   - project:  metadata file, no generation, skip prompt checks
 #   - shotdeck: video batch frontmatter, still needs prompt quality
 # ---------------------------------------------------------------------------
