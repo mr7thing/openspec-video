@@ -8,7 +8,6 @@ import path from 'path';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { logger } from '../utils/logger';
-import { getProjectDir } from '../utils/configLoader';
 import { escapeRegex } from '../utils/string';
 
 // Read version from package.json
@@ -52,6 +51,7 @@ export interface ManifestEntry {
 export interface Manifest {
   version: string;
   target: string;
+  targets?: string[];
   generatedAt: string;
   circles: ManifestEntry[];
   assets: Record<string, { status: string; index: number; category?: string }>;
@@ -200,8 +200,18 @@ export class DependencyGraph {
 
   // --- flat .circleN directory + merged _manifest.json ---
 
-  static resolveTargetBasename(dirPath: string): string {
-    return path.basename(path.resolve(dirPath));
+  static resolveTargetBasename(dirPaths: string[]): string {
+    // If the default three directories are passed, use 'videospec' as basename
+    if (
+      dirPaths.length === 3 &&
+      dirPaths[0] === 'videospec/scenes' &&
+      dirPaths[1] === 'videospec/shots' &&
+      dirPaths[2] === 'videospec/elements'
+    ) {
+      return 'videospec';
+    }
+    // Otherwise use the first directory's basename
+    return path.basename(path.resolve(dirPaths[0]));
   }
 
   static detectCircleN(queueRoot: string, basename: string): number {
@@ -228,12 +238,12 @@ export class DependencyGraph {
     return maxN;
   }
 
-  static checkNameConflict(queueRoot: string, basename: string, dirPath: string): string | null {
+  static checkNameConflict(queueRoot: string, basename: string, dirPaths: string[]): string | null {
     if (!fs.existsSync(queueRoot)) return null;
     const entries = fs.readdirSync(queueRoot);
     const pattern = new RegExp(`^${escapeRegex(basename)}_circle(\\d+)$`);
 
-    const resolvedDir = path.resolve(dirPath);
+    const resolvedDirs = dirPaths.map((d) => path.resolve(d));
 
     for (const e of entries) {
       const m = e.match(pattern);
@@ -244,8 +254,14 @@ export class DependencyGraph {
 
       try {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-        if (manifest.target && path.resolve(manifest.target) !== resolvedDir) {
-          return `Target name "${basename}" already used by a different directory (${manifest.target}). Use --name to specify a different name.`;
+        const manifestTargets = getManifestTargets(manifest);
+        const resolvedManifest = manifestTargets.map((t: string) => path.resolve(t));
+
+        // If any manifest target is not in the current dirs → conflict
+        for (const resolved of resolvedManifest) {
+          if (!resolvedDirs.includes(resolved)) {
+            return `Target name "${basename}" already used by a different directory (${resolved}). Use --name to specify a different name.`;
+          }
         }
       } catch (err: any) {
         logger.warn(`Skipped unreadable manifest: ${manifestPath} — ${err.message}`);
@@ -260,7 +276,7 @@ export class DependencyGraph {
     basename: string,
     circleN: number,
     circles: CircleDefinition[],
-    targetDir: string,
+    targetDirs: string[],
     existingAssets?: Record<string, { status: string; index: number; category?: string }>
   ): string {
     const circleDirName = `${basename}_circle${circleN}`;
@@ -300,7 +316,8 @@ export class DependencyGraph {
 
     const manifest: Manifest = {
       version: MANIFEST_VERSION,
-      target: targetDir,
+      target: targetDirs[0],
+      targets: targetDirs,
       generatedAt: new Date().toISOString(),
       circles: circlesData,
       assets,
@@ -318,62 +335,43 @@ export class DependencyGraph {
     return this.statusMap.get(id) || 'drafting';
   }
 
-  private static readonly DEFAULT_SCAN_SUBDIRS = ['elements', 'scenes', 'shots'];
-
   /**
-   * Build dependency graph from a project directory.
+   * Build dependency graph from project directories.
    *
-   * Two scan modes:
-   * - Default (targetDir='videospec'): Scans elements/, scenes/, shots/ under videospec/ as one graph.
-   * - Explicit --dir: Scans that exact directory only, no recursion.
+   * Scans each target directory for .md files and resolves dependencies
+   * between documents via frontmatter refs.
+   *
+   * Also pulls in upstream assets (referenced but not approved) from
+   * all subdirectories of the project's videospec root.
    */
-  static buildFromDir(projectRoot: string, targetDir: string): DependencyGraph {
+  static buildFromDir(projectRoot: string, targetDirs: string[]): DependencyGraph {
     const graph = new DependencyGraph();
     const documents: ParsedDocument[] = [];
+    const targetAssetIds = new Set<string>();
 
-    const resolvedTarget = path.resolve(projectRoot, targetDir);
     const videospecRoot = path.resolve(projectRoot, 'videospec');
-    const isDefaultMode = targetDir === 'videospec';
 
-    // Determine which directories to scan
-    let scanDirs: string[] = [];
+    // Scan each target directory for .md files
+    for (const rawDir of targetDirs) {
+      const resolvedTarget = path.resolve(projectRoot, rawDir);
+      if (!fs.existsSync(resolvedTarget) || !fs.statSync(resolvedTarget).isDirectory()) continue;
 
-    if (isDefaultMode) {
-      // Default: scan elements/, scenes/, shots/ under videospec/
-      const videospecExists = fs.existsSync(videospecRoot);
-      if (videospecExists) {
-        scanDirs = fs.readdirSync(videospecRoot, { withFileTypes: true })
-          .filter((e) => e.isDirectory())
-          .map((e) => e.name)
-          .filter((name) => this.DEFAULT_SCAN_SUBDIRS.includes(name))
-          .map((name) => path.join(videospecRoot, name));
-      }
-    } else {
-      // Explicit --dir: scan exactly that directory, no recursion
-      if (fs.existsSync(resolvedTarget) && fs.statSync(resolvedTarget).isDirectory()) {
-        scanDirs = [resolvedTarget];
-      }
-    }
-
-    // Scan collected directories for .md files
-    for (const dirPath of scanDirs) {
-      if (!fs.existsSync(dirPath)) continue;
-      const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
+      const files = fs.readdirSync(resolvedTarget).filter((f) => f.endsWith('.md'));
       for (const file of files) {
-        const filePath = path.join(dirPath, file);
+        const filePath = path.join(resolvedTarget, file);
         try {
           const content = fs.readFileSync(filePath, 'utf-8');
           const { frontmatter } = FrontmatterParser.parseRaw(content);
           const id = file.replace(/^@/, '').replace(/\.md$/, '');
           documents.push({ id, filePath, frontmatter });
+          targetAssetIds.add(id);
         } catch (e) {
           logger.warn(`Dependency graph skipped ${file}: ${(e as Error).message}`);
         }
       }
     }
 
-    // Resolve upstream dependencies: scan same search roots
-    const targetAssetIds = new Set(documents.map((d) => d.id));
+    // Resolve upstream dependencies: scan refs to find referenced assets
     const targetRefs = new Set<string>();
 
     for (const doc of documents) {
@@ -458,6 +456,18 @@ export class DependencyGraph {
   }
 
   static buildFromProject(projectRoot: string): DependencyGraph {
-    return DependencyGraph.buildFromDir(projectRoot, getProjectDir(projectRoot, 'videospec'));
+    return DependencyGraph.buildFromDir(projectRoot, ['videospec']);
   }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Read the target paths from a manifest, supporting backward compatibility.
+ * New manifests store `targets: string[]`; old manifests store `target: string`.
+ */
+function getManifestTargets(manifest: { targets?: string[]; target?: string }): string[] {
+  if (Array.isArray(manifest.targets)) return manifest.targets;
+  if (manifest.target) return [manifest.target];
+  return [];
 }

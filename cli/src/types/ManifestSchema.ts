@@ -24,6 +24,7 @@ export type ManifestCircleEntry = z.infer<typeof ManifestCircleEntrySchema>;
 export const CircleManifestSchema = z.object({
   version: z.string(),
   target: z.string(),
+  targets: z.array(z.string()).optional(),
   generatedAt: z.string(),
   assets: z.record(ManifestAssetEntrySchema).optional(),
   circles: z.array(ManifestCircleEntrySchema).optional(),

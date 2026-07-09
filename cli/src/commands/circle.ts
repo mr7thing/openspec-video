@@ -9,42 +9,45 @@ import fs from 'fs';
 import chalk from 'chalk';
 import { DependencyGraph } from '../core/DependencyGraph';
 import { logger } from '../utils/logger';
+import { addDirOption, resolveDirs } from '../utils/dirOption';
 
 interface CircleCreateOptions {
-  dir: string;
+  dir: string[];
   name?: string;
   skipMiddleCircle?: boolean;
 }
 
 interface CircleRefreshOptions {
-  dir: string;
+  dir: string[];
   name?: string;
 }
 
 export function registerCircleCommands(program: Command): void {
   const circle = program.command('circle').description('Circle lifecycle management');
 
-  circle
+  const createCmd = circle
     .command('create')
-    .description('Build dependency graph, create {name}_circle{N}/ directory with _manifest.json')
-    .option('--dir <path>', 'Target directory (e.g. videospec, elements/role)', 'videospec')
+    .description('Build dependency graph, create {name}_circle{N}/ directory with _manifest.json');
+  addDirOption(createCmd, { description: 'Target directories to scan for dependency graph' });
+  createCmd
     .option('--name <name>', 'Override target basename (default: last segment of --dir)')
     .option('--skip-middle-circle', 'Skip generating middle circles')
     .action(async (options: CircleCreateOptions) => {
       try {
         const projectRoot = process.cwd();
         const queueRoot = path.join(projectRoot, 'opsv-queue');
-        const basename = options.name || DependencyGraph.resolveTargetBasename(options.dir);
+        const resolvedDirs = resolveDirs(options.dir, projectRoot, { log: console.log });
+        const basename = options.name || DependencyGraph.resolveTargetBasename(resolvedDirs);
 
         // Name conflict detection
-        const conflict = DependencyGraph.checkNameConflict(queueRoot, basename, options.dir);
+        const conflict = DependencyGraph.checkNameConflict(queueRoot, basename, resolvedDirs);
         if (conflict) {
           console.error(chalk.red(`Error: ${conflict}`));
           process.exit(1);
         }
 
         console.log(chalk.cyan('Building dependency graph...'));
-        const graph = DependencyGraph.buildFromDir(projectRoot, options.dir);
+        const graph = DependencyGraph.buildFromDir(projectRoot, resolvedDirs);
 
         const { batches, cycles } = graph.topologicalSort();
 
@@ -66,7 +69,7 @@ export function registerCircleCommands(program: Command): void {
         const circleN = DependencyGraph.detectCircleN(queueRoot, basename);
 
         console.log(chalk.cyan(`Creating ${basename}_circle${circleN}/...`));
-        const circleDir = graph.writeCircleDir(queueRoot, basename, circleN, circles, options.dir);
+        const circleDir = graph.writeCircleDir(queueRoot, basename, circleN, circles, resolvedDirs);
 
         for (const c of circles) {
           console.log(chalk.green(`  Index ${c.index} (${c.name}): ${c.assetIds.join(', ')}`));
@@ -79,21 +82,23 @@ export function registerCircleCommands(program: Command): void {
       }
     });
 
-  circle
+  const refreshCmd = circle
     .command('refresh')
-    .description('Rebuild graph, diff, update _manifest.json in target circle directory')
-    .option('--dir <path>', 'Target directory (must match original --dir)', 'videospec')
+    .description('Rebuild graph, diff, update _manifest.json in target circle directory');
+  addDirOption(refreshCmd, { description: 'Target directories (must match original --dir)' });
+  refreshCmd
     .option('--name <name>', 'Override target basename (default: last segment of --dir)')
     .action(async (options: CircleRefreshOptions) => {
       try {
         const projectRoot = process.cwd();
         const queueRoot = path.join(projectRoot, 'opsv-queue');
-        const basename = options.name || DependencyGraph.resolveTargetBasename(options.dir);
+        const resolvedDirs = resolveDirs(options.dir, projectRoot, { log: console.log });
+        const basename = options.name || DependencyGraph.resolveTargetBasename(resolvedDirs);
 
         // Find latest .circleN for this basename
         const latestN = DependencyGraph.findLatestCircleN(queueRoot, basename);
         if (latestN === 0) {
-          console.error(chalk.red(`No circle directory found for "${basename}". Run "opsv circle create --dir ${options.dir}" first.`));
+          console.error(chalk.red(`No circle directory found for "${basename}". Run "opsv circle create --dir ..." first.`));
           process.exit(1);
         }
 
@@ -111,7 +116,7 @@ export function registerCircleCommands(program: Command): void {
         }
 
         console.log(chalk.cyan('Rebuilding dependency graph...'));
-        const graph = DependencyGraph.buildFromDir(projectRoot, options.dir);
+        const graph = DependencyGraph.buildFromDir(projectRoot, resolvedDirs);
         const circles = graph.getCircles();
 
         // Build new assets map with layer info
@@ -147,7 +152,7 @@ export function registerCircleCommands(program: Command): void {
         }
 
         // Write updated manifest with frontmatter as authoritative, existing status as fallback
-        graph.writeCircleDir(queueRoot, basename, latestN, circles, options.dir, existingAssets);
+        graph.writeCircleDir(queueRoot, basename, latestN, circles, resolvedDirs, existingAssets);
 
         // Diff detection
         const newAssetIds = new Set(Object.keys(newAssets));

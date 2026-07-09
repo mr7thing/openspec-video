@@ -27,6 +27,7 @@ import { InputTypesLoader } from '../utils/inputTypesLoader';
 import { validateCategory, ValidationIssue } from '../core/CategoryValidator';
 import { bindRefs } from '../core/RefBinder';
 import { parseKey } from '../core/RefBinder';
+import { addDirOption, resolveDirs } from '../utils/dirOption';
 
 interface ValidateCommandOptions {
   dir?: string[];
@@ -39,10 +40,11 @@ interface ValidateCommandOptions {
 }
 
 export function registerValidateCommand(program: Command, version: string): void {
-  program
+  const validateCmd = program
     .command('validate')
-    .description('Validate project documents and frontmatter')
-    .option('--dir <paths...>', 'Target directories to validate (default: videospec/scenes videospec/shots videospec/elements)')
+    .description('Validate project documents and frontmatter');
+  addDirOption(validateCmd);
+  validateCmd
     .option('--exclude <patterns...>', 'Exclude paths matching these patterns (relative to project root)')
     .option('--max-depth <number>', 'Max scan depth (default: 1, -1=unlimited, 0=root only)', (v) => v)
     .option('--category <cat>', 'Only validate documents of this category')
@@ -52,7 +54,7 @@ export function registerValidateCommand(program: Command, version: string): void
     .action(async (options: ValidateCommandOptions) => {
       try {
         const projectRoot = resolveProjectRoot(process.cwd());
-        const dirs = options.dir ?? ['videospec/scenes', 'videospec/shots', 'videospec/elements'];
+        const dirs = resolveDirs(options.dir, projectRoot, { log: console.log });
         const maxDepth = options.maxDepth !== undefined ? parseInt(options.maxDepth, 10) : 1;
 
         // Load category rules + input_types registry
