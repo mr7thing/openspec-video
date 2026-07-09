@@ -15,8 +15,8 @@ export const StatusEnum = z.enum(['drafting', 'syncing', 'approved']);
 | 状态 | 含义 | 谁来设 |
 |------|------|--------|
 | `drafting` | 文档草稿中，未通过审阅 | Agent 写文档时的默认值 |
-| `syncing` | 任务文件被 iterate 改过且 review 通过，待回写源文档 | `approved` 命令在检测到 `_mN` 产物时自动标 |
-| `approved` | 已通过审阅，解锁下游引用 | `approved` 命令 |
+| `syncing` | 任务文件被 iterate 改过且 review 通过，待回写源文档 | `approve` 命令在检测到 `_mN` 产物时自动标 |
+| `approved` | 已通过审阅，解锁下游引用 | `approve` 命令 |
 
 **关键**：`review` 是**动作**不是状态。状态只有这三个。
 
@@ -90,7 +90,11 @@ id_m2.json     → 第 2 次迭代
 ```
 
 - 产物名 = 任务 JSON 名 + `_{index}.ext`（`outputFilename()`，`naming.ts:39-42`）
-- index 由 `resolveNextOutputIndex()`（`naming.ts:53-71`）扫描目录里 `base_*.ext` 取最大值 +1
+- index 由 `resolveNextOutputIndex()`（`naming.ts:151-159`）扫描以下位置取最大值 +1：
+  - 当前目录（与 task JSON 同目录）
+  - 同级其他 `modelKey_NNN` 目录（跨批次接力，新目录不从 1 开始）
+- **并发安全**：`withTaskLock()` 保证同一 task 的多个并发写入不会碰撞
+- **唯一性保证**：以上两者保证每个 `{taskJsonName}_{index}.ext` 全局唯一
 
 ### 4.3 shot_id 不带版本号
 

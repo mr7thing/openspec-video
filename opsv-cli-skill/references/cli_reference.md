@@ -56,7 +56,7 @@ opsv validate --skip-category-rules                      # 跳过分类规则，
 - 自动跳过 `.` 开头的隐藏目录
 - 跨目录相同 `assetId` 去重（后扫到的覆盖前面的）
 
-- **源码**：`src/commands/validate.ts:43`
+- **源码**：`src/commands/validate.ts:54`
 - **加载顺序**：builtin(`project`/`shotdeck`) → `~/.opsv/category_validate.yaml` → `.opsv/category_validate.yaml`（项目级最高）
 - **退出码**：有 error/dead ref/缺失图片/状态不一致/类别 error（`--strict` 含 warning）→ 非零
 - **检测项**：① schema 校验 ② refs 结构（`RefBinder`）③ 分类字段 ④ `@id` 死链 ⑤ body 图片链接存在性 ⑥ manifest 与 frontmatter 状态一致性
@@ -73,27 +73,29 @@ opsv validate --skip-category-rules                      # 跳过分类规则，
 根据文档间 `refs` 依赖关系构建有向无环图（DAG），按拓扑序分层，创建 `{name}_circle{N}/` 目录 + `_manifest.json`。
 
 ```bash
-opsv circle create --dir videospec         # 默认名 videospec_circle1
-opsv circle create --dir <path> --name <name>
+opsv circle create                          # 默认扫 videospec/{scenes,shots,elements}
+opsv circle create --dir videospec/scenes videospec/shots   # 自定义多目录扫描
+opsv circle create --dir <paths...> --name <name>
 opsv circle create --skip-middle-circle    # 只留 zerocircle + firstcircle
 ```
 
-- **源码**：`src/commands/circle.ts:33`
+- **源码**：`src/commands/circle.ts:35`
 - **DAG 构建**：`src/core/DependencyGraph.ts:68-99`（`build()` 遍历每个文档的 `frontmatter.refs`）
-- **扫描范围**：默认 `--dir videospec` 只扫 `elements/`、`scenes/`、`shots/` 第一层（`DEFAULT_SCAN_SUBDIRS`，`DependencyGraph.ts:321`）；显式 `--dir <path>` 只扫该目录
+- **扫描范围**：默认扫 `videospec/scenes`、`videospec/shots`、`videospec/elements` 三个目录（`dirOption.ts:10` 的 `DEFAULT_SCAN_DIRS`）；`--dir <paths...>` 可自定义一个或多个目录
 - **命名**：`{目录名}_circle{N}`，N 自动递增找最大值 +1，**不覆盖已有 Circle**
 - **使用时机**：**只在依赖关系变化时**用
 
 ### `opsv circle refresh`
 
 重建图、与现有 manifest diff、更新 `_manifest.json`。**不产生新文件**。
-
 ```bash
-opsv circle refresh --dir videospec
+
+opsv circle refresh                              # 默认扫三个目录
+opsv circle refresh --dir videospec/scenes videospec/shots  # 自定义多目录
 opsv circle refresh --dir <path> --name <name>
 ```
 
-- **源码**：`src/commands/circle.ts:87`
+- **源码**：`src/commands/circle.ts:91`
 - **检测拓扑变化**：若任何资产移动了 circle 层级 → 报错，提示用 `circle create`（`circle.ts:131-147`）
 - **跳过已通过**：`approved` 状态的资产在生成 test.json 时自动跳过
 - **使用时机**：日常迭代刷新状态
@@ -274,29 +276,24 @@ opsv review --close <sessionId>          # 关闭会话
 - **自动 git commit**：审阅前自动提交 pending 改动（`review.ts:64-77`）
 - **HTTP handler**：`src/review-ui/controllers/`（reviewApprove / approve / file / document / circle）
 
-### `opsv approved`
+### `opsv approve <output-file>`（替代旧 `opsv approved`）
 
-Agent 驱动的批量审批，无需 web UI。
+审批一个生成的产物文件——自动追溯源文档，将其引用添加到 `## Approved References`。一个文件 = 一次 approve。
 
 ```bash
-opsv approved [options]
-  --circle [name]          # 目标 circle（省略自动发现最新）
-  --file <ids>             # 逗号分隔资产 ID，如 "@hero,@temple"
-  --category <name>        # 按分类过滤
-  --action <action>        # approve | design_feedback | revise_prompt（默认 approve）
-  --dry-run                # 预览不落盘
-  --note <text>            # 附带备注
+opsv approve <output-file>      # 必填：产物文件路径
+  --action <action>             # approve | design_feedback | revise_prompt（默认 approve）
+  --dry-run                     # 预览不落盘
+  --note <text>                 # 附带备注
 ```
 
-- **源码**：`src/commands/approved.ts:81`
-- **action 仅 3 个**（`approved.ts:19`）：`approve` / `design_feedback` / `revise_prompt`
-- **产物扫描**：`scanOutputFiles()`（`approved.ts:35-65`）递归扫 circle 目录，匹配 `{assetId}_*` 文件
-- **落盘逻辑**（`ApproveService.execute()`，`src/core/ApproveService.ts:151-202`）：
-  - 总是往源文档 frontmatter 追加 `ReviewEntry` + 更新 `status`
-  - `approve` → 写入 body `## Approved References`
-  - `design_feedback` → 写入 body `## Design References`
-  - `revise_prompt` → 不写 body
-  - 同步更新 manifest 状态
+- **源码**：`src/commands/approve.ts:38`
+- **追溯链路**：
+  1. `parseOutputFilename()` 解析产物名 → 得 task JSON 名
+  2. 同目录读 task JSON → 提取 `_opsv.shotId`
+  3. `AssetManager.findAssetFilePathUnder()` → 定位源文档
+- **鉴 modified**：`_m{N}_{index}.ext` → 状态 `syncing`，否则 `approved`
+- **增量命名是前提**：跨目录扫描 + 并发锁，保证文件名唯一
 
 ---
 

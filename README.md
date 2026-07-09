@@ -61,7 +61,7 @@ cp .env.sample .env           # then edit .env with your keys
 
 # Write your documents in videospec/
 opsv validate
-opsv circle create --dir videospec
+opsv circle create
 opsv imagen --model volcengine.seadream
 opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/
 opsv review
@@ -127,7 +127,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 | `opsv comfy` | Compile ComfyUI workflow tasks |
 | `opsv run` | Execute compiled tasks against AI providers |
 | `opsv review` | Visual review & approve / reject |
-| `opsv approved` | Agent-driven batch approval |
+| `opsv approve <file>` | Approve a single output — adds to ## Approved References |
 | `opsv iterate` | Clone task for retry with modified params |
 | `opsv api-setup` | Configure API keys and providers (interactive + agent mode) |
 | `opsv refs check` | Diagnose prompt ↔ refs alignment |

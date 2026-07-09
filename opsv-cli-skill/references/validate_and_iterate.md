@@ -184,12 +184,12 @@ opsv iterate opsv-queue/.../S01-Shot01.json
 opsv run opsv-queue/.../S01-Shot01_m1.json
 # → 产出 S01-Shot01_m1_1.png
 
-# 4. review 通过后 approved
-opsv approved --file "@S01-Shot01" --action approve
+# 4. review 通过后 approve（每个产物单独审批）
+opsv approve opsv-queue/.../S01-Shot01_m1_1.png --action approve
 # → 因产物名匹配 _mN → 状态标 syncing（待回写源文档）
 
 # 5. Agent 把 _m1 任务的改动回写到源 .md 文档
-# → 再次 approved → 状态转 approved
+# → 再次 approve 同一产物 → 状态转 approved
 ```
 
 ---
