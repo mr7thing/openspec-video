@@ -182,8 +182,28 @@ rm -rf opsv-queue/videospec_circleN   # 不要这样做
 
 | 命令 | 干什么 | Agent 必须知道 |
 |------|--------|---------------|
-| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub/**rhapi**/webapp；`--sync-env` 补齐占位 |
+| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub/**rhapi**/webapp；`--sync-env` 补齐占位；**v0.14.4+ 首次写入自动初始化 AES-256-GCM 加密**，无 master.key 时向后兼容明文 |
 | `opsv webapp --model <key>` | 编译 webapp 类任务（用浏览器自动化的 provider，比如 `webapp.gemini-opencli`） | 跟 `opsv imagen` 同位置，差别是走 `cli/src/webapp-runner/` 路由 |
+
+### 3.8 环境管理（v0.14.4+）
+
+| 命令 | 干什么 | Agent 必须知道 |
+|------|--------|---------------|
+| `opsv env load` | 手动重载 .env 到当前 session | 支持三层加载（user → project root → project .opsv），加密自动解密；`--dry-run` 预览 |
+| `opsv env list` | 列出 .env 中的 key 和状态 | 只显示 key 名不显示值（安全）；标记 ✅ active / ❌ missing |
+| `opsv env init-key` | 初始化 master.key + 迁移加密 | `--dry-run` 预览迁移范围；幂等 |
+
+### 三层 .env 加载顺序
+
+```
+1. ~/.opsv/.env         ← 用户级（最低优先级，所有项目共享）
+2. <project>/.env       ← 项目根（主力）
+3. <project>/.opsv/.env ← 项目隐藏（最高优先级）
+```
+
+**API key 读取**：CLI 启动时 / `opsv env load` 时，从三层 .env 自下而上合并到 `process.env`。有 `master.key` 时自动解密。
+
+**加密触发**：`api-setup --set-key` / 交互模式 / `--sync-env` 写入 key 时，自动调 `ensureMasterKey()` + `migrateEnvToEncrypted()`。数据在磁盘上是 AES-256-GCM 密文，运行时解密到内存。|
 
 ---
 
@@ -606,7 +626,10 @@ opsv run opsv-queue/.../S01-Shot01_m1.json
 - 用户说"怎么编译/跑这个文档" → §3.3 + §3.4
 - 用户说"结果不好，要改/重做" → §3.4 iterate
 - 用户说"审批/审阅/review" → §3.5
-- 用户说"API key/配置/添加模型" → §3.7 + §4
+- 用户说"API key/配置/添加模型/加密" → §3.7 + §3.8 + §4
+- 用户说"重载环境/env load/重新加载 .env" → §3.8
+- 用户说"查看 key 状态/env list" → §3.8
+- 用户说"初始化密钥/master.key/加密 .env" → §3.8
 - 用户说"ComfyUI 工作流/node mapping" → §4
 - 用户说"用 Gemini 跑图/webapp provider/opencli" → §4A（完整 OpenCLI 章节）
 - 用户问"OS picker 关不掉/Chrome 杀不掉/Gemini 卡死" → §4A.6（SOP 恢复流程）
@@ -618,7 +641,7 @@ opsv run opsv-queue/.../S01-Shot01_m1.json
 
 ## 9. references/
 
-- `references/cli_reference.md` — 全部命令全表（语法/必填/可选/源码位置），含 `api-setup`
+- `references/cli_reference.md` — 全部命令全表（语法/必填/可选/源码位置），含 `api-setup`、`opsv env`
 - `references/lifecycle_and_status.md` — 三状态、syncing 回写、产物命名规则
 - `references/refs_syntax.md` — `@` 引用语法、refs 字典结构、refs check/sync
 - `references/validate_and_iterate.md` — validate 加载顺序、类别机制、iterate 迭代命名
