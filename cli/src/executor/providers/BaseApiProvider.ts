@@ -15,7 +15,7 @@ import fs from 'fs';
 import { Jimp } from 'jimp';
 import { BaseTaskJson } from '../../types/Job';
 import { ProviderResult } from '../QueueRunner';
-import { outputFilePath, resolveNextOutputIndex } from '../naming';
+import { outputFilePath, resolveNextOutputIndex, withTaskLock } from '../naming';
 import { HttpClient } from '../HttpClient';
 import { downloadFile } from '../../utils/download';
 import { logger } from '../../utils/logger';
@@ -311,22 +311,24 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     shotId: string,
     taskId: string | null
   ): Promise<ProviderResult> {
-    const outputPaths: string[] = [];
-    const nextIndex = resolveNextOutputIndex(taskPath, ext);
-    for (let i = 0; i < urls.length; i++) {
-      const outputPath = outputFilePath(taskPath, nextIndex + i, ext);
-      await downloadFile(urls[i], outputPath);
-      outputPaths.push(outputPath);
-    }
-    appendLog(taskPath, { event: 'succeeded', task_id: taskId || 'sync', output: outputPaths.join(', '), downloadUrls: urls });
-    return {
-      taskPath,
-      shotId,
-      provider: this.name,
-      success: true,
-      outputPath: outputPaths[0],
-      outputPaths,
-    };
+    return withTaskLock(`${taskPath}:${ext}`, async () => {
+      const outputPaths: string[] = [];
+      const nextIndex = resolveNextOutputIndex(taskPath, ext);
+      for (let i = 0; i < urls.length; i++) {
+        const outputPath = outputFilePath(taskPath, nextIndex + i, ext);
+        await downloadFile(urls[i], outputPath);
+        outputPaths.push(outputPath);
+      }
+      appendLog(taskPath, { event: 'succeeded', task_id: taskId || 'sync', output: outputPaths.join(', '), downloadUrls: urls });
+      return {
+        taskPath,
+        shotId,
+        provider: this.name,
+        success: true,
+        outputPath: outputPaths[0],
+        outputPaths,
+      };
+    });
   }
 
   private async saveBuffersAndFinish(
@@ -336,22 +338,24 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     shotId: string,
     taskId: string | null
   ): Promise<ProviderResult> {
-    const outputPaths: string[] = [];
-    const nextIndex = resolveNextOutputIndex(taskPath, ext);
-    for (let i = 0; i < buffers.length; i++) {
-      const outputPath = outputFilePath(taskPath, nextIndex + i, ext);
-      fs.mkdirSync(require('path').dirname(outputPath), { recursive: true });
-      fs.writeFileSync(outputPath, buffers[i]);
-      outputPaths.push(outputPath);
-    }
-    appendLog(taskPath, { event: 'succeeded', task_id: taskId || 'sync', output: outputPaths.join(', ') });
-    return {
-      taskPath,
-      shotId,
-      provider: this.name,
-      success: true,
-      outputPath: outputPaths[0],
-      outputPaths,
-    };
+    return withTaskLock(`${taskPath}:${ext}`, async () => {
+      const outputPaths: string[] = [];
+      const nextIndex = resolveNextOutputIndex(taskPath, ext);
+      for (let i = 0; i < buffers.length; i++) {
+        const outputPath = outputFilePath(taskPath, nextIndex + i, ext);
+        fs.mkdirSync(require('path').dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath, buffers[i]);
+        outputPaths.push(outputPath);
+      }
+      appendLog(taskPath, { event: 'succeeded', task_id: taskId || 'sync', output: outputPaths.join(', ') });
+      return {
+        taskPath,
+        shotId,
+        provider: this.name,
+        success: true,
+        outputPath: outputPaths[0],
+        outputPaths,
+      };
+    });
   }
 }

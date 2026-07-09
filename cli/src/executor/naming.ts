@@ -16,6 +16,37 @@ import path from 'path';
 import fs from 'fs';
 import { escapeRegex } from '../utils/string';
 
+// ============================================================================
+// Per-task async mutex: serialises the resolveNextOutputIndex + write critical
+// section for the same (taskPath, ext) pair under concurrency > 1.
+// ============================================================================
+const taskLocks = new Map<string, Promise<any>>();
+
+/**
+ * Serialize access to the output-index + write critical section for the same
+ * task identity, so concurrent executions never compute the same nextIndex.
+ *
+ * Uses a promise-chain pattern: new callers wait for the previous lock holder
+ * to finish before running `fn`. If the previous holder's fn rejected, the
+ * rejection handler in `.then(fn, fn)` re-runs fn rather than propagate the
+ * old error (a previous failure shouldn't block a new execution).
+ */
+export async function withTaskLock<T>(
+  taskId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = taskLocks.get(taskId) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  taskLocks.set(taskId, next);
+  try {
+    return await next;
+  } finally {
+    if (taskLocks.get(taskId) === next) {
+      taskLocks.delete(taskId);
+    }
+  }
+}
+
 export function deriveOutputBase(taskPath: string): string {
   return path.basename(taskPath, '.json');
 }
@@ -47,27 +78,84 @@ export function outputFilePath(taskPath: string, index: number, ext: string): st
 }
 
 /**
- * Scan the output directory for existing files matching base_*.<ext>,
- * and return the next available index (max existing index + 1).
+ * Scan a single directory for existing output files matching base_(\d+).ext.
+ * Returns the maximum index found, or 0 if none exist.
  */
-export function resolveNextOutputIndex(taskPath: string, ext: string): number {
-  const outputDir = path.dirname(taskPath);
-  const base = deriveOutputBase(taskPath);
+function scanDirMaxIndex(dir: string, base: string, ext: string): number {
   const pattern = new RegExp(`^${escapeRegex(base)}_(\\d+)\\.${escapeRegex(ext)}$`);
-
   let maxIndex = 0;
   try {
-    const entries = fs.readdirSync(outputDir);
-    for (const entry of entries) {
-      const match = entry.match(pattern);
-      if (match) {
-        maxIndex = Math.max(maxIndex, parseInt(match[1], 10));
-      }
+    for (const entry of fs.readdirSync(dir)) {
+      const m = entry.match(pattern);
+      if (m) maxIndex = Math.max(maxIndex, parseInt(m[1], 10));
     }
   } catch (err: any) {
     if (err.code !== 'ENOENT') throw err;
   }
-  return maxIndex + 1;
+  return maxIndex;
+}
+
+/**
+ * If currentDir matches a model-queue directory pattern (modelKey_NNN),
+ * scan all sibling directories with the same modelKey prefix for existing
+ * output files. Returns the maximum index found across all siblings.
+ *
+ * This ensures that when a produce run creates a new _NNN subdirectory
+ * (e.g. volcengine.seedance_002), its task executions pick up where the
+ * previous _001 directory left off, rather than resetting to 1.
+ *
+ * When the entire opsv-queue tree is cleared (parent dir ENOENT), silently
+ * returns 0 so the caller starts from 1 — same as the local-only fallback.
+ */
+function scanSiblingQueueDirs(
+  currentDir: string,
+  base: string,
+  ext: string,
+): number {
+  const dirName = path.basename(currentDir);
+  const match = dirName.match(/^(.+)_(\d{3})$/);
+  if (!match) return 0;
+
+  const modelKey = match[1];
+  const parentDir = path.dirname(currentDir);
+  const siblingPattern = new RegExp(`^${escapeRegex(modelKey)}_\\d{3}$`);
+  let maxIndex = 0;
+
+  try {
+    for (const entry of fs.readdirSync(parentDir)) {
+      if (entry === dirName) continue;
+      if (!siblingPattern.test(entry)) continue;
+      const siblingPath = path.join(parentDir, entry);
+      const st = fs.statSync(siblingPath);
+      if (!st.isDirectory()) continue;
+      maxIndex = Math.max(maxIndex, scanDirMaxIndex(siblingPath, base, ext));
+    }
+  } catch {
+    // ENOENT on parentDir or permission errors → return 0
+  }
+
+  return maxIndex;
+}
+
+/**
+ * Scan the output directory (and sibling model-queue directories) for existing
+ * files matching base_*.<ext>, and return the next available index
+ * (max existing index + 1).
+ *
+ * Cross-batch auto-increment behaviour:
+ *   - Same directory: scans its own dir → increments within the same _NNN dir.
+ *   - New _NNN dir: also scans sibling model-queue dirs → index continues
+ *     across produce batches (unless the entire queue tree was cleared).
+ *   - Non-queue path (no _NNN suffix): sibling scan is a no-op.
+ */
+export function resolveNextOutputIndex(taskPath: string, ext: string): number {
+  const outputDir = path.dirname(taskPath);
+  const base = deriveOutputBase(taskPath);
+
+  const localMax = scanDirMaxIndex(outputDir, base, ext);
+  const siblingMax = scanSiblingQueueDirs(outputDir, base, ext);
+
+  return Math.max(localMax, siblingMax) + 1;
 }
 
 /**

@@ -201,6 +201,116 @@ export class ApproveService {
     return { success: true, status: newStatus, note: actionDescriptions[req.action] };
   }
 
+  /**
+   * Approve a single output file by tracing it back to its source document.
+   *
+   * Pipeline:
+   *   1. Parse output filename → derive task JSON name (via parseOutputFilename)
+   *   2. Read task JSON from the same directory → extract _opsv.shotId
+   *   3. shotId → AssetManager → source .md document
+   *   4. Write review entry + status to frontmatter
+   *   5. Append the output file reference to ## Approved References (or ## Design References)
+   *   6. Update _manifest.json status
+   *
+   * This is the single-file analogue of execute() — designed for `opsv approve <file>`.
+   */
+  async executeFile(
+    outputFilePath: string,
+    circle: string,
+    action: ReviewAction,
+    note?: string,
+  ): Promise<ApproveResult> {
+    const filename = path.basename(outputFilePath);
+
+    // 1. Parse output filename → task JSON identity
+    const parsed = parseOutputFilename(filename);
+    const taskJsonPath = path.join(path.dirname(outputFilePath), parsed.taskJsonName);
+    if (!fs.existsSync(taskJsonPath)) {
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_FILE_NOT_FOUND,
+        `Task JSON not found: ${taskJsonPath}`,
+      );
+    }
+
+    // 2. Read task JSON → shotId
+    let taskJson: any;
+    try {
+      taskJson = JSON.parse(fs.readFileSync(taskJsonPath, 'utf-8'));
+    } catch (e: any) {
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_FILE_NOT_FOUND,
+        `Failed to parse task JSON: ${e.message}`,
+      );
+    }
+    const shotId: string | undefined = taskJson._opsv?.shotId;
+    if (!shotId) {
+      throw new ValidationError(
+        OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+        `Task JSON missing _opsv.shotId: ${taskJsonPath}`,
+      );
+    }
+
+    // 3. Trace back to source document
+    const targetRoot = this.resolveTargetRoot(circle);
+    const sourceDocPath = AssetManager.findAssetFilePathUnder(targetRoot, shotId);
+    if (!sourceDocPath) {
+      throw new InfrastructureError(
+        OpsVErrorCode.INFRA_FILE_NOT_FOUND,
+        `Source document not found for asset "${shotId}"`,
+      );
+    }
+
+    // 4. Build review entry
+    const now = new Date().toISOString();
+    let newStatus: 'approved' | 'drafting' | 'syncing';
+    if (action === 'approve') {
+      newStatus = parsed.isModified ? 'syncing' : 'approved';
+    } else {
+      newStatus = 'drafting';
+    }
+
+    const entryAction = action === 'approve'
+      ? (newStatus === 'syncing' ? 'syncing' as const : 'approved' as const)
+      : action === 'design_feedback' ? 'design_feedback' as const
+      : 'revise_prompt' as const;
+
+    const reviewEntry: ReviewEntry = {
+      timestamp: now,
+      action: entryAction,
+      outputFile: filename,
+      outputFiles: [filename],
+      modifiedTaskPath: parsed.isModified ? taskJsonPath : undefined,
+      note: note || undefined,
+    };
+
+    // 5. Write review entry + status to document frontmatter
+    const content = fs.readFileSync(sourceDocPath, 'utf-8');
+    let updated = FrontmatterParser.appendReview(content, reviewEntry);
+    updated = FrontmatterParser.updateField(updated, 'status', newStatus);
+    fs.writeFileSync(sourceDocPath, updated);
+
+    // 6. Write reference to document body
+    if (action === 'approve' || action === 'design_feedback') {
+      const variant = path.basename(filename, path.extname(filename));
+      if (action === 'approve') {
+        await this.approvedRefReader.appendApprovedRef(sourceDocPath, variant, outputFilePath);
+      } else {
+        await this.designRefReader.appendDesignRef(sourceDocPath, variant, outputFilePath);
+      }
+    }
+
+    // 7. Update manifest status
+    this.updateManifestStatus(circle, shotId, newStatus);
+
+    const desc = newStatus === 'syncing'
+      ? `Approved (modified task) — ${filename} — syncing required`
+      : action === 'approve' ? `Approved: ${filename}`
+      : action === 'design_feedback' ? `Design feedback: ${filename}`
+      : `Prompt revision requested`;
+
+    return { success: true, status: newStatus, note: desc };
+  }
+
   updateManifestStatus(circle: string, assetId: string, newStatus: string): void {
     const circleDir = resolveWithin(this.queueRoot, circle);
     if (!circleDir) return;
