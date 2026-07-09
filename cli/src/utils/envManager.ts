@@ -1,10 +1,14 @@
 // ============================================================================
 // OpsV .env File Manager
 // Read, write, update .env entries with comment preservation.
+// Automatically handles encrypted .env (AES-256-GCM via master.key)
+// when ~/.opsv/master.key exists.
 // ============================================================================
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import { decryptEnvFile, encryptEnvText, hasMasterKey } from './envCipher';
 
 export interface EnvEntry {
   key: string;
@@ -12,14 +16,10 @@ export interface EnvEntry {
 }
 
 /**
- * Read a .env file and return a map of key → value.
- * Skips comments and blank lines.
+ * Parse KEY=VALUE text into a record, skipping comments and blank lines.
  */
-export function readEnvFile(envPath: string): Record<string, string> {
-  if (!fs.existsSync(envPath)) return {};
-
+export function parseDotenvText(content: string): Record<string, string> {
   const result: Record<string, string> = {};
-  const content = fs.readFileSync(envPath, 'utf-8');
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -33,6 +33,17 @@ export function readEnvFile(envPath: string): Record<string, string> {
 }
 
 /**
+ * Read a .env file and return a map of key → value.
+ * Automatically decrypts if the file is in encrypted format.
+ * Skips comments and blank lines.
+ */
+export function readEnvFile(envPath: string): Record<string, string> {
+  const content = decryptEnvFile(envPath);
+  if (content === null) return {};
+  return parseDotenvText(content);
+}
+
+/**
  * Check which required env vars are missing from a .env file.
  * Returns the list of missing variable names.
  */
@@ -42,20 +53,38 @@ export function getMissingEnvKeys(requiredVars: string[], envPath: string): stri
 }
 
 /**
+ * Get the user-level .env path (~/.opsv/.env).
+ */
+export function resolveUserEnvPath(): string {
+  return path.join(os.homedir(), '.opsv', '.env');
+}
+
+/**
  * Set (update or append) a single KEY=VALUE in a .env file.
  * Preserves comments, blank lines, and ordering of other keys.
  * If the key already exists, its value is replaced in-place.
  * If the key doesn't exist, it's appended at the end.
+ *
+ * When master.key exists, the file is transparently encrypted on write
+ * and automatically migrated from plaintext to encrypted format.
  */
 export function setEnvKey(envPath: string, key: string, value: string): void {
   const line = `${key}=${value}`;
+
   if (!fs.existsSync(envPath)) {
-    fs.writeFileSync(envPath, line + '\n');
+    // New file
+    const output = line + '\n';
+    if (hasMasterKey()) {
+      fs.writeFileSync(envPath, encryptEnvText(output) + '\n');
+    } else {
+      fs.writeFileSync(envPath, output);
+    }
     return;
   }
 
-  const content = fs.readFileSync(envPath, 'utf-8');
-  const lines = content.split('\n');
+  // Read existing content (automatically decrypts if encrypted)
+  const existing = decryptEnvFile(envPath) || '';
+  const lines = existing.split('\n');
 
   const keyPrefix = `${key}=`;
   let found = false;
@@ -73,7 +102,12 @@ export function setEnvKey(envPath: string, key: string, value: string): void {
     lines.push(line);
   }
 
-  fs.writeFileSync(envPath, lines.join('\n'));
+  const output = lines.join('\n');
+  if (hasMasterKey()) {
+    fs.writeFileSync(envPath, encryptEnvText(output) + '\n');
+  } else {
+    fs.writeFileSync(envPath, output);
+  }
 }
 
 /**
@@ -97,3 +131,6 @@ export function resolveEnvPath(projectRoot: string): string {
   if (fs.existsSync(opsvEnv)) return opsvEnv;
   return rootEnv; // default to project root .env
 }
+
+// Re-export cipher utilities for convenience
+export { hasMasterKey, ensureMasterKey, getMasterKeyPath, migrateEnvToEncrypted } from './envCipher';

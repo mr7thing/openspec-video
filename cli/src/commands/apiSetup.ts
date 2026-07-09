@@ -12,7 +12,7 @@ import chalk from 'chalk';
 import readline from 'readline';
 import { OpsVContext } from '../container/OpsVContext';
 import { Container } from '../container/Container';
-import { readEnvFile, setEnvKey, getMissingEnvKeys, resolveEnvPath } from '../utils/envManager';
+import { readEnvFile, setEnvKey, getMissingEnvKeys, resolveEnvPath, ensureMasterKey, migrateEnvToEncrypted } from '../utils/envManager';
 import { validateModelConfig, appendModelToConfig, resolveConfigPath } from '../utils/configWriter';
 import { logger } from '../utils/logger';
 
@@ -120,6 +120,10 @@ async function interactiveMode(ctx: OpsVContext): Promise<void> {
   // Ensure parent directory exists
   fs.mkdirSync(path.dirname(envPath), { recursive: true });
 
+  // Auto-init master.key + migrate existing plaintext .env
+  ensureMasterKey();
+  migrateEnvToEncrypted(envPath);
+
   const sortedMissing = Array.from(allMissing).sort();
   for (const envVar of sortedMissing) {
     const val = await promptValue(chalk.cyan(`  请输入 ${envVar}: `));
@@ -138,6 +142,7 @@ async function interactiveMode(ctx: OpsVContext): Promise<void> {
   } else {
     console.log(chalk.yellow(`⚠  仍有 ${stillMissing.size} 个 key 未设置。`));
   }
+  console.log(chalk.yellow('💡 Run "opsv env load" to reload into the current session.'));
 }
 
 /**
@@ -181,8 +186,14 @@ function setKeyMode(ctx: OpsVContext, kv: string): void {
 
   const envPath = resolveEnvPath(ctx.projectRoot);
   fs.mkdirSync(path.dirname(envPath), { recursive: true });
+
+  // Auto-init master.key + migrate existing plaintext .env
+  ensureMasterKey();
+  migrateEnvToEncrypted(envPath);
+
   setEnvKey(envPath, key, value);
   console.log(chalk.green(`✅ ${key}=${value}  →  ${envPath}`));
+  console.log(chalk.yellow('💡 Run "opsv env load" to reload into the current session.'));
 }
 
 /**
@@ -245,6 +256,10 @@ function syncEnvMode(ctx: OpsVContext): void {
   const envPath = resolveEnvPath(ctx.projectRoot);
   fs.mkdirSync(path.dirname(envPath), { recursive: true });
 
+  // Auto-init master.key + migrate existing plaintext .env
+  ensureMasterKey();
+  migrateEnvToEncrypted(envPath);
+
   const requiredVars = new Set<string>();
   for (const modelConfig of Object.values(config.models || {})) {
     const required = modelConfig.required_env || [];
@@ -263,6 +278,7 @@ function syncEnvMode(ctx: OpsVContext): void {
   if (added > 0) {
     console.log(chalk.green(`✅ Added ${added} placeholder(s) to ${envPath}`));
     console.log(chalk.gray('   Edit the file to set your actual API keys.'));
+    console.log(chalk.yellow('💡 Run "opsv env load" to reload into the current session.'));
   } else {
     console.log(chalk.green('✅ All required env vars are already present.'));
   }

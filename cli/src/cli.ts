@@ -5,6 +5,7 @@
 
 import { Command } from 'commander';
 import fs from 'fs-extra';
+import os from 'os';
 import path from 'path';
 import dotenv from 'dotenv';
 import { Container } from './container/Container';
@@ -27,20 +28,43 @@ import { registerIterateCommand } from './commands/iterate';
 import { registerRefsCommand } from './commands/refs';
 import { registerImageStitchCommand } from './commands/imageStitch';
 import { registerApiSetupCommand } from './commands/apiSetup';
+import { registerEnvCommands } from './commands/env';
 import { resolveProjectRoot } from './utils/projectResolver';
+import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
-// Load .env from the resolved project root (not just cwd)
+// Three-tier .env loading: user → project root → project .opsv
+// Supports both plaintext and encrypted (AES-256-GCM) .env files.
+// When master.key exists, files are transparently decrypted via decryptEnvFile().
+// dotenv.config() is used for plaintext; for encrypted files we parse and set manually.
 const projectRoot = resolveProjectRoot(process.cwd());
+
+function loadEnvFile(envPath: string): void {
+  if (!fs.existsSync(envPath)) return;
+
+  if (hasMasterKey()) {
+    // Encrypted path: decrypt → parse → set process.env
+    const decrypted = decryptEnvFile(envPath);
+    if (decrypted) {
+      const parsed = dotenv.parse(decrypted);
+      for (const [key, value] of Object.entries(parsed)) {
+        if (!(key in process.env)) {
+          process.env[key] = value;
+        }
+      }
+    }
+  } else {
+    // Plaintext path: let dotenv handle it
+    dotenv.config({ path: envPath });
+  }
+}
+
+const userEnvPath = path.join(os.homedir(), '.opsv', '.env');
 const rootEnvPath = path.join(projectRoot, '.env');
 const opsvEnvPath = path.join(projectRoot, '.opsv', '.env');
 
-if (fs.existsSync(rootEnvPath)) {
-  dotenv.config({ path: rootEnvPath });
-} else if (fs.existsSync(opsvEnvPath)) {
-  dotenv.config({ path: opsvEnvPath });
-} else {
-  dotenv.config();
-}
+loadEnvFile(userEnvPath);
+loadEnvFile(rootEnvPath);
+loadEnvFile(opsvEnvPath);
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../package.json');
@@ -100,5 +124,6 @@ registerApprovedCommand(program);
 registerRefsCommand(program);
 registerImageStitchCommand(program);
 registerApiSetupCommand(program);
+registerEnvCommands(program);
 
 program.parse(process.argv);
