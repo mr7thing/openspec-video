@@ -54,6 +54,7 @@ models:
   # 火山引擎 (Volcengine Ark)
   # seedance2.0 文档: https://www.volcengine.com/docs/82379/2291680
   # seadream5.0 文档: https://www.volcengine.com/docs/82379/1824121
+  # seadream5.0pro 文档: https://www.volcengine.com/docs/82379/1824121
   # ==========================================
   volc.seadream5:
     provider: volcengine
@@ -83,6 +84,30 @@ models:
       "2K": "2560x1440"
       "hd": "2560x1440"
       "standard": "2560x1440"
+
+  # SeaDream 5.0 Pro — 旗舰级单图生成
+  # 特性: 文生图 / 单图生图 / 多图生图（最多10张参考图）
+  # 不支持: 组图(sequential)、流式(stream)、联网搜索
+  volc.seadream5pro:
+    provider: volcengine
+    type: imagen
+    model: doubao-seedream-5-0-pro-260628
+    api_url: https://ark.cn-beijing.volces.com/api/v3/images/generations
+    docs_url: https://www.volcengine.com/docs/82379/1824121
+    required_env:
+      - ARK_API_KEY
+    supports_reference_images: true
+    max_reference_images: 10
+    defaults:
+      size: "1024x1024"
+      output_format: "png"
+      response_format: "url"
+      watermark: false
+    quality_map:
+      "1920x1080": "1024x1024"
+      "2K": "2048x2048"
+      "hd": "1424x800"
+      "standard": "1024x1024"
 
   volc.seedance2:
     provider: volcengine
@@ -132,6 +157,32 @@ models:
     provider: volcengine
     type: video
     model: doubao-seedance-2-0-fast-260128
+    api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+    docs_url: https://www.volcengine.com/docs/82379/2291680
+    required_env:
+      - ARK_API_KEY
+    supports_first_image: true
+    supports_last_image: true
+    supports_reference_images: true
+    max_reference_images: 10
+    supports_reference_videos: true
+    max_reference_videos: 3
+    supports_reference_audios: true
+    max_reference_audios: 3
+    defaults:
+      ratio: "16:9"
+      duration: 5
+      generate_audio: true
+      watermark: false
+
+  # Seedance 2.0 Mini — 高性价比视频生成
+  # 模型ID: doubao-seedance-2-0-mini-260615
+  # 特性: 性价比版，功能与 seedance2 一致
+  volc.seedance2mini:
+    provider: volcengine
+    type: video
+    model: doubao-seedance-2-0-mini-260615
     api_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
     api_status_url: https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
     docs_url: https://www.volcengine.com/docs/82379/2291680

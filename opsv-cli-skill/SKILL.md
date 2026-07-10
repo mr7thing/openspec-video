@@ -602,7 +602,14 @@ opsv refs check videospec/shots/S01-Shot01.md
 opsv circle create
 
 # 3. 编译 + 执行
+# 文生图 (SD 5.0)
 opsv imagen --model volcengine.seadream --manifest opsv-queue/videospec_circle1/_manifest.json --file S01-Shot01
+# 文生图 (SD 5.0 Pro 旗舰版，支持最多10张参考图)
+opsv imagen --model volcengine.seadream5pro --manifest opsv-queue/videospec_circle1/_manifest.json --file S01-Shot01
+# 视频生成 (Seedance 2.0 / 2.0 Fast / 2.0 Mini)
+opsv animate --model volcengine.seedance2 --manifest .../manifest.json --file S01-Shot01
+opsv animate --model volcengine.seedance2f --manifest .../manifest.json --file S01-Shot01
+opsv animate --model volcengine.seedance2mini --manifest .../manifest.json --file S01-Shot01
 opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/*.json
 
 # 4. 审阅

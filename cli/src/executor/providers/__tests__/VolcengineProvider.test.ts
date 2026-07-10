@@ -4,7 +4,12 @@ import { OpsVContext } from '../../../container/OpsVContext';
 import * as naming from '../../naming';
 import * as download from '../../../utils/download';
 
-jest.mock('../../naming');
+jest.mock('../../naming', () => ({
+  ...jest.requireActual('../../naming'),
+  resolveNextOutputIndex: jest.fn(),
+  outputFilePath: jest.fn(),
+  withTaskLock: jest.fn((_key: string, fn: () => Promise<any>) => fn()),
+}));
 jest.mock('../../../utils/download');
 jest.mock('../../../container/OpsVContext');
 
@@ -52,6 +57,15 @@ describe('VolcengineProvider', () => {
     compiledAt: '2024-01-01T00:00:00Z',
   };
 
+  const proMeta = {
+    provider: 'volcengine',
+    modelKey: 'volc.seadream5pro',
+    type: 'imagen' as const,
+    shotId: 'pro-hero',
+    api_url: 'http://img.api',
+    compiledAt: '2024-01-01T00:00:00Z',
+  };
+
   const videoMeta = {
     provider: 'volcengine',
     modelKey: 'volc.seedance2',
@@ -70,6 +84,29 @@ describe('VolcengineProvider', () => {
 
     expect(result.success).toBe(true);
     expect(result.outputPath).toBe('/tmp/out_1.png');
+  });
+
+  it('executes pro model image task', async () => {
+    httpPost.mockResolvedValueOnce({ data: [{ url: 'http://pro-image.png' }] });
+
+    const task: BaseTaskJson<any> = { payload: { prompt: 'pro quality' }, _opsv: proMeta };
+    const result = await provider.execute(task, '/tmp/task.json', ctx);
+
+    expect(result.success).toBe(true);
+    expect(result.outputPath).toBe('/tmp/out_1.png');
+  });
+
+  it('supports up to 10 reference images for pro model', async () => {
+    httpPost.mockResolvedValueOnce({ data: [{ url: 'http://pro-ref.png' }] });
+
+    const payload = { prompt: 'pro ref', reference_images: ['http://example.com/ref1.jpg', 'http://example.com/ref2.jpg'] };
+    const task: BaseTaskJson<any> = { payload, _opsv: proMeta };
+    const result = await provider.execute(task, '/tmp/task.json', ctx);
+
+    expect(result.success).toBe(true);
+    expect(httpPost).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      reference_images: expect.arrayContaining(['http://example.com/ref1.jpg', 'http://example.com/ref2.jpg']),
+    }));
   });
 
   it('handles multi-image response', async () => {

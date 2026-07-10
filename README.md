@@ -142,7 +142,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 
 | Provider | Image | Video | Notes |
 |----------|:-----:|:-----:|-------|
-| **Volcengine** (Seedream / Seedance) | ✅ | ✅ | |
+| **Volcengine** (Seedream / Seedance) | ✅ | ✅ | seadream5 / seadream5pro / seedance2 / seedance2f / seedance2mini |
 | **SiliconFlow** (Qwen / Wan) | ✅ | ✅ | |
 | **Minimax** | ✅ | ✅ | |
 | **RunningHub** | ✅ | — | Grid storyboard |
