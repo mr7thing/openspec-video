@@ -90,6 +90,7 @@ import { RunningHubProvider } from './executor/providers/RunningHubProvider';
 import { ComfyLocalProvider } from './executor/providers/ComfyLocalProvider';
 import { WebappProvider } from './executor/providers/WebappProvider';
 import { RHapiProvider } from './executor/providers/RHapiProvider';
+import { RhWorkflowProvider } from './executor/providers/RhWorkflowProvider';
 
 container.registerExecutor('volcengine', VolcengineProvider);
 container.registerExecutor('siliconflow', SiliconFlowProvider);
@@ -98,6 +99,7 @@ container.registerExecutor('runninghub', RunningHubProvider);
 container.registerExecutor('comfylocal', ComfyLocalProvider);
 container.registerExecutor('webapp', WebappProvider);
 container.registerExecutor('rhapi', RHapiProvider);
+container.registerExecutor('rhworkflow', RhWorkflowProvider);
 
 const program = new Command();
 program

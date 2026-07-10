@@ -148,6 +148,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 | **RunningHub** | ✅ | — | Grid storyboard |
 | **RunningHub API** (rhapi) | ✅ | ✅ | Direct REST |
 | **ComfyUI Local** | — | ✅ | Custom workflows |
+| **RH Workflow** (rhworkflow) | ✅ | ✅ | Workflow Run API, comfy mode |
 | **Webapp** | ✅ | ✅ | Browser automation |
 
 ---

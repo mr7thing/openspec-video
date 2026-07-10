@@ -203,6 +203,65 @@ models:
       watermark: false
 
   # ==========================================
+  # RunningHub Workflow Run API (comfy 模式)
+  # 文档: https://www.runninghub.cn/call-api/api-detail/2075497084035358722
+  # 先用 opsv comfy-node-mapping <workflow.json> 生成 node_mappings 后填入
+  # ==========================================
+
+  # Klein 9B 镜头调度 (文生图/图生图)
+  rhworkflow.klein9b:
+    provider: rhworkflow
+    type: comfy
+    api_url: https://api.runninghub.cn/run/workflow/2075497084035358722
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2075497084035358722"
+    workflow: "test/workflows/opsv-klein9b镜头调度2_api-id_2075497084035358722.json"
+    required_env:
+      - RH_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    supports_first_image: true
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # node_mappings:
+    #   prompt:
+    #     nodeId: "177"
+    #     fieldName: "prompt"
+    #   seed:
+    #     nodeId: "103"
+    #     fieldName: "noise_seed"
+    #   image1:
+    #     nodeId: "76"
+    #     fieldName: "image"
+
+  # Krea2 T2I (文生图)
+  rhworkflow.krea2:
+    provider: rhworkflow
+    type: comfy
+    api_url: https://api.runninghub.cn/run/workflow/2074897972374097921
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2074897972374097921"
+    workflow: "test/workflows/opsv-krea2_t2i_api-id_2074897972374097921.json"
+    required_env:
+      - RH_API_KEY
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # node_mappings:
+    #   prompt:
+    #     nodeId: "79"
+    #     fieldName: "prompt"
+    #   seed:
+    #     nodeId: "82"
+    #     fieldName: "seed"
+    #   refine_prompt:
+    #     nodeId: "68"
+    #     fieldName: "value"
+
+  # ==========================================
   # 硅基流动 (SiliconFlow)
   # 文档: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
   # 文档: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit

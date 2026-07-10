@@ -610,6 +610,10 @@ opsv imagen --model volcengine.seadream5pro --manifest opsv-queue/videospec_circ
 opsv animate --model volcengine.seedance2 --manifest .../manifest.json --file S01-Shot01
 opsv animate --model volcengine.seedance2f --manifest .../manifest.json --file S01-Shot01
 opsv animate --model volcengine.seedance2mini --manifest .../manifest.json --file S01-Shot01
+# ComfyUI 工作流 (本地 ComfyUI)
+opsv comfy --model comfylocal.workflow --manifest opsv-queue/videospec_circle1/_manifest.json --file S01-Shot01
+# ComfyUI 工作流 (RunningHub Workflow Run API)
+opsv comfy --model rhworkflow.klein9b --manifest opsv-queue/videospec_circle1/_manifest.json --file S01-Shot01
 opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/*.json
 
 # 4. 审阅
