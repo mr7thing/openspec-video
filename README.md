@@ -148,8 +148,23 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 | **RunningHub** | ✅ | — | Grid storyboard |
 | **RunningHub API** (rhapi) | ✅ | ✅ | Direct REST |
 | **ComfyUI Local** | — | ✅ | Custom workflows |
-| **RH Workflow** (rhworkflow) | ✅ | ✅ | Workflow Run API, comfy mode |
+| **RH Workflow** (rhworkflow) | ✅ | ✅ | Workflow Run API, `opsv comfy` mode |
 | **Webapp** | ✅ | ✅ | Browser automation |
+
+---
+
+## Changelog
+
+### v0.14.7 (2026-07-11)
+
+- **feat(volcengine)**: Add SeaDream 5.0 Pro (`volc.seadream5pro`) — flagship single-image generation, up to 10 reference images, 1K/2K resolution presets
+- **feat(volcengine)**: Add Seedance 2.0 Mini (`volc.seedance2mini`) — high cost-efficiency video generation
+- **feat(rhworkflow)**: New `rhworkflow.*` provider for RunningHub Workflow Run API (`/run/workflow/{apiId}`), comfy mode, supports base64 / rh_upload file modes, sync + async response handling
+- **docs**: Usage examples for all new models in SKILL.md and provider table
+
+### v0.14.6
+
+- Previous release
 
 ---
 
