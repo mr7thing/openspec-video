@@ -149,7 +149,7 @@ export class ManifestReviewStrategy implements ReviewStrategy {
   listDocuments(): DocumentInfo[] {
     const { manifestInfo, projectRoot } = this;
     const { circleDir, circleName, manifest } = manifestInfo;
-    const assetsMap: Record<string, { status?: string; index?: number; category?: string }> = manifest.assets || {};
+    const assetsMap: Record<string, ManifestAssetEntry> = manifest.assets || {};
     const targetRoot = path.resolve(projectRoot, manifest.target || getProjectDir(projectRoot, 'videospec'));
 
     const docs: DocumentInfo[] = [];

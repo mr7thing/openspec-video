@@ -54,7 +54,7 @@ export interface Manifest {
   targets?: string[];
   generatedAt: string;
   circles: ManifestEntry[];
-  assets: Record<string, { status: string; index: number; category?: string }>;
+  assets: Record<string, { status: string; index: number; category: string }>;
 }
 
 const ORDINALS = ['zerocircle', 'firstcircle', 'secondcircle', 'thirdcircle', 'fourthcircle', 'fifthcircle', 'sixthcircle', 'seventhcircle', 'eighthcircle', 'ninthcircle'];
@@ -277,14 +277,14 @@ export class DependencyGraph {
     circleN: number,
     circles: CircleDefinition[],
     targetDirs: string[],
-    existingAssets?: Record<string, { status: string; index: number; category?: string }>
+    existingAssets?: Record<string, { status: string; index: number; category: string }>
   ): string {
     const circleDirName = `${basename}_circle${circleN}`;
     const circleDir = path.join(queueRoot, circleDirName);
 
     fs.mkdirSync(circleDir, { recursive: true });
 
-    const assets: Record<string, { status: string; index: number; category?: string }> = {};
+    const assets: Record<string, { status: string; index: number; category: string }> = {};
     const circlesData: ManifestEntry[] = [];
 
     for (const circle of circles) {

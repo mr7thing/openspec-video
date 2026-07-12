@@ -26,7 +26,7 @@ export interface Asset {
 export interface CircleAssetEntry {
   id: string;
   status: string;
-  category?: string;
+  category: string;
   filePath?: string;
 }
 
@@ -116,7 +116,7 @@ export class AssetManager {
       const assets: CircleAssetEntry[] = [];
       for (const circle of data.circles || []) {
         for (const [id, status] of Object.entries(circle.status || {})) {
-          assets.push({ id, status: status as string, filePath: this.findAssetFilePath(id, preferredSubdir) });
+          assets.push({ id, status: status as string, category: '', filePath: this.findAssetFilePath(id, preferredSubdir) });
         }
       }
       return { circleName, assets, circles: data.circles };

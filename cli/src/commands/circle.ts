@@ -107,10 +107,14 @@ export function registerCircleCommands(program: Command): void {
         const manifestPath = path.join(circleDir, '_manifest.json');
 
         // Read existing manifest to preserve status (as fallback)
-        let existingAssets: Record<string, { status: string; index: number; category?: string }> = {};
+        let existingAssets: Record<string, { status: string; index: number; category: string }> = {};
         if (fs.existsSync(manifestPath)) {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
           if (manifest.assets) {
+            // Ensure category is always a string (backward compat with old manifests)
+            for (const [id, entry] of Object.entries(manifest.assets as Record<string, any>)) {
+              entry.category = entry.category || '';
+            }
             existingAssets = manifest.assets;
           }
         }
@@ -120,14 +124,14 @@ export function registerCircleCommands(program: Command): void {
         const circles = graph.getCircles();
 
         // Build new assets map with layer info
-        const newAssets: Record<string, { status: string; index: number; category?: string }> = {};
+        const newAssets: Record<string, { status: string; index: number; category: string }> = {};
         for (const circle of circles) {
           for (const id of circle.assetIds) {
             const existing = existingAssets[id];
             newAssets[id] = {
               status: existing?.status || 'drafting',
               index: circle.index,
-              category: existing?.category,
+              category: existing?.category || '',
             };
           }
         }
