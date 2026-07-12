@@ -27,3 +27,5 @@ npm-debug.log*
 # private skills packs (symlinked)
 opsv-packs/
 opsv-packs
+
+API/*

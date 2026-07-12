@@ -1,11 +1,13 @@
 // ============================================================================
 // OpsV Webapp Provider Compiler
 // Browser automation via Chrome Extension bridge (Gemini)
+// Supports dynamic inputs binding via api_config.yaml > model > inputs
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
 import { BaseTaskJson } from '../../../types/Job';
 import { ConfigError, OpsVErrorCode } from '../../../errors/OpsVError';
+import { evaluateInputs, applyToPayload, InputEvalContext } from '../shared/InputEvaluator';
 
 export class WebappCompiler implements ProviderCompiler {
   readonly provider = 'webapp';
@@ -25,17 +27,33 @@ export class WebappCompiler implements ProviderCompiler {
       upload_method: defaults.upload_method || 'drag-drop',
     };
 
-    // Reference images — pass as local paths (extension reads via native host)
-    if (ctx.referenceImages && ctx.referenceImages.length > 0) {
-      payload.reference_files = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
-    }
-
-    // First/last frame reference
-    if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
-      payload.frame_ref = {
-        first: job.payload.frame_ref.first,
-        last: job.payload.frame_ref?.last || null,
+    // Resolve inputs via InputEvaluator if configured, else legacy behavior
+    const inputs = modelConfig.inputs;
+    if (inputs && Object.keys(inputs).length > 0) {
+      const evalCtx: InputEvalContext = {
+        job,
+        modelConfig,
+        referenceImages: ctx.referenceImages,
+        referenceVideos: ctx.referenceVideos,
+        referenceAudios: ctx.referenceAudios,
+        groupedInputs: ctx.groupedInputs,
       };
+      const values = evaluateInputs(inputs, evalCtx);
+      applyToPayload(values, inputs, payload);
+    } else {
+      // Legacy: hardcoded reference injection
+      // Reference images — pass as local paths (extension reads via native host)
+      if (ctx.referenceImages && ctx.referenceImages.length > 0) {
+        payload.reference_files = ctx.referenceImages.slice(0, modelConfig.max_reference_images || 1);
+      }
+
+      // First/last frame reference
+      if (job.payload.frame_ref?.first && modelConfig.supports_first_image) {
+        payload.frame_ref = {
+          first: job.payload.frame_ref.first,
+          last: job.payload.frame_ref?.last || null,
+        };
+      }
     }
 
     return {
