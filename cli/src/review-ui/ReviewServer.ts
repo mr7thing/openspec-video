@@ -36,6 +36,7 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
 
   app.get('/api/documents', docCtrl.listDocuments);
   app.get('/api/documents/by-id/:docId', docCtrl.getDocumentById);
+  app.get('/api/documents/by-id/:docId/refs', docCtrl.getDocumentRefs);
   app.patch('/api/documents/by-id/:docId', express.json(), docCtrl.updateDocumentById);
   app.get('/api/documents/:circle/:docId', docCtrl.getDocument);
   app.get('/api/circles', circleCtrl.listCircles);

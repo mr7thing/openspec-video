@@ -79,5 +79,48 @@ export function createDocumentController(strategy: ReviewStrategy) {
       }
       res.json(doc);
     },
+
+    // GET /api/documents/by-id/:docId/refs — resolve @id references in prompt to document info
+    getDocumentRefs(req: Request, res: Response): void {
+      const docId = Array.isArray(req.params.docId) ? req.params.docId[0] : req.params.docId;
+      const doc = strategy.findDocumentById(docId);
+      if (!doc) {
+        res.status(404).json({ error: 'Document not found' });
+        return;
+      }
+
+      const content = doc.content || '';
+      const { frontmatter } = FrontmatterParser.parseRaw(content);
+
+      // Extract @id references from prompt
+      const prompt = String(frontmatter.prompt || '');
+      const refRegex = /@([a-zA-Z0-9_\-]+)(?::([a-zA-Z0-9_\-]+))?/g;
+      const refIds = new Set<string>();
+      let match;
+      while ((match = refRegex.exec(prompt)) !== null) {
+        refIds.add(match[1]);
+      }
+
+      // Resolve each @id to document info
+      const refs: Array<{ id: string; found: boolean; docId?: string; category?: string; status?: string }> = [];
+      for (const refId of refIds) {
+        const refDoc = strategy.findDocumentById(refId);
+        if (refDoc) {
+          const refContent = refDoc.content || '';
+          const { frontmatter: refFm } = FrontmatterParser.parseRaw(refContent);
+          refs.push({
+            id: refId,
+            found: true,
+            docId: refDoc.docId,
+            category: refFm.category || refDoc.category,
+            status: refFm.status || refDoc.status,
+          });
+        } else {
+          refs.push({ id: refId, found: false });
+        }
+      }
+
+      res.json({ docId, refs });
+    },
   };
 }

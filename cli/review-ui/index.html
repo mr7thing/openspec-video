@@ -620,6 +620,80 @@
       background: var(--card); color: var(--text);
       font-size: 13px; cursor: pointer;
     }
+
+    /* ================================================================
+       Split View (Multi-document comparison)
+       ================================================================ */
+    .split-btn {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border: none; border-radius: 6px;
+      background: transparent;
+      color: var(--text-dim); font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .split-btn:hover { background: var(--card); }
+    .split-btn.active { background: var(--accent-bg); color: var(--accent); }
+
+    .split-container {
+      display: none; flex: 1; overflow: hidden;
+    }
+    .split-container.active { display: flex; }
+    .split-pane {
+      flex: 1; display: flex; flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden; min-width: 0;
+    }
+    .split-pane:last-child { border-right: none; }
+    .split-pane-header {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      min-height: 36px;
+    }
+    .split-pane-header .sp-title {
+      flex: 1; font-size: 13px; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .split-pane-header .sp-tag {
+      font-size: 10px; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .split-pane-header .sp-close {
+      width: 24px; height: 24px;
+      border: none; border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted); font-size: 12px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .split-pane-header .sp-close:hover { background: var(--card); color: var(--text); }
+    .split-pane-body {
+      flex: 1; overflow-y: auto; padding: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .split-ref-link {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      border-bottom: 1px dashed var(--accent);
+      transition: all 0.15s;
+    }
+    .split-ref-link:hover {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+    .split-pane-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 13px;
+      flex-direction: column; gap: 8px; padding: 20px;
+    }
+    .split-pane-empty .hint {
+      font-size: 11px; color: var(--text-muted);
+      text-align: center; line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -629,6 +703,7 @@
     <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
     <span class="top-title" id="topTitle">OpsV Review</span>
     <span class="top-progress" id="topProgress">-/-</span>
+    <button class="split-btn" id="splitBtn" onclick="toggleSplitView()" title="分屏对比">⊞</button>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
   </div>
 
@@ -725,6 +800,34 @@
     </div>
   </div>
 
+  <!-- Split View Container (multi-document comparison) -->
+  <div class="split-container" id="splitContainer">
+    <div class="split-pane" id="splitPane1">
+      <div class="split-pane-header">
+        <span class="sp-title" id="sp1Title">文档 A</span>
+        <button class="sp-close" onclick="closeSplitPane(1)">✕</button>
+      </div>
+      <div class="split-pane-body" id="sp1Body">
+        <div class="split-pane-empty">
+          <span>📄</span>
+          <div class="hint">点击文档列表中的<br>文档名打开到此面板</div>
+        </div>
+      </div>
+    </div>
+    <div class="split-pane" id="splitPane2">
+      <div class="split-pane-header">
+        <span class="sp-title" id="sp2Title">文档 B</span>
+        <button class="sp-close" onclick="closeSplitPane(2)">✕</button>
+      </div>
+      <div class="split-pane-body" id="sp2Body">
+        <div class="split-pane-empty">
+          <span>📄</span>
+          <div class="hint">点击 @id 引用链接<br>可在此打开依赖文档</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Action Bar -->
   <div class="actionbar" id="actionBar">
     <button class="act-btn approve" id="btnApprove" onclick="doAction('approve')">✓ 通过</button>
@@ -768,6 +871,154 @@
     let pendingAction = null;
     let pendingRemove = null;
     let currentCat = '';
+    let splitMode = false;
+    let splitPanes = { 1: null, 2: null }; // docId in each pane
+
+    // ================================================================
+    // Split View
+    // ================================================================
+    function toggleSplitView() {
+      splitMode = !splitMode;
+      const btn = document.getElementById('splitBtn');
+      const container = document.getElementById('splitContainer');
+      const contentView = document.getElementById('contentView');
+
+      btn.classList.toggle('active', splitMode);
+
+      if (splitMode) {
+        contentView.style.display = 'none';
+        container.classList.add('active');
+        // Load current doc into pane 1 if empty
+        if (!splitPanes[1] && filteredDocs[curDocIdx]) {
+          openInSplitPane(1, filteredDocs[curDocIdx].docId);
+        }
+      } else {
+        container.classList.remove('active');
+        contentView.style.display = 'flex';
+      }
+    }
+
+    async function openInSplitPane(paneNum, docId) {
+      if (!splitMode) return;
+      const paneBody = document.getElementById(`sp${paneNum}Body`);
+      const paneTitle = document.getElementById(`sp${paneNum}Title`);
+
+      splitPanes[paneNum] = docId;
+
+      // Fetch doc content
+      let doc = allDocs.find(d => d.docId === docId);
+      if (!doc) {
+        paneBody.innerHTML = `<div class="split-pane-empty"><span>❌</span><div class="hint">文档 "${docId}" 未找到</div></div>`;
+        return;
+      }
+
+      // Load content if not cached
+      if (!docContents[docId]) {
+        try {
+          const r = await fetch(`${API}/api/documents/by-id/${docId}`);
+          if (r.ok) {
+            const d = await r.json();
+            docContents[docId] = { content: d.content || '' };
+          }
+        } catch (_) {}
+      }
+
+      const raw = docContents[docId]?.content || '';
+      const fm = parseFM(raw);
+      const body = stripFM(raw);
+      const cat = (fm && fm.category) || doc.category || 'unknown';
+      const status = (fm && fm.status) || doc.status || 'drafting';
+      const title = (fm && fm.title) || doc.title || docId;
+
+      paneTitle.textContent = title;
+
+      // Build content
+      let html = `<div class="dp-tags" style="margin-bottom:10px;">
+        <span class="t ${cat}">${cat}</span>
+        <span class="t ${status}">${status}</span>
+      </div>`;
+
+      // Prompt with clickable @id refs
+      const prompt = (fm && fm.prompt) ? fm.prompt : '';
+      if (prompt) {
+        const clickablePrompt = prompt.replace(
+          /@([a-zA-Z0-9_\-]+)(?::([a-zA-Z0-9_\-]+))?/g,
+          (match, id, variant) => {
+            const label = variant ? `@${id}:${variant}` : `@${id}`;
+            return `<a class="split-ref-link" onclick="openRefInOtherPane('${id}', ${paneNum})" title="点击打开 @${id}">${label}</a>`;
+          }
+        );
+        html += `<div style="background:var(--accent-bg);border-radius:6px;padding:10px;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Prompt</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6;">${clickablePrompt}</div>
+        </div>`;
+      }
+
+      // Markdown body
+      let cleanBody = body;
+      if (cleanBody) {
+        cleanBody = cleanBody.split(/\n(?=## )/).filter(s => {
+          const fl = s.trim().split('\n')[0];
+          return !fl.match(/^##\s*(Design|Approved)\s*References$/i);
+        }).join('\n');
+      }
+      if (cleanBody) {
+        try {
+          const mdHtml = fixMdImages(renderMd(cleanBody), doc.docPath);
+          html += `<div class="md">${mdHtml}</div>`;
+        } catch(_) {}
+      }
+
+      paneBody.innerHTML = html;
+    }
+
+    function openRefInOtherPane(refId, sourcePane) {
+      if (!splitMode) return;
+      const targetPane = sourcePane === 1 ? 2 : 1;
+      openInSplitPane(targetPane, refId);
+    }
+
+    function openRefAsCompare(refId) {
+      // If not in split mode, enable split and open the ref in pane 2
+      if (!splitMode) {
+        splitMode = true;
+        const btn = document.getElementById('splitBtn');
+        const container = document.getElementById('splitContainer');
+        const contentView = document.getElementById('contentView');
+        btn.classList.add('active');
+        contentView.style.display = 'none';
+        container.classList.add('active');
+        // Load current doc into pane 1
+        if (filteredDocs[curDocIdx]) {
+          openInSplitPane(1, filteredDocs[curDocIdx].docId);
+        }
+      }
+      openInSplitPane(2, refId);
+    }
+
+    function closeSplitPane(paneNum) {
+      const paneBody = document.getElementById(`sp${paneNum}Body`);
+      const paneTitle = document.getElementById(`sp${paneNum}Title`);
+      splitPanes[paneNum] = null;
+      paneTitle.textContent = paneNum === 1 ? '文档 A' : '文档 B';
+      paneBody.innerHTML = `<div class="split-pane-empty">
+        <span>📄</span>
+        <div class="hint">${paneNum === 1 ? '点击文档列表中的<br>文档名打开到此面板' : '点击 @id 引用链接<br>可在此打开依赖文档'}</div>
+      </div>`;
+    }
+
+    // Modify sidebar doc click to support split view
+    function onDocClick(idx, event) {
+      if (splitMode && event && event.shiftKey) {
+        // Shift+click opens in the first empty pane
+        const doc = filteredDocs[idx];
+        if (!doc) return;
+        if (!splitPanes[1]) openInSplitPane(1, doc.docId);
+        else if (!splitPanes[2]) openInSplitPane(2, doc.docId);
+        return;
+      }
+      pickDoc(idx);
+    }
 
     // ================================================================
     // Theme
@@ -895,7 +1146,7 @@
         let badge = '';
         if (allOut > 0 && doneOut === allOut) badge = 'approved';
         else if (r && Object.keys(r).length > 0) badge = 'feedback';
-        return `<div class="doc-item${i===0?' active':''}" data-idx="${i}" onclick="pickDoc(${i})">
+        return `<div class="doc-item${i===0?' active':''}" data-idx="${i}" onclick="onDocClick(${i}, event)" ondblclick="pickDoc(${i})">
           <span class="doc-name">${d.docId}</span>
           ${badge ? `<span class="doc-badge ${badge}">${badge==='approved'?'✓':'✎'}</span>` : ''}
         </div>`;
@@ -1002,11 +1253,21 @@
       // Meta fields
       if (metaHtml) html += `<div class="fm-meta">${metaHtml}</div>`;
 
-      // Prompt (highlighted)
+      // Prompt (highlighted, with clickable @id refs)
       if (prompt) {
+        const clickablePrompt = prompt.replace(
+          /@([a-zA-Z0-9_\-]+)(?::([a-zA-Z0-9_\-]+))?/g,
+          (match, id, variant) => {
+            const label = variant ? `@${id}:${variant}` : `@${id}`;
+            if (splitMode) {
+              return `<a class="split-ref-link" onclick="openRefInSplitPane('${id}', 1)" title="分屏打开 @${id}">${label}</a>`;
+            }
+            return `<a class="split-ref-link" onclick="openRefAsCompare('${id}')" title="Shift+点击打开分屏对比">${label}</a>`;
+          }
+        );
         html += `<div style="background:var(--accent-bg);border-radius:6px;padding:10px;margin-bottom:10px;">
           <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Prompt</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6;">${prompt}</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6;">${clickablePrompt}</div>
         </div>`;
       }
 
