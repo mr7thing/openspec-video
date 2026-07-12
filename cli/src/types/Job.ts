@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-export type JobType = 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
+export type JobType = 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp' | 'produce';
 
 export interface FrameRef {
   first: string | null;

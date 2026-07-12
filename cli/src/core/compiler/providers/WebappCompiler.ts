@@ -18,14 +18,20 @@ export class WebappCompiler implements ProviderCompiler {
     if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'WebappCompiler: api_status_url is required in api_config.yaml');
     const defaults = modelConfig.defaults || {};
 
-    const payload: Record<string, any> = {
-      task_id: job.id,
-      target_url: defaults.target_url || '',
-      prompt: job.prompt || job.payload.prompt,
-      typing_speed: defaults.typing_speed || 'human',
-      watermark_removal: defaults.watermark_removal ?? true,
-      upload_method: defaults.upload_method || 'drag-drop',
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        task_id: job.id,
+        target_url: defaults.target_url || '',
+        prompt: job.prompt || job.payload.prompt,
+        typing_speed: defaults.typing_speed || 'human',
+        watermark_removal: defaults.watermark_removal ?? true,
+        upload_method: defaults.upload_method || 'drag-drop',
+      };
+    }
 
     // Resolve inputs via InputEvaluator if configured, else legacy behavior
     const inputs = modelConfig.inputs;

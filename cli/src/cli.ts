@@ -13,9 +13,7 @@ import { OpsVContext } from './container/OpsVContext';
 import { registerInitCommand } from './commands/init';
 import { registerValidateCommand } from './commands/validate';
 import { registerCircleCommands } from './commands/circle';
-import { registerImagenCommand } from './commands/imagen';
-import { registerAnimateCommand } from './commands/animate';
-import { registerComfyCommand } from './commands/comfy';
+import { registerProduceCommand } from './commands/produce';
 import { registerComfyNodeMappingCommand } from './commands/comfyNodeMapping';
 import { registerAudioCommand } from './commands/audio';
 import { registerWebappCommand } from './commands/webapp';
@@ -95,11 +93,11 @@ import { RhWorkflowProvider } from './executor/providers/RhWorkflowProvider';
 container.registerExecutor('volcengine', VolcengineProvider);
 container.registerExecutor('siliconflow', SiliconFlowProvider);
 container.registerExecutor('minimax', MinimaxProvider);
-container.registerExecutor('runninghub', RunningHubProvider);
+container.registerExecutor('rhworkflow-v1', RunningHubProvider);
 container.registerExecutor('comfylocal', ComfyLocalProvider);
 container.registerExecutor('webapp', WebappProvider);
 container.registerExecutor('rhapi', RHapiProvider);
-container.registerExecutor('rhworkflow', RhWorkflowProvider);
+container.registerExecutor('rhworkflow-v2', RhWorkflowProvider);
 
 const program = new Command();
 program
@@ -111,9 +109,7 @@ program
 registerInitCommand(program, VERSION);
 registerValidateCommand(program, VERSION);
 registerCircleCommands(program);
-registerImagenCommand(program);
-registerAnimateCommand(program);
-registerComfyCommand(program);
+registerProduceCommand(program);
 registerComfyNodeMappingCommand(program);
 registerAudioCommand(program);
 registerWebappCommand(program);

@@ -10,7 +10,7 @@ import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/Op
 import { evaluateInputs, buildNodeInfoList, InputEvalContext } from '../shared/InputEvaluator';
 
 export class RunningHubCompiler implements ProviderCompiler {
-  readonly provider = 'runninghub';
+  readonly provider = 'rhworkflow-v1';
 
   compile(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
@@ -76,36 +76,44 @@ export class RunningHubCompiler implements ProviderCompiler {
     // ------------------------------------------------------------------------
     // Build RunningHub task payload
     // ------------------------------------------------------------------------
-    const payload: Record<string, any> = {
-      workflowId,
-      nodeInfoList,
-    };
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+      // Override dynamic fields
+      payload.workflowId = workflowId;
+      payload.nodeInfoList = nodeInfoList;
+    } else {
+      payload = {
+        workflowId,
+        nodeInfoList,
+      };
 
-    const defaults = modelConfig.defaults || {};
+      const defaults = modelConfig.defaults || {};
 
-    if (defaults.addMetadata !== undefined) {
-      payload.addMetadata = defaults.addMetadata;
-    }
-    if (defaults.retainSeconds !== undefined && defaults.retainSeconds !== null) {
-      payload.retainSeconds = defaults.retainSeconds;
-    }
-    if (defaults.instanceType !== undefined && defaults.instanceType !== null) {
-      payload.instanceType = defaults.instanceType;
-    }
-    if (defaults.usePersonalQueue !== undefined) {
-      payload.usePersonalQueue = defaults.usePersonalQueue;
-    }
-    if (defaults.accessPassword !== undefined && defaults.accessPassword !== null) {
-      payload.accessPassword = defaults.accessPassword;
-    }
-    if (defaults.webhookUrl !== undefined && defaults.webhookUrl !== null) {
-      payload.webhookUrl = defaults.webhookUrl;
+      if (defaults.addMetadata !== undefined) {
+        payload.addMetadata = defaults.addMetadata;
+      }
+      if (defaults.retainSeconds !== undefined && defaults.retainSeconds !== null) {
+        payload.retainSeconds = defaults.retainSeconds;
+      }
+      if (defaults.instanceType !== undefined && defaults.instanceType !== null) {
+        payload.instanceType = defaults.instanceType;
+      }
+      if (defaults.usePersonalQueue !== undefined) {
+        payload.usePersonalQueue = defaults.usePersonalQueue;
+      }
+      if (defaults.accessPassword !== undefined && defaults.accessPassword !== null) {
+        payload.accessPassword = defaults.accessPassword;
+      }
+      if (defaults.webhookUrl !== undefined && defaults.webhookUrl !== null) {
+        payload.webhookUrl = defaults.webhookUrl;
+      }
     }
 
     return {
       payload,
       _opsv: {
-        provider: modelConfig.provider || 'runninghub',
+        provider: modelConfig.provider || 'rhworkflow-v1',
         modelKey: ctx.modelKey,
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,

@@ -12,7 +12,7 @@ import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/Op
 import { evaluateInputs, buildNodeInfoList, InputEvalContext } from '../shared/InputEvaluator';
 
 export class RhWorkflowCompiler implements ProviderCompiler {
-  readonly provider = 'rhworkflow';
+  readonly provider = 'rhworkflow-v2';
 
   compile(ctx: CompileContext): BaseTaskJson<Record<string, unknown>> {
     const { job, modelConfig } = ctx;
@@ -77,39 +77,45 @@ export class RhWorkflowCompiler implements ProviderCompiler {
     }
 
     // Build payload — 注意：不包含 workflowId（API ID 在 URL 中）
-    const payload: Record<string, any> = {
-      nodeInfoList,
-    };
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+      payload.nodeInfoList = nodeInfoList;
+    } else {
+      payload = {
+        nodeInfoList,
+      };
 
-    const defaults = modelConfig.defaults || {};
+      const defaults = modelConfig.defaults || {};
 
-    if (defaults.addMetadata !== undefined) {
-      payload.addMetadata = defaults.addMetadata;
-    }
-    if (defaults.retainSeconds !== undefined && defaults.retainSeconds !== null) {
-      payload.retainSeconds = defaults.retainSeconds;
-    }
-    if (defaults.instanceType !== undefined && defaults.instanceType !== null) {
-      payload.instanceType = defaults.instanceType;
-    }
-    if (defaults.usePersonalQueue !== undefined) {
-      payload.usePersonalQueue = defaults.usePersonalQueue;
-    }
-    if (defaults.accessPassword !== undefined && defaults.accessPassword !== null) {
-      payload.accessPassword = defaults.accessPassword;
-    }
-    if (defaults.webhookUrl !== undefined && defaults.webhookUrl !== null) {
-      payload.webhookUrl = defaults.webhookUrl;
-    }
-    // 传递上传模式给执行器
-    if (defaults.upload_method !== undefined) {
-      payload.upload_method = defaults.upload_method;
+      if (defaults.addMetadata !== undefined) {
+        payload.addMetadata = defaults.addMetadata;
+      }
+      if (defaults.retainSeconds !== undefined && defaults.retainSeconds !== null) {
+        payload.retainSeconds = defaults.retainSeconds;
+      }
+      if (defaults.instanceType !== undefined && defaults.instanceType !== null) {
+        payload.instanceType = defaults.instanceType;
+      }
+      if (defaults.usePersonalQueue !== undefined) {
+        payload.usePersonalQueue = defaults.usePersonalQueue;
+      }
+      if (defaults.accessPassword !== undefined && defaults.accessPassword !== null) {
+        payload.accessPassword = defaults.accessPassword;
+      }
+      if (defaults.webhookUrl !== undefined && defaults.webhookUrl !== null) {
+        payload.webhookUrl = defaults.webhookUrl;
+      }
+      // 传递上传模式给执行器
+      if (defaults.upload_method !== undefined) {
+        payload.upload_method = defaults.upload_method;
+      }
     }
 
     return {
       payload,
       _opsv: {
-        provider: modelConfig.provider || 'rhworkflow',
+        provider: modelConfig.provider || 'rhworkflow-v2',
         modelKey: ctx.modelKey,
         type: modelConfig.type === 'video' ? 'video' : 'imagen',
         shotId: job.id,

@@ -28,11 +28,17 @@ export class MinimaxCompiler implements ProviderCompiler {
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: model is required in api_config.yaml');
 
-    const payload: Record<string, any> = {
-      model: modelConfig.model,
-      prompt: job.prompt || job.payload.prompt,
-      aspect_ratio: job.payload.global_settings?.aspect_ratio || modelConfig.defaults?.aspect_ratio || '1:1',
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        model: modelConfig.model,
+        prompt: job.prompt || job.payload.prompt,
+        aspect_ratio: job.payload.global_settings?.aspect_ratio || modelConfig.defaults?.aspect_ratio || '1:1',
+      };
+    }
 
     // Resolve inputs via InputEvaluator if configured, else legacy behavior
     const inputs = modelConfig.inputs;
@@ -64,10 +70,16 @@ export class MinimaxCompiler implements ProviderCompiler {
     if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: api_status_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'MinimaxCompiler: model is required in api_config.yaml');
 
-    const payload: Record<string, any> = {
-      model: modelConfig.model,
-      prompt: job.prompt || job.payload.prompt,
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        model: modelConfig.model,
+        prompt: job.prompt || job.payload.prompt,
+      };
+    }
 
     // Resolution: frontmatter > api_config.defaults
     const resolution = (job.payload.global_settings as any)?.resolution || modelConfig.defaults?.resolution;

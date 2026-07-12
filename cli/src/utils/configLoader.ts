@@ -81,6 +81,7 @@ export interface ModelConfig {
   timeout?: TimeoutConfig;
   max_poll_duration?: number;
   retry?: RetryConfig;
+  payload_example?: Record<string, any>;  // API 请求体标准模板，放在配置块末尾
 }
 
 export interface PollingSettings {

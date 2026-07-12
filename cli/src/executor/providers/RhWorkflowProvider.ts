@@ -45,7 +45,7 @@ interface RhWorkflowStatusResponse {
 }
 
 export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>, RhWorkflowSubmitResponse, RhWorkflowStatusResponse> {
-  readonly name = 'rhworkflow';
+  readonly name = 'rhworkflow-v2';
 
   protected buildPayload(task: BaseTaskJson<Record<string, unknown>>, _ctx?: OpsVContext): unknown {
     const { apiKey, ...cleanPayload } = task.payload as Record<string, any>;

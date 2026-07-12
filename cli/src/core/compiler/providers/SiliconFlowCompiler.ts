@@ -28,12 +28,18 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'SiliconFlowCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'SiliconFlowCompiler: model is required in api_config.yaml');
 
-    const payload: Record<string, any> = {
-      model: modelConfig.model,
-      prompt: job.prompt || job.payload.prompt,
-      image_size: resolveSize(job.payload.global_settings, modelConfig, 'image_size'),
-      batch_size: 1,
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        model: modelConfig.model,
+        prompt: job.prompt || job.payload.prompt,
+        image_size: resolveSize(job.payload.global_settings, modelConfig, 'image_size'),
+        batch_size: 1,
+      };
+    }
 
     // Merge remaining defaults (cfg_scale, steps, seed, num_inference_steps, cfg, etc.)
     const defaults = modelConfig.defaults || {};
@@ -74,10 +80,16 @@ export class SiliconFlowCompiler implements ProviderCompiler {
     if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'SiliconFlowCompiler: api_status_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'SiliconFlowCompiler: model is required in api_config.yaml');
 
-    const payload: Record<string, any> = {
-      model: modelConfig.model,
-      prompt: job.prompt || job.payload.prompt,
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        model: modelConfig.model,
+        prompt: job.prompt || job.payload.prompt,
+      };
+    }
 
     // Resolve inputs via InputEvaluator if configured, else legacy behavior
     const inputs = modelConfig.inputs;

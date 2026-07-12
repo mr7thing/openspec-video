@@ -33,9 +33,15 @@ export class RHapiCompiler implements ProviderCompiler {
         'RHapiCompiler: api_url is required in api_config.yaml');
     }
 
-    const payload: Record<string, any> = {
-      prompt: job.prompt || job.payload.prompt,
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        prompt: job.prompt || job.payload.prompt,
+      };
+    }
 
     // Inject aspect ratio from global_settings if model doesn't have explicit size
     const aspectRatio = job.payload.global_settings?.aspect_ratio;
@@ -101,9 +107,15 @@ export class RHapiCompiler implements ProviderCompiler {
         'RHapiCompiler: api_url is required in api_config.yaml');
     }
 
-    const payload: Record<string, any> = {
-      prompt: job.prompt || job.payload.prompt,
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        prompt: job.prompt || job.payload.prompt,
+      };
+    }
 
     // Duration
     const duration = job.payload.duration || modelConfig.defaults?.duration;

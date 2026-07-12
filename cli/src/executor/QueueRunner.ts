@@ -309,7 +309,8 @@ export class QueueRunner {
       case 'minimax': return 'MINIMAX_API_KEY';
       case 'siliconflow': return 'SILICONFLOW_API_KEY';
       case 'volcengine': return 'ARK_API_KEY';
-      case 'runninghub': return 'RUNNINGHUB_API_KEY';
+      case 'rhworkflow-v1':
+      case 'rhworkflow-v2': return 'RH_WORKFLOW_API_KEY';
       default: return undefined;
     }
   }

@@ -28,11 +28,17 @@ export class VolcengineCompiler implements ProviderCompiler {
     if (!modelConfig.api_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: model is required in api_config.yaml');
 
-    const payload: Record<string, any> = {
-      model: modelConfig.model,
-      prompt: job.prompt || job.payload.prompt,
-      size: resolveSize(job.payload.global_settings, modelConfig, 'size'),
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        model: modelConfig.model,
+        prompt: job.prompt || job.payload.prompt,
+        size: resolveSize(job.payload.global_settings, modelConfig, 'size'),
+      };
+    }
 
     // Support sequential image generation (组图)
     const seqGen = (modelConfig.defaults as any)?.sequential_image_generation;
@@ -83,15 +89,21 @@ export class VolcengineCompiler implements ProviderCompiler {
     if (!modelConfig.api_status_url) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: api_status_url is required in api_config.yaml');
     if (!modelConfig.model) throw new ConfigError(OpsVErrorCode.CONFIG_KEY_NOT_FOUND, 'VolcengineCompiler: model is required in api_config.yaml');
 
-    const payload: Record<string, any> = {
-      model: modelConfig.model,
-      content: [
-        {
-          type: 'text',
-          text: job.prompt || job.payload.prompt,
-        },
-      ],
-    };
+    // Build base payload: from payload_example if available, else hardcoded
+    let payload: Record<string, any>;
+    if (modelConfig.payload_example) {
+      payload = structuredClone(modelConfig.payload_example);
+    } else {
+      payload = {
+        model: modelConfig.model,
+        content: [
+          {
+            type: 'text',
+            text: job.prompt || job.payload.prompt,
+          },
+        ],
+      };
+    }
 
     // Duration: frontmatter > api_config.defaults
     const duration = resolveDuration(job, modelConfig);

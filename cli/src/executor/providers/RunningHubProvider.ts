@@ -36,7 +36,7 @@ interface RhStatusResponse {
 }
 
 export class RunningHubProvider extends BaseApiProvider<Record<string, unknown>, RhSubmitResponse, RhStatusResponse> {
-  readonly name = 'runninghub';
+  readonly name = 'rhworkflow-v1';
 
   protected buildPayload(task: BaseTaskJson<Record<string, unknown>>, ctx?: OpsVContext): unknown {
     const payload = { ...task.payload };

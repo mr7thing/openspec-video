@@ -33,11 +33,11 @@ const COMPILERS: Record<string, new () => ProviderCompiler> = {
   volcengine: VolcengineCompiler,
   siliconflow: SiliconFlowCompiler,
   minimax: MinimaxCompiler,
-  runninghub: RunningHubCompiler,
+  'rhworkflow-v1': RunningHubCompiler,
   comfylocal: ComfyUICompiler,
   webapp: WebappCompiler,
   rhapi: RHapiCompiler,
-  rhworkflow: RhWorkflowCompiler,
+  'rhworkflow-v2': RhWorkflowCompiler,
 };
 
 export class TaskBuilder {

@@ -1,20 +1,26 @@
-# OpsV v0.8 多模态资产生态系统配置文件
-# 类型值对齐 Produce 命令: imagen / video / audio / comfy / webapp
+# OpsV 多模态资产生态系统配置文件
 #
 # 修改 api_url 可切换私有化部署或区域节点
-# 修改 defaults 可调整生成参数而无需重新编译代码
+# 修改 defaults / inputs / payload_example 可调整生成参数而无需重新编译代码
 #
 # 使用示例:
-#   opsv imagen --model volcengine.seadream
-#   opsv animate --model volcengine.seedance2
+#   opsv produce --model volc.seedance2
+#   opsv produce --model rh-api.seedance
+#   opsv produce --model rh-workflow-v2.klein9b
+#   opsv produce --model comfylocal.workflow
 #   opsv run opsv-queue/videospec.circle1/
 #
+# 配置项说明:
+#   inputs:        声明 source（从文档/refs/defaults 读取）→ target（注入到 payload 路径）
+#   defaults:      运行时默认值
+#   payload_example: API 请求体 JSON 骨架（定义在配置块末尾，以 # == payload_example == 分隔）
+
 # 并发控制:
 #   在 model 下添加 concurrency 可指定该 provider 的单 provider 内并发数
 #   CLI: opsv run --concurrency 3 <dir> 可覆盖 api_config 中的设置
 #   默认串行 (concurrency=1)，仅对支持并发的 API 建议调高
-#
-# 超时 / 轮询 / 重试配置化 (v0.8.22+):
+
+# 超时 / 轮询 / 重试配置化:
 #   在 model 下可添加:
 #     timeout:
 #       submit: 120000      # 任务提交超时 (ms)
@@ -25,37 +31,12 @@
 #     retry:
 #       max_retries: 3
 #       delay_cap: 30000    # 重试延迟上限 (ms)
-#   在顶层可添加 settings:
-#     settings:
-#       dirs:
-#         videospec: videospec
-#         queue: opsv-queue
-#       polling:
-#         intervals:
-#           - thresholdMinutes: 5
-#             intervalSeconds: 10
-#           - thresholdMinutes: 10
-#             intervalSeconds: 30
-#           - thresholdMinutes: 30
-#             intervalSeconds: 60
-#           - thresholdMinutes: 60
-#             intervalSeconds: 300
-#       timeout:               # 全局超时默认值 (model 级别同名 key 覆盖)
-#         submit: 300000       # 提交 HTTP 超时 (ms), 默认 5min
-#         status: 300000       # 状态查询 HTTP 超时 (ms), 默认 5min
-#         download: 30000      # 下载超时 (ms), 默认 30s
-#       max_poll_duration: 14400000  # 总轮询时长上限 (ms), 默认 4h
-#       retry:
-#         max_retries: 3
-#         delay_cap: 30000     # 重试延迟上限 (ms)
 
 models:
   # ==========================================
   # 火山引擎 (Volcengine Ark)
-  # seedance2.0 文档: https://www.volcengine.com/docs/82379/2291680
-  # seadream5.0 文档: https://www.volcengine.com/docs/82379/1824121
-  # seadream5.0pro 文档: https://www.volcengine.com/docs/82379/1824121
   # ==========================================
+
   volc.seadream5:
     provider: volcengine
     type: imagen
@@ -74,20 +55,27 @@ models:
       output_format: "png"
       response_format: "url"
       watermark: false
-      # === 组图参数（仅 volc.seadream5 支持）===
-      # 一张 prompt 生成 max_images 张图（id_1.png, id_2.png...）
-      # 关闭请注释这两行
-      sequential_image_generation: "auto"  # 或 "on"
-      max_images: 4                         # 1~4张
+      sequential_image_generation: "auto"
+      max_images: 4
     quality_map:
       "1920x1080": "2560x1440"
       "2K": "2560x1440"
       "hd": "2560x1440"
       "standard": "2560x1440"
+    # == payload_example ==
+    payload_example:
+      model: "doubao-seedream-5-0-260128"
+      prompt: ""
+      size: "2048x2048"
+      steps: 30
+      cfg_scale: 7.5
+      negative_prompt: ""
+      output_format: "png"
+      response_format: "url"
+      watermark: false
+      sequential_image_generation: "auto"
+      max_images: 4
 
-  # SeaDream 5.0 Pro — 旗舰级单图生成
-  # 特性: 文生图 / 单图生图 / 多图生图（最多10张参考图）
-  # 不支持: 组图(sequential)、流式(stream)、联网搜索
   volc.seadream5pro:
     provider: volcengine
     type: imagen
@@ -108,6 +96,14 @@ models:
       "2K": "2048x2048"
       "hd": "1424x800"
       "standard": "1024x1024"
+    # == payload_example ==
+    payload_example:
+      model: "doubao-seedream-5-0-pro-260628"
+      prompt: ""
+      size: "1024x1024"
+      output_format: "png"
+      response_format: "url"
+      watermark: false
 
   volc.seedance2:
     provider: volcengine
@@ -127,29 +123,25 @@ models:
     supports_reference_audios: true
     max_reference_audios: 3
     inputs:
-      # key 对齐 frontmatter ### <type> 子标题
-      # source = 数据来源快捷路径, target = API payload 注入位置
-      prompt:
-        source: prompt
-        target: content[0].text
-      first_frame:
-        source: first_frame
-        target: content[].image_url
-      last_frame:
-        source: last_frame
-        target: content[].image_url
-      image:
-        source: refs[image]              # v0.10.0: 取 refs.image 所有路径
-        target: content[].image_url
-      video:
-        source: refs[video]
-        target: content[].video_url
-      audio:
-        source: refs[audio]
-        target: content[].audio_url
+      prompt:        { source: prompt,          target: content[0].text }
+      first_frame:   { source: first_frame,     target: content[].image_url }
+      last_frame:    { source: last_frame,      target: content[].image_url }
+      image:         { source: refs[image],     target: content[].image_url }
+      video:         { source: refs[video],     target: content[].video_url }
+      audio:         { source: refs[audio],     target: content[].audio_url }
     defaults:
       ratio: "16:9"
       duration: 5
+      generate_audio: true
+      watermark: false
+    # == payload_example ==
+    payload_example:
+      model: "doubao-seedance-2-0-260128"
+      content:
+        - type: "text"
+          text: ""
+      duration: 5
+      ratio: "16:9"
       generate_audio: true
       watermark: false
 
@@ -175,10 +167,17 @@ models:
       duration: 5
       generate_audio: true
       watermark: false
+    # == payload_example ==
+    payload_example:
+      model: "doubao-seedance-2-0-fast-260128"
+      content:
+        - type: "text"
+          text: ""
+      duration: 5
+      ratio: "16:9"
+      generate_audio: true
+      watermark: false
 
-  # Seedance 2.0 Mini — 高性价比视频生成
-  # 模型ID: doubao-seedance-2-0-mini-260615
-  # 特性: 性价比版，功能与 seedance2 一致
   volc.seedance2mini:
     provider: volcengine
     type: video
@@ -201,301 +200,115 @@ models:
       duration: 5
       generate_audio: true
       watermark: false
-
-  # ==========================================
-  # RunningHub Workflow Run API (comfy 模式)
-  # 文档: https://www.runninghub.cn/call-api/api-detail/2075497084035358722
-  # 先用 opsv comfy-node-mapping <workflow.json> 生成 node_mappings 后填入
-  # ==========================================
-
-  # Klein 9B 镜头调度 (文生图/图生图)
-  rhworkflow.klein9b:
-    provider: rhworkflow
-    type: comfy
-    api_url: https://api.runninghub.cn/run/workflow/2075497084035358722
-    api_status_url: https://www.runninghub.cn/openapi/v2/query
-    workflowId: "2075497084035358722"
-    workflow: "test/workflows/opsv-klein9b镜头调度2_api-id_2075497084035358722.json"
-    required_env:
-      - RH_API_KEY
-    supports_reference_images: true
-    max_reference_images: 1
-    supports_first_image: true
-    defaults:
-      addMetadata: false
-      usePersonalQueue: false
-      upload_method: base64
-    # node_mappings:
-    #   prompt:
-    #     nodeId: "177"
-    #     fieldName: "prompt"
-    #   seed:
-    #     nodeId: "103"
-    #     fieldName: "noise_seed"
-    #   image1:
-    #     nodeId: "76"
-    #     fieldName: "image"
-
-  # Krea2 T2I (文生图)
-  rhworkflow.krea2:
-    provider: rhworkflow
-    type: comfy
-    api_url: https://api.runninghub.cn/run/workflow/2074897972374097921
-    api_status_url: https://www.runninghub.cn/openapi/v2/query
-    workflowId: "2074897972374097921"
-    workflow: "test/workflows/opsv-krea2_t2i_api-id_2074897972374097921.json"
-    required_env:
-      - RH_API_KEY
-    defaults:
-      addMetadata: false
-      usePersonalQueue: false
-      upload_method: base64
-    # node_mappings:
-    #   prompt:
-    #     nodeId: "79"
-    #     fieldName: "prompt"
-    #   seed:
-    #     nodeId: "82"
-    #     fieldName: "seed"
-    #   refine_prompt:
-    #     nodeId: "68"
-    #     fieldName: "value"
-
-  # ==========================================
-  # 硅基流动 (SiliconFlow)
-  # 文档: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
-  # 文档: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
-  # 文档: https://docs.siliconflow.cn/cn/api-reference/videos/get_videos_status
-  # ==========================================
-  siliconflow.qimg:
-    provider: siliconflow
-    type: imagen
-    model: Qwen/Qwen-Image
-    api_url: https://api.siliconflow.cn/v1/images/generations
-    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
-    required_env:
-      - SILICONFLOW_API_KEY
-    supports_reference_images: true
-    max_reference_images: 1
-    defaults:
-      image_size: "1664x928"
-      cfg_scale: 4.0
-      steps: 50
-      seed: 42
-
-  siliconflow.edit2509:
-    provider: siliconflow
-    type: imagen
-    model: Qwen/Qwen-Image-Edit-2509
-    api_url: https://api.siliconflow.cn/v1/images/generations
-    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
-    required_env:
-      - SILICONFLOW_API_KEY
-    supports_reference_images: true
-    max_reference_images: 3
-    defaults:
-      image_size: "1664x928"
-      num_inference_steps: 20
-      cfg: 4
-
-  siliconflow.want2v:
-    provider: siliconflow
-    type: video
-    model: Wan-AI/Wan2.2-T2V-A14B
-    api_url: https://api.siliconflow.cn/v1/video/submit
-    api_status_url: https://api.siliconflow.cn/v1/video/status
-    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
-    required_env:
-      - SILICONFLOW_API_KEY
-    # 并发数: 允许同时提交 N 个任务到该 provider (默认 1)
-    concurrency: 3
-    defaults:
-      image_size: "1280x720"
-      seed: 42
-
-  siliconflow.wani2v:
-    provider: siliconflow
-    type: video
-    model: Wan-AI/Wan2.2-I2V-A14B
-    api_url: https://api.siliconflow.cn/v1/video/submit
-    api_status_url: https://api.siliconflow.cn/v1/video/status
-    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
-    required_env:
-      - SILICONFLOW_API_KEY
-    supports_first_image: true
-    defaults:
-      image_size: "1280x720"
-      seed: 42
-
-  # ==========================================
-  # MiniMax 稀宇科技
-  # ==========================================
-  minimax.img01:
-    provider: minimax
-    type: imagen
-    model: image-01
-    api_url: https://api.minimaxi.com/v1/image_generation
-    docs_url: https://platform.minimaxi.com/docs/api-reference/image-generation-t2i
-    required_env:
-      - MINIMAX_API_KEY
-    supports_reference_images: true
-    max_reference_images: 1
-    defaults:
-      aspect_ratio: "16:9"
-      size: "1920x1080"
-      quality: "hd"
-
-  minimax.vid01:
-    provider: minimax
-    type: video
-    model: MiniMax-Hailuo-2.3
-    api_url: https://api.minimaxi.com/v1/video_generation
-    api_status_url: https://api.minimaxi.com/v1/query/video_generation
-    docs_url: https://platform.minimaxi.com/docs/api-reference/video-generation-t2v
-    required_env:
-      - MINIMAX_API_KEY
-    supports_first_image: true
-    max_reference_images: 1
-    defaults:
-      resolution: "1080P"
+    # == payload_example ==
+    payload_example:
+      model: "doubao-seedance-2-0-mini-260615"
+      content:
+        - type: "text"
+          text: ""
       duration: 5
+      ratio: "16:9"
+      generate_audio: true
+      watermark: false
 
   # ==========================================
-  # ComfyUI Local
+  # RunningHub Workflow v1 — ComfyUI Cloud (旧版)
+  # POST /task/openapi/create
   # ==========================================
-  comfylocal.workflow:
-    provider: comfylocal
-    type: comfy
-    model: workflow
-    api_url: http://127.0.0.1:8188/
-    node_mappings:
-      # 本地 ComfyUI 同样需要 node_mapping
-      prompt:
-        nodeId: "6"
-        fieldName: "text"
-      negative_prompt:
-        nodeId: "7"
-        fieldName: "text"
-    workflow: "comfyui_workflow_templates/ref2.json"
 
-  # ==========================================
-  # RunningHub (ComfyUI Cloud) — v2 API
-  # 文档: https://www.runninghub.cn/runninghub-api-doc-cn/api-276613249
-  # 文件上传: https://www.runninghub.cn/runninghub-api-doc-cn/api-425749007
-  #
-  # 不再使用本地 workflow JSON 文件。通过 node_mappings 将 OpsV 参数
-  # 直接映射到 RunningHub 的 nodeId + fieldName。
-  # 可用 opsv comfy-node-mapping <workflow.json> 自动发现节点映射。
-  # 优先级：frontmatter.workflow / node_mapping > api_config.workflowId / node_mappings
-  # ==========================================
-  runninghub.default:
-    provider: runninghub
+  rh-workflow-v1.default:
+    provider: rhworkflow-v1
     type: comfy
     workflowId: "your-workflow-id-here"
     api_url: https://www.runninghub.cn/task/openapi/create
     api_status_url: https://www.runninghub.cn/task/openapi/status
     required_env:
-      - RUNNINGHUB_API_KEY
+      - RH_WORKFLOW_API_KEY
     supports_first_image: true
     supports_reference_images: true
     max_reference_images: 4
     inputs:
-      # inputs key 与 node_mappings key 对齐
-      # inputs 解析值，node_mappings 指定注入位置
-      prompt:
-        source: prompt
-      negative_prompt:
-        source: negative_prompt
-      seed:
-        source: default.seed
-      image1:
-        source: refs[image][0]            # v0.10.0: 取 refs.image 第一个
+      prompt:         { source: prompt }
+      negative_prompt:{ source: negative_prompt }
+      seed:           { source: default.seed }
+      image1:         { source: refs[image][0] }
     node_mappings:
-      # 提示词节点 (通常是 CLIPTextEncode 或 CR Prompt Text)
-      prompt:
-        nodeId: "6"
-        fieldName: "text"
-      # 负向提示词节点
-      negative_prompt:
-        nodeId: "7"
-        fieldName: "text"
-      # 种子节点 (CR Seed / KSampler seed 等)
-      seed:
-        nodeId: "116"
-        fieldName: "seed"
-      # 参考图片节点 (LoadImage)
-      image1:
-        nodeId: "10"
-        fieldName: "image"
-      # 首帧/尾帧 (视频工作流)
-      # first_frame:
-      #   nodeId: "15"
-      #   fieldName: "image"
-      # 其他自定义参数直接按 key 映射
+      prompt:         { nodeId: "6",  fieldName: "text" }
+      negative_prompt:{ nodeId: "7",  fieldName: "text" }
+      seed:           { nodeId: "116", fieldName: "seed" }
+      image1:         { nodeId: "10", fieldName: "image" }
     defaults:
       addMetadata: true
       instanceType: ""
       usePersonalQueue: false
       retainSeconds: null
       accessPassword: null
-      # seed 支持固定数字或 "random" (opsv run 时自动生成 < 10^10 的随机自然数)
       seed: random
+    # == payload_example ==
+    payload_example:
+      workflowId: "your-workflow-id-here"
+      nodeInfoList: []
+      addMetadata: true
+      instanceType: ""
+      usePersonalQueue: false
+      retainSeconds: null
+      accessPassword: null
 
   # ==========================================
-  # Web App 浏览器自动化
+  # RunningHub Workflow v2 — Workflow Run API
+  # POST /run/workflow/{apiId}
   # ==========================================
-  webapp.gemini:
-    provider: webapp
-    type: webapp
-    api_url: http://127.0.0.1:9700/generate
-    api_status_url: http://127.0.0.1:9700/status
+
+  rh-workflow-v2.klein9b:
+    provider: rhworkflow-v2
+    type: comfy
+    api_url: https://api.runninghub.cn/run/workflow/2075497084035358722
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2075497084035358722"
+    workflow: "test/workflows/opsv-klein9b镜头调度2_api-id_2075497084035358722.json"
+    required_env:
+      - RH_WORKFLOW_API_KEY
     supports_reference_images: true
+    max_reference_images: 1
     supports_first_image: true
-    max_reference_images: 13
     defaults:
-      target_url: "https://gemini.google.com"
-      typing_speed: "human"
-      watermark_removal: true
-      upload_method: "drag-drop"
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # == payload_example ==
+    payload_example:
+      addMetadata: false
+      nodeInfoList: []
+      instanceType: "default"
+      usePersonalQueue: false
 
-  # webapp.wan:
-  #   provider: webapp
-  #   type: webapp
-  #   api_url: http://127.0.0.1:9700/generate
-  #   api_status_url: http://127.0.0.1:9700/status
-  #   supports_reference_images: true
-  #   supports_first_image: true
-  #   max_reference_images: 1
-  #   defaults:
-  #     target_url: "https://wan.example.com"
-  #     typing_speed: "fast"
-  #     watermark_removal: false
-  #     upload_method: "file-input"
-
-  # webapp.jimeng:
-  #   provider: webapp
-  #   type: webapp
-  #   api_url: http://127.0.0.1:9700/generate
-  #   api_status_url: http://127.0.0.1:9700/status
-  #   supports_reference_images: true
-  #   supports_first_image: true
-  #   max_reference_images: 9
-  #   defaults:
-  #     target_url: "https://jimeng.jianying.com"
-  #     typing_speed: "human"
-  #     watermark_removal: true
-  #     upload_method: "paste"
+  rh-workflow-v2.krea2:
+    provider: rhworkflow-v2
+    type: comfy
+    api_url: https://api.runninghub.cn/run/workflow/2074897972374097921
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2074897972374097921"
+    workflow: "test/workflows/opsv-krea2_t2i_api-id_2074897972374097921.json"
+    required_env:
+      - RH_WORKFLOW_API_KEY
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # == payload_example ==
+    payload_example:
+      addMetadata: false
+      nodeInfoList: []
+      instanceType: "default"
+      usePersonalQueue: false
 
   # ==========================================
-  # RunningHub Standard Model API (rhapi)
-  # 直连 REST API，不走 ComfyUI workflow 模式
-  # Auth: Authorization: Bearer $RH_API_KEY
-  # 状态查询统一使用 /openapi/v2/query
+  # RunningHub 直连 REST API (rh-api)
+  # 不走 ComfyUI workflow，直接调用标准模型接口
+  # API Key: RH_API_KEY
   # ==========================================
 
-  # Seedance 2.0 多模态视频（高品质）
-  # POST https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/multimodal-video
-  rhapi.seedance:
+  rh-api.seedance:
     provider: rhapi
     type: video
     api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/multimodal-video
@@ -518,13 +331,23 @@ models:
         - "all"
       returnLastFrame: false
       seed: -1
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      resolution: "720p"
+      duration: "5"
+      imageUrls: []
+      videoUrls: []
+      audioUrls: []
+      generateAudio: true
+      ratio: "adaptive"
+      realPersonMode: true
+      conversionSlots:
+        - "all"
+      returnLastFrame: false
+      seed: -1
 
-  # Seedance 2.0 Mini 多模态视频（高性价比批量生产）
-  # 文档: https://www.runninghub.cn/call-api/api-detail/2133000000000504043
-  # 原生 480p/720p；1080p/2k/4k 先以 720p 生成再超分补帧
-  # 支持文本、图片、视频、音频等多模态参考输入
-  # 注意: max_reference_images 为 9（vs 标准版的 10）
-  rhapi.seedance2mini:
+  rh-api.seedance2mini:
     provider: rhapi
     type: video
     api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-mini/multimodal-video
@@ -547,9 +370,23 @@ models:
         - "all"
       returnLastFrame: false
       seed: -1
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      resolution: "720p"
+      duration: "5"
+      imageUrls: []
+      videoUrls: []
+      audioUrls: []
+      generateAudio: true
+      ratio: "adaptive"
+      realPersonMode: true
+      conversionSlots:
+        - "all"
+      returnLastFrame: false
+      seed: -1
 
-  # Seedance 2.0 Fast 多模态视频（高性价比）
-  rhapi.seedancefast:
+  rh-api.seedancefast:
     provider: rhapi
     type: video
     api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-fast/multimodal-video
@@ -572,9 +409,23 @@ models:
         - "all"
       returnLastFrame: false
       seed: -1
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      resolution: "720p"
+      duration: "5"
+      imageUrls: []
+      videoUrls: []
+      audioUrls: []
+      generateAudio: true
+      ratio: "adaptive"
+      realPersonMode: true
+      conversionSlots:
+        - "all"
+      returnLastFrame: false
+      seed: -1
 
-  # Vidu 参考生视频 Q2（旗舰级参考生视频）
-  rhapi.viduq2:
+  rh-api.viduq2:
     provider: rhapi
     type: video
     api_url: https://www.runninghub.cn/openapi/v2/vidu/reference-to-video-q2
@@ -588,9 +439,16 @@ models:
       duration: "5"
       aspectRatio: "16:9"
       movementAmplitude: "auto"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      resolution: "720p"
+      duration: "5"
+      imageUrls: []
+      aspectRatio: "16:9"
+      movementAmplitude: "auto"
 
-  # 全能图片 V2 文生图（低价渠道版）
-  rhapi.v2:
+  rh-api.v2:
     provider: rhapi
     type: imagen
     api_url: https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/text-to-image
@@ -600,9 +458,13 @@ models:
     defaults:
       aspectRatio: "1:1"
       resolution: "1k"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      aspectRatio: "1:1"
+      resolution: "1k"
 
-  # 全能图片 V2 图生图（低价渠道版）
-  rhapi.v2i2i:
+  rh-api.v2i2i:
     provider: rhapi
     type: imagen
     api_url: https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/image-to-image
@@ -614,9 +476,14 @@ models:
     defaults:
       aspectRatio: "1:1"
       resolution: "1k"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      imageUrls: []
+      aspectRatio: "1:1"
+      resolution: "1k"
 
-  # 全能图片 X 文生图（低价渠道版）
-  rhapi.x:
+  rh-api.x:
     provider: rhapi
     type: imagen
     api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g/text-to-image
@@ -625,10 +492,12 @@ models:
       - RH_API_KEY
     defaults:
       model: "g-4.2"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      model: "g-4.2"
 
-  # 全能图片 X 图生图（低价渠道版）
-  # 注意：X 系列 i2i 用的是单数 imageUrl（String），不是 imageUrls（Array）
-  rhapi.xi2i:
+  rh-api.xi2i:
     provider: rhapi
     type: imagen
     api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g/image-to-image
@@ -643,9 +512,13 @@ models:
       ref_img:
         source: reference_images[0]
         target: imageUrl
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      model: "g-4.2"
+      imageUrl: ""
 
-  # 全能图片 G-2.0 图生图（低价渠道版）
-  rhapi.g2i2i:
+  rh-api.g2i2i:
     provider: rhapi
     type: imagen
     api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g-2/image-to-image
@@ -656,9 +529,13 @@ models:
     max_reference_images: 10
     defaults:
       resolution: "1k"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      imageUrls: []
+      resolution: "1k"
 
-  # 全能图片 G-2 文生图（官方稳定版）
-  rhapi.g2:
+  rh-api.g2:
     provider: rhapi
     type: imagen
     api_url: https://www.runninghub.cn/openapi/v2/rhart-image-g-2-official/text-to-image
@@ -669,24 +546,194 @@ models:
       aspectRatio: "1:1"
       resolution: "2k"
       quality: "medium"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      aspectRatio: "1:1"
+      resolution: "2k"
+      quality: "medium"
 
-  # # ==========================================
-  # # Seedance 2.0 ACT 角色资产注册
-  # # 文档: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/character
-  # # POST 注册角色资产，返回 asset_id 用于后续视频生成
-  # # ==========================================
-  # rhapi.act:
-  #   provider: rhapi
-  #   type: asset
-  #   api_url: https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0/character
-  #   api_status_url: https://www.runninghub.cn/openapi/v2/query
-  #   required_env:
-  #     - RH_API_KEY
-  #   supports_reference_images: true
-  #   supports_reference_audios: true
-  #   max_reference_images: 5
-  #   max_reference_audios: 1
-  #   defaults:
-  #     characterName: "character"
+  # ==========================================
+  # 硅基流动 (SiliconFlow)
+  # ==========================================
 
+  siliconflow.qimg:
+    provider: siliconflow
+    type: imagen
+    model: Qwen/Qwen-Image
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      image_size: "1664x928"
+      cfg_scale: 4.0
+      steps: 50
+      seed: 42
+    # == payload_example ==
+    payload_example:
+      model: "Qwen/Qwen-Image"
+      prompt: ""
+      image_size: "1664x928"
+      batch_size: 1
+      cfg_scale: 4.0
+      steps: 50
+      seed: 42
 
+  siliconflow.edit2509:
+    provider: siliconflow
+    type: imagen
+    model: Qwen/Qwen-Image-Edit-2509
+    api_url: https://api.siliconflow.cn/v1/images/generations
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/images/images-generations
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_reference_images: true
+    max_reference_images: 3
+    defaults:
+      image_size: "1664x928"
+      num_inference_steps: 20
+      cfg: 4
+    # == payload_example ==
+    payload_example:
+      model: "Qwen/Qwen-Image-Edit-2509"
+      prompt: ""
+      image_size: "1664x928"
+      batch_size: 1
+      num_inference_steps: 20
+      cfg: 4
+
+  siliconflow.want2v:
+    provider: siliconflow
+    type: video
+    model: Wan-AI/Wan2.2-T2V-A14B
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
+    required_env:
+      - SILICONFLOW_API_KEY
+    concurrency: 3
+    defaults:
+      image_size: "1280x720"
+      seed: 42
+    # == payload_example ==
+    payload_example:
+      model: "Wan-AI/Wan2.2-T2V-A14B"
+      prompt: ""
+      image_size: "1280x720"
+      seed: 42
+
+  siliconflow.wani2v:
+    provider: siliconflow
+    type: video
+    model: Wan-AI/Wan2.2-I2V-A14B
+    api_url: https://api.siliconflow.cn/v1/video/submit
+    api_status_url: https://api.siliconflow.cn/v1/video/status
+    docs_url: https://docs.siliconflow.cn/cn/api-reference/videos/videos_submit
+    required_env:
+      - SILICONFLOW_API_KEY
+    supports_first_image: true
+    defaults:
+      image_size: "1280x720"
+      seed: 42
+    # == payload_example ==
+    payload_example:
+      model: "Wan-AI/Wan2.2-I2V-A14B"
+      prompt: ""
+      image_size: "1280x720"
+      seed: 42
+
+  # ==========================================
+  # MiniMax 稀宇科技
+  # ==========================================
+
+  minimax.img01:
+    provider: minimax
+    type: imagen
+    model: image-01
+    api_url: https://api.minimaxi.com/v1/image_generation
+    docs_url: https://platform.minimaxi.com/docs/api-reference/image-generation-t2i
+    required_env:
+      - MINIMAX_API_KEY
+    supports_reference_images: true
+    max_reference_images: 1
+    defaults:
+      aspect_ratio: "16:9"
+      size: "1920x1080"
+      quality: "hd"
+    # == payload_example ==
+    payload_example:
+      model: "image-01"
+      prompt: ""
+      aspect_ratio: "16:9"
+
+  minimax.vid01:
+    provider: minimax
+    type: video
+    model: MiniMax-Hailuo-2.3
+    api_url: https://api.minimaxi.com/v1/video_generation
+    api_status_url: https://api.minimaxi.com/v1/query/video_generation
+    docs_url: https://platform.minimaxi.com/docs/api-reference/video-generation-t2v
+    required_env:
+      - MINIMAX_API_KEY
+    supports_first_image: true
+    max_reference_images: 1
+    defaults:
+      resolution: "1080P"
+      duration: 5
+    # == payload_example ==
+    payload_example:
+      model: "MiniMax-Hailuo-2.3"
+      prompt: ""
+      resolution: "1080P"
+      duration: 5
+
+  # ==========================================
+  # ComfyUI Local
+  # ==========================================
+
+  comfylocal.workflow:
+    provider: comfylocal
+    type: comfy
+    model: workflow
+    api_url: http://127.0.0.1:8188/
+    node_mappings:
+      prompt:
+        nodeId: "6"
+        fieldName: "text"
+      negative_prompt:
+        nodeId: "7"
+        fieldName: "text"
+    workflow: "comfyui_workflow_templates/ref2.json"
+
+  # ==========================================
+  # Web App 浏览器自动化
+  # ==========================================
+
+  webapp.gemini:
+    provider: webapp
+    type: webapp
+    api_url: http://127.0.0.1:9700/generate
+    api_status_url: http://127.0.0.1:9700/status
+    supports_reference_images: true
+    supports_first_image: true
+    max_reference_images: 13
+    defaults:
+      target_url: "https://gemini.google.com"
+      typing_speed: "human"
+      watermark_removal: true
+      upload_method: "drag-drop"
+    # == payload_example ==
+    payload_example:
+      task_id: ""
+      target_url: "https://gemini.google.com"
+      prompt: ""
+      typing_speed: "human"
+      watermark_removal: true
+      upload_method: "drag-drop"
+      reference_files: []
+      frame_ref:
+        first: ""
+        last: null
