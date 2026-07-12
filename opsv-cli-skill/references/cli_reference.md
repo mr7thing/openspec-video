@@ -1,7 +1,7 @@
 # CLI 命令手册 (cli_reference)
 
 > 全部 20 个命令，按组分类。每条含语法、必填参数、可选 flag、源码位置。
-> 真相基准：`videospec` v0.15.0 源码 `src/commands/`。所有 file:line 以源码为准。
+> 真相基准：`videospec` v0.16.0 源码 `src/commands/`。所有 file:line 以源码为准。
 
 ---
 

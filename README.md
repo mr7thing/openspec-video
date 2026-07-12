@@ -155,6 +155,18 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 
 ## Changelog
 
+### v0.16.0 (2026-07-13)
+
+- **feat(review-ui)**: Split view mode — open multiple documents side-by-side for comparison, click @id references to navigate to dependent documents
+- **feat(cli)**: `opsv status` — quick project status overview with progress bars and completion percentages
+- **feat(cli)**: `opsv trace <assetId>` — asset provenance tracking from output back to source document
+- **refactor**: `RefEngine` — unified facade for RefBinder + RefResolver + RefSyntaxParser + PromptCompiler
+- **refactor**: `ProductionPipeline` — extract orchestration logic from produce command into testable module
+- **refactor**: `CloudReviewSession` — encapsulate cloud review lifecycle for future edge tunnel support
+- **refactor**: Skill pack two-layer architecture — Agent Skill layer (pure instructions) + OPSV Config layer (optional validation)
+- **fix**: `OpsVError` context propagation — errors now carry assetId, circle, phase, provider info
+- **fix**: All 12 pre-existing test failures resolved (217/217 passing)
+
 ### v0.14.7 (2026-07-11)
 
 - **feat(volcengine)**: Add SeaDream 5.0 Pro (`volc.seadream5pro`) — flagship single-image generation, up to 10 reference images, 1K/2K resolution presets
