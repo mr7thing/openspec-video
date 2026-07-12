@@ -1,4 +1,4 @@
-# OpsV Category Validation Rules (v0.10.0)
+# OpsV Category Validation Rules (v0.15.0)
 # Document-level business rules by `category` field.
 # Lookup order:
 #   1. ~/.opsv/category_validate.yaml (user-level global fallback)
@@ -7,6 +7,11 @@
 # The loader starts from an empty rule set. All rules come from config files.
 # Recommended defaults for `project` and `shotdeck` categories are defined below.
 # Copy this file to ~/.opsv/category_validate.yaml or .opsv/category_validate.yaml.
+#
+# 全局默认检查（不依赖 category）：
+#   - prompt: 必填、≥10字符、无占位符
+#   - brief:  建议填写（warning 级别），用于 annotate prompt 编译
+# 可通过 skip_prompt_check: true / skip_brief_check: true 在类别规则中跳过。
 
 # ---------------------------------------------------------------------------
 # Default rules for built-in categories:
@@ -29,25 +34,22 @@ shotdeck:
 # Example user-defined categories (uncomment / edit per project)
 # ---------------------------------------------------------------------------
 
-# element:
-#   required_fields: [status, title, visual_brief, prompt]
-#   field_schema:
-#     prompt:
-#       min_length: 10
-#       no_placeholder: true
-#       refs_in_prompt_must_match_refs: true
-#
 # scene:
-#   required_fields: [status, title, prompt]
+#   required_fields: [status, title]
 #   field_schema:
 #     prompt:
 #       min_length: 10
 #       refs_in_prompt_must_match_refs: true
 #
 # shot:
-#   required_fields: [status, prompt, refs]
+#   required_fields: [status, refs]
 #   field_schema:
 #     prompt:
 #       min_length: 20
 #       no_placeholder: true
 #       refs_in_prompt_must_match_refs: true
+#
+# # 跳过全局 brief 检查的示例：
+# no_brief_needed:
+#   skip_brief_check: true
+#   required_fields: [status]

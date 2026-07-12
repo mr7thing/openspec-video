@@ -28,38 +28,92 @@ const PLACEHOLDER_PATTERNS = [
 /**
  * Validate one document's frontmatter + body against its category rule.
  *
+ * brief 和 prompt 是默认检查项（所有文档都会检查），除非类别设置了跳过标志。
+ *
  * @param frontmatter parsed YAML
  * @param body the markdown body (used for ref scanning)
- * @param rule rule for this category (may be undefined → no checks)
+ * @param rule rule for this category (may be undefined → only default checks)
  */
 export function validateCategory(
   frontmatter: Record<string, any>,
   body: string,
   rule: CategoryRule | undefined,
 ): ValidationIssue[] {
-  if (!rule) return [];
-
   const issues: ValidationIssue[] = [];
   const category = String(frontmatter.category ?? '');
-  const defaultSeverity: ValidationSeverity = rule.severity || 'error';
+  const defaultSeverity: ValidationSeverity = rule?.severity || 'error';
 
-  // 1) Required fields
-  for (const field of rule.required_fields || []) {
-    if (frontmatter[field] === undefined || frontmatter[field] === null || frontmatter[field] === '') {
+  // 1) Required fields (from category rule, if any)
+  if (rule) {
+    for (const field of rule.required_fields || []) {
+      if (frontmatter[field] === undefined || frontmatter[field] === null || frontmatter[field] === '') {
+        issues.push({
+          severity: defaultSeverity,
+          category,
+          field,
+          message: `Required field "${field}" is missing or empty`,
+        });
+      }
+    }
+  }
+
+  // 2) Default checks: prompt (always checked unless skipped)
+  const skipPrompt = rule?.skip_prompt_check === true;
+  if (!skipPrompt) {
+    const promptVal = frontmatter['prompt'];
+    if (promptVal === undefined || promptVal === null || promptVal === '') {
       issues.push({
         severity: defaultSeverity,
         category,
-        field,
-        message: `Required field "${field}" is missing or empty`,
+        field: 'prompt',
+        message: 'Required field "prompt" is missing or empty',
+      });
+    } else if (typeof promptVal === 'string') {
+      if (promptVal.length < 10) {
+        issues.push({
+          severity: defaultSeverity,
+          category,
+          field: 'prompt',
+          message: `"prompt" length ${promptVal.length} < min_length 10`,
+        });
+      }
+      if (hasPlaceholder(promptVal)) {
+        issues.push({
+          severity: defaultSeverity,
+          category,
+          field: 'prompt',
+          message: '"prompt" contains placeholder text (TODO/FIXME/XXX/TBD)',
+        });
+      }
+    }
+  }
+
+  // 3) Default checks: brief (always checked unless skipped, warning not error)
+  const skipBrief = rule?.skip_brief_check === true;
+  if (!skipBrief) {
+    const briefVal = frontmatter['brief'];
+    if (briefVal === undefined || briefVal === null || briefVal === '') {
+      issues.push({
+        severity: 'warning',  // brief 缺失只警告
+        category,
+        field: 'brief',
+        message: 'Recommended field "brief" is missing — used by prompt compiler annotate mode for image annotations',
+      });
+    } else if (typeof briefVal === 'string' && briefVal.length < 4) {
+      issues.push({
+        severity: 'warning',
+        category,
+        field: 'brief',
+        message: `"brief" length ${briefVal.length} < min_length 4 — too short for meaningful annotation`,
       });
     }
   }
 
-  // 2) Field-level checks
-  if (rule.field_schema) {
+  // 4) Field-level schema checks (from category rule)
+  if (rule?.field_schema) {
     for (const [field, check] of Object.entries(rule.field_schema)) {
-      // Special case: skip_prompt_check trumps prompt field checks
-      if (rule.skip_prompt_check && field === 'prompt') continue;
+      // skip_prompt_check also trumps prompt in field_schema
+      if (skipPrompt && field === 'prompt') continue;
 
       const value = frontmatter[field];
       const severity = check.severity || defaultSeverity;
@@ -77,33 +131,14 @@ export function validateCategory(
       const strVal = typeof value === 'string' ? value : String(value);
 
       if (typeof check.min_length === 'number' && strVal.length < check.min_length) {
-        issues.push({
-          severity,
-          category,
-          field,
-          message: `"${field}" length ${strVal.length} < min_length ${check.min_length}`,
-        });
+        issues.push({ severity, category, field, message: `"${field}" length ${strVal.length} < min_length ${check.min_length}` });
       }
-
       if (typeof check.max_length === 'number' && strVal.length > check.max_length) {
-        issues.push({
-          severity,
-          category,
-          field,
-          message: `"${field}" length ${strVal.length} > max_length ${check.max_length}`,
-        });
+        issues.push({ severity, category, field, message: `"${field}" length ${strVal.length} > max_length ${check.max_length}` });
       }
-
       if (check.no_placeholder && hasPlaceholder(strVal)) {
-        issues.push({
-          severity,
-          category,
-          field,
-          message: `"${field}" contains placeholder text (TODO/FIXME/XXX/TBD)`,
-        });
+        issues.push({ severity, category, field, message: `"${field}" contains placeholder text (TODO/FIXME/XXX/TBD)` });
       }
-
-      // refs_in_prompt_must_match_refs may also live on prompt field schema
       if (check.refs_in_prompt_must_match_refs && field === 'prompt') {
         const refIssues = validateRefsBidirectional(frontmatter, body, severity);
         issues.push(...refIssues);
@@ -117,7 +152,8 @@ export function validateCategory(
 /**
  * Bidirectional refs ↔ prompt validation (v0.10.0):
  *   refs only mirror what the prompt field references.
- *   visual_brief / visual_detailed / body are NOT scanned — they may
+ *   prompt / refs are validated (when present);
+ *   brief / visual_brief / visual_detailed / body are NOT scanned — they may
  *   contain narrative @-references that don't represent generation inputs.
  *
  *  - Every @-token in `prompt` must have a refs entry

@@ -96,12 +96,34 @@ export class TaskBuilder {
                 logger.warn(`TaskBuilder refs[${job.id}]: ${err}`);
               }
 
-              // Cross-doc lookup: for external refs, check if the referenced doc has asset_id
-              for (const ref of resolvedRefs) {
-                if (ref.kind !== 'external') continue;
-                const assetId = lookupAssetId(this.ctx.projectRoot, ref.id);
-                if (assetId) {
-                  ref.assetId = assetId;
+              // Cross-doc lookup: populate brief + asset_id for each external ref
+              if (this.ctx.projectRoot) {
+                const videospecDir = getProjectDir(this.ctx.projectRoot, 'videospec');
+                for (const ref of resolvedRefs) {
+                  if (ref.kind !== 'external') continue;
+
+                  // Find source .md document: elements/{id}.md or elements/@{id}.md
+                  const elementsDir = path.join(videospecDir, 'elements');
+                  let docPath = path.join(elementsDir, `${ref.id}.md`);
+                  if (!fs.existsSync(docPath)) {
+                    docPath = path.join(elementsDir, `@${ref.id}.md`);
+                  }
+
+                  if (fs.existsSync(docPath)) {
+                    try {
+                      const docContent = fs.readFileSync(docPath, 'utf-8');
+                      const { frontmatter } = FrontmatterParser.parseRaw(docContent);
+                      const fm = frontmatter as Record<string, unknown>;
+                      if (typeof fm.brief === 'string' && fm.brief.trim()) {
+                        ref.brief = fm.brief.trim();
+                      }
+                      if (fm.asset_id) {
+                        ref.assetId = String(fm.asset_id);
+                      }
+                    } catch {
+                      // silently skip unparseable docs
+                    }
+                  }
                 }
               }
             }
@@ -111,11 +133,11 @@ export class TaskBuilder {
         }
       }
 
-      // Effective prompt compile mode: CLI > job > api_config > default
+      // Effective prompt compile mode: CLI > job > api_config > default (annotate)
       const effectiveMode: PromptCompileMode =
-        promptCompileMode || modelConfig.prompt_compile_mode || 'keep';
+        promptCompileMode || modelConfig.prompt_compile_mode || 'annotate';
 
-      // Apply PromptCompiler if we have resolved refs
+      // Compile prompt
       let refsMap: Record<string, string> | undefined;
       if (resolvedRefs && resolvedRefs.length > 0) {
         const originalPrompt = job.prompt || job.payload.prompt || '';
@@ -164,8 +186,8 @@ export class TaskBuilder {
 
       const taskJson = compiler.compile(ctx);
 
-      // Attach _refs_map to _opsv metadata when in keep mode (so model can resolve @-tokens)
-      if (effectiveMode === 'keep' && refsMap && Object.keys(refsMap).length > 0) {
+      // Attach _refs_map to _opsv metadata in keep/annotate mode (so model can resolve @-tokens)
+      if ((effectiveMode === 'keep' || effectiveMode === 'annotate') && refsMap && Object.keys(refsMap).length > 0) {
         (taskJson._opsv as unknown as Record<string, unknown>)._refs_map = refsMap;
       }
 

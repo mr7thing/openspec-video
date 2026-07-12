@@ -20,7 +20,9 @@ export interface FieldCheck {
 
 export interface CategoryRule {
   required_fields?: string[];
-  skip_prompt_check?: boolean;
+  skip_prompt_check?: boolean;           // 跳过默认 prompt 检查
+  skip_brief_check?: boolean;            // 跳过默认 brief 检查
+  skip_prompt_refs_check?: boolean;      // 跳过 prompt ↔ refs 双向校验
   severity?: 'error' | 'warning';
   field_schema?: Record<string, FieldCheck>;
 }

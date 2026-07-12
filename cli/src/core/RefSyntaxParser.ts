@@ -14,9 +14,9 @@ import { PromptRefToken } from '../types/Refs';
 //     :name              (in-doc)
 //     FRAME:name_kind    (frame)
 //     id(:variant)?      (external)
-// id/key/variant: alphanumeric + _ -
+// id/key/variant: Unicode alphanumeric + _ -
 // Note: '.' is intentionally excluded to avoid swallowing trailing punctuation in prose.
-const TOKEN_REGEX = /@(?::([a-zA-Z0-9_\-]+)|FRAME:([a-zA-Z0-9_\-]+)|([a-zA-Z0-9_\-]+)(?::([a-zA-Z0-9_\-]+))?)/g;
+const TOKEN_REGEX = /@(?::([\p{L}\p{N}_\-]+)|FRAME:([\p{L}\p{N}_\-]+)|([\p{L}\p{N}_\-]+)(?::([\p{L}\p{N}_\-]+))?)/gu;
 
 /**
  * Parse all @-tokens in a text. Returns tokens in source order.

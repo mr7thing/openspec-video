@@ -36,6 +36,8 @@ export interface ResolvedRef {
   variant?: string;
   /** Resolved file paths (at least one when validated) */
   paths: string[];
+  /** Brief description from referenced doc's frontmatter (populated at compile time) */
+  brief?: string;
   /**
    * API-side asset ID, populated from the referenced doc's frontmatter.
    * Only set when the referenced doc (e.g. elements/yun_li_adult.md) has

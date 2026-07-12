@@ -20,14 +20,21 @@ builtin 内置规则
 
 合并方式：`Object.assign` 逐层覆盖（`categoryValidateLoader.ts:58-68`），后加载的覆盖前者。
 
-### 1.2 内置类别（`BUILTIN_DEFAULTS`，`categoryValidateLoader.ts:30-44`）
+### 1.2 内置类别 + 全局默认检查
 
-只有两个内置类别，不可删：
+全局默认检查（不依赖 category）、不可跳过（除非类别规则明确 skip）：
+
+| 检查项 | 所有文档默认检查 | 跳过方式 | 说明 |
+|--------|-----------------|----------|------|
+| `prompt` | ✅ 必填、≥10字符、无占位符 | `skip_prompt_check: true` | 生成指令 |
+| `brief` | ✅ 建议填写（warning 级别） | `skip_brief_check: true` | 用于 annotate prompt 编译的图注描述 |
+
+内置类别（`BUILTIN_DEFAULTS`，`categoryValidateLoader.ts:30-44`）：
 
 | 类别 | required_fields | 特殊 |
 |------|-----------------|------|
 | `project` | `status` | `skip_prompt_check: true` |
-| `shotdeck` | `status`, `title` | prompt `min_length: 10` + `no_placeholder: true` |
+| `shotdeck` | `status`, `title` | — |
 
 ### 1.3 自定义类别
 

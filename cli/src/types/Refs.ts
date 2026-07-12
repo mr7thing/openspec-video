@@ -36,11 +36,13 @@ export interface PromptRefToken {
 /**
  * PromptCompileMode — how to rewrite prompt @-tokens at compile time.
  *
- * - keep:  prompt unchanged, attach _refs_map payload
- * - index: @hero → image1, @:angle_side → image2 (per-type sequential)
- * - name:  @hero → hero, @:angle_side → angle_side (bare names)
+ * - keep:    prompt unchanged, attach _refs_map payload
+ * - index:   @hero → image1, @:angle_side → image2 (per-type sequential)
+ * - name:    @hero → hero, @:angle_side → angle_side (bare names)
+ * - annotate: (default) prefix with imageN is @hero(#brief:...);
+ *             body: @hero → @hero(image1); reads brief from referenced doc
  */
-export type PromptCompileMode = 'keep' | 'index' | 'name';
+export type PromptCompileMode = 'keep' | 'index' | 'name' | 'annotate';
 
 /**
  * RefSyntaxKind — categorizes a parsed @-token without consuming it.
