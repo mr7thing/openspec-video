@@ -5,61 +5,19 @@
 // ============================================================================
 
 import { Command } from 'commander';
-import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
-import qrcode from 'qrcode-terminal';
 import { ManifestReader } from '../core/ManifestReader';
 import { ManifestReviewStrategy, GlobalReviewStrategy } from '../core/ReviewStrategy';
 import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
 import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
-import { CloudClient } from '../tunnel/CloudClient';
-import { TunnelClient, AccessLogEntry } from '../tunnel/TunnelClient';
-import { CloudflaredManager } from '../tunnel/CloudflaredManager';
-import { createAuthMiddleware } from '../review-ui/middleware/auth';
-import { CredentialManager } from '../auth/CredentialManager';
-import { DeviceFlowClient } from '../auth/DeviceFlowClient';
+import { CloudReviewSession, resolveCloudConfig, executeCloudCommand } from '../tunnel/CloudReviewSession';
 
 const DEFAULT_REVIEW_PORT = 3100;
 const DEFAULT_REVIEW_TTL = 900;
-
-function normalizeCloudUrl(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
-async function resolveCloudConfig(opts: ReviewOptions): Promise<{ cloudUrl: string; authToken: string } | null> {
-  if (!opts.cloud) return null;
-
-  const cloudUrl = opts.cloudUrl || process.env.OPSV_CLOUD_URL;
-  if (!cloudUrl) {
-    console.error(chalk.red('Cloud review requires --cloud-url/OPSV_CLOUD_URL.'));
-    process.exit(1);
-  }
-
-  const normalizedUrl = normalizeCloudUrl(cloudUrl);
-
-  // Try OAuth first
-  const deviceFlow = new DeviceFlowClient(normalizedUrl);
-  let authToken = await deviceFlow.refreshIfNeeded();
-
-  // Fallback to API key
-  if (!authToken) {
-    const apiKey = opts.cloudApiKey || process.env.OPSV_CLOUD_API_KEY;
-    if (apiKey) {
-      authToken = `Bearer ${apiKey}`;
-    }
-  }
-
-  if (!authToken) {
-    console.error(chalk.red('未登录。请先运行 opsv login，或设置 OPSV_CLOUD_API_KEY。'));
-    process.exit(1);
-  }
-
-  return { cloudUrl: normalizedUrl, authToken };
-}
 
 function autoCommitPendingChanges(projectRoot: string): void {
   try {
@@ -81,16 +39,16 @@ export function registerReviewCommand(program: Command): void {
     .command('review')
     .description('Start visual review server')
     .option('--port <number>', 'Server port', `${DEFAULT_REVIEW_PORT}`)
-    .option('--circle [path]', 'Run in manifest-driven mode. Auto-discovers latest manifest if no path given. Accepts circle dir or manifest file path.')
+    .option('--circle [path]', 'Run in manifest-driven mode. Auto-discovers latest manifest if no path given.')
     .option('--latest', 'Show only latest circle outputs (global mode)')
     .option('--all', 'Show all circle outputs (global mode)')
     .option('--ttl <seconds>', `Auto-shutdown after idle seconds (default: ${DEFAULT_REVIEW_TTL})`, `${DEFAULT_REVIEW_TTL}`)
     .option('--cloud', 'Expose the review server through OpsV Cloud tunnel')
     .option('--cloud-url <url>', 'OpsV Cloud base URL (or OPSV_CLOUD_URL)')
-    .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY, fallback if not logged in)')
-    .option('--status <sessionId>', 'Get cloud session status (requires --cloud)')
-    .option('--rotate-review-token <sessionId>', 'Rotate the reviewer URL token (requires --cloud)')
-    .option('--close <sessionId>', 'Close a cloud session (requires --cloud)')
+    .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY)')
+    .option('--status <sessionId>', 'Get cloud session status')
+    .option('--rotate-review-token <sessionId>', 'Rotate the reviewer URL token')
+    .option('--close <sessionId>', 'Close a cloud session')
     .action(async (options: ReviewOptions) => {
       try {
         const parsed = ReviewOptionsSchema.safeParse(options);
@@ -103,27 +61,10 @@ export function registerReviewCommand(program: Command): void {
         // ─── Cloud lifecycle commands (no local server needed) ───
         const cloudConfig = await resolveCloudConfig(opts);
         if (cloudConfig && (opts.status || opts.rotateReviewToken || opts.close)) {
-          const client = new CloudClient(cloudConfig.cloudUrl, cloudConfig.authToken);
-
-          if (opts.status) {
-            const info = await client.getSession(opts.status);
-            console.log(chalk.cyan(`Session: ${opts.status}`));
-            console.log(JSON.stringify(info, null, 2));
-            return;
-          }
-
-          if (opts.rotateReviewToken) {
-            const result = await client.rotateReviewToken(opts.rotateReviewToken);
-            console.log(chalk.green(`Review token rotated: ${opts.rotateReviewToken}`));
-            console.log(chalk.green(`Review URL: ${result.reviewUrl}`));
-            return;
-          }
-
-          if (opts.close) {
-            await client.closeSession(opts.close);
-            console.log(chalk.green(`Session closed: ${opts.close}`));
-            return;
-          }
+          if (opts.status) await executeCloudCommand(cloudConfig, 'status', opts.status);
+          if (opts.rotateReviewToken) await executeCloudCommand(cloudConfig, 'rotate', opts.rotateReviewToken);
+          if (opts.close) await executeCloudCommand(cloudConfig, 'close', opts.close);
+          return;
         }
 
         // ─── Standard review server startup ───
@@ -166,28 +107,7 @@ export function registerReviewCommand(program: Command): void {
           manifestReader,
         });
 
-        let cloudflaredManager: CloudflaredManager | null = null;
-
-        let tunnelClient: TunnelClient | null = null;
-        let cloudClient: CloudClient | null = null;
-        let cloudSessionId: string | null = null;
-        let cloudSessionToken: string | null = null;
-        let cleanedUp = false;
-
-        const cleanupCloud = async () => {
-          if (cleanedUp) return;
-          cleanedUp = true;
-          tunnelClient?.close();
-          cloudflaredManager?.stop();
-          if (cloudClient && cloudSessionId) {
-            try {
-              await cloudClient.closeSession(cloudSessionId);
-              console.log(chalk.gray(`Cloud session closed: ${cloudSessionId}`));
-            } catch (err: any) {
-              logger.warn(`Failed to close cloud session: ${err.message}`);
-            }
-          }
-        };
+        let cloudSession: CloudReviewSession | null = null;
 
         const server = app.listen(opts.port, async () => {
           console.log(chalk.green(`Review server running at http://localhost:${opts.port}`));
@@ -195,70 +115,21 @@ export function registerReviewCommand(program: Command): void {
           if (!cloudConfig) return;
 
           try {
-            cloudClient = new CloudClient(cloudConfig.cloudUrl, cloudConfig.authToken);
-            const session = await cloudClient.createSession();
-            cloudSessionId = session.sessionId;
-            cloudSessionToken = session.sessionToken;
-
-            // Mount HMAC auth middleware for tunnel mode
-            app.use(createAuthMiddleware({ sessionToken: session.sessionToken }));
-
-            // Start cloudflared tunnel
-            cloudflaredManager = new CloudflaredManager();
-            const tunnelUrl = await cloudflaredManager.start(opts.port);
-            console.log(chalk.green(`Cloudflared tunnel: ${tunnelUrl}`));
-
-            // Report tunnel URL to VPS
-            await cloudClient.updateTunnelUrl(session.sessionId, tunnelUrl);
-
-            // Keep WebSocket connection for relay fallback + control
-            tunnelClient = new TunnelClient(cloudConfig.cloudUrl, session.sessionToken, opts.port, session.sessionId);
-            await tunnelClient.connect();
-
-            // Write full URL to file so it's never truncated in terminal
-            const urlFile = path.join(process.cwd(), '.opsv-review-url');
-            fs.writeFileSync(urlFile, session.reviewUrl, 'utf-8');
-
-            console.log(chalk.green(`Cloud review URL: ${session.reviewUrl}`));
-            console.log(chalk.gray(`Cloud session: ${session.sessionId}`));
-            console.log(chalk.cyan('Full URL saved to:'), chalk.yellow(urlFile));
-            console.log(chalk.cyan('Scan QR code to open on mobile:'));
-            qrcode.generate(session.reviewUrl, { small: true });
-
-            // Expose relay control endpoints
-            app.get('/api/session-info', async (_req, res) => {
-              try {
-                const info = await cloudClient!.getSession(session.sessionId);
-                res.json(info);
-              } catch (err: any) {
-                res.status(500).json({ error: err.message });
-              }
-            });
-
-            app.post('/api/enable-relay', async (_req, res) => {
-              try {
-                const result = await cloudClient!.enableRelay(session.sessionId);
-                res.json(result);
-              } catch (err: any) {
-                res.status(500).json({ error: err.message });
-              }
-            });
+            cloudSession = new CloudReviewSession(cloudConfig.cloudUrl, cloudConfig.authToken);
+            await cloudSession.start(opts.port, app);
           } catch (err: any) {
             logger.error(err.message);
-            await cleanupCloud();
+            await cloudSession?.stop();
             server.close(() => process.exit(1));
           }
         });
 
         server.on('close', () => {
-          void cleanupCloud();
+          void cloudSession?.stop();
         });
 
         const shutdown = () => {
-          // Close cloud resources first, then the HTTP server.
-          // server.close() waits for all connections (including WS) to close,
-          // so we must cleanup before calling it, with a timeout fallback.
-          cleanupCloud().then(() => {
+          cloudSession?.stop().then(() => {
             server.close(() => process.exit(0));
           });
           setTimeout(() => process.exit(0), 5000);

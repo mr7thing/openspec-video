@@ -1,4 +1,4 @@
-import { bindRefs, parseKey } from '../RefBinder';
+import { bindRefs, parseKey } from '../RefEngine';
 import { RefsByType } from '../../types/Refs';
 import { InputTypesLoader } from '../../utils/inputTypesLoader';
 import path from 'path';

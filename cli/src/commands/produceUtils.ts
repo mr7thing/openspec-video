@@ -7,7 +7,7 @@ import fs from 'fs';
 import { AssetManager, CircleAssetEntry } from '../core/AssetManager';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { DesignRefReader } from '../core/DesignRefReader';
-import { RefResolver } from '../core/RefResolver';
+import { RefResolver } from '../core/RefEngine';
 import { FrontmatterParser } from '../core/FrontmatterParser';
 import { Job } from '../types/Job';
 import { resolveProjectRoot } from '../utils/projectResolver';

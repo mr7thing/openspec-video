@@ -1,4 +1,4 @@
-import { compilePrompt } from '../PromptCompiler';
+import { compilePrompt } from '../../RefEngine';
 import { ResolvedRef } from '../../../types/FrontmatterSchema';
 
 const refs: ResolvedRef[] = [

@@ -23,9 +23,12 @@ describe('ConfigLoader', () => {
     fs.writeFileSync(path.join(opsvDir, 'api_config.yaml'), content);
   }
 
-  it('loads empty config when file missing', () => {
+  it('loads built-in config when file missing', () => {
     const cfg = loader.loadConfig(tmpDir);
-    expect(cfg.models).toEqual({});
+    // When no project config exists, built-in defaults are loaded
+    expect(Object.keys(cfg.models).length).toBeGreaterThan(0);
+    // Built-in models include volc.seadream5, siliconflow.want2v, etc.
+    expect(cfg.models['volc.seadream5']).toBeDefined();
   });
 
   it('loads valid YAML config', () => {

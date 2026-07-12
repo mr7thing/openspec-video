@@ -25,8 +25,7 @@ import { CircleManifest } from '../types/ManifestSchema';
 import { CategoryValidateLoader } from '../utils/categoryValidateLoader';
 import { InputTypesLoader } from '../utils/inputTypesLoader';
 import { validateCategory, ValidationIssue } from '../core/CategoryValidator';
-import { bindRefs } from '../core/RefBinder';
-import { parseKey } from '../core/RefBinder';
+import { bindRefs, parseKey } from '../core/RefEngine';
 import { addDirOption, resolveDirs } from '../utils/dirOption';
 
 interface ValidateCommandOptions {

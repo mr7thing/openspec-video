@@ -9,7 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
 import { FrontmatterParser } from '../core/FrontmatterParser';
-import { extractAllRefs } from '../core/RefSyntaxParser';
+import { extractAllRefs } from '../core/RefEngine';
 import { RefsByType } from '../types/Refs';
 import { logger } from '../utils/logger';
 import { registerRefsFillCommand } from './refsFill';

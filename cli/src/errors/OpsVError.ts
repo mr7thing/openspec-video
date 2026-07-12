@@ -63,15 +63,47 @@ export enum OpsVErrorCode {
   SCHEDULING_DEP_NOT_READY = 'E7002',
 }
 
-/** Base OpsV error with code + message */
+/** Extra context attached to an OpsV error */
+export interface ErrorContext {
+  phase?: string;
+  assetId?: string;
+  circle?: string;
+  provider?: string;
+  command?: string;
+  /** Free-form additional context */
+  extra?: Record<string, unknown>;
+}
+
+/** Base OpsV error with code + message + context */
 export class OpsVError extends Error {
+  public context: ErrorContext;
+
   constructor(
     public readonly code: OpsVErrorCode,
     message: string,
     public readonly details?: Record<string, unknown>,
+    context?: ErrorContext,
   ) {
     super(message);
     this.name = 'OpsVError';
+    this.context = context || {};
+  }
+
+  /** Attach context without creating a new error */
+  withContext(ctx: Partial<ErrorContext>): this {
+    this.context = { ...this.context, ...ctx };
+    return this;
+  }
+
+  /** Format error with context for display */
+  formatMessage(): string {
+    const parts = [this.message];
+    if (this.context.assetId) parts.push(`asset=${this.context.assetId}`);
+    if (this.context.circle) parts.push(`circle=${this.context.circle}`);
+    if (this.context.phase) parts.push(`phase=${this.context.phase}`);
+    if (this.context.provider) parts.push(`provider=${this.context.provider}`);
+    if (this.context.command) parts.push(`command=${this.context.command}`);
+    return `[${this.code}] ${parts.join(' | ')}`;
   }
 
   toJSON(): Record<string, unknown> {
@@ -80,6 +112,7 @@ export class OpsVError extends Error {
       code: this.code,
       message: this.message,
       details: this.details,
+      context: this.context,
     };
   }
 }
@@ -89,50 +122,50 @@ export class OpsVError extends Error {
 // ---------------------------------------------------------------------------
 
 export class AssetError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'AssetError';
   }
 }
 
 export class ConfigError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'ConfigError';
   }
 }
 
 export class CompilationError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'CompilationError';
   }
 }
 
 export class ExecutionError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'ExecutionError';
   }
 }
 
 export class InfrastructureError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'InfrastructureError';
   }
 }
 
 export class ValidationError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'ValidationError';
   }
 }
 
 export class SchedulingError extends OpsVError {
-  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>) {
-    super(code, message, details);
+  constructor(code: OpsVErrorCode, message: string, details?: Record<string, unknown>, context?: ErrorContext) {
+    super(code, message, details, context);
     this.name = 'SchedulingError';
   }
 }

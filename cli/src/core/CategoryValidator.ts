@@ -6,7 +6,7 @@
 
 import { RefsByType } from '../types/Refs';
 import { CategoryRule, FieldCheck } from '../utils/categoryValidateLoader';
-import { extractAllRefs } from './RefSyntaxParser';
+import { extractAllRefs } from './RefEngine';
 
 export type ValidationSeverity = 'error' | 'warning';
 
@@ -57,9 +57,10 @@ export function validateCategory(
     }
   }
 
-  // 2) Default checks: prompt (always checked unless skipped)
+  // 2) Default checks: prompt (always checked unless skipped or overridden by field_schema)
   const skipPrompt = rule?.skip_prompt_check === true;
-  if (!skipPrompt) {
+  const hasPromptFieldSchema = !!rule?.field_schema?.prompt;
+  if (!skipPrompt && !hasPromptFieldSchema) {
     const promptVal = frontmatter['prompt'];
     if (promptVal === undefined || promptVal === null || promptVal === '') {
       issues.push({

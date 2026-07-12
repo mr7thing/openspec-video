@@ -10,7 +10,7 @@ import fs from 'fs';
 import chalk from 'chalk';
 import yaml from 'js-yaml';
 import { FrontmatterParser } from '../core/FrontmatterParser';
-import { extractAllRefs } from '../core/RefSyntaxParser';
+import { extractAllRefs } from '../core/RefEngine';
 import { RefsByType } from '../types/Refs';
 import { ApprovedRefReader } from '../core/ApprovedRefReader';
 import { AssetManager } from '../core/AssetManager';

@@ -195,15 +195,22 @@ my-pack/
 ├── README.md                     # Install & usage guide
 ├── manifest.json                 # OPSV runtime metadata (optional)
 ├── SKILL.md                      # Entry skill (pack navigator)
+├── contracts/                    # ⭐ Stage input/output contracts
+│   ├── stage-inputs.md           #   What each stage needs
+│   └── stage-outputs.md          #   What each stage must produce
 ├── guides/                       # Shared prompt frameworks
 ├── references/                   # Shared reference docs (CLI, refs, file specs)
-├── .opsv/
-│   └── _category_validate.yaml   # Per-category validation contracts
+├── .opsv/                        # ⭐ OPSV config (optional — enhances validation)
+│   └── _category_validate.yaml   #   Per-category validation contracts
 └── skills/                       # Stage skills (one dir per stage)
     ├── opsv-<stage-1>/           #   SKILL.md + references per stage
     ├── opsv-<stage-2>/
     └── ...
 ```
+
+**Two-layer architecture:**
+- **Agent Skill layer** (pure instructions + contracts): zero code dependency. Agent reads SKILL.md + contracts/ to execute any stage independently.
+- **OPSV Config layer** (optional): `.opsv/` provides automated validation via `opsv validate`. Works without it — just no auto-validation.
 
 ### Per-category validation
 

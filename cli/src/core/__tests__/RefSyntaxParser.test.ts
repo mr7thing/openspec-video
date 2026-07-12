@@ -3,7 +3,7 @@ import {
   extractRefsFromText,
   extractFrameRefs,
   extractAllRefs,
-} from '../RefSyntaxParser';
+} from '../RefEngine';
 
 describe('RefSyntaxParser', () => {
   describe('parsePromptRefs', () => {

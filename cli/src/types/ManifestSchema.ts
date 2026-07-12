@@ -9,7 +9,7 @@ import { StatusEnum } from './FrontmatterSchema';
 export const ManifestAssetEntrySchema = z.object({
   status: StatusEnum,
   index: z.number(),
-  category: z.string().optional(),
+  category: z.string(),
 });
 export type ManifestAssetEntry = z.infer<typeof ManifestAssetEntrySchema>;
 

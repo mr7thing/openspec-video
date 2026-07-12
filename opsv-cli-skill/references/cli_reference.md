@@ -1,7 +1,7 @@
 # CLI 命令手册 (cli_reference)
 
-> 全部 18 个命令，按组分类。每条含语法、必填参数、可选 flag、源码位置。
-> 真相基准：`videospec` v0.11.4 源码 `src/commands/`。所有 file:line 以源码为准。
+> 全部 20 个命令，按组分类。每条含语法、必填参数、可选 flag、源码位置。
+> 真相基准：`videospec` v0.15.0 源码 `src/commands/`。所有 file:line 以源码为准。
 
 ---
 
@@ -445,6 +445,43 @@ opsv env init-key --dry-run          # 预览哪些 .env 会被迁移
 | `opsv webapp-exec run` | 执行 webapp 任务 | `src/commands/webappExec.ts:30` |
 | `opsv webapp-exec status` | 查队列状态 | `src/commands/webappExec.ts:83` |
 | `opsv webapp-exec info` | 查任务解析信息 | `src/commands/webappExec.ts:99` |
+
+---
+
+## 9. 状态与溯源
+
+### `opsv status`
+
+快速查看项目状态：circle 完成度、pending 资产、下一步操作提示。
+
+```bash
+opsv status                          # 显示所有 circle 状态
+opsv status --circle <name>          # 只显示指定 circle
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `--circle <name>` | `string` | 全部 | 只显示指定 circle 的状态 |
+
+- **源码**：`src/commands/status.ts`
+- **输出**：每个 circle 的进度条（█░）、approved/syncing/drafting 数量、总体完成百分比
+
+### `opsv trace <assetId>`
+
+从输出文件反向追溯到源文档，显示完整的资产生命周期。
+
+```bash
+opsv trace hero                      # 追溯 hero 资产
+opsv trace shot01 --circle circle1   # 只追溯指定 circle
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `<assetId>` | `string` | 必填 | 要追溯的资产 ID |
+| `--circle <name>` | `string` | 全部 | 限制追溯范围 |
+
+- **源码**：`src/commands/trace.ts`
+- **输出**：源文档路径、category、status、refs 引用、output 文件列表、review 历史
 
 ---
 

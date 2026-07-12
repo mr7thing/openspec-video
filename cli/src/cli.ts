@@ -27,6 +27,8 @@ import { registerRefsCommand } from './commands/refs';
 import { registerImageStitchCommand } from './commands/imageStitch';
 import { registerApiSetupCommand } from './commands/apiSetup';
 import { registerEnvCommands } from './commands/env';
+import { registerStatusCommand } from './commands/status';
+import { registerTraceCommand } from './commands/trace';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -123,5 +125,7 @@ registerRefsCommand(program);
 registerImageStitchCommand(program);
 registerApiSetupCommand(program);
 registerEnvCommands(program);
+registerStatusCommand(program);
+registerTraceCommand(program);
 
 program.parse(process.argv);

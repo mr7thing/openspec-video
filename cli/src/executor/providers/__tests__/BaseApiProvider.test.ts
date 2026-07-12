@@ -96,6 +96,7 @@ describe('BaseApiProvider', () => {
     jest.spyOn(polling, 'appendLog').mockImplementation(() => {});
     jest.spyOn(naming, 'resolveNextOutputIndex').mockReturnValue(1);
     jest.spyOn(naming, 'outputFilePath').mockReturnValue('/tmp/output_1.png');
+    jest.spyOn(naming, 'withTaskLock').mockImplementation(async (_id, fn) => fn());
     jest.spyOn(download, 'downloadFile').mockResolvedValue('/tmp/output.png');
   });
 

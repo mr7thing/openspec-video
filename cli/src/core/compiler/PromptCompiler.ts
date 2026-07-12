@@ -10,7 +10,7 @@
 
 import { PromptCompileMode } from '../../types/Refs';
 import { ResolvedRef } from '../../types/FrontmatterSchema';
-import { parsePromptRefs } from '../RefSyntaxParser';
+import { parsePromptRefs } from '../RefEngine';
 
 export interface PromptCompileResult {
   /** Rewritten prompt text */

@@ -20,12 +20,12 @@ import { RhWorkflowCompiler } from './providers/RhWorkflowCompiler';
 import { logger } from '../../utils/logger';
 import { CompilationError, ConfigError, OpsVErrorCode } from '../../errors/OpsVError';
 import { OpsVContext } from '../../container/OpsVContext';
-import { bindRefs } from '../RefBinder';
+import { bindRefs } from '../RefEngine';
 import { FrontmatterParser } from '../FrontmatterParser';
 import { ResolvedRef } from '../../types/FrontmatterSchema';
 import { RefsByType, PromptCompileMode } from '../../types/Refs';
 import { InputTypesLoader } from '../../utils/inputTypesLoader';
-import { compilePrompt } from './PromptCompiler';
+import { compilePrompt } from '../RefEngine';
 import { getProjectDir } from '../../utils/configLoader';
 import { buildAssetDocIndex } from '../AssetDocIndex';
 

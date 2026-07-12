@@ -11,7 +11,7 @@ import { TaskBuilder } from '../core/compiler/TaskBuilder';
 import { OpsVContext } from '../container/OpsVContext';
 import { CircleAssetEntry } from '../core/AssetManager';
 import { FrontmatterParser } from '../core/FrontmatterParser';
-import { RefResolver } from '../core/RefResolver';
+import { RefResolver } from '../core/RefEngine';
 import { DesignRefReader } from '../core/DesignRefReader';
 import { Job } from '../types/Job';
 import { logger } from '../utils/logger';
