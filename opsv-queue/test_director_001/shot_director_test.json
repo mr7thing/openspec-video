@@ -1,0 +1,78 @@
+{
+  "payload": {
+    "addMetadata": false,
+    "nodeInfoList": [
+      {
+        "nodeId": "6",
+        "fieldName": "text",
+        "fieldValue": "A young woman in flowing crimson robes walks through a grand palace hall toward a stone stele."
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "timeline_data",
+        "fieldValue": "{\"segments\":[{\"id\":\"seg1\",\"start\":0,\"length\":24,\"prompt\":\"女人推开宫殿门走进去\",\"type\":\"image\"},{\"id\":\"seg2\",\"start\":24,\"length\":24,\"prompt\":\"女人走向宫殿里的石碑\",\"type\":\"image\"},{\"id\":\"seg3\",\"start\":48,\"length\":24,\"prompt\":\"女人触碰石碑\",\"type\":\"image\"}],\"audioSegments\":[]}"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "local_prompts",
+        "fieldValue": "女人推开宫殿门走进去 | 女人走向宫殿里的石碑 | 女人触碰石碑"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "segment_lengths",
+        "fieldValue": "24,24,24"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "guide_strength",
+        "fieldValue": "1.00,1.00,1.00"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "frame_rate",
+        "fieldValue": 24
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "duration_seconds",
+        "fieldValue": 5
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "epsilon",
+        "fieldValue": 0.5
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "use_custom_audio",
+        "fieldValue": false
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "custom_width",
+        "fieldValue": 1920
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "custom_height",
+        "fieldValue": 1080
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "display_mode",
+        "fieldValue": "seconds"
+      }
+    ],
+    "instanceType": "default",
+    "usePersonalQueue": false
+  },
+  "_opsv": {
+    "provider": "rhworkflow-v2",
+    "modelKey": "rh-workflow-v2.director",
+    "type": "imagen",
+    "shotId": "shot_director_test",
+    "api_url": "https://api.runninghub.cn/run/workflow/2064630504955142146",
+    "api_status_url": "https://www.runninghub.cn/openapi/v2/query",
+    "compiledAt": "2026-07-12T12:01:28.267Z"
+  }
+}

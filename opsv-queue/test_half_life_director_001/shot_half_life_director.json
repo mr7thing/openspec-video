@@ -1,0 +1,83 @@
+{
+  "payload": {
+    "addMetadata": false,
+    "nodeInfoList": [
+      {
+        "nodeId": "6",
+        "fieldName": "text",
+        "fieldValue": "黄昏庭院，金色暖光透过树叶洒落，石板小径通向远处木门，氛围宁静温暖。中年男子立于庭院中，神情沉重，青色长袍被风吹动。年轻女子站在门槛旁，手扶门框，目光复杂，红色裙摆在暮色中微扬。远山雪顶映照暮色，天地苍茫，一只孤雁飞过天际"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "timeline_data",
+        "fieldValue": "{\"segments\":[{\"id\":\"frame1\",\"start\":0,\"length\":108,\"prompt\":\"黄昏庭院，金色暖光透过树叶洒落，石板小径通向远处木门，氛围宁静温暖\",\"type\":\"image\",\"imageFile\":\"mood-courtyard-warm-gold_1.png\",\"imageB64\":\"/home/uncle7/creative/opsv-projects-test/半生未满/opsv-queue/videospec_circle2/webapp.gemini-opencli_003/mood-courtyard-warm-gold_1.png\"},{\"id\":\"frame2\",\"start\":108,\"length\":96,\"prompt\":\"中年男子立于庭院中，神情沉重，青色长袍被风吹动\",\"type\":\"image\",\"imageFile\":\"char-husband_1.png\",\"imageB64\":\"/home/uncle7/creative/opsv-projects-test/半生未满/opsv-queue/videospec_circle2/webapp.gemini-opencli_003/char-husband_1.png\"},{\"id\":\"frame3\",\"start\":204,\"length\":96,\"prompt\":\"年轻女子站在门槛旁，手扶门框，目光复杂，红色裙摆在暮色中微扬\",\"type\":\"image\",\"imageFile\":\"char-wife_1.png\",\"imageB64\":\"/home/uncle7/creative/opsv-projects-test/半生未满/opsv-queue/videospec_circle2/webapp.gemini-opencli_003/char-wife_1.png\"},{\"id\":\"frame4\",\"start\":300,\"length\":60,\"prompt\":\"远山雪顶映照暮色，天地苍茫，一只孤雁飞过天际\",\"type\":\"image\",\"imageFile\":\"mood-snow-mountain-dusk_1.png\",\"imageB64\":\"/home/uncle7/creative/opsv-projects-test/半生未满/opsv-queue/videospec_circle2/webapp.gemini-opencli_003/mood-snow-mountain-dusk_1.png\"}],\"audioSegments\":[{\"id\":\"bgm\",\"start\":0,\"length\":360,\"audioFile\":\"bgm.mp3\",\"audioB64\":\"/tmp/半生未满_15s.mp3\"}]}"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "local_prompts",
+        "fieldValue": "黄昏庭院，金色暖光透过树叶洒落，石板小径通向远处木门，氛围宁静温暖 | 中年男子立于庭院中，神情沉重，青色长袍被风吹动 | 年轻女子站在门槛旁，手扶门框，目光复杂，红色裙摆在暮色中微扬 | 远山雪顶映照暮色，天地苍茫，一只孤雁飞过天际"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "segment_lengths",
+        "fieldValue": "108,96,96,60"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "guide_strength",
+        "fieldValue": "1.00,1.00,1.00,1.00"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "frame_rate",
+        "fieldValue": 24
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "global_prompt",
+        "fieldValue": "古风情感短片，暖金色调，夫妻关系中的沉默与遗憾，诗意的日常瞬间"
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "duration_seconds",
+        "fieldValue": 15
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "epsilon",
+        "fieldValue": 0.5
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "use_custom_audio",
+        "fieldValue": true
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "custom_width",
+        "fieldValue": 1920
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "custom_height",
+        "fieldValue": 1080
+      },
+      {
+        "nodeId": "46",
+        "fieldName": "display_mode",
+        "fieldValue": "seconds"
+      }
+    ],
+    "instanceType": "default",
+    "usePersonalQueue": false
+  },
+  "_opsv": {
+    "provider": "rhworkflow-v2",
+    "modelKey": "rh-workflow-v2.director",
+    "type": "imagen",
+    "shotId": "shot_half_life_director",
+    "api_url": "https://api.runninghub.cn/run/workflow/2064630504955142146",
+    "api_status_url": "https://www.runninghub.cn/openapi/v2/query",
+    "compiledAt": "2026-07-12T12:19:44.485Z"
+  }
+}
