@@ -60,7 +60,7 @@ opsv validate --skip-category-rules                      # 跳过分类规则，
 - **加载顺序**：builtin(`project`/`shotdeck`) → `~/.opsv/category_validate.yaml` → `.opsv/category_validate.yaml`（项目级最高）
 - **退出码**：有 error/dead ref/缺失图片/状态不一致/类别 error（`--strict` 含 warning）→ 非零
 - **检测项**：① schema 校验 ② refs 结构（`RefBinder`）③ 分类字段 ④ `@id` 死链 ⑤ body 图片链接存在性 ⑥ manifest 与 frontmatter 状态一致性
-- **编译前验证**（v0.13.8+）：`animate` / `imagen` / `comfy` / `webapp` 在编译前独立做资产引用验证，不依赖当前 circle 的 manifest，支持跨 circle 引用。
+- **编译前验证**（v0.13.8+）：`produce` 在编译前独立做资产引用验证，不依赖当前 circle 的 manifest，支持跨 circle 引用。
 
 > 详情见 `validate_and_iterate.md`。
 
@@ -106,61 +106,27 @@ opsv circle refresh --dir <path> --name <name>
 
 > 编译命令**只产出 task.json**，不调生成 API。真正的执行是 `opsv run`。
 
-### `opsv imagen`
+### `opsv produce`
 
-从 circle manifest 编译图像生成任务。
+统一编译命令，替代旧的 `imagen`/`animate`/`comfy`。从 circle manifest 读取资产文档，根据模型配置编译为 task.json。
 
 ```bash
-opsv imagen --model <model> [options]      # --model 必填
+opsv produce --model <key> [options]      # --model 必填
   --manifest <path>        # 指定 manifest，默认自动发现最新
   --category <cat>         # 按分类过滤
-  --status-skip <statuses> # 跳过指定状态（如 approved）
+  --status-skip <statuses> # 跳过指定状态（如 approved，默认），用 "none" 不过滤
   --file <id>              # 只编译指定资产
-  --prompt-mode <mode>     # keep | index | name（默认 keep）
+  --workflow <file>        # 工作流 JSON 路径（ComfyUI/RunningHub 用）
+  --param <json>           # 注入参数到 payload.extra
+  --prompt-mode <mode>     # keep | index | name | annotate（默认 annotate）
   --dry-run                # 只看会编译什么，不写文件
 ```
 
-- **源码**：`src/commands/imagen.ts:35`
+- **源码**：`src/commands/produce.ts`
+- **模型 key 格式**：`{provider}.{名称}`，例如 `volc.seedance2`、`rh-api.seedance`、`rh-workflow-v2.director`
 - **产出位置**：`circleDir/{model}_NNN/{jobId}.json`
-- **job 构建**：`buildImageJob`（`imagen.ts:108-151`）拉取 prompt/aspect_ratio/quality/reference_images
-
-### `opsv animate`
-
-从 circle manifest 编译视频生成任务。
-
-```bash
-opsv animate --model <model> [options]     # --model 必填
-  --manifest <path>
-  --category <cat>
-  --status-skip <statuses>
-  --file <id>
-  --prompt-mode <mode>
-  --dry-run
-```
-
-- **源码**：`src/commands/animate.ts:40`
-- **job 构建**：`buildVideoJob`（`animate.ts:113-175`）含 duration/frame_ref（首尾帧）/reference_images/videos/audios
-
-### `opsv comfy`
-
-从 circle manifest 编译 ComfyUI 工作流任务。
-
-```bash
-opsv comfy [options]
-  --manifest <path>
-  --category <cat>
-  --status-skip <statuses>
-  --file <id>
-  --workflow <file>        # 工作流 JSON 路径（绝对或相对 projectRoot）
-  --param <json>           # 注入参数
-  --force-api-mapping      # 强制使用 api_config.node_mappings（忽略 frontmatter）
-  --prompt-mode <mode>
-  --dry-run
-```
-
-- **源码**：`src/commands/comfy.ts:38`
-- **工作流文件**：在 `api_config.yaml` 中通过 `workflow` 字段指定 `.json` 文件路径（相对 projectRoot 或绝对路径）。CLI `--workflow` 可临时覆盖
-- **node_mappings**：定义 OPSV 参数注入到 ComfyUI 节点的映射关系，在 `api_config.yaml` 的 model 级别配置，或在文档 frontmatter 的 `node_mapping` 字段中配置。优先级：frontmatter > api_config
+- **job 构建**：`buildProduceJob`（`produce.ts:195-230`）统一处理 prompt、refs(image/video/audio)、frame_ref，其余 frontmatter 字段自动透传到 `payload.extra`
+- **prompt 默认模式 annotate**：自动生成 `image1 is @hero(#brief:...); @hero(image1)` 格式的图注
 
 ### `opsv comfy-node-mapping <workflow-file>`
 
@@ -358,29 +324,26 @@ opsv image-stitch <imgs...> -o <out> --down     # 纵向拼接
 opsv api-setup                        # 交互模式：扫描所有模型，显示 key 状态，引导补全缺失 key
 opsv api-setup --list                 # JSON 输出（Agent 友好），含每个模型的 key 状态
 opsv api-setup --set-key KEY=VALUE    # 设置/更新单个 key 到 .env
-opsv api-setup --add-model <json>     # 追加 comfylocal / runninghub / rhapi 模型配置
+opsv api-setup --add-model <json>     # 追加模型配置（所有 provider 通用）
 opsv api-setup --sync-env             # 扫描 api_config，补全 .env 中缺失的 key 占位
 ```
 
 - **源码**：`src/commands/apiSetup.ts:25`
-- **`--add-model` JSON 格式**（支持 `comfylocal` / `runninghub` / `rhapi`，`comfylocal` 和 `runninghub` 必须包含 `node_mappings`；`rhapi` 不需要）：
+- **`--add-model` JSON 格式**（支持所有 provider 类型）：
 
 ```json
-// comfylocal 示例：workflow 指向单个 .json 文件
-{"modelKey":"comfylocal.myflux","config":{"provider":"comfylocal","workflow":"comfyui_workflow_templates/txt2img.json","node_mappings":{"prompt":{"nodeId":"6","fieldName":"text"},"seed":{"nodeId":"25","fieldName":"noise_seed"}}}}
+// rh-workflow-v2 示例：新版 RunningHub 工作流
+{"modelKey":"rh-workflow-v2.director","config":{"provider":"rhworkflow-v2","workflowId":"2064630504955142146","api_url":"https://api.runninghub.cn/run/workflow/2064630504955142146","api_status_url":"https://www.runninghub.cn/openapi/v2/query","required_env":["RH_WORKFLOW_API_KEY"],"node_mappings":{"prompt":{"nodeId":"6","fieldName":"text"},"timeline_data":{"nodeId":"46","fieldName":"timeline_data"}}}}
 
-// runninghub 示例：workflowId 指向云端工作流
-{"modelKey":"runninghub.myvideo","config":{"provider":"runninghub","workflowId":"wf_abc123","api_url":"https://www.runninghub.cn/task/openapi/create","api_status_url":"https://www.runninghub.cn/task/openapi/status","node_mappings":{"prompt":{"nodeId":"6","fieldName":"text"},"image1":{"nodeId":"10","fieldName":"image"}}}}
-
-// rhapi 示例：直连 REST API，不需要 node_mappings
-{"modelKey":"rhapi.seedance2mini","config":{"provider":"rhapi","api_url":"https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-mini/multimodal-video","type":"video","supports_reference_images":true,"defaults":{"resolution":"720p","duration":"5"}}}
+// rh-api 示例：直连 REST API，不需要 node_mappings
+{"modelKey":"rh-api.seedance2mini","config":{"provider":"rhapi","api_url":"https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-mini/multimodal-video","type":"video","supports_reference_images":true,"defaults":{"resolution":"720p","duration":"5"}}}
 ```
 
 - **`--add-model` 验证规则**：
   - `comfylocal`：`workflow` + `node_mappings` 必填；不允许 `required_env`；`api_url` 默认 `http://127.0.0.1:8188/`
-  - `runninghub`：`workflowId` + `node_mappings` + `api_url` + `api_status_url` 必填；自动追加 `required_env: ["RUNNINGHUB_API_KEY"]`
-  - `rhapi`：`api_url` 必填；不需要 `node_mappings`；`api_status_url` 默认 `https://www.runninghub.cn/openapi/v2/query`；`required_env` 自动追加 `["RH_API_KEY"]`；`type` 默认 `video`
-- **`--set-key`**：如 `opsv api-setup --set-key RUNNINGHUB_API_KEY=sk-xxx`，写入项目 `.env`
+  - `rh-workflow-v1` / `rh-workflow-v2`：`workflowId` + `node_mappings` + `api_url` + `api_status_url` 必填；自动追加 `required_env: ["RH_WORKFLOW_API_KEY"]`
+  - `rh-api`：`api_url` 必填；不需要 `node_mappings`；`api_status_url` 默认 `https://www.runninghub.cn/openapi/v2/query`；`required_env` 自动追加 `["RH_API_KEY"]`；`type` 默认 `video`
+- **`--set-key`**：如 `opsv api-setup --set-key RH_WORKFLOW_API_KEY=sk-xxx`，写入项目 `.env`
 - **`--sync-env`**：扫描所有模型的 `required_env`，将缺失的变量以 `your_key_here` 占位追加到 `.env`
 
 ### 加密行为（v0.14.4+）
@@ -487,6 +450,6 @@ opsv env init-key --dry-run          # 预览哪些 .env 会被迁移
 
 ## 附录：命令注册一览
 
-入口 `src/cli.ts:77-102`，注册顺序见 `cli.ts`。Provider 注册（`cli.ts:69-75`）：volcengine / siliconflow / minimax / runninghub / comfylocal / webapp / rhapi。
+入口 `src/cli.ts:77-102`，注册顺序见 `cli.ts`。Provider 注册（`cli.ts:95-102`）：volcengine / siliconflow / minimax / rhworkflow-v1 / comfylocal / webapp / rhapi / rhworkflow-v2。
 
 > 注：`cli.ts:83` 注释为 "Register all commands"（v0.11.0 已修正数字）。
