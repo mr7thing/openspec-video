@@ -155,6 +155,12 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 
 ## Changelog
 
+### v0.16.2 (2026-07-14)
+
+- **fix(upload)**: RH upload returns fileName (COS path) instead of download_url for ComfyUI nodes
+- **fix(upload)**: imageFile field now correctly uses fileName from RH upload
+- **docs**: Add RH file upload mechanism documentation (COS mount architecture)
+
 ### v0.16.1 (2026-07-13)
 
 - **feat(tunnel)**: TunnelAdapter abstraction — pluggable tunnel providers (cloudflared, tencent-edge)
