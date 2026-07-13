@@ -218,7 +218,8 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
   /**
    * Upload a local file to RunningHub's media API.
    * POST multipart/form-data to /openapi/v2/media/upload/binary
-   * Returns the download URL for use in nodeInfoList.
+   * Returns the fileName for use in ComfyUI nodes (not the download_url).
+   * fileName is the path in ComfyUI's input directory (e.g., "openapi/xxx.png").
    */
   private async uploadFile(filePath: string, apiKey: string): Promise<string> {
     if (!fs.existsSync(filePath)) {
@@ -242,12 +243,14 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
       }
     );
 
-    if (res.data.code !== 0 || !res.data.data?.download_url) {
+    if (res.data.code !== 0 || !res.data.data?.fileName) {
       throw new Error(`RH upload failed: code=${res.data.code}`);
     }
 
-    logger.info(`[rhworkflow] Uploaded ${filePath} → ${res.data.data.download_url}`);
-    return res.data.data.download_url;
+    // Return fileName (path in ComfyUI input directory), not download_url
+    // This is what ComfyUI nodes expect for file references
+    logger.info(`[rhworkflow] Uploaded ${filePath} → ${res.data.data.fileName}`);
+    return res.data.data.fileName;
   }
 
   /**
