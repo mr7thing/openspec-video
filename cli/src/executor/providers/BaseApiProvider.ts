@@ -193,6 +193,71 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     }
   }
 
+  /**
+   * Deep scan a JSON string field for local file paths and resolve them via uploadFn.
+   * Used for nested structures like ComfyUI timeline_data where image paths are
+   * embedded inside a JSON string.
+   *
+   * @param jsonString - the JSON string to scan and mutate
+   * @param uploadFn - async callback that uploads a local file and returns a URL
+   * @returns the modified JSON string
+   */
+  protected async resolveNestedFileReferences(
+    jsonString: string,
+    uploadFn: (filePath: string) => Promise<string>
+  ): Promise<string> {
+    if (!jsonString || typeof jsonString !== 'string') return jsonString;
+
+    try {
+      const parsed = JSON.parse(jsonString);
+      const modified = await this.deepResolveFiles(parsed, uploadFn);
+      return JSON.stringify(modified);
+    } catch {
+      // Not valid JSON, return as-is
+      return jsonString;
+    }
+  }
+
+  /**
+   * Recursively scan an object for local file paths and upload them.
+   */
+  private async deepResolveFiles(
+    obj: any,
+    uploadFn: (filePath: string) => Promise<string>
+  ): Promise<any> {
+    if (obj === null || obj === undefined) return obj;
+
+    if (typeof obj === 'string') {
+      // Check if it's a local file path (not http/https/data URL)
+      if (!obj.startsWith('http://') && !obj.startsWith('https://') && !obj.startsWith('data:')) {
+        // Check if it looks like a file path (contains extension or is an absolute/relative path)
+        if (obj.match(/\.\w{2,4}$/) || obj.startsWith('/') || obj.startsWith('./')) {
+          try {
+            return await uploadFn(obj);
+          } catch {
+            // Upload failed, return original
+            return obj;
+          }
+        }
+      }
+      return obj;
+    }
+
+    if (Array.isArray(obj)) {
+      return Promise.all(obj.map(item => this.deepResolveFiles(item, uploadFn)));
+    }
+
+    if (typeof obj === 'object') {
+      const result: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = await this.deepResolveFiles(value, uploadFn);
+      }
+      return result;
+    }
+
+    return obj;
+  }
+
   async execute(
     task: BaseTaskJson<TPayload>,
     taskPath: string,
