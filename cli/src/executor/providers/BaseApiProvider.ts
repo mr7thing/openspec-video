@@ -219,14 +219,15 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
 
   /**
    * Recursively scan an object for media file paths and upload them.
-   * Matches strings that:
-   * 1. End with a known media extension, OR
-   * 2. Are local file paths that exist on disk
+   * Special handling for ComfyUI timeline_data format:
+   * - When `imageFile` contains a local file path, convert to base64
+   * - Put base64 in `imageB64` field, clear `imageFile`
    */
   private async scanAndResolveMedia(
     obj: any,
     uploadFn: (filePath: string) => Promise<string>,
-    extSet: Set<string>
+    extSet: Set<string>,
+    parentKey?: string
   ): Promise<any> {
     if (obj === null || obj === undefined) return obj;
 
@@ -258,13 +259,39 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
     }
 
     if (Array.isArray(obj)) {
-      return Promise.all(obj.map(item => this.scanAndResolveMedia(item, uploadFn, extSet)));
+      return Promise.all(obj.map(item => this.scanAndResolveMedia(item, uploadFn, extSet, parentKey)));
     }
 
     if (typeof obj === 'object') {
       const result: Record<string, any> = {};
-      for (const [key, value] of Object.entries(obj)) {
-        result[key] = await this.scanAndResolveMedia(value, uploadFn, extSet);
+      const keys = Object.keys(obj);
+
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = obj[key];
+
+        // Special handling for ComfyUI imageFile/imageB64 pattern
+        // When imageFile contains a local path, convert to base64 and put in imageB64
+        if (key === 'imageFile' && typeof value === 'string' && value.length > 0) {
+          const isLocalPath = value.startsWith('/') || value.startsWith('./') || value.startsWith('../');
+          const isMediaFile = [...extSet].some(ext => value.toLowerCase().endsWith(ext));
+
+          if ((isLocalPath || isMediaFile) && this.fileExists(value)) {
+            // Convert to base64 for imageB64 field
+            try {
+              const b64 = await this.resolveImageToBase64(value);
+              if (b64) {
+                result['imageFile'] = '';  // Clear imageFile
+                result['imageB64'] = b64;  // Put base64 in imageB64
+                continue;  // Skip normal processing
+              }
+            } catch {
+              // Fall through to normal processing
+            }
+          }
+        }
+
+        result[key] = await this.scanAndResolveMedia(value, uploadFn, extSet, key);
       }
       return result;
     }

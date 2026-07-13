@@ -64,70 +64,97 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
       // Determine upload mode
       const useBase64 = payload.upload_method === 'base64';
 
-      // Process nodeInfoList: resolve local file paths
-      if (Array.isArray(payload.nodeInfoList)) {
-        payload.nodeInfoList = await Promise.all(
-          payload.nodeInfoList.map(async (item: any) => {
-            if (typeof item.fieldValue !== 'string') return item;
+      // Check if workflow mode
+      if (payload._workflow_mode === 'workflow' && payload._workflow_json) {
+        // Workflow mode: process the workflow JSON directly
+        const workflowJson = { ...payload._workflow_json };
 
-            // HTTP/HTTPS/data URLs: pass through
-            if (item.fieldValue.startsWith('http://') ||
-                item.fieldValue.startsWith('https://') ||
-                item.fieldValue.startsWith('data:')) {
-              return item;
-            }
+        // Scan workflow for media files and upload them
+        const mediaExtensions = [
+          '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff',
+          '.mp4', '.mov', '.webm', '.avi', '.mkv',
+          '.mp3', '.wav', '.m4a', '.flac', '.ogg',
+        ];
 
-            // Local file path: resolve by upload mode
-            if (fs.existsSync(item.fieldValue)) {
-              if (useBase64) {
-                // Mode 1: base64 encode
-                const b64 = await this.resolveImageToBase64(item.fieldValue);
-                if (b64) {
-                  appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: item.fieldValue });
-                  return { ...item, fieldValue: b64 };
-                }
-              } else {
-                // Mode 2: upload to RH media API
-                try {
-                  const uploadedUrl = await this.uploadFile(item.fieldValue, apiKey);
-                  appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: item.fieldValue });
-                  return { ...item, fieldValue: uploadedUrl };
-                } catch (err: any) {
-                  logger.warn(`[rhworkflow] Upload failed for ${item.fieldValue}, sending raw: ${err.message}`);
+        const uploadFn = useBase64
+          ? async (fp: string) => (await this.resolveImageToBase64(fp)) || fp
+          : async (fp: string) => {
+              try {
+                const url = await this.uploadFile(fp, apiKey);
+                appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: fp });
+                return url;
+              } catch (err: any) {
+                logger.warn(`[rhworkflow] Upload failed for ${fp}: ${err.message}`);
+                return fp;
+              }
+            };
+
+        // Deep scan and resolve media files in workflow JSON
+        const extSet = new Set(mediaExtensions.map(e => e.toLowerCase()));
+        const resolved = await this.deepResolveWorkflowMedia(workflowJson, uploadFn, extSet);
+
+        // Update payload with resolved workflow
+        payload.workflow = JSON.stringify(resolved);
+        delete payload._workflow_json;
+      } else {
+        // NodeInfoList mode: process nodeInfoList
+        if (Array.isArray(payload.nodeInfoList)) {
+          payload.nodeInfoList = await Promise.all(
+            payload.nodeInfoList.map(async (item: any) => {
+              if (typeof item.fieldValue !== 'string') return item;
+
+              // HTTP/HTTPS/data URLs: pass through
+              if (item.fieldValue.startsWith('http://') ||
+                  item.fieldValue.startsWith('https://') ||
+                  item.fieldValue.startsWith('data:')) {
+                return item;
+              }
+
+              // Local file path: resolve by upload mode
+              if (fs.existsSync(item.fieldValue)) {
+                if (useBase64) {
+                  const b64 = await this.resolveImageToBase64(item.fieldValue);
+                  if (b64) {
+                    appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: item.fieldValue });
+                    return { ...item, fieldValue: b64 };
+                  }
+                } else {
+                  try {
+                    const uploadedUrl = await this.uploadFile(item.fieldValue, apiKey);
+                    appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: item.fieldValue });
+                    return { ...item, fieldValue: uploadedUrl };
+                  } catch (err: any) {
+                    logger.warn(`[rhworkflow] Upload failed for ${item.fieldValue}, sending raw: ${err.message}`);
+                  }
                 }
               }
-            }
-            return item;
-          })
-        );
+              return item;
+            })
+          );
+        }
+
+        // Scan entire payload for media files
+        const mediaExtensions = [
+          '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff',
+          '.mp4', '.mov', '.webm', '.avi', '.mkv',
+          '.mp3', '.wav', '.m4a', '.flac', '.ogg',
+        ];
+
+        const uploadFn = useBase64
+          ? async (fp: string) => (await this.resolveImageToBase64(fp)) || fp
+          : async (fp: string) => {
+              try {
+                const url = await this.uploadFile(fp, apiKey);
+                appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: fp });
+                return url;
+              } catch (err: any) {
+                logger.warn(`[rhworkflow] Upload failed for ${fp}: ${err.message}`);
+                return fp;
+              }
+            };
+
+        await this.resolveAllMediaFiles(payload, uploadFn, mediaExtensions);
       }
-
-      // Scan entire payload for media files using known extensions
-      // This handles nested structures like timeline_data, segments, etc.
-      // without needing to know specific field names
-      const mediaExtensions = [
-        // Images
-        '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff',
-        // Video
-        '.mp4', '.mov', '.webm', '.avi', '.mkv',
-        // Audio
-        '.mp3', '.wav', '.m4a', '.flac', '.ogg',
-      ];
-
-      const uploadFn = useBase64
-        ? async (fp: string) => (await this.resolveImageToBase64(fp)) || fp
-        : async (fp: string) => {
-            try {
-              const url = await this.uploadFile(fp, apiKey);
-              appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: fp });
-              return url;
-            } catch (err: any) {
-              logger.warn(`[rhworkflow] Upload failed for ${fp}: ${err.message}`);
-              return fp;
-            }
-          };
-
-      await this.resolveAllMediaFiles(payload, uploadFn, mediaExtensions);
     }
 
     // Store resolved payload for base class execute()
@@ -221,5 +248,57 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
 
     logger.info(`[rhworkflow] Uploaded ${filePath} → ${res.data.data.download_url}`);
     return res.data.data.download_url;
+  }
+
+  /**
+   * Recursively scan workflow JSON for media files and upload them.
+   * Handles ComfyUI workflow structure with nodes.inputs pattern.
+   */
+  private async deepResolveWorkflowMedia(
+    obj: any,
+    uploadFn: (filePath: string) => Promise<string>,
+    extSet: Set<string>
+  ): Promise<any> {
+    if (obj === null || obj === undefined) return obj;
+
+    if (typeof obj === 'string') {
+      // Skip URLs
+      if (obj.startsWith('http://') || obj.startsWith('https://') || obj.startsWith('data:')) {
+        return obj;
+      }
+
+      // Check if it matches a known media extension
+      const lowerObj = obj.toLowerCase();
+      const isMediaFile = [...extSet].some(ext => lowerObj.endsWith(ext));
+
+      // Also check if it's an existing local file
+      const isLocalFile = !isMediaFile && (
+        obj.startsWith('/') || obj.startsWith('./') || obj.startsWith('../')
+      ) && fs.existsSync(obj);
+
+      if (isMediaFile || isLocalFile) {
+        try {
+          return await uploadFn(obj);
+        } catch {
+          return obj;
+        }
+      }
+
+      return obj;
+    }
+
+    if (Array.isArray(obj)) {
+      return Promise.all(obj.map(item => this.deepResolveWorkflowMedia(item, uploadFn, extSet)));
+    }
+
+    if (typeof obj === 'object') {
+      const result: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = await this.deepResolveWorkflowMedia(value, uploadFn, extSet);
+      }
+      return result;
+    }
+
+    return obj;
   }
 }
