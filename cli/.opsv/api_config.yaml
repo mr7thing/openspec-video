@@ -428,14 +428,11 @@ models:
       custom_height: 1080
       use_custom_audio: true
     # == payload_example ==
-    # LTXDirector uses 'inputs' format (not 'nodeInfoList')
-    # nodeId must be number, field is 'value' not 'fieldValue'
     payload_example:
       addMetadata: false
-      inputs: []
+      nodeInfoList: []
       instanceType: "default"
       usePersonalQueue: false
-    node_list_format: inputs  # 'nodeInfoList' | 'inputs'
 
   # ==========================================
   # RunningHub 直连 REST API (rh-api)
