@@ -155,6 +155,13 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 
 ## Changelog
 
+### v0.16.1 (2026-07-13)
+
+- **feat(tunnel)**: TunnelAdapter abstraction — pluggable tunnel providers (cloudflared, tencent-edge)
+- **feat(tunnel)**: TencentEdgeAdapter — stable URLs via Tencent Cloud Edge Functions
+- **fix(upload)**: Deep scan entire payload for media files by extension, not hardcoded field names
+- **fix(upload)**: Nested JSON structures (e.g., ComfyUI timeline_data) now properly upload local files
+
 ### v0.16.0 (2026-07-13)
 
 - **feat(review-ui)**: Split view mode — open multiple documents side-by-side for comparison, click @id references to navigate to dependent documents
