@@ -271,38 +271,24 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
         const value = obj[key];
 
         // Special handling for ComfyUI imageFile/imageB64 pattern
-        // When imageFile contains a local path:
-        // 1. Upload to RH to get fileName (for ComfyUI input directory)
-        // 2. Convert to base64 for imageB64 (fallback for LTXDirector)
+        // When imageFile contains a local path, upload to RH and use fileName
+        // fileName is the path in ComfyUI's input directory
         if (key === 'imageFile' && typeof value === 'string' && value.length > 0) {
           const isLocalPath = value.startsWith('/') || value.startsWith('./') || value.startsWith('../');
           const isMediaFile = [...extSet].some(ext => value.toLowerCase().endsWith(ext));
 
           if ((isLocalPath || isMediaFile) && this.fileExists(value)) {
+            // Upload to RH, uploadFn returns fileName (path in input directory)
+            // This works for both images and videos
             try {
-              // Convert to base64 for imageB64 field (compressed for LTXDirector)
-              const b64 = await this.resolveImageToBase64(value);
-              if (b64) {
-                result['imageFile'] = '';  // Clear imageFile (base64 is primary)
-                result['imageB64'] = b64;  // Put compressed base64 in imageB64
+              const fileName = await uploadFn(value);
+              if (fileName) {
+                result['imageFile'] = fileName;  // Use fileName from RH upload
                 continue;  // Skip normal processing
               }
             } catch {
               // Fall through to normal processing
             }
-          }
-        }
-
-        // Special handling for audio/video fields
-        // When field contains a local path, upload to RH and use fileName
-        const audioVideoFields = ['audio', 'video', 'audioFile', 'videoFile'];
-        if (audioVideoFields.includes(key) && typeof value === 'string' && value.length > 0) {
-          const isLocalPath = value.startsWith('/') || value.startsWith('./') || value.startsWith('../');
-          const isMediaFile = [...extSet].some(ext => value.toLowerCase().endsWith(ext));
-
-          if ((isLocalPath || isMediaFile) && this.fileExists(value)) {
-            // For audio/video, keep the local path - uploadFn will handle it
-            // The uploadFn should return the RH fileName, not a URL
           }
         }
 
