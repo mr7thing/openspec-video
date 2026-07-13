@@ -280,6 +280,46 @@ opsv comfy --model comfylocal.myworkflow --manifest ... --workflow /path/to/othe
 > v2 是新版 Workflow Run API，推荐优先使用。
 > `rh-api`（RunningHub Standard Model API）不是 ComfyUI 模式，而是直连 REST API。不需要 `node_mappings` 或 `workflowId`，见下方 4.6 节。
 
+### 4.5a RunningHub 文件上传机制
+
+**核心架构**：RH 将 COS（对象存储）挂载到 ComfyUI 的 input 目录。上传的文件存储在 COS 中，ComfyUI 通过挂载路径访问。
+
+```
+本地文件 → RH 上传 API → COS (openapi/xxx.png)
+                              ↓
+                    fileName 直接用于 imageFile
+                              ↓
+               ComfyUI 通过挂载的 COS 读取文件 ✅
+```
+
+**上传 API**：`POST /openapi/v2/media/upload/binary`
+
+**支持格式**：
+| 类型 | 格式 |
+|------|------|
+| 图片 | JPG, PNG, JPEG, WEBP |
+| 音频 | MP3, WAV, FLAC |
+| 视频 | MP4, AVI, MOV, MKV |
+
+**关键字段**：
+- `fileName`：COS 中的路径（如 `openapi/xxx.png`），**直接用于节点**
+- `download_url`：公共 URL（24小时有效），**不用于节点**
+
+**OPSV 处理流程**：
+1. 任务 JSON 中的路径是本地路径
+2. `opsv run` 时自动检测本地文件
+3. 调用 RH 上传 API → 获取 `fileName`
+4. 替换本地路径为 `fileName`
+5. 提交替换后的 payload 给 API
+
+**上传模式配置**：
+```yaml
+rh-workflow-v2.director:
+  defaults:
+    upload_method: rh_upload  # 推荐：上传获取 fileName
+    # upload_method: base64   # 仅图片可用，视频/音频不支持
+```
+
 ### 4.5 用 api-setup 添加新工作流
 
 ```bash

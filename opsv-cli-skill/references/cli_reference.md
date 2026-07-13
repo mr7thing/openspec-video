@@ -485,6 +485,67 @@ opsv trace shot01 --circle circle1   # 只追溯指定 circle
 
 ---
 
+## 10. RunningHub 文件上传机制
+
+### 架构
+
+RunningHub 将 COS 挂载到 ComfyUI input 目录。上传的文件存储在 COS 中，ComfyUI 通过挂载路径访问。
+
+```
+本地文件 → RH 上传 API → COS (openapi/xxx.png)
+                              ↓
+                    fileName 直接用于 imageFile
+                              ↓
+               ComfyUI 通过挂载的 COS 读取文件 ✅
+```
+
+### 上传 API
+
+```
+POST https://www.runninghub.cn/openapi/v2/media/upload/binary
+Authorization: Bearer {API_KEY}
+Content-Type: multipart/form-data
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "data": {
+    "fileName": "openapi/xxx.png",     // ← 用于节点
+    "download_url": "https://..."       // ← 不用于节点
+  }
+}
+```
+
+### 支持格式
+
+| 类型 | 格式 |
+|------|------|
+| 图片 | JPG, PNG, JPEG, WEBP |
+| 音频 | MP3, WAV, FLAC |
+| 视频 | MP4, AVI, MOV, MKV |
+
+### OPSV 处理流程
+
+1. 任务 JSON 中的路径是本地路径
+2. `opsv run` 时自动检测本地文件
+3. 调用 RH 上传 API → 获取 `fileName`
+4. 替换本地路径为 `fileName`
+5. 提交替换后的 payload 给 API
+
+### 上传模式配置
+
+```yaml
+# api_config.yaml
+rh-workflow-v2.director:
+  defaults:
+    upload_method: rh_upload  # 推荐：上传获取 fileName
+    # upload_method: base64   # 仅图片可用，视频/音频不支持
+```
+
+---
+
 ## 附录：命令注册一览
 
 入口 `src/cli.ts:77-102`，注册顺序见 `cli.ts`。Provider 注册（`cli.ts:95-102`）：volcengine / siliconflow / minimax / rhworkflow-v1 / comfylocal / webapp / rhapi / rhworkflow-v2。
