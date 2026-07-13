@@ -194,68 +194,109 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
   }
 
   /**
-   * Deep scan a JSON string field for local file paths and resolve them via uploadFn.
-   * Used for nested structures like ComfyUI timeline_data where image paths are
-   * embedded inside a JSON string.
+   * Scan the entire payload recursively for local media files and upload them.
+   * Uses input_types.yaml extensions to identify media files, or falls back to
+   * checking if a string is a local file path that exists on disk.
    *
-   * @param jsonString - the JSON string to scan and mutate
+   * This is the recommended approach — it handles any payload structure including
+   * nested JSON strings, without needing to know field names in advance.
+   *
+   * @param payload - the task payload to mutate in-place
    * @param uploadFn - async callback that uploads a local file and returns a URL
-   * @returns the modified JSON string
+   * @param mediaExtensions - known media extensions from input_types.yaml (e.g., ['.png', '.jpg', '.mp4'])
    */
-  protected async resolveNestedFileReferences(
-    jsonString: string,
-    uploadFn: (filePath: string) => Promise<string>
-  ): Promise<string> {
-    if (!jsonString || typeof jsonString !== 'string') return jsonString;
+  protected async resolveAllMediaFiles(
+    payload: Record<string, any>,
+    uploadFn: (filePath: string) => Promise<string>,
+    mediaExtensions: string[] = []
+  ): Promise<void> {
+    // Build a Set for fast lookup, normalize to lowercase
+    const extSet = new Set(mediaExtensions.map(e => e.toLowerCase()));
 
-    try {
-      const parsed = JSON.parse(jsonString);
-      const modified = await this.deepResolveFiles(parsed, uploadFn);
-      return JSON.stringify(modified);
-    } catch {
-      // Not valid JSON, return as-is
-      return jsonString;
-    }
+    const resolved = await this.scanAndResolveMedia(payload, uploadFn, extSet);
+    Object.assign(payload, resolved);
   }
 
   /**
-   * Recursively scan an object for local file paths and upload them.
+   * Recursively scan an object for media file paths and upload them.
+   * Matches strings that:
+   * 1. End with a known media extension, OR
+   * 2. Are local file paths that exist on disk
    */
-  private async deepResolveFiles(
+  private async scanAndResolveMedia(
     obj: any,
-    uploadFn: (filePath: string) => Promise<string>
+    uploadFn: (filePath: string) => Promise<string>,
+    extSet: Set<string>
   ): Promise<any> {
     if (obj === null || obj === undefined) return obj;
 
     if (typeof obj === 'string') {
-      // Check if it's a local file path (not http/https/data URL)
-      if (!obj.startsWith('http://') && !obj.startsWith('https://') && !obj.startsWith('data:')) {
-        // Check if it looks like a file path (contains extension or is an absolute/relative path)
-        if (obj.match(/\.\w{2,4}$/) || obj.startsWith('/') || obj.startsWith('./')) {
-          try {
-            return await uploadFn(obj);
-          } catch {
-            // Upload failed, return original
-            return obj;
-          }
+      // Skip URLs
+      if (obj.startsWith('http://') || obj.startsWith('https://') || obj.startsWith('data:')) {
+        return obj;
+      }
+
+      // Check if it matches a known media extension
+      const lowerObj = obj.toLowerCase();
+      const isMediaFile = [...extSet].some(ext => lowerObj.endsWith(ext));
+
+      // Also check if it's an existing local file (handles paths without extensions)
+      const isLocalFile = !isMediaFile && (
+        obj.startsWith('/') || obj.startsWith('./') || obj.startsWith('../')
+      ) && this.fileExists(obj);
+
+      if (isMediaFile || isLocalFile) {
+        try {
+          return await uploadFn(obj);
+        } catch {
+          // Upload failed, return original
+          return obj;
         }
       }
+
       return obj;
     }
 
     if (Array.isArray(obj)) {
-      return Promise.all(obj.map(item => this.deepResolveFiles(item, uploadFn)));
+      return Promise.all(obj.map(item => this.scanAndResolveMedia(item, uploadFn, extSet)));
     }
 
     if (typeof obj === 'object') {
       const result: Record<string, any> = {};
       for (const [key, value] of Object.entries(obj)) {
-        result[key] = await this.deepResolveFiles(value, uploadFn);
+        result[key] = await this.scanAndResolveMedia(value, uploadFn, extSet);
       }
       return result;
     }
 
     return obj;
+  }
+
+  /**
+   * Check if a file exists on disk.
+   */
+  private fileExists(filePath: string): boolean {
+    try {
+      const fs = require('fs');
+      return fs.existsSync(filePath);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Collect all media extensions from the input_types registry.
+   * Returns a flat array of extensions like ['.png', '.jpg', '.mp4', ...]
+   */
+  protected collectMediaExtensions(inputTypes?: Record<string, { extensions?: string[] }>): string[] {
+    if (!inputTypes) return [];
+    const extensions: string[] = [];
+    for (const def of Object.values(inputTypes)) {
+      if (def.extensions) {
+        extensions.push(...def.extensions);
+      }
+    }
+    return [...new Set(extensions)];
   }
 
   async execute(

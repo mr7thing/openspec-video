@@ -102,81 +102,38 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
         );
       }
 
-      // Process nested JSON fields (e.g., timeline_data for 导演台 workflow)
-      // These fields contain JSON strings with embedded file paths
-      const nestedJsonFields = ['timeline_data', 'segments', 'keyframes'];
-      for (const field of nestedJsonFields) {
-        if (payload[field] && typeof payload[field] === 'string') {
-          try {
-            const parsed = JSON.parse(payload[field]);
-            const modified = await this.resolveNestedJsonFiles(parsed, apiKey, useBase64, taskPath, task._opsv.shotId);
-            payload[field] = JSON.stringify(modified);
-          } catch {
-            // Not valid JSON or resolution failed, skip
-          }
-        }
-      }
+      // Scan entire payload for media files using known extensions
+      // This handles nested structures like timeline_data, segments, etc.
+      // without needing to know specific field names
+      const mediaExtensions = [
+        // Images
+        '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff',
+        // Video
+        '.mp4', '.mov', '.webm', '.avi', '.mkv',
+        // Audio
+        '.mp3', '.wav', '.m4a', '.flac', '.ogg',
+      ];
+
+      const uploadFn = useBase64
+        ? async (fp: string) => (await this.resolveImageToBase64(fp)) || fp
+        : async (fp: string) => {
+            try {
+              const url = await this.uploadFile(fp, apiKey);
+              appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: fp });
+              return url;
+            } catch (err: any) {
+              logger.warn(`[rhworkflow] Upload failed for ${fp}: ${err.message}`);
+              return fp;
+            }
+          };
+
+      await this.resolveAllMediaFiles(payload, uploadFn, mediaExtensions);
     }
 
     // Store resolved payload for base class execute()
     (payload as any)._apiKey = apiKey;
     const patched: BaseTaskJson<Record<string, unknown>> = { ...task, payload };
     return super.execute(patched, taskPath, ctx);
-  }
-
-  /**
-   * Recursively resolve file paths in a nested JSON structure.
-   * Handles ComfyUI timeline_data format with segments[].imageFile paths.
-   */
-  private async resolveNestedJsonFiles(
-    obj: any,
-    apiKey: string,
-    useBase64: boolean,
-    taskPath: string,
-    shotId: string
-  ): Promise<any> {
-    if (obj === null || obj === undefined) return obj;
-
-    if (typeof obj === 'string') {
-      // Skip URLs
-      if (obj.startsWith('http://') || obj.startsWith('https://') || obj.startsWith('data:')) {
-        return obj;
-      }
-
-      // Check if it's a local file path
-      if (fs.existsSync(obj)) {
-        if (useBase64) {
-          const b64 = await this.resolveImageToBase64(obj);
-          if (b64) {
-            appendLog(taskPath, { event: 'upload', task_id: shotId, file: obj });
-            return b64;
-          }
-        } else {
-          try {
-            const uploadedUrl = await this.uploadFile(obj, apiKey);
-            appendLog(taskPath, { event: 'upload', task_id: shotId, file: obj });
-            return uploadedUrl;
-          } catch (err: any) {
-            logger.warn(`[rhworkflow] Nested upload failed for ${obj}: ${err.message}`);
-          }
-        }
-      }
-      return obj;
-    }
-
-    if (Array.isArray(obj)) {
-      return Promise.all(obj.map(item => this.resolveNestedJsonFiles(item, apiKey, useBase64, taskPath, shotId)));
-    }
-
-    if (typeof obj === 'object') {
-      const result: Record<string, any> = {};
-      for (const [key, value] of Object.entries(obj)) {
-        result[key] = await this.resolveNestedJsonFiles(value, apiKey, useBase64, taskPath, shotId);
-      }
-      return result;
-    }
-
-    return obj;
   }
 
   protected parseTaskId(res: RhWorkflowSubmitResponse): string | undefined {
