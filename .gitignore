@@ -20,6 +20,8 @@ npm-debug.log*
 
 # agent
 .pilotdeck/
+.mimocode/
+
 
 # key
 .env
