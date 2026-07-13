@@ -1,8 +1,16 @@
 // ============================================================================
 // OpsV RhWorkflow Provider Compiler
 // RunningHub Workflow Run API — comfy 模式
-// POST https://api.runninghub.cn/run/workflow/{apiId}  + nodeInfoList
+// POST https://api.runninghub.cn/run/workflow/{apiId}  + nodeInfoList or inputs
 // 兼容旧模式 (runninghub.*) 和新模式 (rhworkflow.*)
+//
+// 支持两种 payload 格式:
+//   - nodeInfoList: [{ nodeId: "46", fieldName: "xxx", fieldValue: "yyy" }]
+//   - inputs:       [{ nodeId: 46,  fieldName: "xxx", value: "yyy" }]
+//
+// 通过 api_config.yaml 的 node_list_format 配置选择格式:
+//   node_list_format: nodeInfoList  (默认，旧工作流兼容)
+//   node_list_format: inputs        (LTXDirector 等新工作流)
 // ============================================================================
 
 import { ProviderCompiler, CompileContext } from '../ProviderCompiler';
@@ -10,6 +18,15 @@ import { BaseTaskJson } from '../../../types/Job';
 import { logger } from '../../../utils/logger';
 import { ConfigError, CompilationError, OpsVErrorCode } from '../../../errors/OpsVError';
 import { evaluateInputs, buildNodeInfoList, InputEvalContext } from '../shared/InputEvaluator';
+
+export type NodeListFormat = 'nodeInfoList' | 'inputs';
+
+interface NodeInfoItem {
+  nodeId: string | number;
+  fieldName: string;
+  fieldValue?: any;
+  value?: any;
+}
 
 export class RhWorkflowCompiler implements ProviderCompiler {
   readonly provider = 'rhworkflow-v2';
@@ -37,7 +54,10 @@ export class RhWorkflowCompiler implements ProviderCompiler {
       );
     }
 
-    const nodeInfoList: Array<{ nodeId: string; fieldName: string; fieldValue: any }> = [];
+    // Determine output format: nodeInfoList (legacy) or inputs (new LTXDirector)
+    const format: NodeListFormat = (modelConfig as any).node_list_format || 'nodeInfoList';
+
+    const rawItems: Array<{ nodeId: string; fieldName: string; fieldValue: any }> = [];
 
     // Reference images (supports up to max_reference_images)
     const refImages = ctx.referenceImages || job.reference_images || [];
@@ -61,13 +81,13 @@ export class RhWorkflowCompiler implements ProviderCompiler {
     if (inputs && Object.keys(inputs).length > 0) {
       const values = evaluateInputs(inputs, evalCtx);
       const mapped = buildNodeInfoList(values, mappings);
-      nodeInfoList.push(...mapped);
+      rawItems.push(...mapped);
     } else {
       // Legacy path: resolve nodeMapping keys by naming convention
       for (const [key, mapping] of Object.entries(mappings)) {
         const value = resolveLegacyValue(key, evalCtx);
         if (value !== undefined && value !== null) {
-          nodeInfoList.push({
+          rawItems.push({
             nodeId: mapping.nodeId,
             fieldName: mapping.fieldName,
             fieldValue: value,
@@ -76,15 +96,29 @@ export class RhWorkflowCompiler implements ProviderCompiler {
       }
     }
 
+    // Convert to target format
+    const nodeList: NodeInfoItem[] = format === 'inputs'
+      ? rawItems.map(item => ({
+          nodeId: parseInt(item.nodeId, 10) || item.nodeId,  // numeric nodeId for inputs format
+          fieldName: item.fieldName,
+          value: item.fieldValue,
+        }))
+      : rawItems;  // keep original nodeInfoList format
+
     // Build payload — 注意：不包含 workflowId（API ID 在 URL 中）
     let payload: Record<string, any>;
     if (modelConfig.payload_example) {
       payload = structuredClone(modelConfig.payload_example);
-      payload.nodeInfoList = nodeInfoList;
+      // Set the correct key based on format
+      if (format === 'inputs') {
+        payload.inputs = nodeList;
+      } else {
+        payload.nodeInfoList = nodeList;
+      }
     } else {
-      payload = {
-        nodeInfoList,
-      };
+      payload = format === 'inputs'
+        ? { inputs: nodeList }
+        : { nodeInfoList: nodeList };
 
       const defaults = modelConfig.defaults || {};
 
@@ -103,7 +137,7 @@ export class RhWorkflowCompiler implements ProviderCompiler {
       if (defaults.accessPassword !== undefined && defaults.accessPassword !== null) {
         payload.accessPassword = defaults.accessPassword;
       }
-      if (defaults.webhookUrl !== undefined && defaults.webhookUrl !== null) {
+      if (defaults.webhookUrl !== undefined) {
         payload.webhookUrl = defaults.webhookUrl;
       }
       // 传递上传模式给执行器
@@ -111,6 +145,9 @@ export class RhWorkflowCompiler implements ProviderCompiler {
         payload.upload_method = defaults.upload_method;
       }
     }
+
+    // Store format info in payload for executor
+    payload._node_list_format = format;
 
     return {
       payload,

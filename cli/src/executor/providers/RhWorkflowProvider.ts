@@ -64,36 +64,42 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
       // Determine upload mode
       const useBase64 = payload.upload_method === 'base64';
 
-      // Process nodeInfoList: resolve local file paths
-      if (Array.isArray(payload.nodeInfoList)) {
-        payload.nodeInfoList = await Promise.all(
-          payload.nodeInfoList.map(async (item: any) => {
-            if (typeof item.fieldValue !== 'string') return item;
+      // Determine format: nodeInfoList or inputs
+      const format = payload._node_list_format || 'nodeInfoList';
+      const nodeListKey = format === 'inputs' ? 'inputs' : 'nodeInfoList';
+      const valueKey = format === 'inputs' ? 'value' : 'fieldValue';
+
+      // Process node list: resolve local file paths
+      if (Array.isArray(payload[nodeListKey])) {
+        payload[nodeListKey] = await Promise.all(
+          payload[nodeListKey].map(async (item: any) => {
+            const fieldValue = item[valueKey];
+            if (typeof fieldValue !== 'string') return item;
 
             // HTTP/HTTPS/data URLs: pass through
-            if (item.fieldValue.startsWith('http://') ||
-                item.fieldValue.startsWith('https://') ||
-                item.fieldValue.startsWith('data:')) {
+            if (fieldValue.startsWith('http://') ||
+                fieldValue.startsWith('https://') ||
+                fieldValue.startsWith('data:')) {
               return item;
             }
 
             // Local file path: resolve by upload mode
-            if (fs.existsSync(item.fieldValue)) {
+            if (fs.existsSync(fieldValue)) {
               if (useBase64) {
                 // Mode 1: base64 encode
-                const b64 = await this.resolveImageToBase64(item.fieldValue);
+                const b64 = await this.resolveImageToBase64(fieldValue);
                 if (b64) {
-                  appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: item.fieldValue });
-                  return { ...item, fieldValue: b64 };
+                  appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: fieldValue });
+                  return { ...item, [valueKey]: b64 };
                 }
               } else {
                 // Mode 2: upload to RH media API
                 try {
-                  const uploadedUrl = await this.uploadFile(item.fieldValue, apiKey);
-                  appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: item.fieldValue });
-                  return { ...item, fieldValue: uploadedUrl };
+                  const uploadedUrl = await this.uploadFile(fieldValue, apiKey);
+                  appendLog(taskPath, { event: 'upload', task_id: task._opsv.shotId, file: fieldValue });
+                  return { ...item, [valueKey]: uploadedUrl };
                 } catch (err: any) {
-                  logger.warn(`[rhworkflow] Upload failed for ${item.fieldValue}, sending raw: ${err.message}`);
+                  logger.warn(`[rhworkflow] Upload failed for ${fieldValue}, sending raw: ${err.message}`);
                 }
               }
             }
