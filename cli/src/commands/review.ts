@@ -14,7 +14,7 @@ import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
 import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
-import { CloudReviewSession, resolveCloudConfig, executeCloudCommand } from '../tunnel/CloudReviewSession';
+import { CloudReviewSession, resolveCloudConfig, executeCloudCommand, TunnelProvider } from '../tunnel/CloudReviewSession';
 
 const DEFAULT_REVIEW_PORT = 3100;
 const DEFAULT_REVIEW_TTL = 900;
@@ -46,6 +46,8 @@ export function registerReviewCommand(program: Command): void {
     .option('--cloud', 'Expose the review server through OpsV Cloud tunnel')
     .option('--cloud-url <url>', 'OpsV Cloud base URL (or OPSV_CLOUD_URL)')
     .option('--cloud-api-key <key>', 'OpsV Cloud API key (or OPSV_CLOUD_API_KEY)')
+    .option('--edge', 'Use Tencent Cloud Edge tunnel (requires --cloud, stable URL)')
+    .option('--edge-url <url>', 'Edge Function WebSocket URL (or OPSV_EDGE_URL)')
     .option('--status <sessionId>', 'Get cloud session status')
     .option('--rotate-review-token <sessionId>', 'Rotate the reviewer URL token')
     .option('--close <sessionId>', 'Close a cloud session')
@@ -115,7 +117,25 @@ export function registerReviewCommand(program: Command): void {
           if (!cloudConfig) return;
 
           try {
-            cloudSession = new CloudReviewSession(cloudConfig.cloudUrl, cloudConfig.authToken);
+            // Determine tunnel provider
+            let tunnelProvider: TunnelProvider = 'cloudflared';
+            let edgeConfig: { edgeFunctionUrl: string; edgeDomain?: string } | undefined;
+
+            if (opts.edge) {
+              tunnelProvider = 'tencent-edge';
+              const edgeUrl = (opts as any).edgeUrl || process.env.OPSV_EDGE_URL;
+              if (!edgeUrl) {
+                throw new Error('Edge tunnel requires --edge-url or OPSV_EDGE_URL');
+              }
+              edgeConfig = { edgeFunctionUrl: edgeUrl };
+            }
+
+            cloudSession = new CloudReviewSession(
+              cloudConfig.cloudUrl,
+              cloudConfig.authToken,
+              tunnelProvider,
+              edgeConfig,
+            );
             await cloudSession.start(opts.port, app);
           } catch (err: any) {
             logger.error(err.message);

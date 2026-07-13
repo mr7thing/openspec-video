@@ -77,6 +77,8 @@ export const ReviewOptionsSchema = z.object({
   cloud: z.boolean().optional(),
   cloudUrl: z.string().optional(),
   cloudApiKey: z.string().optional(),
+  edge: z.boolean().optional(),
+  edgeUrl: z.string().optional(),
   status: z.string().optional(),
   rotateReviewToken: z.string().optional(),
   close: z.string().optional(),

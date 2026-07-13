@@ -1,5 +1,8 @@
 /**
  * Cloudflared binary management — auto-download, spawn, and lifecycle.
+ *
+ * Implements TunnelAdapter for cloudflared tunnel provider.
+ * Provides temporary URLs (https://xxx.trycloudflare.com).
  */
 
 import fs from 'fs-extra';
@@ -9,6 +12,7 @@ import { spawn, ChildProcess } from 'child_process';
 import https from 'https';
 import chalk from 'chalk';
 import { logger } from '../utils/logger';
+import { TunnelAdapter, TunnelStartResult } from './TunnelAdapter';
 
 const CACHE_DIR = path.join(os.homedir(), '.opsv', 'bin');
 const DOWNLOAD_TIMEOUT_MS = 60000;
@@ -85,7 +89,8 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-export class CloudflaredManager {
+export class CloudflaredManager implements TunnelAdapter {
+  readonly provider = 'cloudflared';
   private process: ChildProcess | null = null;
   private tunnelUrl: string | null = null;
   private urlResolver: ((url: string) => void) | null = null;
@@ -122,11 +127,13 @@ export class CloudflaredManager {
    * Start cloudflared tunnel pointing to local port.
    * Returns a promise that resolves with the public tunnel URL.
    */
-  async start(localPort: number): Promise<string> {
+  async start(localPort: number): Promise<TunnelStartResult> {
     const binaryPath = await this.ensureBinary();
 
     return new Promise((resolve, reject) => {
-      this.urlResolver = resolve;
+      this.urlResolver = (url: string) => {
+        resolve({ url, stable: false, provider: 'cloudflared' });
+      };
       this.urlRejecter = reject;
 
       this.process = spawn(binaryPath, [
@@ -194,18 +201,25 @@ export class CloudflaredManager {
     });
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.process) {
       this.process.kill('SIGTERM');
-      setTimeout(() => {
-        if (this.process && !this.process.killed) {
-          this.process.kill('SIGKILL');
-        }
-      }, 5000);
+      await new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (this.process && !this.process.killed) {
+            this.process.kill('SIGKILL');
+          }
+          resolve();
+        }, 5000);
+      });
     }
   }
 
   getTunnelUrl(): string | null {
     return this.tunnelUrl;
+  }
+
+  isConnected(): boolean {
+    return this.process !== null && this.tunnelUrl !== null;
   }
 }

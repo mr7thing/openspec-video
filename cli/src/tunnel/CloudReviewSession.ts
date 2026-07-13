@@ -5,7 +5,7 @@
 // Manages the complete cloud review session:
 //   1. Resolve auth (OAuth or API key)
 //   2. Create cloud session
-//   3. Start cloudflared tunnel
+//   3. Start tunnel (cloudflared or tencent-edge)
 //   4. Connect WebSocket relay
 //   5. Mount auth middleware
 //   6. Display QR code
@@ -26,6 +26,8 @@ import chalk from 'chalk';
 import { CloudClient } from './CloudClient';
 import { TunnelClient } from './TunnelClient';
 import { CloudflaredManager } from './CloudflaredManager';
+import { TencentEdgeAdapter } from './TencentEdgeAdapter';
+import { TunnelAdapter, TunnelAdapterConfig } from './TunnelAdapter';
 import { createAuthMiddleware } from '../review-ui/middleware/auth';
 import { DeviceFlowClient } from '../auth/DeviceFlowClient';
 import { CredentialManager } from '../auth/CredentialManager';
@@ -44,7 +46,11 @@ export interface CloudSessionInfo {
   sessionId: string;
   reviewUrl: string;
   tunnelUrl?: string;
+  tunnelProvider?: string;
+  stable?: boolean;
 }
+
+export type TunnelProvider = 'cloudflared' | 'tencent-edge';
 
 // ============================================================================
 // CloudReviewSession
@@ -53,7 +59,7 @@ export interface CloudSessionInfo {
 export class CloudReviewSession {
   private cloudClient: CloudClient | null = null;
   private tunnelClient: TunnelClient | null = null;
-  private cloudflaredManager: CloudflaredManager | null = null;
+  private tunnelAdapter: TunnelAdapter | null = null;
   private sessionId: string | null = null;
   private sessionToken: string | null = null;
   private reviewUrl: string | null = null;
@@ -62,6 +68,11 @@ export class CloudReviewSession {
   constructor(
     private cloudUrl: string,
     private authToken: string,
+    private tunnelProvider: TunnelProvider = 'cloudflared',
+    private edgeConfig?: {
+      edgeFunctionUrl: string;
+      edgeDomain?: string;
+    },
   ) {}
 
   /**
@@ -80,10 +91,11 @@ export class CloudReviewSession {
     // 2. Mount auth middleware
     app.use(createAuthMiddleware({ sessionToken: session.sessionToken }));
 
-    // 3. Start cloudflared tunnel
-    this.cloudflaredManager = new CloudflaredManager();
-    const tunnelUrl = await this.cloudflaredManager.start(localPort);
-    logger.info(`Cloudflared tunnel: ${tunnelUrl}`);
+    // 3. Start tunnel adapter
+    this.tunnelAdapter = this.createTunnelAdapter();
+    const tunnelResult = await this.tunnelAdapter.start(localPort);
+    const tunnelUrl = tunnelResult.url;
+    logger.info(`Tunnel started (${tunnelResult.provider}): ${tunnelUrl}`);
 
     // 4. Report tunnel URL to cloud
     await this.cloudClient.updateTunnelUrl(session.sessionId, tunnelUrl);
@@ -104,6 +116,7 @@ export class CloudReviewSession {
     // 7. Display QR code
     console.log(chalk.green(`Cloud review URL: ${session.reviewUrl}`));
     console.log(chalk.gray(`Cloud session: ${session.sessionId}`));
+    console.log(chalk.cyan(`Tunnel: ${tunnelResult.provider} (${tunnelResult.stable ? 'stable' : 'temporary'})`));
     console.log(chalk.cyan('Full URL saved to:'), chalk.yellow(urlFile));
     console.log(chalk.cyan('Scan QR code to open on mobile:'));
     qrcode.generate(session.reviewUrl, { small: true });
@@ -115,6 +128,8 @@ export class CloudReviewSession {
       sessionId: session.sessionId,
       reviewUrl: session.reviewUrl,
       tunnelUrl,
+      tunnelProvider: tunnelResult.provider,
+      stable: tunnelResult.stable,
     };
   }
 
@@ -126,7 +141,7 @@ export class CloudReviewSession {
     this.cleanedUp = true;
 
     this.tunnelClient?.close();
-    this.cloudflaredManager?.stop();
+    await this.tunnelAdapter?.stop();
 
     if (this.cloudClient && this.sessionId) {
       try {
@@ -149,6 +164,15 @@ export class CloudReviewSession {
   // ==========================================================================
   // Internal
   // ==========================================================================
+
+  private createTunnelAdapter(): TunnelAdapter {
+    if (this.tunnelProvider === 'tencent-edge' && this.edgeConfig) {
+      return new TencentEdgeAdapter({
+        edgeFunctionUrl: this.edgeConfig.edgeFunctionUrl,
+      });
+    }
+    return new CloudflaredManager();
+  }
 
   private mountControlEndpoints(app: Application, sessionId: string): void {
     app.get('/api/session-info', async (_req, res) => {
