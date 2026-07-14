@@ -383,10 +383,8 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
           totalWaitSeconds += waitSeconds;
 
           if (totalWaitSeconds >= maxWaitSeconds) {
-            throw new ExecutionError(
-              OpsVErrorCode.EXECUTION_SUBMIT_FAILED,
-              `${this.name} submit failed: queue limit exceeded after ${maxWaitSeconds}s`
-            );
+            logger.warn(`[${this.name}] Queue limit exceeded ${maxWaitSeconds}s, continuing to wait...`);
+            totalWaitSeconds = 0;  // Reset and continue
           }
 
           logger.info(`[${this.name}] Queue limit, waiting ${waitSeconds}s (attempt ${submitAttempts + 1}, total wait: ${totalWaitSeconds}s)...`);
@@ -430,11 +428,9 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
       while (true) {
         pollAttempt++;
         const elapsed = getElapsedMs(taskPath);
-        if (elapsed > maxDuration) {
-          throw new ExecutionError(
-            OpsVErrorCode.EXECUTION_TIMEOUT,
-            `Polling timeout for ${taskId} (${maxDuration}ms exceeded)`
-          );
+        if (elapsed > maxDuration && pollAttempt % 10 === 0) {
+          // Log warning every 10 attempts after timeout, but don't throw
+          logger.warn(`[${this.name}] ${shotId}: still polling after ${Math.round(elapsed/1000)}s (max: ${Math.round(maxDuration/1000)}s)`);
         }
 
         // Wait intervals: 5s, 10s, 20s, 30s, 60s, 120s, then loop
