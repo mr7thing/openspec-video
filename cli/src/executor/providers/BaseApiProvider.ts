@@ -346,14 +346,45 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
       if (!taskId) {
         const payload = this.buildPayload(task, ctx);
         expandRandomSeeds(payload);
-        const submitRes = await client.post<TSubmitResponse>(meta.api_url, payload);
 
-        // Check for submit-level error first (some APIs return 200 with error body)
-        const submitErr = this.extractSubmitError(submitRes);
-        if (submitErr) {
+        // Submit with retry for queue limit errors
+        let submitRes: TSubmitResponse | null = null;
+        let submitAttempts = 0;
+        const maxSubmitRetries = 5;
+
+        while (submitAttempts < maxSubmitRetries) {
+          submitRes = await client.post<TSubmitResponse>(meta.api_url, payload);
+
+          // Check for submit-level error
+          const submitErr = this.extractSubmitError(submitRes);
+          if (!submitErr) {
+            break; // Success, no error
+          }
+
+          // Check if this is a queue limit error (retryable)
+          const isQueueLimit = submitErr.includes('queue limit') ||
+                               submitErr.includes('421') ||
+                               submitErr.includes('429');
+
+          if (isQueueLimit && submitAttempts < maxSubmitRetries - 1) {
+            const delay = Math.min(5000 * Math.pow(2, submitAttempts), 60000);
+            logger.info(`[${this.name}] Queue limit, waiting ${delay/1000}s before retry... (attempt ${submitAttempts + 1}/${maxSubmitRetries})`);
+            await sleep(delay);
+            submitAttempts++;
+            continue;
+          }
+
+          // Non-retryable error or max retries exceeded
           throw new ExecutionError(
             OpsVErrorCode.EXECUTION_SUBMIT_FAILED,
             `${this.name} submit failed: ${submitErr}`
+          );
+        }
+
+        if (!submitRes) {
+          throw new ExecutionError(
+            OpsVErrorCode.EXECUTION_SUBMIT_FAILED,
+            `${this.name} submit failed: no response`
           );
         }
 

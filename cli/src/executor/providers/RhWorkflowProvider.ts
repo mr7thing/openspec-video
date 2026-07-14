@@ -167,6 +167,22 @@ export class RhWorkflowProvider extends BaseApiProvider<Record<string, unknown>,
     return res.taskId;
   }
 
+  /**
+   * Detect submit-level errors (e.g., queue limit).
+   * RH API returns HTTP 200 with errorCode in body for queue limit.
+   */
+  protected extractSubmitError(res: RhWorkflowSubmitResponse): string | undefined {
+    // Queue limit error
+    if (res.errorCode === '421' || res.errorCode === '429') {
+      return res.errorMessage || `Queue limit (code: ${res.errorCode})`;
+    }
+    // Other errors
+    if (res.errorCode && res.errorCode !== '0') {
+      return res.errorMessage || `Error code: ${res.errorCode}`;
+    }
+    return undefined;
+  }
+
   protected extractSyncOutputUrls(res: RhWorkflowSubmitResponse): string[] {
     if (res.status === 'SUCCESS' && Array.isArray(res.results) && res.results.length > 0) {
       const urls = res.results

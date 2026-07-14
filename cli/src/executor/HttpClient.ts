@@ -149,9 +149,14 @@ export class HttpClient {
         return await fn();
       } catch (err: any) {
         lastErr = err;
-        // Don't retry 4xx client errors — they are not recoverable
         const status = err.response?.status;
-        if (typeof status === 'number' && status >= 400 && status < 500) {
+        const body = err.response?.data;
+
+        // Check if this is a retryable error
+        const isRetryable = this.isRetryableError(status, body);
+
+        if (!isRetryable && typeof status === 'number' && status >= 400 && status < 500) {
+          // Don't retry most 4xx client errors — they are not recoverable
           const bodySnippet = truncate(err.response?.data, 400);
           throw new ExecutionError(
             OpsVErrorCode.EXECUTION_API_ERROR,
@@ -159,6 +164,7 @@ export class HttpClient {
             { cause: err.message, status }
           );
         }
+
         if (i < maxRetries - 1) {
           const delay = Math.min(1000 * Math.pow(2, i), cap);
           logger.warn(`[HttpClient] ${label} failed (attempt ${i + 1}/${maxRetries}): ${err.message}. Retrying in ${delay}ms...`);
@@ -172,6 +178,25 @@ export class HttpClient {
       `${label} failed after ${maxRetries} attempts: ${lastErr?.message}`,
       { cause: lastErr?.message }
     );
+  }
+
+  /**
+   * Check if an error is retryable (e.g., queue limit, rate limit).
+   * For queue limit, we should wait and retry, not throw immediately.
+   */
+  private isRetryableError(status?: number, body?: any): boolean {
+    // 421 Misdirected Request — RH queue limit
+    if (status === 421) return true;
+
+    // 429 Too Many Requests
+    if (status === 429) return true;
+
+    // RH-specific queue limit error in response body
+    if (body?.errorCode === '421' || body?.code === 421) return true;
+    if (body?.errorMessage?.includes('queue limit')) return true;
+    if (body?.msg?.includes('queue limit')) return true;
+
+    return false;
   }
 }
 
