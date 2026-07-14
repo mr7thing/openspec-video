@@ -155,6 +155,13 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 
 ## Changelog
 
+### v0.16.3 (2026-07-14)
+
+- **fix(retry)**: Queue limit and timeout are warnings, not errors — continue waiting
+- **fix(retry)**: Unified wait intervals (5s→10s→20s→30s→60s→120s→loop)
+- **fix(upload)**: RH upload returns fileName for all file types (images/audio/video)
+- **fix(upload)**: Queue limit (421) errors trigger wait-and-retry instead of immediate failure
+
 ### v0.16.2 (2026-07-14)
 
 - **fix(upload)**: RH upload returns fileName (COS path) instead of download_url for ComfyUI nodes
