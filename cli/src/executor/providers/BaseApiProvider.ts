@@ -348,11 +348,15 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
         expandRandomSeeds(payload);
 
         // Submit with retry for queue limit errors
+        // Wait intervals: 5s, 10s, 20s, 30s, 60s, 120s, then loop
+        // Max wait: 1 hour (then throw error)
+        const WAIT_INTERVALS = [5, 10, 20, 30, 60, 120];
         let submitRes: TSubmitResponse | null = null;
         let submitAttempts = 0;
-        const maxSubmitRetries = 5;
+        const maxWaitSeconds = 3600; // 1 hour
+        let totalWaitSeconds = 0;
 
-        while (submitAttempts < maxSubmitRetries) {
+        while (totalWaitSeconds < maxWaitSeconds) {
           submitRes = await client.post<TSubmitResponse>(meta.api_url, payload);
 
           // Check for submit-level error
@@ -366,19 +370,28 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
                                submitErr.includes('421') ||
                                submitErr.includes('429');
 
-          if (isQueueLimit && submitAttempts < maxSubmitRetries - 1) {
-            const delay = Math.min(5000 * Math.pow(2, submitAttempts), 60000);
-            logger.info(`[${this.name}] Queue limit, waiting ${delay/1000}s before retry... (attempt ${submitAttempts + 1}/${maxSubmitRetries})`);
-            await sleep(delay);
-            submitAttempts++;
-            continue;
+          if (!isQueueLimit) {
+            // Non-retryable error
+            throw new ExecutionError(
+              OpsVErrorCode.EXECUTION_SUBMIT_FAILED,
+              `${this.name} submit failed: ${submitErr}`
+            );
           }
 
-          // Non-retryable error or max retries exceeded
-          throw new ExecutionError(
-            OpsVErrorCode.EXECUTION_SUBMIT_FAILED,
-            `${this.name} submit failed: ${submitErr}`
-          );
+          // Queue limit: wait and retry
+          const waitSeconds = WAIT_INTERVALS[submitAttempts % WAIT_INTERVALS.length];
+          totalWaitSeconds += waitSeconds;
+
+          if (totalWaitSeconds >= maxWaitSeconds) {
+            throw new ExecutionError(
+              OpsVErrorCode.EXECUTION_SUBMIT_FAILED,
+              `${this.name} submit failed: queue limit exceeded after ${maxWaitSeconds}s`
+            );
+          }
+
+          logger.info(`[${this.name}] Queue limit, waiting ${waitSeconds}s (attempt ${submitAttempts + 1}, total wait: ${totalWaitSeconds}s)...`);
+          await sleep(waitSeconds * 1000);
+          submitAttempts++;
         }
 
         if (!submitRes) {
@@ -424,11 +437,10 @@ export abstract class BaseApiProvider<TPayload, TSubmitResponse, TStatusResponse
           );
         }
 
-        const interval = getPollIntervalMs(
-          elapsed,
-          ctx.configLoader.getSettings()?.polling?.intervals
-        );
-        await sleep(interval);
+        // Wait intervals: 5s, 10s, 20s, 30s, 60s, 120s, then loop
+        const POLL_INTERVALS = [5, 10, 20, 30, 60, 120];
+        const waitSeconds = POLL_INTERVALS[(pollAttempt - 1) % POLL_INTERVALS.length];
+        await sleep(waitSeconds * 1000);
 
         const statusRes = await this.pollStatus(
           client,
