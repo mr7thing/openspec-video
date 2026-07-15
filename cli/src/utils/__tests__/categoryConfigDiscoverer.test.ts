@@ -23,6 +23,16 @@ describe('matchesConfigPattern', () => {
     'something_category_validate_other.yaml',
     'category_validate.txt',
     'categoryvalidate.yml',
+    // Extra-suffix / backup / sample / draft cases — must not be loaded
+    'category_validate.yaml.bak',
+    'category_validate.bak.yaml',
+    'category_validate.yaml.sample',
+    'category_validate.sample.yaml',
+    'category_validate.yaml.draft',
+    'category_validate.yaml.tmp',
+    'category_validate.yaml.swp',
+    'category_validate.yml~',
+    'category_validate.yaml.1',
   ];
 
   test.each(valid)('valid: %s', (name) => {
@@ -92,23 +102,40 @@ describe('CategoryConfigDiscoverer', () => {
   it('uses underscore-prefix when only it exists at project level', () => {
     fs.writeFileSync(path.join(projectDir, '_category_validate.yaml'), 'project:\n  required_fields: [status]\n');
     const d = new CategoryConfigDiscoverer();
-    const r = d.discover(tmpDir, { strictNaming: true, homedir: fakeHomedir });
+    const r = d.discover(tmpDir, { homedir: fakeHomedir });
     expect(r.config?.basename).toBe('_category_validate.yaml');
-    expect(r.warnings.length).toBeGreaterThan(0);
-  });
-
-  it('warns on non-canonical name in strict mode', () => {
-    fs.writeFileSync(path.join(projectDir, '_category_validate.yaml'), 'project:\n  required_fields: [status]\n');
-    const d = new CategoryConfigDiscoverer();
-    const r = d.discover(tmpDir, { strictNaming: true, homedir: fakeHomedir });
+    // Non-canonical filename ALWAYS warns (v0.11.0+: no more silent option)
     expect(r.warnings.some(w => w.includes('non-canonical'))).toBe(true);
   });
 
-  it('no warning in non-strict mode', () => {
+  it('warns on non-canonical underscore-prefix filename', () => {
     fs.writeFileSync(path.join(projectDir, '_category_validate.yaml'), 'project:\n  required_fields: [status]\n');
     const d = new CategoryConfigDiscoverer();
-    const r = d.discover(tmpDir, { strictNaming: false, homedir: fakeHomedir });
-    expect(r.warnings).toHaveLength(0);
+    const r = d.discover(tmpDir, { homedir: fakeHomedir });
+    expect(r.warnings.some(w => w.includes('non-canonical'))).toBe(true);
+  });
+
+  it('warns on non-canonical other-variant filename', () => {
+    fs.writeFileSync(path.join(projectDir, 'opsv-category_validate.yaml'), 'project:\n  required_fields: [status]\n');
+    const d = new CategoryConfigDiscoverer();
+    const r = d.discover(tmpDir, { homedir: fakeHomedir });
+    expect(r.warnings.some(w => w.includes('non-canonical prefix variant'))).toBe(true);
+  });
+
+  it('warns when falling back to user-level config', () => {
+    fs.writeFileSync(path.join(userDir, 'category_validate.yaml'), 'project:\n  required_fields: [status]\n');
+    const d = new CategoryConfigDiscoverer();
+    const r = d.discover(tmpDir, { homedir: fakeHomedir });
+    expect(r.config?.path).toBe(path.join(userDir, 'category_validate.yaml'));
+    expect(r.warnings.some(w => w.includes('Falling back to user-level'))).toBe(true);
+  });
+
+  it('warns when no config found at either level', () => {
+    // No project-level, no user-level
+    const d = new CategoryConfigDiscoverer();
+    const r = d.discover(tmpDir, { homedir: fakeHomedir });
+    expect(r.config).toBeNull();
+    expect(r.warnings.some(w => w.includes('No category validate config found'))).toBe(true);
   });
 
   it('errors on multiple candidates at project level', () => {

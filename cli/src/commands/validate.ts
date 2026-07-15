@@ -60,7 +60,7 @@ export function registerValidateCommand(program: Command, version: string): void
 
         // Load category rules + input_types registry
         const catLoader = new CategoryValidateLoader();
-        const catResult = catLoader.load(projectRoot, { silent: true, explicitPath: options.categoryConfig });
+        const catResult = catLoader.load(projectRoot, { explicitPath: options.categoryConfig });
         // If discovery found conflicting configs, abort (user must resolve with --category-config)
         if (catResult.discovery.errors.length > 0) {
           console.error(chalk.red(`\nResolve the category validate config conflict above before running validate.\n`));

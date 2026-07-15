@@ -168,22 +168,32 @@ export class CategoryValidateLoader {
 
   /**
    * Discover + load using the old API signature.
-   * Uses CategoryConfigDiscoverer internally. Silent mode suppresses console output.
+   * Uses CategoryConfigDiscoverer internally.
+   *
+   * ALL warnings and errors are printed to console — never silent. The user must
+   * see what config was used, what fallback happened, and what fields are unrecognized.
+   *
    * @param projectRoot - Project root directory
    * @param options.explicitPath - Explicit config path (from CLI --category-config); skips discovery
-   * @param options.silent - Suppress console warnings
    */
-  load(projectRoot: string, options?: { explicitPath?: string; silent?: boolean }): DiscoveryLoadResult {
+  load(projectRoot: string, options?: { explicitPath?: string }): DiscoveryLoadResult {
     const discoverer = new CategoryConfigDiscoverer();
     const discovery = discoverer.discover(projectRoot, { explicitPath: options?.explicitPath });
     const result = this.loadFromDiscovery(discovery);
-    // Errors are ALWAYS shown (blocking) — silent only suppresses warnings
+    // Errors are ALWAYS shown (blocking)
     for (const e of discovery.errors) {
       console.error(`[opsv validate] error: ${e}`);
     }
-    if (!options?.silent && discovery.warnings.length > 0) {
-      for (const w of discovery.warnings) {
-        console.warn(`[opsv validate] warning: ${w}`);
+    // Warnings are ALWAYS shown (user must see fallback, non-canonical filename, etc.)
+    for (const w of discovery.warnings) {
+      console.warn(`[opsv validate] warning: ${w}`);
+    }
+    // Config-load issues (e.g., unsupported rules in YAML) — ALWAYS shown
+    for (const issue of result.issues) {
+      if (issue.severity === 'error') {
+        console.error(`[opsv validate] error: ${issue.path}: ${issue.message}`);
+      } else {
+        console.warn(`[opsv validate] warning: ${issue.path}: ${issue.message}`);
       }
     }
     this.rules = result.rules;
@@ -222,8 +232,8 @@ export class CategoryValidateLoader {
 
     const obj = parsed as Record<string, unknown>;
 
-    // Collect unknown top-level keys
-    issues.push(...collectRuleIssues(obj, ''));
+    // Top-level keys are category names (user-defined, no validation needed).
+    // We only validate the rule-object under each category name.
 
     const rules: CategoryRules = {};
 

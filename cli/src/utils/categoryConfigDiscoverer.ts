@@ -61,10 +61,17 @@ export interface DiscoveryResult {
 //   k2-category_validate.yaml, opsv-category_validate.yaml (prefix variants)
 //   category_validate.yml (alternate extension)
 //
-// Does NOT match:
+// Does NOT match (intentional — these files will NOT be loaded):
 //   categoryvalidate.yaml, category-validate.yaml (no/wrong separator)
-//   something_category_validate_other.yaml (has suffix after validate)
+//   something_category_validate_other.yaml (suffix after validate)
 //   category_validate.txt (wrong extension)
+//   category_validate.yaml.bak (extra suffix after extension)
+//   category_validate.bak.yaml (extra suffix before extension)
+//   category_validate.yaml.sample, .tmp, .swp, .draft, ~, .N (editor/backup suffixes)
+//   category_validate.json (not YAML)
+//
+// The `$` anchor forces the filename to END with `.yaml` or `.yml`.
+// Any extra suffix (e.g., `.bak`, `.sample`) makes the file invisible to the discoverer.
 const CONFIG_PATTERN = /^_?([a-z][a-z0-9]*[-_])?category_validate\.ya?ml$/i;
 
 /**
@@ -154,7 +161,6 @@ export class CategoryConfigDiscoverer {
     projectRoot: string,
     options?: {
       explicitPath?: string;
-      strictNaming?: boolean;
       homedir?: string;
     },
   ): DiscoveryResult {
@@ -183,8 +189,10 @@ export class CategoryConfigDiscoverer {
         warnings,
         errors,
       };
-      if (options.strictNaming && variant === 'underscore-prefix') {
+      if (variant === 'underscore-prefix') {
         warnings.push(`Using non-canonical config filename "${basename}" (expected: category_validate.yaml)`);
+      } else if (variant === 'other') {
+        warnings.push(`Using non-canonical prefix-variant config filename "${basename}" (expected: category_validate.yaml)`);
       }
       return discovered;
     }
@@ -207,16 +215,22 @@ export class CategoryConfigDiscoverer {
       }
 
       const selected = projectCandidates[0];
-      if (options?.strictNaming && selected.variant === 'underscore-prefix') {
+      // Always warn on non-canonical filename (even single candidate)
+      if (selected.variant === 'underscore-prefix') {
         warnings.push(
-          `Config filename "${selected.basename}" is non-canonical. ` +
-          `Consider renaming to category_validate.yaml for clarity.`,
+          `Config filename ".opsv/${selected.basename}" is non-canonical. ` +
+          `Recommended: "category_validate.yaml".`,
+        );
+      } else if (selected.variant === 'other') {
+        warnings.push(
+          `Config filename ".opsv/${selected.basename}" has a non-canonical prefix variant. ` +
+          `Recommended: "category_validate.yaml".`,
         );
       }
       return { config: selected, projectCandidates, userCandidates, warnings, errors };
     }
 
-    // Project not found → user-level fallback
+    // Project not found → user-level fallback (warn so user knows it's happening)
     if (userCandidates.length > 0) {
       if (userCandidates.length > 1) {
         const names = userCandidates.map(c => `~/.opsv/${c.basename}`).join(', ');
@@ -228,16 +242,33 @@ export class CategoryConfigDiscoverer {
       }
 
       const selected = userCandidates[0];
-      if (options?.strictNaming && selected.variant === 'underscore-prefix') {
+      // Project-level not found → using user-level fallback (always warn)
+      warnings.push(
+        `No project-level category validate config found in "${projectDir}/". ` +
+        `Falling back to user-level: "~/.opsv/${selected.basename}". ` +
+        `Consider copying this to "${projectDir}/category_validate.yaml" for project isolation.`,
+      );
+      // Always warn on non-canonical filename
+      if (selected.variant === 'underscore-prefix') {
         warnings.push(
           `User-level config "~/.opsv/${selected.basename}" is non-canonical. ` +
-          `Consider renaming to category_validate.yaml.`,
+          `Recommended: "category_validate.yaml".`,
+        );
+      } else if (selected.variant === 'other') {
+        warnings.push(
+          `User-level config "~/.opsv/${selected.basename}" has a non-canonical prefix variant. ` +
+          `Recommended: "category_validate.yaml".`,
         );
       }
       return { config: selected, projectCandidates, userCandidates, warnings, errors };
     }
 
-    // Neither found
+    // Neither project-level nor user-level config found (always warn)
+    warnings.push(
+      `No category validate config found in "${projectDir}/" or "~/.opsv/". ` +
+      `Validation will run with NO category rules (only Zod schema + default prompt/brief checks). ` +
+      `Create "${projectDir}/category_validate.yaml" to enable Skill Pack validation rules.`,
+    );
     return { config: null, projectCandidates, userCandidates, warnings, errors };
   }
 }

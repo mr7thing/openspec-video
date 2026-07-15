@@ -355,24 +355,49 @@ If you define `field_schema.prompt`, the default prompt check is **disabled** (y
 
 ## Unknown Rules Handling
 
-If your config contains a rule key the validator doesn't recognize, it produces a **warning** at load time:
+**All warnings and errors are printed to stderr** — OpsV never silently ignores config issues. There are 5 distinct cases that always surface feedback to the user:
+
+| Case | Severity | When | Example output |
+|---|---|---|---|
+| **No project config, no user config** | ⚠️ warning | Both `.opsv/` paths are empty | `No category validate config found in ".../.opsv/" or "~/.opsv/". Validation will run with NO category rules...` |
+| **Project config missing, using user-level fallback** | ⚠️ warning | Project has no `.opsv/`, but user has one | `No project-level category validate config found in "...". Falling back to user-level: "~/.opsv/category_validate.yaml".` |
+| **Non-canonical filename** (e.g., `_category_validate.yaml`) | ⚠️ warning | Used Skill Pack convention | `Config filename ".opsv/_category_validate.yaml" is non-canonical. Recommended: "category_validate.yaml".` |
+| **Unknown rule key in YAML** | ⚠️ warning | Validator doesn't recognize a key | `concept.prompt.min_word_count: Unknown field check key "min_word_count"...` |
+| **Multiple configs found** (conflict) | ❌ error (exit 2) | 2+ configs at same level | `Multiple category validate configs found... Resolve the conflict or use --category-config <path>...` |
+| **Explicit `--category-config` with bad filename** | ❌ error (exit 2) | User passed wrong filename | `Explicit --category-config filename does not match pattern: wrong-name.yaml` |
+
+### Why this matters
+
+Earlier versions of OpsV silently fell back when projects lacked category configs. This caused user confusion: "Why aren't my custom rules running?" v0.11.0+ surfaces every fallback, every non-canonical choice, and every unrecognized rule — no silent acceptance.
+
+### Example: unrecognized rule
 
 ```yaml
-# BAD: "min_word_count" is not a supported rule
-prompt:
-  min_word_count: 10  # ← unknown rule
+# /my/project/.opsv/category_validate.yaml
+
+concept:
+  required_fields: [status]
+  field_schema:
+    prompt:
+      min_word_count: 10   # ← unknown rule (validator doesn't recognize this)
+      min_length: 5        # ← known rule
+    duration_ms:
+      must_be_positive: true  # ← unknown rule
 ```
 
-→ On `opsv validate`, you'll see:
+→ `opsv validate` prints to stderr:
 
 ```
-[opsv validate] warning: unsupported rule: min_word_count (in field prompt)
+[opsv validate] warning: concept.prompt.min_word_count: Unknown field check key "min_word_count" for field "prompt" — validator will ignore it
+[opsv validate] warning: concept.duration_ms.must_be_positive: Unknown field check key "must_be_positive" for field "duration_ms" — validator will ignore it
 ```
 
-The validator does NOT silently ignore unknown rules. If you see this warning, either:
+**The validator still loads the file** — the unknown rules are simply skipped (silently at execution time, loudly at load time). The known rule (`min_length: 5`) does run.
 
-1. **Remove the unknown rule** if you don't need it
-2. **Use a supported rule** (see [Supported Rule Types](#supported-rule-types-generic-field-schema))
+### What to do when you see unknown-rule warnings
+
+1. **Remove the unknown rule** if you don't actually need it (often copy-paste leftovers)
+2. **Replace with a supported rule** (see [Supported Rule Types](#supported-rule-types-generic-field-schema))
 3. **File a feature request** if you think the rule should be supported
 
 ---
