@@ -1,7 +1,8 @@
 // ============================================================================
-// OpsV CategoryValidator (v0.10.0)
+// OpsV CategoryValidator (v0.11.0)
 // Applies per-category rules from category_validate.yaml to a document.
-// Also performs bidirectional refs ↔ prompt validation.
+// All rules are executed generically — no field names are hardcoded.
+// Unknown rule keys in the config are flagged by the loader, not ignored.
 // ============================================================================
 
 import { RefsByType } from '../types/Refs';
@@ -25,13 +26,193 @@ const PLACEHOLDER_PATTERNS = [
   /\bplaceholder\b/i,
 ];
 
+// ---------------------------------------------------------------------------
+// Generic field value coercion helpers
+// ---------------------------------------------------------------------------
+
+/** Coerce a value to a string for string-type checks. */
+function asString(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return String(value);
+}
+
+/** Coerce a value to a number for numeric checks. Returns NaN if not coercible. */
+function asNumber(value: unknown): number {
+  if (value === undefined || value === null) return NaN;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (typeof value === 'string') return parseFloat(value);
+  return NaN;
+}
+
+/** Check if value is array. */
+function isArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+// ---------------------------------------------------------------------------
+// Generic field validation — one field, all its checks
+// ---------------------------------------------------------------------------
+
+/**
+ * Run all field-level checks for a single field against its value.
+ * Returns issues for ALL failed checks (not short-circuit).
+ */
+function validateField(
+  field: string,
+  value: unknown,
+  check: FieldCheck,
+  defaultSeverity: ValidationSeverity,
+  category: string,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const severity = check.severity || defaultSeverity;
+
+  // ----- type -----
+  if (check.type !== undefined) {
+    const typeOk = checkType(value, check.type);
+    if (!typeOk) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" must be of type ${check.type}, got ${typeof value}${Array.isArray(value) ? ' (array)' : ''}`,
+      });
+    }
+  }
+
+  // ----- min / max (numeric) -----
+  if (!isNaN(asNumber(value))) {
+    const numVal = asNumber(value);
+    if (typeof check.min === 'number' && numVal < check.min) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" value ${numVal} < min ${check.min}`,
+      });
+    }
+    if (typeof check.max === 'number' && numVal > check.max) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" value ${numVal} > max ${check.max}`,
+      });
+    }
+  }
+
+  // ----- min_length / max_length (string) -----
+  const strVal = asString(value);
+  if (strVal !== null) {
+    if (typeof check.min_length === 'number' && strVal.length < check.min_length) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" length ${strVal.length} < min_length ${check.min_length}`,
+      });
+    }
+    if (typeof check.max_length === 'number' && strVal.length > check.max_length) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" length ${strVal.length} > max_length ${check.max_length}`,
+      });
+    }
+    if (check.no_placeholder && hasPlaceholder(strVal)) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" contains placeholder text (TODO/FIXME/XXX/TBD)`,
+      });
+    }
+  }
+
+  // ----- min_items / max_items (array) -----
+  if (isArray(value)) {
+    const arr = value as unknown[];
+    if (typeof check.min_items === 'number' && arr.length < check.min_items) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" has ${arr.length} items, min_items ${check.min_items}`,
+      });
+    }
+    if (typeof check.max_items === 'number' && arr.length > check.max_items) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" has ${arr.length} items, max_items ${check.max_items}`,
+      });
+    }
+  }
+
+  // ----- enum -----
+  if (check.enum !== undefined && Array.isArray(check.enum)) {
+    const valStr = strVal ?? JSON.stringify(value);
+    if (!check.enum.some(e => String(e) === valStr)) {
+      issues.push({
+        severity,
+        category,
+        field,
+        message: `"${field}" value "${valStr}" is not one of allowed values: [${check.enum.map(e => JSON.stringify(e)).join(', ')}]`,
+      });
+    }
+  }
+
+  // ----- must_include (array or object field values must contain specific items) -----
+  if (check.must_include !== undefined && Array.isArray(check.must_include) && isArray(value)) {
+    const arr = value as string[];
+    for (const required of check.must_include) {
+      if (!arr.includes(required)) {
+        issues.push({
+          severity,
+          category,
+          field,
+          message: `"${field}" must include "${required}", got [${arr.map(v => JSON.stringify(v)).join(', ')}]`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+/** Check if a value matches the expected type string. */
+function checkType(value: unknown, expected: string): boolean {
+  switch (expected) {
+    case 'string':
+      return typeof value === 'string';
+    case 'integer':
+    case 'number':
+      return typeof value === 'number' && !isNaN(value) && (expected === 'integer' ? Number.isInteger(value) : true);
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'array':
+      return Array.isArray(value);
+    case 'object':
+      return typeof value === 'object' && value !== null && !Array.isArray(value);
+    default:
+      return true; // Unknown type → pass
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main validate function
+// ---------------------------------------------------------------------------
+
 /**
  * Validate one document's frontmatter + body against its category rule.
  *
- * brief 和 prompt 是默认检查项（所有文档都会检查），除非类别设置了跳过标志。
- *
- * @param frontmatter parsed YAML
- * @param body the markdown body (used for ref scanning)
+ * @param frontmatter parsed YAML (record of field → value)
+ * @param body markdown body (used for ref scanning)
  * @param rule rule for this category (may be undefined → only default checks)
  */
 export function validateCategory(
@@ -43,7 +224,7 @@ export function validateCategory(
   const category = String(frontmatter.category ?? '');
   const defaultSeverity: ValidationSeverity = rule?.severity || 'error';
 
-  // 1) Required fields (from category rule, if any)
+  // 1) Required fields
   if (rule) {
     for (const field of rule.required_fields || []) {
       if (frontmatter[field] === undefined || frontmatter[field] === null || frontmatter[field] === '') {
@@ -57,7 +238,7 @@ export function validateCategory(
     }
   }
 
-  // 2) Default checks: prompt (always checked unless skipped or overridden by field_schema)
+  // 2) Default checks: prompt (always checked unless skipped)
   const skipPrompt = rule?.skip_prompt_check === true;
   const hasPromptFieldSchema = !!rule?.field_schema?.prompt;
   if (!skipPrompt && !hasPromptFieldSchema) {
@@ -95,7 +276,7 @@ export function validateCategory(
     const briefVal = frontmatter['brief'];
     if (briefVal === undefined || briefVal === null || briefVal === '') {
       issues.push({
-        severity: 'warning',  // brief 缺失只警告
+        severity: 'warning',
         category,
         field: 'brief',
         message: 'Recommended field "brief" is missing — used by prompt compiler annotate mode for image annotations',
@@ -113,53 +294,43 @@ export function validateCategory(
   // 4) Field-level schema checks (from category rule)
   if (rule?.field_schema) {
     for (const [field, check] of Object.entries(rule.field_schema)) {
-      // skip_prompt_check also trumps prompt in field_schema
+      // skip_prompt_check also bypasses prompt field_schema checks
       if (skipPrompt && field === 'prompt') continue;
 
       const value = frontmatter[field];
-      const severity = check.severity || defaultSeverity;
-
       if (value === undefined || value === null) continue;
 
+      // refs is special: handle refs_in_prompt_must_match_refs generically
       if (field === 'refs') {
         if (check.refs_in_prompt_must_match_refs) {
-          const refIssues = validateRefsBidirectional(frontmatter, body, severity);
+          const refIssues = validateRefsBidirectional(frontmatter, body, check.severity || defaultSeverity);
           issues.push(...refIssues);
+        }
+        // Also validate refs structure generically
+        if (typeof check.min_items === 'number' || typeof check.max_items === 'number' || check.enum || check.type || check.must_include) {
+          issues.push(...validateField(field, value, check, defaultSeverity, category));
         }
         continue;
       }
 
-      const strVal = typeof value === 'string' ? value : String(value);
-
-      if (typeof check.min_length === 'number' && strVal.length < check.min_length) {
-        issues.push({ severity, category, field, message: `"${field}" length ${strVal.length} < min_length ${check.min_length}` });
-      }
-      if (typeof check.max_length === 'number' && strVal.length > check.max_length) {
-        issues.push({ severity, category, field, message: `"${field}" length ${strVal.length} > max_length ${check.max_length}` });
-      }
-      if (check.no_placeholder && hasPlaceholder(strVal)) {
-        issues.push({ severity, category, field, message: `"${field}" contains placeholder text (TODO/FIXME/XXX/TBD)` });
-      }
+      // refs_in_prompt_must_match_refs on the prompt field
       if (check.refs_in_prompt_must_match_refs && field === 'prompt') {
-        const refIssues = validateRefsBidirectional(frontmatter, body, severity);
+        const refIssues = validateRefsBidirectional(frontmatter, body, check.severity || defaultSeverity);
         issues.push(...refIssues);
       }
+
+      // Generic field validation for all check types
+      issues.push(...validateField(field, value, check, defaultSeverity, category));
     }
   }
 
   return issues;
 }
 
-/**
- * Bidirectional refs ↔ prompt validation (v0.10.0):
- *   refs only mirror what the prompt field references.
- *   prompt / refs are validated (when present);
- *   brief / visual_brief / visual_detailed / body are NOT scanned — they may
- *   contain narrative @-references that don't represent generation inputs.
- *
- *  - Every @-token in `prompt` must have a refs entry
- *  - Every refs key must appear as an @-token in `prompt`
- */
+// ---------------------------------------------------------------------------
+// Bidirectional refs ↔ prompt validation (v0.11.0)
+// ---------------------------------------------------------------------------
+
 export function validateRefsBidirectional(
   frontmatter: Record<string, any>,
   body: string,
@@ -180,7 +351,7 @@ export function validateRefsBidirectional(
     }
   }
 
-  // Direction 1: prompt @-token must be in refs
+  // Direction 1: @-token in prompt must exist in refs
   for (const key of promptKeys) {
     if (!refKeys.has(key)) {
       issues.push({
@@ -206,6 +377,10 @@ export function validateRefsBidirectional(
 
   return issues;
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function hasPlaceholder(text: string): boolean {
   for (const re of PLACEHOLDER_PATTERNS) {

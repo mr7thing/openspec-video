@@ -36,6 +36,7 @@ interface ValidateCommandOptions {
   exclude?: string[];
   maxDepth?: string;
   circle?: string;
+  categoryConfig?: string;
 }
 
 export function registerValidateCommand(program: Command, version: string): void {
@@ -49,6 +50,7 @@ export function registerValidateCommand(program: Command, version: string): void
     .option('--category <cat>', 'Only validate documents of this category')
     .option('--strict', 'Treat warnings as errors (non-zero exit)')
     .option('--skip-category-rules', 'Skip category_validate.yaml rule checks')
+    .option('--category-config <path>', 'Explicit path to category validate config (resolves conflicts; overrides discovery)')
     .option('--circle [path]', 'Validate only documents in a specific circle. Accepts circle dir or manifest path. Auto-discovers latest if omitted.')
     .action(async (options: ValidateCommandOptions) => {
       try {
@@ -58,7 +60,12 @@ export function registerValidateCommand(program: Command, version: string): void
 
         // Load category rules + input_types registry
         const catLoader = new CategoryValidateLoader();
-        catLoader.load(projectRoot, { silent: true });
+        const catResult = catLoader.load(projectRoot, { silent: true, explicitPath: options.categoryConfig });
+        // If discovery found conflicting configs, abort (user must resolve with --category-config)
+        if (catResult.discovery.errors.length > 0) {
+          console.error(chalk.red(`\nResolve the category validate config conflict above before running validate.\n`));
+          process.exit(2);
+        }
         const inputTypes = new InputTypesLoader();
         inputTypes.load(projectRoot, { silent: true });
 
