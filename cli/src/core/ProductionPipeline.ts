@@ -417,28 +417,28 @@ export class ProductionPipeline {
             continue;
           }
 
-          const descContent = fs.readFileSync(descPath, 'utf-8');
-          const descBody = FrontmatterParser.extractBody(descContent);
-          const approvedSection = descBody.match(
-            /##\s*Approved\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i,
-          );
-          if (!approvedSection) {
-            errors.push(`@${refId} — ## Approved References section not found`);
+          const descriptor = FrontmatterParser.parseRaw(fs.readFileSync(descPath, 'utf-8')).frontmatter;
+          if (descriptor.status === 'syncing') {
+            errors.push(`@${refId} — referenced Asset is syncing and cannot be consumed`);
             continue;
           }
-
-          const approvedImgRe = variant
-            ? new RegExp(`!\\[${escapeRegex(variant)}\\]\\(([^)]+)\\)`)
-            : /!\[([^\]]*)\]\(([^)]+)\)/;
-          const approvedMatch = approvedSection[1].match(approvedImgRe);
-          if (!approvedMatch) {
-            errors.push(`@${refId}${variant ? ':' + variant : ''} — no matching approved output`);
+          const approvedRefs = await this.approvedRefReader.getAll(descPath);
+          if (approvedRefs.length === 0) {
+            errors.push(`@${refId} — no approved output`);
             continue;
           }
-          const approvedPath = approvedMatch[variant ? 1 : 2];
-          const resolvedApproved = path.resolve(path.dirname(descPath), approvedPath);
-          if (!fs.existsSync(resolvedApproved)) {
-            errors.push(`@${refId}${variant ? ':' + variant : ''} — approved file not found: ${approvedPath}`);
+          const duplicates = await this.approvedRefReader.getDuplicateVariants(descPath);
+          if (duplicates.length) {
+            errors.push(`@${refId} — duplicate approved variants: ${duplicates.join(', ')}`);
+            continue;
+          }
+          if (!variant && approvedRefs.length > 1) {
+            errors.push(`@${refId} — variant required because the asset has ${approvedRefs.length} approved references`);
+            continue;
+          }
+          const approved = variant ? approvedRefs.find(ref => ref.variant === variant) : approvedRefs[0];
+          if (!approved || !fs.existsSync(approved.filePath)) {
+            errors.push(`@${refId}${variant ? ':' + variant : ''} — no matching approved output file`);
           }
         }
       }
