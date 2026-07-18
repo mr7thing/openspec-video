@@ -94,8 +94,14 @@ export interface DirSettings {
   queue?: string;
 }
 
+export interface CircleSettings {
+  /** Default document directories used when `opsv circle` receives no --dir. */
+  dirs?: string[];
+}
+
 export interface ProjectSettings {
   dirs?: DirSettings;
+  circle?: CircleSettings;
   polling?: PollingSettings;
   timeout?: TimeoutConfig;
   max_poll_duration?: number;
@@ -163,6 +169,7 @@ export class ConfigLoader {
         ...base.settings,
         ...override.settings,
         dirs: { ...base.settings?.dirs, ...override.settings?.dirs },
+        circle: { ...base.settings?.circle, ...override.settings?.circle },
         polling: { ...base.settings?.polling, ...override.settings?.polling },
         timeout: { ...base.settings?.timeout, ...override.settings?.timeout },
         retry: { ...base.settings?.retry, ...override.settings?.retry },

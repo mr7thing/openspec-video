@@ -6,8 +6,19 @@
 import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
+import { ConfigLoader } from './configLoader';
 
 export const DEFAULT_SCAN_DIRS = ['videospec/scenes', 'videospec/shots', 'videospec/elements'];
+
+/**
+ * Resolve the configured default Circle scope. The ConfigLoader already merges
+ * shipped, user, and project configuration in ascending precedence.
+ */
+export function getDefaultCircleDirs(projectRoot: string): string[] {
+  const loader = new ConfigLoader();
+  const configured = loader.loadConfig(projectRoot, { silent: true }).settings?.circle?.dirs;
+  return configured && configured.length > 0 ? configured : DEFAULT_SCAN_DIRS;
+}
 
 /**
  * Add a standardised --dir <paths...> option to a command.
@@ -31,9 +42,10 @@ export function addDirOption(
 export function resolveDirs(
   dirs: string[] | undefined,
   projectRoot: string,
-  opts?: { log?: (msg: string) => void },
+  opts?: { log?: (msg: string) => void; defaultDirs?: string[] },
 ): string[] {
-  const raw = dirs ?? DEFAULT_SCAN_DIRS;
+  const defaults = opts?.defaultDirs ?? DEFAULT_SCAN_DIRS;
+  const raw = dirs ?? defaults;
   const resolved: string[] = [];
   for (const d of raw) {
     const fullPath = path.resolve(projectRoot, d);
@@ -43,5 +55,5 @@ export function resolveDirs(
       opts?.log?.(`Directory not found, skipping: ${d}`);
     }
   }
-  return resolved.length > 0 ? resolved : DEFAULT_SCAN_DIRS;
+  return resolved.length > 0 ? resolved : defaults;
 }

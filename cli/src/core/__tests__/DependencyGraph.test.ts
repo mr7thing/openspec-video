@@ -86,7 +86,7 @@ describe('DependencyGraph', () => {
       expect(circles[14].index).toBe(14);
     });
 
-    it('end_circle when last layer contains shotdeck', () => {
+    it('does not give a business category a special Circle name', () => {
       const graph = new DependencyGraph();
       graph.build([
         makeDoc('a', []),
@@ -95,10 +95,10 @@ describe('DependencyGraph', () => {
       const circles = graph.getCircles();
       expect(circles).toHaveLength(2);
       expect(circles[0].name).toBe('zerocircle');
-      expect(circles[1].name).toBe('end_circle');
+      expect(circles[1].name).toBe('firstcircle');
     });
 
-    it('end_circle overrides ordinal name in deep graphs', () => {
+    it('keeps category-independent names in deep graphs', () => {
       const graph = new DependencyGraph();
       const docs: ParsedDocument[] = [];
       for (let i = 0; i < 5; i++) {
@@ -109,7 +109,7 @@ describe('DependencyGraph', () => {
       graph.build(docs);
       const circles = graph.getCircles();
       const last = circles[circles.length - 1];
-      expect(last.name).toBe('end_circle');
+      expect(last.name).toBe('fifthcircle');
       expect(last.assetIds).toContain('shotdeck');
     });
   });

@@ -9,7 +9,7 @@ import fs from 'fs';
 import chalk from 'chalk';
 import { DependencyGraph } from '../core/DependencyGraph';
 import { logger } from '../utils/logger';
-import { addDirOption, resolveDirs } from '../utils/dirOption';
+import { addDirOption, getDefaultCircleDirs, resolveDirs } from '../utils/dirOption';
 
 interface CircleCreateOptions {
   dir: string[];
@@ -36,7 +36,10 @@ export function registerCircleCommands(program: Command): void {
       try {
         const projectRoot = process.cwd();
         const queueRoot = path.join(projectRoot, 'opsv-queue');
-        const resolvedDirs = resolveDirs(options.dir, projectRoot, { log: console.log });
+        const resolvedDirs = resolveDirs(options.dir, projectRoot, {
+          log: console.log,
+          defaultDirs: getDefaultCircleDirs(projectRoot),
+        });
         const basename = options.name || DependencyGraph.resolveTargetBasename(resolvedDirs);
 
         // Name conflict detection
@@ -92,7 +95,10 @@ export function registerCircleCommands(program: Command): void {
       try {
         const projectRoot = process.cwd();
         const queueRoot = path.join(projectRoot, 'opsv-queue');
-        const resolvedDirs = resolveDirs(options.dir, projectRoot, { log: console.log });
+        const resolvedDirs = resolveDirs(options.dir, projectRoot, {
+          log: console.log,
+          defaultDirs: getDefaultCircleDirs(projectRoot),
+        });
         const basename = options.name || DependencyGraph.resolveTargetBasename(resolvedDirs);
 
         // Find latest .circleN for this basename

@@ -9,6 +9,7 @@ import { FrontmatterParser } from './FrontmatterParser';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { logger } from '../utils/logger';
 import { escapeRegex } from '../utils/string';
+import { parseRefKey } from './RefSyntaxParser';
 
 // Read version from package.json
 const pkgPath = path.join(__dirname, '../../package.json');
@@ -77,13 +78,10 @@ export class DependencyGraph {
         for (const typeMap of Object.values(doc.frontmatter.refs)) {
           if (!typeMap || typeof typeMap !== 'object') continue;
           for (const key of Object.keys(typeMap)) {
-            // Strip @ prefix; skip in-doc refs (@:) — they don't create cross-doc dependencies
-            if (!key.startsWith('@')) continue;
-            if (key.startsWith('@:')) continue;
-            let cleanId = key.slice(1);
-            const colonIdx = cleanId.indexOf(':');
-            if (colonIdx > 0) cleanId = cleanId.slice(0, colonIdx);
-            if (cleanId !== doc.id) deps.add(cleanId);
+            const ref = parseRefKey(key);
+            // Local Design References are generation inputs, not Circle dependencies.
+            if (!ref || ref.kind !== 'external') continue;
+            if (ref.id !== doc.id) deps.add(ref.id);
           }
         }
       }
@@ -136,20 +134,8 @@ export class DependencyGraph {
     const { batches } = this.topologicalSort();
     const circles: CircleDefinition[] = [];
 
-    const lastBatchHasShotList = (batch: string[]): boolean => batch.includes('shotdeck');
-
     for (const [index, batch] of batches.entries()) {
-      const isLastLayer = index === batches.length - 1;
-      const hasShotList = lastBatchHasShotList(batch);
-
-      let name: string;
-      if (isLastLayer && hasShotList) {
-        name = 'end_circle';
-      } else {
-        name = ORDINALS[index] ?? `circle.${index}`;
-      }
-
-      circles.push({ name, index, assetIds: batch });
+      circles.push({ name: ORDINALS[index] ?? `circle.${index}`, index, assetIds: batch });
     }
 
     return circles;
