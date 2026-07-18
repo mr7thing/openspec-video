@@ -32,6 +32,11 @@ describe('ProjectConfig Pack Stack', () => {
     expect(() => resolvePacks(root)).toThrow('Pack id mismatch');
   });
 
+  it('rejects a Project policy that weakens delete: never', () => {
+    fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'policy:\n  delete: auto\n');
+    expect(() => loadProjectConfig(root)).toThrow('delete');
+  });
+
   it('links platform discovery shims to canonical Pack Skills', () => {
     const pack = path.join(root, '.opsv', 'packs', 'short-drama');
     fs.mkdirSync(path.join(pack, 'skills', 'make'), { recursive: true });

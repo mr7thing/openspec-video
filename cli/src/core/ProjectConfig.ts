@@ -17,6 +17,7 @@ export interface ActionPolicy {
   execute?: 'auto' | 'ask' | 'human';
   approve?: 'auto' | 'ask' | 'human';
   sync?: 'auto' | 'ask' | 'human';
+  delete?: 'never';
 }
 
 export interface DerivedProfile {
@@ -64,7 +65,11 @@ export function loadProjectConfig(projectRoot: string): ProjectConfig {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error(`${PROJECT_CONFIG_PATH} must contain a YAML object`);
   }
-  return parsed as ProjectConfig;
+  const config = parsed as ProjectConfig;
+  if (config.policy && Object.prototype.hasOwnProperty.call(config.policy, 'delete') && config.policy.delete !== 'never') {
+    throw new Error('policy.delete is a Core invariant and must be "never"');
+  }
+  return config;
 }
 
 export function resolvePacks(projectRoot: string, config = loadProjectConfig(projectRoot)): ResolvedPack[] {
