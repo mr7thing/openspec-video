@@ -134,7 +134,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 | `opsv refs fill` | Auto-fill missing refs keys + paths |
 | `opsv login / logout` | OPSV Cloud auth |
 
-> Full reference: `opsv-cli-skill/references/cli_reference.md`
+> Agent contract: `opsv-cli-skill/references/agent-contract.md`
 
 ---
 

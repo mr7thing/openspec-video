@@ -1,726 +1,87 @@
 ---
 name: opsv-cli-skill
-description: OPSV 命令操作员手册 — 教 Agent 如何使用 opsv CLI 管理视频项目。当用户想初始化项目、写/校验/编译/执行/审阅/迭代任何 OPSV 文档时，或询问"opsv 怎么用""这个命令要什么参数""文档 frontmatter 该怎么写"时使用。本技能只讲命令用法与文档规范，说明opsv-cli使用的正确原则，不涉及生产流程的具体阶段划分。
+description: Operate an OPSV asset-production project. Use when an agent must inspect, create, validate, materialize, schedule, compile, approve, synchronize, or iterate an OPSV Asset Document or Pack.
 ---
 
-# opsv-cli — OPSV 命令操作员手册
+# OPSV CLI Operator
 
-> **定位**：你加载这个技能，就具备了驱动整个 OPSV 管线的能力——知道有哪些命令、每条命令要求文档按什么规范写、哪些事绝对不能做。
-> **不讲**：生产流程（做哪一步、产出什么）——那是各阶段技能的事。
+Treat the Asset Document as the source of truth for one asset's specification,
+generation references, review record, and approved results. Run the CLI from the
+project root. Read [agent-contract.md](references/agent-contract.md) before writing
+frontmatter or a reference.
 
----
-
-## 1. 核心原则（不可违背）
-
-这三条是 OPSV 的宪法，任何操作都要服从：
-
-1. **有产物必有文档** — 每一个 AI 生成的产物（图/视频/音频）都必须有一个文档描述其生成过程（prompt + 参数 + refs）。没有文档的产物不存在。
-2. **文档是绝对真相** — 所有生成所需的参数都写在文档 frontmatter 里。代码、API key、生成产物都从文档派生，不能反过来。
-3. **验证 / 反馈 / 迭代** — 用可配置的校验机制把文档守门，产物通过 review 反馈，迭代命令复制任务重做。
-
-### 1.1 Agent 行为守则（5 条）
-
-| # | 守则 | 反面 |
-|---|------|------|
-| 1 | **只写文档、调 opsv 命令** | ❌ 自己发 HTTP 调生成 API |
-| 2 | **只观察产物、按反馈修文档** | ❌ 手改产物文件名/内容 |
-| 3 | **迭代改任务 JSON，不改源文档** | ❌ iterate 后手改源 `.md` |
-| 4 | **产物命名/依赖/增量由命令管** | ❌ 手动改名、手动排依赖顺序 |
-| 5 | **修复错误只动文档或同步文档** | ❌ 改代码绕过校验 |
-
-### 🚫 **绝对禁止：任何删除操作**
-
-> **这是 OPSV 最高优先级禁令，违反即丢失追溯能力。**
-
-| 禁止行为 | 后果 | 应替换为 |
-|----------|------|---------|
-| `rm -rf opsv-queue/` | 丢失全部历史产物和追溯记录 | 产物自动增量保存，用 `opsv circle refresh` 推进 |
-| `rm -rf videospec_circleN/` | 丢失该批次所有输出图和任务 JSON | 用 `opsv iterate --inject` 克隆任务 |
-| 手动删除任何文件（产物/任务 JSON/日志） | 破坏 opsv-queue 的完整追溯链 | 产物永远不删，旧版本自动保留 |
-| `rm`、`rmdir`、`trash`、`mv` 改产物名 | 引用路径断裂，下游依赖崩溃 | 命名由 `run`/`iterate` 自动管理 |
-
-**OPSV 的设计哲学是增量保存——所有生成结果都必须留档。** 每次生成、每次迭代都产生新文件，旧版本永远保留在 opsv-queue 中供追溯。Agent 没有权限、也没有理由删除任何产物。即使产物不满意，也要用 `iterate` 生成新版本，旧版自然保留作为对比依据。
-
----
-
-## 2. 心智模型
-
-```
-   ┌─────────────────────────────────────────────────────────────┐
-   │                    文档（绝对真相）                          │
-   │   frontmatter: category / status / prompt / refs / ...     │
-   └───────────────────────┬─────────────────────────────────────┘
-                           │ opsv 命令读文档
-                           ▼
-   ┌─────────┐    ┌───────────────┐    ┌──────────┐    ┌─────────┐
-   │ validate │───▶│ circle create │───▶│ produce  │───▶│  run    │
-   │ (守门)   │    │ (建依赖 DAG)  │    │ (编译)   │    │ (执行)  │
-   └─────────┘    │  → manifest   │    └──────────┘    └────┬────┘
-                  └───────────────┘                         │
-                                                            ▼
-                  ┌───────────────┐    ┌──────────┐    ┌─────────┐
-                  │ approved      │◀───│ review   │◀───│ 产物    │
-                  │ (解锁下游)    │    │ (审阅)   │    │ (图/视频)│
-                  └───────┬───────┘    └──────────┘    └─────────┘
-                          │ 不满意
-                          ▼
-                  ┌───────────────┐
-                  │ iterate       │───▶ 复制任务(JSON) → 修改 prompt/refs/参数 → 回 run
-                  │ (迭代重做)    │     后缀自动 _m1/_m2，历史保留
-                  └───────────────┘
-```
-
-**一句话**：Agent 永远在"写文档 → 让命令处理 → 看反馈 → 改文档/迭代任务"的循环里，不碰 API、不碰产物名（除非用户强烈要求）。
-
----
-
-## 3. 命令分组速查（详情见 references/cli_reference.md）
-
-### 3.1 脚手架与守门
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv init` | 建项目骨架 | 会创建 `.opsv/` + `videospec/`，复制内置配置为 `.sample` 文件，生成 `.env.sample` |
-| `opsv validate` | 读文档做格式守门 | 默认扫 `videospec/scenes`、`videospec/shots`、`videospec/elements` 三个目录（多值 `--dir` 可覆盖）；支持 `--exclude` 按路径排除子目录、`--max-depth` 控制深度（默认 1，`-1`=无限）；点目录自动跳过；文档 `category` 必须在 `_category_validate.yaml` 注册过；所有文档默认检查 `prompt`（必填+长度+占位符）和 `brief`（建议填写，缺失 warning 不报错），类别可设 `skip_prompt_check: true` 或 `skip_brief_check: true` 跳过；不评判质量，只查格式 |
-| `opsv status` | 快速查看项目状态 | 显示每个 circle 的进度条、approved/syncing/drafting 数量、总体完成百分比；`--circle <name>` 限定范围 |
-| `opsv trace <assetId>` | 资产溯源 | 从输出文件反向追溯到源文档，显示 refs 引用、output 文件列表、review 历史 |
-
-### 3.2 任务环
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv circle create` | 从 `refs` 依赖建 DAG、分层、写 manifest | **只在依赖关系变化时**用；不是每步都跑 |
-| `opsv circle refresh` | 检查文档状态，刷新任务环文档状态统计、不动文件 | 日常迭代用；检测到拓扑变化会报错让你用 create |
-
-**⚠️ Circle 批处理机制（重要操作规范）**：
-
-一个 Circle 包含多个 index（批），按依赖拓扑分层：
-- **Index 0（zerocircle）**：已 approved 的资产（角色/道具参考图）
-- **Index 1（firstcircle）**：依赖 index 0 的场景/镜头
-- **Index N**：更深层依赖
-
-**正确工作方式（不重建 Circle）：**
-1. `circle create` 只在**依赖关系变化时**执行（修改了 refs、增删文档、改了文档分类/状态）
-2. 日常工作中：`circle refresh` 刷新状态 → 看哪些 index 就绪了 → 编译那些 index 的任务 → `run` → `approved`
-3. 当前 index 完成后，`circle refresh` 会自动标记状态，下一批 index 变为可执行
-4. **禁止**每完成一批就 `rm -rf` 重建 Circle（会丢失历史产物）
-
-**错误做法（我踩过的坑）：**
-```
-❌ rm -rf opsv-queue/videospec_circleN  # 错误：删除历史
-❌ opsv circle create    # 每次执行前都建新 circle
-```
-
-**正确做法：**
-```
-✅ opsv circle refresh                   # 刷新状态
-✅ opsv produce --model ... --manifest ... --file X   # 编译就绪的任务
-✅ opsv run ...                          # 执行
-✅ opsv approve <output-file>              # 审批产物（单个文件，自动追溯文档）
-✅ 重复直到所有 index 完成               # 不重建 circle
-```
-
-### 3.3 编译
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv produce --model <key>` | 统一编译命令（替代旧的 imagen/animate/comfy） | `--model` 必填；模型 key 格式 `{provider}.{name}`（如 `volc.seedance2`、`rh-api.seedance`、`rh-workflow-v2.director`）；外加 `--workflow`（ComfyUI / RunningHub 工作流用）、`--param <json>`（参数覆盖）、`--category`/`--file`（筛选）、`--prompt-mode`（@-token 编译模式，默认 `annotate`）、`--dry-run`（预览）；只产出 task.json，不执行 |
-| `opsv webapp` | 编译浏览器自动化任务 | 多站点 runner（目前仅支持 Gemini） |
-
-> 编译命令**只产出 task.json**，真正的 API 调用在 `run` 里。
-
-### 3.4 执行与迭代
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv run` | 执行 task.json（提交/轮询/下载） | 按模型 concurrency 控制；不直接调 API 是它调；`--force` 强制重跑已成功任务（输出增量保存） |
-| `opsv iterate` | 克隆任务做迭代 | `--inject key=value` 支持注入指定字段到克隆版本；后缀**自动**加 `_m1`/`_m2`；**禁止手改名** |
-
-**⚠️ iterate --inject 使用规范（重要）**：
-
-当**只修改 prompt 或参数（依赖关系不变）**时，用 `opsv iterate` 而不是重建 Circle：
+## Start Every Asset Action
 
 ```bash
-# ✅ 正确：克隆任务 + 注入新 prompt，保留全部历史
-opsv iterate opsv-queue/videospec_circleN/rhapi.v2i2i_NNN/X.json \
-  --inject payload.prompt="新的英文 prompt"
-opsv run opsv-queue/.../X_m1.json     # 自动 _m1 后缀
-
-# ✅ 也可以注入多个字段
-opsv iterate ... --inject payload.prompt="..." payload.seed=42
-
-# ❌ 错误：删掉整个 circle 重建（丢失历史产物）
-rm -rf opsv-queue/videospec_circleN   # 不要这样做
-
-# ❌ 错误：iterate 后手改源 .md 文档
-# 所有临时改动在任务 JSON 上 ，直接快速，待review 确认哪一个版本修改通过后，再通过syncing 标记，提醒agent追溯到具体任务，回写源文档。
+opsv work check <asset>
 ```
 
-**iterate 的产物命名规则（ opsv 将自动执行此规则）**：
-- 首次执行：`X_1.png`（run 产生）
-- iterate 后执行：`X_m1_1.png`（iterate + run 产生）
-- 再次 iterate：`X_m2_1.png`（后续版本）
-- **所有版本都保留在 opsv-queue 中**，可供追溯
+Follow its one primary Skill, gates, action policy, binding, and candidate command.
+Use `opsv validate` for document/schema validation; use `opsv work check` for
+workflow readiness. Do not infer a production workflow from a document's location.
 
-### 3.5 审阅与审批
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv review` | 启审阅 UI（本地/云） | `--cloud` 暂未开放 |
-| `opsv approve <output-file>` | 审批单个产物，自动从文件名追溯源文档，写入 `## Approved References` | 一个文件 = 一次 approve，不加批。支持 --action、--dry-run、--note |
-
-### 3.6 引用与辅助
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv refs check` | 查 prompt ↔ refs 一致性 | 用了 `@id` 但 refs 没声明 → 报错 |
-| `opsv refs fill` | 自动补齐缺失 refs key + 填充路径 | --write 写回；--dry-run 预览 |
-| `opsv image-stitch` | 拼接图片 | 横拼 `--right` / 纵拼 `--down` |
-| `opsv comfy-node-mapping` | 分析 ComfyUI 工作流 | 产出节点映射 |
-
-### 3.7 API 配置
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv api-setup` | 配置 API key 和 Provider | 交互引导补 key；`--list` JSON 输出；`--set-key` 设 key；`--add-model` 追加 comfylocal/runninghub/**rhapi**/webapp；`--sync-env` 补齐占位；**v0.14.4+ 首次写入自动初始化 AES-256-GCM 加密**，无 master.key 时向后兼容明文 |
-| `opsv webapp --model <key>` | 编译 webapp 类任务（用浏览器自动化的 provider，比如 `webapp.gemini-opencli`） | 跟 `opsv imagen` 同位置，差别是走 `cli/src/webapp-runner/` 路由 |
-
-### 3.8 环境管理（v0.14.4+）
-
-| 命令 | 干什么 | Agent 必须知道 |
-|------|--------|---------------|
-| `opsv env load` | 手动重载 .env 到当前 session | 支持三层加载（user → project root → project .opsv），加密自动解密；`--dry-run` 预览 |
-| `opsv env list` | 列出 .env 中的 key 和状态 | 只显示 key 名不显示值（安全）；标记 ✅ active / ❌ missing |
-| `opsv env init-key` | 初始化 master.key + 迁移加密 | `--dry-run` 预览迁移范围；幂等 |
-
-### 三层 .env 加载顺序
-
-```
-1. ~/.opsv/.env         ← 用户级（最低优先级，所有项目共享）
-2. <project>/.env       ← 项目根（主力）
-3. <project>/.opsv/.env ← 项目隐藏（最高优先级）
-```
-
-**API key 读取**：CLI 启动时 / `opsv env load` 时，从三层 .env 自下而上合并到 `process.env`。有 `master.key` 时自动解密。
-
-**加密触发**：`api-setup --set-key` / 交互模式 / `--sync-env` 写入 key 时，自动调 `ensureMasterKey()` + `migrateEnvToEncrypted()`。数据在磁盘上是 AES-256-GCM 密文，运行时解密到内存。|
-
----
-
-## 4. ComfyUI Node Mapping 与工作流模板
-
-> ComfyUI 是 OPSV 最灵活的扩展方式。用户可以通过 `node_mappings` 将 OPSV 的 prompt/参数注入到任意 ComfyUI 工作流的任意节点。
-
-### 4.1 什么是 node_mappings
-
-ComfyUI 工作流是一个 JSON 节点图，每个节点有 `nodeId` 和若干字段。`node_mappings` 告诉 OPSV：**把哪个参数注入到哪个节点的哪个字段**。
-
-```yaml
-# .opsv/api_config.yaml 中的配置
-models:
-  comfylocal.myworkflow:
-    provider: comfylocal
-    workflow: "comfyui_workflow_templates/txt2img.json"   # 工作流 JSON 文件路径
-    node_mappings:
-      prompt:                                              # OPSV 参数名
-        nodeId: "6"                                        # ComfyUI 节点 ID
-        fieldName: "text"                                  # 节点上的字段名
-      negative_prompt:
-        nodeId: "7"
-        fieldName: "text"
-      seed:
-        nodeId: "25"
-        fieldName: "noise_seed"
-      image1:
-        nodeId: "10"
-        fieldName: "image"
-```
-
-OPSV 会从文档中提取 `prompt`、`negative_prompt`、`seed` 等值，按 `node_mappings` 注入到工作流节点中。
-
-### 4.2 如何生成 node_mappings
+For a new project or a changed Pack Stack:
 
 ```bash
-# 用 comfy-node-mapping 命令自动分析工作流 JSON，输出映射
-opsv comfy-node-mapping comfyui_workflow_templates/txt2img.json
-
-# 保存到文件
-opsv comfy-node-mapping comfyui_workflow_templates/txt2img.json -o node_mapping.yaml
+opsv pack list
+opsv pack lock
+opsv pack sync-skills --platform agents
 ```
 
-该命令会扫描工作流中所有节点，找出 `CLIPTextEncode`、`KSampler`、`LoadImage` 等常见节点并建议映射。输出后复制到 `api_config.yaml` 或文档 frontmatter 的 `node_mapping` 字段。
+Discovery shims only link to canonical Pack Skills. Never copy business rules into
+`.agents/` or `.codex/` shims.
 
-### 4.3 工作流文件路径
+## Required Operating Rules
 
-在 `api_config.yaml` 中通过 `workflow` 字段指定工作流 JSON 文件路径（相对 `projectRoot` 或绝对路径）：
+- Do not delete Asset Documents, Tasks, Circles, Artifacts, or output history.
+- Do not call generation APIs directly. Let OPSV compile and execute the selected Task.
+- Do not use the removed `opsv approved` command or filename scanning for approval.
+- Approve one selected output with a semantic Variant:
+  `opsv approve <output> --variant <name>`.
+- After an approved revision enters `syncing`, freely reconcile the Asset Document,
+  then run `opsv sync <asset>`. Do not reverse-compile a payload.
+- `opsv iterate` is a focused conversation path for a runnable payload. It may change
+  its payload freely; the next asset action resolves any `syncing` state first.
 
-```yaml
-models:
-  comfylocal.myworkflow:
-    workflow: "comfyui_workflow_templates/txt2img.json"   # 单个 .json 文件
-```
+## References And Scheduling
 
-也支持 CLI 临时覆盖：
+`refs` contains only media supplied to generation. Workflow/document prerequisites
+belong to the selected Profile and Skill, never to `refs`.
+
+- `@asset` or `@asset:variant` is an external Approved Reference.
+- With two or more approved outputs, `@asset:variant` is mandatory.
+- `@:name` is this document's Design Reference and creates no Circle dependency.
+- `@FRAME:` is valid only when the selected Profile enables it.
+- A Materialized Design Reference deliberately removes the external scheduling edge.
+
+Create or inspect a Circle only for external-reference execution ordering. A Circle is
+an immutable Task snapshot; it does not represent authoring workflow prerequisites.
+
+## Workflows
+
+For a workflow document, use the Work Packet's `materialize` action. It creates only
+missing production documents declared by the Profile. Write actual generation `refs`
+only after selecting real reference assets. Empty `refs` is valid when no media is
+being supplied to a model.
+
+For a production document, resolve the packet's blockers, create a Circle if requested,
+then compile with its bound model. Respect `draft`, `compile`, `execute`, `approve`,
+and `sync` policy values. `delete: never` cannot be relaxed.
+
+## Pack Authors
+
+Use the `opsv-skills-creator` Pack to create or revise a Pack. A Pack exports categories,
+Profiles, and canonical Skill manifests; it must not add arbitrary executable pipeline
+code. Run its contract checks before publishing a Pack change.
+
+## Verification
+
+At the narrowest useful scope, run:
 
 ```bash
-opsv comfy --model comfylocal.myworkflow --manifest ... --workflow /path/to/other.json
+opsv validate --dir <document-directory> --max-depth -1
+opsv work check <asset> --json
 ```
 
-### 4.4 两种 ComfyUI 模式对比
-
-| 维度 | `comfylocal` | `rh-workflow-v1` / `rh-workflow-v2` |
-|------|-------------|---------------------------|
-| 场景 | 本地部署的 ComfyUI | RunningHub 云端 ComfyUI |
-| API Key | 不需要 | 需要 `RH_WORKFLOW_API_KEY` |
-| 工作流来源 | 本地 `workflow` 路径指向的 `.json` 文件 | RunningHub 服务端的 `workflowId` |
-| node_mappings | 必填 | 必填 |
-| API 端点 | `http://127.0.0.1:8188/` | v1: `/task/openapi/create`，v2: `/run/workflow/{apiId}` |
-| 添加方式 | `api-setup --add-model` | `api-setup --add-model` |
-
-> v2 是新版 Workflow Run API，推荐优先使用。
-> `rh-api`（RunningHub Standard Model API）不是 ComfyUI 模式，而是直连 REST API。不需要 `node_mappings` 或 `workflowId`，见下方 4.6 节。
-
-### 4.5a RunningHub 文件上传机制
-
-**核心架构**：RH 将 COS（对象存储）挂载到 ComfyUI 的 input 目录。上传的文件存储在 COS 中，ComfyUI 通过挂载路径访问。
-
-```
-本地文件 → RH 上传 API → COS (openapi/xxx.png)
-                              ↓
-                    fileName 直接用于 imageFile
-                              ↓
-               ComfyUI 通过挂载的 COS 读取文件 ✅
-```
-
-**上传 API**：`POST /openapi/v2/media/upload/binary`
-
-**支持格式**：
-| 类型 | 格式 |
-|------|------|
-| 图片 | JPG, PNG, JPEG, WEBP |
-| 音频 | MP3, WAV, FLAC |
-| 视频 | MP4, AVI, MOV, MKV |
-
-**关键字段**：
-- `fileName`：COS 中的路径（如 `openapi/xxx.png`），**直接用于节点**
-- `download_url`：公共 URL（24小时有效），**不用于节点**
-
-**OPSV 处理流程**：
-1. 任务 JSON 中的路径是本地路径
-2. `opsv run` 时自动检测本地文件
-3. 调用 RH 上传 API → 获取 `fileName`
-4. 替换本地路径为 `fileName`
-5. 提交替换后的 payload 给 API
-
-**上传模式配置**：
-```yaml
-rh-workflow-v2.director:
-  defaults:
-    upload_method: rh_upload  # 推荐：上传获取 fileName
-    # upload_method: base64   # 仅图片可用，视频/音频不支持
-```
-
-### 4.5 用 api-setup 添加新工作流
-
-```bash
-# 添加本地 ComfyUI 工作流（workflow 指向 .json 文件）
-opsv api-setup --add-model '{
-  "modelKey": "comfylocal.txt2img",
-  "config": {
-    "provider": "comfylocal",
-    "workflow": "comfyui_workflow_templates/txt2img.json",
-    "node_mappings": {
-      "prompt": {"nodeId":"6","fieldName":"text"},
-      "seed": {"nodeId":"25","fieldName":"noise_seed"}
-    }
-  }
-}'
-
-# 添加 RunningHub 云端工作流（v1 — 旧版）
-opsv api-setup --add-model '{
-  "modelKey": "rh-workflow-v1.default",
-  "config": {
-    "provider": "rhworkflow-v1",
-    "workflowId": "wf_abc123",
-    "api_url": "https://www.runninghub.cn/task/openapi/create",
-    "api_status_url": "https://www.runninghub.cn/task/openapi/status",
-    "required_env": ["RH_WORKFLOW_API_KEY"],
-    "node_mappings": {
-      "prompt": {"nodeId":"6","fieldName":"text"},
-      "image1": {"nodeId":"10","fieldName":"image"}
-    }
-  }
-}'
-
-# 添加 RunningHub 云端工作流（v2 — 新版 Workflow Run API）
-opsv api-setup --add-model '{
-  "modelKey": "rh-workflow-v2.director",
-  "config": {
-    "provider": "rhworkflow-v2",
-    "workflowId": "2064630504955142146",
-    "api_url": "https://api.runninghub.cn/run/workflow/2064630504955142146",
-    "api_status_url": "https://www.runninghub.cn/openapi/v2/query",
-    "required_env": ["RH_WORKFLOW_API_KEY"],
-    "node_mappings": {
-      "prompt": {"nodeId":"6","fieldName":"text"},
-      "timeline_data": {"nodeId":"46","fieldName":"timeline_data"}
-    }
-  }
-}'
-
-# 添加 RHapi 直连模型（RunningHub Standard Model API）
-# 不需要 node_mappings，api_status_url 和 required_env 自动填充
-opsv api-setup --add-model '{
-  "modelKey": "rhapi.seedance2mini",
-  "config": {
-    "provider": "rhapi",
-    "api_url": "https://www.runninghub.cn/openapi/v2/rhart-video/sparkvideo-2.0-mini/multimodal-video",
-    "type": "video",
-    "supports_reference_images": true,
-    "supports_reference_videos": true,
-    "max_reference_images": 9,
-    "defaults": {
-      "resolution": "720p",
-      "duration": "5"
-    }
-  }
-}'
-```
-
-添加后即可用对应命令编译：
-- `comfylocal` → `opsv produce --model comfylocal.xxx`
-- `rh-workflow-v1/v2` → `opsv produce --model rh-workflow-v2.xxx`
-- `rh-api` → `opsv produce --model rh-api.xxx`
-- `webapp` → `opsv webapp --model webapp.xxx`
-
-> 所有类型的编译入口统一为 `opsv produce`。模型 key 的 provider 部分决定编译器行为（`volcengine`/`siliconflow`/`minimax` 走 payload 编译；`rhworkflow-v1`/`rhworkflow-v2`/`comfylocal` 走 node mapping 编译；`rhapi` 走直连 REST）。
-
----
-
-## 4A. WebApp Provider — Gemini via OpenCLI
-
-> **定位**：用 OpenCLI 浏览器自动化（Browser Bridge Extension + daemon）跑 Gemini 出图任务。**比 CDP 直连稳**——opencli daemon 接管 Chrome，runner 只发命令不用管浏览器底层。
->
-> **使用时机**：你想用 Gemini 跑图、想把 Gemini 当作一个可调度的 provider，但又不想手动开 tab。
-
-### 4A.1 前置条件（一次性）
-
-1. **Chrome 已装 OpenCLI Browser Bridge extension**
-   - 路径：`chrome://extensions` → 加载已解压的扩展程序
-   - 源码一般在 `~/.opencli/extension/` 或 opencli npm 包的 `dist/extension/`
-2. **opencli daemon 在跑**（端口 19825）：`opencli daemon start` 或 `npm install -g @jackwener/opencli`
-3. **Chrome 已被 opencli 接管**：手动开一次 Chrome（用平时的 user-data-dir）→ daemon 自动连 → `opencli profile list` 看到 `default — connected`
-4. **Gemini 已登录**到你日常 user-data-dir
-
-### 4A.2 注册 Provider
-
-```bash
-# webapp.gemini-opencli 是固定 modelKey，runner 写死在 cli/src/webapp-runner/runners/gemini-opencli.ts
-opsv api-setup --add-model '{
-  "modelKey": "webapp.gemini-opencli",
-  "config": {
-    "provider": "webapp",
-    "runner": "gemini-opencli",
-    "opencli_session": "work",
-    "download_dir": "~/下载"
-  }
-}'
-```
-
-### 4A.3 编译任务
-
-```bash
-# webapp 类的编译入口
-opsv webapp --model webapp.gemini-opencli videospec/scenes/S01-Shot05.md
-# 输出：opsv-queue/videospec_circle1/webapp.gemini_NNN/storyboard_S01-Shot05.json
-```
-
-task JSON 结构跟 ComfyUI 类**完全同构**（顶层 `payload` + `_opsv`），差别只在 `_opsv.modelKey`：
-
-```json
-{
-  "payload": {
-    "task_id": "storyboard_S01-Shot05",
-    "target_url": "https://gemini.google.com",
-    "prompt": "...",
-    "reference_files": ["...png", "...png"]
-  },
-  "_opsv": {
-    "provider": "webapp",
-    "modelKey": "webapp.gemini-opencli",   ← 唯一差别
-    "type": "webapp",
-    "shotId": "storyboard_S01-Shot05",
-    "compiledAt": "..."
-  }
-}
-```
-
-### 4A.4 执行任务
-
-```bash
-# 跑单个 task JSON
-node cli/dist/webapp-runner/runners/gemini-opencli.js \
-  opsv-queue/videospec_circle1/webapp.gemini_NNN/storyboard_S01-Shot05.json
-
-# 或走 opsv run（推荐：自动找 manifest + 串行跑）
-opsv run opsv-queue/videospec_circle1/webapp.gemini_NNN/
-```
-
-### 4A.5 chatId 复用（关键：避免每次新建对话）
-
-Runner 在 `queue_dir/chat_state.json` 记录**当前 batch 用的 Gemini chat ID**：
-
-```json
-{
-  "shot": "webapp.gemini_027",
-  "chatId": "95da971bb5b61572",
-  "chatUrl": "https://gemini.google.com/app/95da971bb5b61572",
-  "createdAt": "...",
-  "updatedAt": "...",
-  "tasks": [
-    {"taskId": "storyboard_S01-Shot05", "imagePath": "...", "md5": "...", "successAt": "..."},
-    {"taskId": "storyboard_S01-Shot06", "imagePath": "...", "md5": "...", "successAt": "..."}
-  ]
-}
-```
-
-**解析优先级**（每次 runner 启动）：
-1. `task._opsv.chatId`（task JSON 自带，最显式）
-2. `queue_dir/chat_state.json`（同 batch 复用）
-3. `https://gemini.google.com/app`（fresh chat）
-
-**好处**：N 个 shot 跑下来**都累积在同一个 Gemini 对话里**，可以传前一张图当下一次的 ref。
-
-### 4A.6 OS Picker 问题与恢复（重要警告）
-
-**症状**：runner 上传完文件后，Gemini 的 "上传和工具" menuitem click 会**触发原生 OS 文件选择对话框**（GTK/Qt 进程级 dialog）。
-
-**为什么**：
-- runner 用 `evalJS` 把 file 注入到 `input.files`（chunked base64 → DataTransfer）
-- **但** Gemini 的 menuitem click handler **内部 click hidden input** → 弹 OS picker
-- OS picker 是独立进程，**CDP 看不到**，`opencli browser eval` / `dialog dismiss` 都关不掉
-
-**最有效的恢复（手动 SOP）**：
-
-```bash
-# 1. 关掉 opencli 控制的 Chrome 进程
-pkill -9 -f "/opt/google/chrome/chrome"
-# （daemon 不死，它会保持 WebSocket 监听）
-
-# 2. 等几秒（daemon 检测到 Chrome 没了，profile disconnected）
-
-# 3. 重新手动开 Chrome（带日常 user-data-dir）
-google-chrome-stable --user-data-dir=/home/uncle7/.config/google-chrome \
-                     --profile-directory=Default \
-                     "https://gemini.google.com/app/<chatId>"
-# ← 关键是 **带 chatId 打开 URL**，让浏览器直接恢复那个对话
-
-# 4. 等 extension 自动连回 daemon
-sleep 3 && opencli profile list
-# 看到 default connected 即可
-
-# 5. 重新跑任务（runner 读 chat_state.json 自动续对话）
-opsv run opsv-queue/.../webapp.gemini_NNN/
-```
-
-**为什么这个流程有效**：
-- Chat 状态在 Google 账号服务端，**换 Chrome/进程都不影响**
-- 带 chatId 打开 URL 直接续对话，**prompt + AI 图都在**
-- OS picker 是 Chrome 进程内的，**杀进程 = 杀 picker**
-
-### 4A.7 端到端示例（027 Shot05+06 跑通版）
-
-```bash
-# 1. 编译两个 shot
-opsv webapp --model webapp.gemini-opencli videospec/scenes/S01-Shot05.md
-opsv webapp --model webapp.gemini-opencli videospec/scenes/S01-Shot06.md
-
-# 2. 跑 Shot06（fresh chat）
-node cli/dist/webapp-runner/runners/gemini-opencli.js \
-  opsv-queue/.../webapp.gemini_027/storyboard_S01-Shot06.json
-# → 新建 chat, chatId 写入 chat_state.json
-
-# 3. 跑 Shot05（自动复用 Shot06 的 chat）
-node cli/dist/webapp-runner/runners/gemini-opencli.js \
-  opsv-queue/.../webapp.gemini_027/storyboard_S01-Shot05.json
-# → runner 读 chat_state.json → open 同一个 chat URL
-# → 同一对话里累积 2 张图
-```
-
-### 4A.8 Runner 实现细节
-
-源码：`cli/src/webapp-runner/runners/gemini-opencli.ts`
-
-核心函数：
-- `preflight()` — `which opencli` + `doctor` + `profile list` + `bind work` + `open https://gemini.google.com/app`
-- `uploadFiles()` — **chunked base64 eval 注入到 `window.__upload_b64_N`**，最后一次性 `input.files = dt.files` + dispatch `change`/`input` event（绕开 OS picker）
-- `sendPrompt()` — `keys Escape` 兜底 + click "发送" + 等 URL 跳到 `/app/{chatId}`
-- `waitForImages()` — 轮询 `img[alt*='AI 生成']` + `naturalWidth >= 512`
-- `downloadImages()` — click `[aria-label="下载完整尺寸的图片"]` + 等 ~/下载/ 出现新 png
-- `retryOnFailure()` — 包裹主循环，失败时按等级升级（Escape → 重新 open URL → 杀 Chrome → 重试 3 次）
-- `recordChatSuccess()` — 把 chatId + 任务结果写进 `chat_state.json`
-
-### 4A.9 已知坑（v0.13.5 实测）
-
-| 坑 | 表现 | 修法 |
-|---|---|---|
-| E2BIG | `node` 进程命令行参数 > 128 KiB | chunked eval 拼装 base64 到 `window` |
-| OS picker 锁 composer | menuitem click 触发 hidden input | 注入 files 但不 click input；真卡了就杀 Chrome 重建 |
-| `opencli browser press` 子命令不存在 | `press Escape` 报错 | 用 `keys Escape`（文档上写的是 `keys` 不是 `press`） |
-| `dialog dismiss` 只处理 JS | 不能 dismiss OS picker | 杀 Chrome 重建是唯一稳的 |
-| URL 跳变时机 | click 发送后 5-15s 跳到 `/app/{id}` | runner 轮询 20s 等跳变；没跳就 throw 触发 retry |
-| chatId 不复用 | 每次重置 chat | chat_state.json 持久化（自动） |
-| Brave / Chrome 共存 | OS picker 可能是别 Chrome 弹的 | 用 ps 区分 opencli 控制的 Chrome PID |
-| `img[alt*="AI 生成"]` selector | alt 里是中文逗号 `，AI 生成` | substring 匹配可以，**别用 JSON.stringify 转义**会破坏 selector |
-
----
-
-## 5. Agent 必须遵守的文档规范
-
-### 5.1 frontmatter 基础字段（`BaseFrontmatterSchema`）
-
-每个文档必须有这两个，其余按需：
-
-```yaml
----
-category: <类别名>          # 必填，必须在 _category_validate.yaml 注册
-status: drafting            # 必填，三选一：drafting / syncing / approved
-brief: "简短描述"           # 推荐加（全局检查，缺失 validate 会 warning），
-                          # 用于 annotate prompt 编译生成图注描述
-# 其余见 references/lifecycle_and_status.md
----
-```
-
-### 5.2 refs 字段（字典结构，不是数组）
-
-**正典是双层字典 + 路径数组**（v0.10.0 起，`RefsByTypeSchema`）：
-
-```yaml
-refs:
-  image:                    # 外层 key = input_type（image/video/audio/bvh/mask，见 input_types.yaml）
-    "@LuRan":               # 内层 key = @ 引用语法
-      - path/to/LuRan.png   # 值 = 非空路径数组
-    "@LuRan:portrait":
-      - path/to/LuRan-portrait.png
-  video:
-    "@shot-S01-Shot01":
-      - path/to/clip.mp4
-```
-
-- 外层 key 必须是已注册的 input_type，否则编译报 `unknown input_type`
-- 内层 key 必须以 `@` 开头，三种合法形态：`@id` / `@id:variant` / `@:key`
-- 值必须是非空数组（空数组报错）
-- **数组形式 `- "@LuRan"` 是过时写法，编译器会拒绝**（报 `must be an object mapping`）
-
-> 完整语法见 references/refs_syntax.md。
-
-### 5.3 prompt 与 refs 必须双向对应
-
-prompt 里写了 `@LuRan` → `refs` 里必须声明 `@LuRan`。反过来声明了没用也会警告。用 `opsv refs check <file>` 一键查。
-
-### 5.4 产物命名交给命令，禁止手改
-
-| 场景 | 文件名规则 | 谁来做 |
-|------|-----------|--------|
-| 首次编译执行 | `{任务json名}_1.png` | opsv run |
-| 同参数重跑 | `{任务json名}_2.png` | opsv run |
-| 迭代后执行 | `{任务json名}_m1_1.png` | opsv iterate + run |
-
-`shot_id`（如 `S01-Shot01`）本身**不附加版本号**，版本后缀全部由命令自动管。
-
-> 命名规则与 lifecycle 见 references/lifecycle_and_status.md、references/validate_and_iterate.md。
-
----
-
-## 6. 反模式清单（绝对禁止）
-
-| # | 反模式 | 正确做法 |
-|---|--------|---------|
-| 1 | 手改产物文件名（加后缀、改编号） | 文件名由 `run`/`iterate` 自动管 |
-| 2 | 自己发 HTTP 调生成 API | 一律走 `run` 执行编译好的 task.json |
-| 3 | iterate 后手改源 `.md` 同步 | 改的是任务 JSON；源文档同步由 syncing 回写机制处理 |
-| 4 | prompt 用 `@LuRan` 但 refs 没写 | 先 `opsv refs check`，按报错补 |
-| 5 | 用 `_category_validate.yaml` 里没有的 category | 只能用注册过的类别 |
-| 6 | refs 写成数组 `- "@id"` | 写成字典 `{ "@id": [path] }` |
-| 7 | 文件名/目录名带 `@` 前缀 | `@` 只在 prompt/refs 里用 |
-| 8 | 手写 Circle 层级（ZeroCircle/FirstCircle） | Circle 由 `circle create` 按 refs DAG 自动分层 |
-| 9 | 每完成一批就 `circle create`（或删掉重建） | 只在依赖关系变化时 create；日常用 refresh 继续下一批 |
-| 10 | 用 `@id.md` 或 `@Character:id` 这种写法 | 直接 `@id`，不带 `.md` 不带类别前缀 |
-| 11 | prompt 或参数改了但依赖关系没变时，删 circle 重建 | 用 `opsv iterate --inject prompt="..."` 克隆任务，保留全部历史 |
-| 12 | iterate 后手改源 `.md` 文档内容 | iterate 只改任务 JSON，源文档不动；review 通过后由 syncing 回写机制处理 |
-
----
-
-## 7. 典型工作流（一个镜头的完整生命周期）
-
-```bash
-# 0. 初始化（一次性）
-opsv init
-# 写好文档 frontmatter（category/status/prompt/refs）
-
-# 1. 守门
-opsv validate
-opsv refs check videospec/shots/S01-Shot01.md
-
-# 2. 建依赖（依赖变化时才跑）
-opsv circle create
-
-# 3. 编译 + 执行
-# 文生图 (Volcengine SeaDream)
-opsv produce --model volc.seadream5 --manifest opsv-queue/videospec_circle1/_manifest.json --file S01-Shot01
-# 文生图 (SeaDream 5.0 Pro 旗舰版，支持最多10张参考图)
-opsv produce --model volc.seadream5pro --manifest .../_manifest.json --file S01-Shot01
-# 视频生成 (Volcengine Seedance 2.0 / 2.0 Fast / 2.0 Mini)
-opsv produce --model volc.seedance2 --manifest .../_manifest.json --file S01-Shot01
-opsv produce --model volc.seedance2f --manifest .../_manifest.json --file S01-Shot01
-opsv produce --model volc.seedance2mini --manifest .../_manifest.json --file S01-Shot01
-# RunningHub 直连 REST API（rh-api）
-opsv produce --model rh-api.seedance --manifest .../_manifest.json --file S01-Shot01
-# RunningHub Workflow v2（导演台）
-opsv produce --model rh-workflow-v2.director --manifest .../_manifest.json --file S01-Shot01
-opsv run opsv-queue/.../volc.seadream5_001/*.json
-
-# 4. 审阅
-opsv review --circle
-
-# 5a. 满意 → 审批解锁下游（每个产物单独审批）
-opsv approve opsv-queue/videospec_circle1/volcengine.seadream_001/S01-Shot01_1.png --action approve
-opsv approve opsv-queue/videospec_circle1/volcengine.seadream_001/S01-Shot01_2.png --action approve
-
-# 5b. 不满意 → 迭代（复制任务、改 prompt、重跑）
-opsv iterate opsv-queue/videospec_circle1/volcengine.seadream_001/S01-Shot01_m1.json
-# 改 m1 任务的 prompt/refs →
-opsv run opsv-queue/.../S01-Shot01_m1.json
-```
-
----
-
-## 8. 触发条件
-
-- 用户说"初始化项目""opsv init" → §3.1
-- 用户说"校验""validate 报错了" → §3.1 + references/validate_and_iterate.md
-- 用户说"怎么编译/跑这个文档" → §3.3 + §3.4
-- 用户说"结果不好，要改/重做" → §3.4 iterate
-- 用户说"审批/审阅/review" → §3.5
-- 用户说"API key/配置/添加模型/加密" → §3.7 + api-setup 技能
-- 用户说"根据 API 文档配模型/配工作流" → api-setup 技能（按 API 文档创建 inputs/payload_example/node_mappings）
-- 用户说"rh-api/rh-workflow-v2/导演台怎么配" → api-setup 技能（含完整示例）
-- 用户说"重载环境/env load/重新加载 .env" → §3.8
-- 用户说"查看 key 状态/env list" → §3.8
-- 用户说"初始化密钥/master.key/加密 .env" → §3.8
-- 用户说"ComfyUI 工作流/node mapping" → §4
-- 用户说"用 Gemini 跑图/webapp provider/opencli" → §4A（完整 OpenCLI 章节）
-- 用户问"OS picker 关不掉/Chrome 杀不掉/Gemini 卡死" → §4A.6（SOP 恢复流程）
-- 用户问"refs 怎么写""@ 语法""这个错什么意思" → references/refs_syntax.md
-- 用户问"状态是什么意思/syncing/approved" → references/lifecycle_and_status.md
-- 用户问某个命令的参数 → references/cli_reference.md
-
----
-
-## 9. references/
-
-- `references/cli_reference.md` — 全部命令全表
-- `references/lifecycle_and_status.md` — 三状态、syncing 回写、产物命名规则
-- `references/refs_syntax.md` — `@` 引用语法、refs 字典结构
-- `references/validate_and_iterate.md` — validate 加载顺序、类别机制、iterate 迭代命名
-- **`api-setup-skill.md`** — 根据 API 文档创建模型配置，适配 rh-api/rh-workflow-v2/volcengine 等 provider
+Report blockers precisely. Never manufacture approved references or a successful review
+to bypass a gate.
