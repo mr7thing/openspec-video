@@ -159,6 +159,7 @@ export async function validateRefStatuses(
 
     const refs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
     const videospecDir = getProjectDir(projectRoot, 'videospec');
+    const approvedRefReader = new ApprovedRefReader(projectRoot);
 
     for (const typeMap of Object.values(refs)) {
       if (!typeMap || typeof typeMap !== 'object') continue;
@@ -205,29 +206,34 @@ export async function validateRefStatuses(
 
         // Read ## Approved References from the descriptor
         const descContent = fs.readFileSync(descPath, 'utf-8');
-        const descBody = FrontmatterParser.extractBody(descContent);
-        const approvedSection = descBody.match(
-          /##\s*Approved\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i,
-        );
-        if (!approvedSection) {
+        const approvedRefs = await approvedRefReader.getAll(descPath);
+        if (approvedRefs.length === 0) {
           errors.push(`@${refId} — ## Approved References section not found in descriptor`);
           continue;
         }
 
-        // Find matching image entry
-        const approvedImgRe = variant
-          ? new RegExp(`!\\[${escapeRegex(variant)}\\]\\(([^)]+)\\)`)
-          : /!\[([^\]]*)\]\(([^)]+)\)/;
-        const approvedMatch = approvedSection[1].match(approvedImgRe);
-        if (!approvedMatch) {
-          const detail = variant ? ` ![${variant}](path)` : '';
-          errors.push(`@${refId}${detail ? ':' + variant : ''} — no matching approved output in ## Approved References`);
+        const duplicates = await approvedRefReader.getDuplicateVariants(descPath);
+        if (duplicates.length > 0) {
+          errors.push(`@${refId} — duplicate approved variants: ${duplicates.join(', ')}`);
           continue;
         }
-        const approvedPath = approvedMatch[variant ? 1 : 2];
-        const resolvedApproved = path.resolve(path.dirname(descPath), approvedPath);
+
+        if (!variant && approvedRefs.length > 1) {
+          errors.push(`@${refId} — variant required because the asset has ${approvedRefs.length} approved references`);
+          continue;
+        }
+
+        const approvedRef = variant
+          ? approvedRefs.find((ref) => ref.variant === variant)
+          : approvedRefs[0];
+        if (!approvedRef) {
+          errors.push(`@${refId}${variant ? `:${variant}` : ''} — no matching approved output in ## Approved References`);
+          continue;
+        }
+
+        const resolvedApproved = approvedRef.filePath;
         if (!fs.existsSync(resolvedApproved)) {
-          errors.push(`@${refId}${variant ? ':' + variant : ''} — approved file not found: ${approvedPath}`);
+          errors.push(`@${refId}${variant ? ':' + variant : ''} — approved file not found: ${resolvedApproved}`);
         } else {
           // Warning: descriptor is not approved but already has approved outputs
           const { frontmatter: descFm } = FrontmatterParser.parseRaw(descContent);

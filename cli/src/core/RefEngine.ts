@@ -15,7 +15,8 @@
 // ============================================================================
 
 // Re-export all individual module APIs
-export { parsePromptRefs, extractRefsFromText, extractFrameRefs, extractAllRefs } from './RefSyntaxParser';
+export { parsePromptRefs, parseRefKey, extractRefsFromText, extractFrameRefs, extractAllRefs } from './RefSyntaxParser';
+export type { ParsedRefKey } from './RefSyntaxParser';
 export { bindRefs, parseKey, checkPathsExist } from './RefBinder';
 export type { RefBinderContext, RefBinderResult } from './RefBinder';
 export { compilePrompt } from './compiler/PromptCompiler';

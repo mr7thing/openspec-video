@@ -23,7 +23,9 @@ describe('RefBinder (v0.10.0)', () => {
       expect(parseKey('@')).toBeNull();
       expect(parseKey('@:')).toBeNull();
       expect(parseKey('@id:')).toBeNull();
-      expect(parseKey('@:key:variant')).not.toBeNull(); // @:key gets the rest
+      expect(parseKey('@:key:variant')).toBeNull();
+      expect(parseKey('@id:variant:extra')).toBeNull();
+      expect(parseKey('@id.with.dot')).toBeNull();
     });
   });
 

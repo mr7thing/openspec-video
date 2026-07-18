@@ -9,6 +9,12 @@
 
 import { PromptRefToken } from '../types/Refs';
 
+export interface ParsedRefKey {
+  kind: 'external' | 'doc';
+  id: string;
+  variant?: string;
+}
+
 // Token regex:
 //   @ followed by either:
 //     :name              (in-doc)
@@ -17,6 +23,23 @@ import { PromptRefToken } from '../types/Refs';
 // id/key/variant: Unicode alphanumeric + _ -
 // Note: '.' is intentionally excluded to avoid swallowing trailing punctuation in prose.
 const TOKEN_REGEX = /@(?::([\p{L}\p{N}_\-]+)|FRAME:([\p{L}\p{N}_\-]+)|([\p{L}\p{N}_\-]+)(?::([\p{L}\p{N}_\-]+))?)/gu;
+const REF_KEY_REGEX = /^@(?::([\p{L}\p{N}_\-]+)|([\p{L}\p{N}_\-]+)(?::([\p{L}\p{N}_\-]+))?)$/u;
+
+/**
+ * Parse a frontmatter refs-map key with the same grammar used for prompt tokens.
+ * `@FRAME:` is intentionally profile-scoped and is not a general refs-map key.
+ */
+export function parseRefKey(key: string): ParsedRefKey | null {
+  const match = REF_KEY_REGEX.exec(key);
+  if (!match) return null;
+
+  const [, docId, externalId, variant] = match;
+  if (docId !== undefined) return { kind: 'doc', id: docId };
+  if (externalId !== undefined) {
+    return { kind: 'external', id: externalId, variant };
+  }
+  return null;
+}
 
 /**
  * Parse all @-tokens in a text. Returns tokens in source order.

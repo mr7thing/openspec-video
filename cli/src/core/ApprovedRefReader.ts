@@ -35,25 +35,34 @@ export class ApprovedRefReader {
 
   async getVariant(docPath: string, variant: string): Promise<string | null> {
     const refs = await this.parseApprovedRefs(docPath);
-    return refs.get(variant) || null;
+    const matches = refs.filter((ref) => ref.variant === variant);
+    return matches.length === 1 ? matches[0].filePath : null;
   }
 
   async getFirst(docPath: string): Promise<string | null> {
     const refs = await this.parseApprovedRefs(docPath);
-    const first = refs.entries().next();
-    return first.done ? null : first.value[1];
+    return refs.length === 1 ? refs[0].filePath : null;
   }
 
   async getAll(docPath: string): Promise<ApprovedRef[]> {
-    const refs = await this.parseApprovedRefs(docPath);
-    return Array.from(refs.entries()).map(([variant, filePath]) => ({ variant, filePath }));
+    return this.parseApprovedRefs(docPath);
+  }
+
+  async getDuplicateVariants(docPath: string): Promise<string[]> {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const { variant } of await this.parseApprovedRefs(docPath)) {
+      if (seen.has(variant)) duplicates.add(variant);
+      seen.add(variant);
+    }
+    return [...duplicates];
   }
 
   async hasAnyApproved(assetId: string): Promise<boolean> {
     const docPath = await this.findDocPath(assetId);
     if (!docPath) return false;
     const refs = await this.parseApprovedRefs(docPath);
-    return refs.size > 0;
+    return refs.length > 0;
   }
 
   async appendApprovedRef(docPath: string, variant: string, imagePath: string): Promise<void> {
@@ -77,8 +86,8 @@ export class ApprovedRefReader {
     await FileUtils.writeFile(docPath, content);
   }
 
-  private async parseApprovedRefs(docPath: string): Promise<Map<string, string>> {
-    const refs = new Map<string, string>();
+  private async parseApprovedRefs(docPath: string): Promise<ApprovedRef[]> {
+    const refs: ApprovedRef[] = [];
     if (!docPath) return refs;
 
     const exists = await FileUtils.exists(docPath);
@@ -101,7 +110,7 @@ export class ApprovedRefReader {
         ? filePath
         : path.resolve(path.dirname(docPath), filePath);
 
-      refs.set(variant, absPath);
+      refs.push({ variant, filePath: absPath });
     }
     return refs;
   }

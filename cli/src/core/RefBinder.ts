@@ -7,6 +7,7 @@ import { ResolvedRef } from '../types/FrontmatterSchema';
 import { RefsByType } from '../types/Refs';
 import { logger } from '../utils/logger';
 import { InputTypesLoader } from '../utils/inputTypesLoader';
+import { parseRefKey } from './RefSyntaxParser';
 
 export interface RefBinderContext {
   projectRoot: string;
@@ -79,27 +80,7 @@ export function bindRefs(rawRefs: RefsByType | undefined, ctx: RefBinderContext)
 
 /** Parse a refs map key into structured form. */
 export function parseKey(key: string): { kind: 'external' | 'doc'; id: string; variant?: string } | null {
-  if (!key.startsWith('@')) return null;
-  const rest = key.slice(1);
-
-  // @:docKey
-  if (rest.startsWith(':')) {
-    const id = rest.slice(1);
-    if (!id) return null;
-    return { kind: 'doc', id };
-  }
-
-  // @id or @id:variant
-  const colonIdx = rest.indexOf(':');
-  if (colonIdx > 0) {
-    const id = rest.slice(0, colonIdx);
-    const variant = rest.slice(colonIdx + 1);
-    if (!id || !variant) return null;
-    return { kind: 'external', id, variant };
-  }
-
-  if (!rest) return null;
-  return { kind: 'external', id: rest };
+  return parseRefKey(key);
 }
 
 /**
