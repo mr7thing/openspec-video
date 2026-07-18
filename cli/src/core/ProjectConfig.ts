@@ -110,3 +110,24 @@ export function writePackLock(projectRoot: string, packs: ResolvedPack[]): strin
   fs.writeFileSync(target, yaml.dump(lock, { lineWidth: -1 }), 'utf8');
   return target;
 }
+
+/** Create discovery-only links; Skill rules remain canonical inside each Pack. */
+export function syncPackSkillShims(projectRoot: string, platform: 'agents' | 'codex', packs = resolvePacks(projectRoot)): string[] {
+  const base = path.join(projectRoot, platform === 'agents' ? '.agents/skills' : '.codex/skills');
+  const written: string[] = [];
+  for (const pack of packs) {
+    for (const [skill, manifestRelative] of Object.entries(pack.manifest.skills || {})) {
+      const source = path.dirname(path.join(pack.root, manifestRelative));
+      const target = path.join(base, `${pack.manifest.id}--${skill}`);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      if (fs.existsSync(target) || fs.lstatSync(path.dirname(target)).isSymbolicLink()) {
+        if (!fs.existsSync(target) || fs.realpathSync(target) !== fs.realpathSync(source)) {
+          fs.rmSync(target, { recursive: true, force: true });
+        } else { written.push(target); continue; }
+      }
+      fs.symlinkSync(path.relative(path.dirname(target), source), target, 'dir');
+      written.push(target);
+    }
+  }
+  return written;
+}

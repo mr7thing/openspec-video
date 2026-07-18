@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
-import { loadProjectConfig, resolvePacks, writePackLock } from '../ProjectConfig';
+import { loadProjectConfig, resolvePacks, syncPackSkillShims, writePackLock } from '../ProjectConfig';
 
 describe('ProjectConfig Pack Stack', () => {
   let root: string;
@@ -30,5 +30,16 @@ describe('ProjectConfig Pack Stack', () => {
   it('rejects a manifest whose identity differs from the project declaration', () => {
     fs.writeFileSync(path.join(root, '.opsv', 'packs', 'short-drama', 'pack.yaml'), 'id: other\nversion: 1.0.0\n');
     expect(() => resolvePacks(root)).toThrow('Pack id mismatch');
+  });
+
+  it('links platform discovery shims to canonical Pack Skills', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'short-drama');
+    fs.mkdirSync(path.join(pack, 'skills', 'make'), { recursive: true });
+    fs.writeFileSync(path.join(pack, 'skills', 'make', 'skill.yaml'), 'action: compile\n');
+    fs.writeFileSync(path.join(pack, 'skills', 'make', 'SKILL.md'), '# Make\n');
+    fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: short-drama\nversion: 1.0.0\nskills:\n  make: skills/make/skill.yaml\n');
+    const [target] = syncPackSkillShims(root, 'agents');
+    expect(fs.lstatSync(target).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(path.join(target, 'SKILL.md'), 'utf8')).toContain('# Make');
   });
 });

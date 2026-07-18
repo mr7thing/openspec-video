@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadProjectConfig, resolvePacks, writePackLock } from '../core/ProjectConfig';
+import { loadProjectConfig, resolvePacks, syncPackSkillShims, writePackLock } from '../core/ProjectConfig';
 import { logger } from '../utils/logger';
 
 export function registerPackCommands(program: Command): void {
@@ -34,4 +34,16 @@ export function registerPackCommands(program: Command): void {
       process.exitCode = 1;
     }
   });
+
+  pack.command('sync-skills')
+    .description('Synchronize platform discovery shims to canonical Pack Skills')
+    .option('--platform <platform>', 'agents or codex', 'agents')
+    .action((options: { platform: string }) => {
+      try {
+        if (options.platform !== 'agents' && options.platform !== 'codex') throw new Error('--platform must be agents or codex');
+        const projectRoot = process.cwd();
+        const targets = syncPackSkillShims(projectRoot, options.platform, resolvePacks(projectRoot));
+        for (const target of targets) console.log(chalk.green(`Linked: ${target}`));
+      } catch (error: any) { logger.error(error.message); process.exitCode = 1; }
+    });
 }
