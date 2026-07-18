@@ -30,7 +30,7 @@ import { getProjectDir } from '../utils/configLoader';
 import { CompilationError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 import { logger } from '../utils/logger';
 import { loadProjectConfig } from './ProjectConfig';
-import { resolveDocumentContract } from './PackContracts';
+import { missingRequiredRefCategories, resolveDocumentContract } from './PackContracts';
 
 // ============================================================================
 // Types
@@ -190,6 +190,11 @@ export class ProductionPipeline {
 
     const prompt = this.resolvePromptText(frontmatter, body, asset.id);
     this.validateFrameDirective(frontmatter, prompt, asset.id);
+    if (frontmatter.category) {
+      const contract = resolveDocumentContract(this.projectRoot, frontmatter.category, frontmatter.profile, loadProjectConfig(this.projectRoot));
+      const missing = missingRequiredRefCategories(this.projectRoot, contract.profile, frontmatter.refs);
+      if (missing.length) throw new CompilationError(OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND, `${asset.id}: Profile requires references to category: ${missing.join(', ')}`);
+    }
 
     // Resolve refs
     const fmRefs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;

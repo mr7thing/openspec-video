@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 import { AssetManager } from './AssetManager';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { FrontmatterParser } from './FrontmatterParser';
-import { resolveDocumentContract } from './PackContracts';
+import { missingRequiredRefCategories, resolveDocumentContract } from './PackContracts';
 import { loadProjectConfig } from './ProjectConfig';
 import { parseRefKey } from './RefSyntaxParser';
 import { getProjectDir } from '../utils/configLoader';
@@ -81,6 +81,9 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
       packet.refs.push({ key, state: 'missing', message }); packet.issues.push({ code: 'REF_UNAVAILABLE', message: `${key}: ${message}` }); continue;
     }
     packet.refs.push({ key, state: 'ready' });
+  }
+  for (const category of missingRequiredRefCategories(projectRoot, contract.profile, frontmatter.refs)) {
+    packet.issues.push({ code: 'PROFILE_REF_REQUIRED', message: `Profile requires an external reference to category "${category}"` });
   }
   packet.circle.manifests = circleManifests(projectRoot, asset);
   packet.circle.available = packet.circle.manifests.length > 0;

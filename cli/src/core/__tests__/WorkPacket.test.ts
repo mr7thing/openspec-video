@@ -27,4 +27,13 @@ describe('Work Packet', () => {
     expect(packet.primarySkill).toMatchObject({ name: 'make', gates: ['work-check', 'refs-valid'] });
     expect(packet.policy.execute).toBe('human');
   });
+
+  it('applies Profile-specific required reference categories without imposing a global requirement', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'test');
+    fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\nskill: make\nrequired_ref_categories: [storyboard]\n');
+    fs.writeFileSync(path.join(root, 'videospec/assets', 'source.md'), '---\ncategory: image\nstatus: approved\n---\n## Approved References\n\n![one](one.png)\n');
+    fs.writeFileSync(path.join(root, 'videospec/assets', 'target.md'), '---\ncategory: image\nstatus: drafting\nrefs:\n  image:\n    "@source": [x]\n---\n');
+    const packet = buildWorkPacket(root, 'target');
+    expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROFILE_REF_REQUIRED' })]));
+  });
 });

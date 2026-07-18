@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { ProfileKind, ProjectConfig, ResolvedPack, loadProjectConfig, resolvePacks } from './ProjectConfig';
+import { parseRefKey } from './RefSyntaxParser';
+import { AssetManager } from './AssetManager';
+import { FrontmatterParser } from './FrontmatterParser';
 
 export interface CategoryContract {
   default_profile?: string;
@@ -14,10 +17,29 @@ export interface ProfileContract {
   skill?: string;
   outputs?: string[];
   frame_directive?: boolean;
+  required_ref_categories?: string[];
   materialize?: {
     clips?: { directory: string; category: string };
     shots?: { directory: string; category: string };
   };
+}
+
+/** Profile-specific generation-reference requirement. Empty means references remain optional. */
+export function missingRequiredRefCategories(
+  projectRoot: string,
+  profile: ProfileContract,
+  refs: Record<string, Record<string, string[]>> | undefined,
+): string[] {
+  const required = profile.required_ref_categories || [];
+  if (required.length === 0) return [];
+  const categories = new Set<string>();
+  for (const typeMap of Object.values(refs || {})) for (const key of Object.keys(typeMap || {})) {
+    const ref = parseRefKey(key);
+    if (!ref || ref.kind !== 'external') continue;
+    const doc = AssetManager.findAssetFilePathUnder(path.join(projectRoot, 'videospec'), ref.id);
+    if (doc) categories.add(FrontmatterParser.parseRaw(fs.readFileSync(doc, 'utf8')).frontmatter.category);
+  }
+  return required.filter(category => !categories.has(category));
 }
 
 export interface ResolvedDocumentContract {
