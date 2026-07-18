@@ -87,7 +87,7 @@ export function registerCircleCommands(program: Command): void {
 
   const refreshCmd = circle
     .command('refresh')
-    .description('Rebuild graph, diff, update _manifest.json in target circle directory');
+    .description('Rebuild graph and create a new immutable Circle snapshot');
   addDirOption(refreshCmd, { description: 'Target directories (must match original --dir)' });
   refreshCmd
     .option('--name <name>', 'Override target basename (default: last segment of --dir)')
@@ -142,27 +142,11 @@ export function registerCircleCommands(program: Command): void {
           }
         }
 
-        // Detect index topology changes
-        const indexChanged: string[] = [];
-        for (const id of Object.keys(newAssets)) {
-          const oldIndex = existingAssets[id]?.index;
-          const newIndex = newAssets[id]?.index;
-          if (oldIndex !== undefined && newIndex !== undefined && oldIndex !== newIndex) {
-            indexChanged.push(`${id}: ${oldIndex} → ${newIndex}`);
-          }
-        }
-
-        if (indexChanged.length > 0) {
-          console.error(chalk.red('Index topology changed. Run "opsv circle create" to create a new circle batch.'));
-          console.error(chalk.yellow('  Changed assets:'));
-          for (const change of indexChanged) {
-            console.error(chalk.yellow(`    ${change}`));
-          }
-          process.exit(1);
-        }
-
-        // Write updated manifest with frontmatter as authoritative, existing status as fallback
-        graph.writeCircleDir(queueRoot, basename, latestN, circles, resolvedDirs, existingAssets);
+        // A refresh never rewrites the previous execution snapshot. Status is only
+        // copied as a fallback for unchanged Assets; Tasks and Artifacts remain owned
+        // by the old Circle directory.
+        const nextN = DependencyGraph.detectCircleN(queueRoot, basename);
+        const nextDir = graph.writeCircleDir(queueRoot, basename, nextN, circles, resolvedDirs, existingAssets);
 
         // Diff detection
         const newAssetIds = new Set(Object.keys(newAssets));
@@ -181,7 +165,7 @@ export function registerCircleCommands(program: Command): void {
           console.log(chalk.green('  No changes detected.'));
         }
 
-        console.log(chalk.green(`Circle manifest updated: ${manifestPath}`));
+        console.log(chalk.green(`New Circle snapshot: ${path.join(nextDir, '_manifest.json')}`));
       } catch (err: any) {
         logger.error(err.message);
         process.exit(1);
