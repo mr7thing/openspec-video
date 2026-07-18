@@ -30,6 +30,7 @@ export interface ApproveRequest {
   outputFiles?: string[];
   taskJsonPath?: string;
   note?: string;
+  supersedes?: string;
 }
 
 export interface ApproveResult {
@@ -98,6 +99,7 @@ export class ApproveService {
       outputFile: req.outputFiles?.[0],
       outputFiles: req.outputFiles,
       modifiedTaskPath: req.taskJsonPath,
+      supersedes: req.supersedes,
       note: req.note || undefined,
     };
     return { newStatus, reviewEntry };
@@ -220,6 +222,7 @@ export class ApproveService {
     action: ReviewAction,
     note?: string,
     variant?: string,
+    supersedes?: string,
   ): Promise<ApproveResult> {
     const filename = path.basename(outputFilePath);
 
@@ -282,6 +285,8 @@ export class ApproveService {
       outputFiles: [filename],
       modifiedTaskPath: parsed.isModified ? taskJsonPath : undefined,
       note: note || undefined,
+      variant,
+      supersedes,
     };
 
     // 5. Write review entry + status to document frontmatter
@@ -294,7 +299,13 @@ export class ApproveService {
     if (action === 'approve' || action === 'design_feedback') {
       const referenceVariant = variant || path.basename(filename, path.extname(filename));
       if (action === 'approve') {
-        await this.approvedRefReader.appendApprovedRef(sourceDocPath, referenceVariant, outputFilePath);
+        if (supersedes && !(await this.approvedRefReader.getVariant(sourceDocPath, supersedes))) {
+          throw new ValidationError(
+            OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+            `Superseded approved reference variant does not exist: ${supersedes}`,
+          );
+        }
+        await this.approvedRefReader.appendApprovedRef(sourceDocPath, referenceVariant, outputFilePath, supersedes);
       } else {
         await this.designRefReader.appendDesignRef(sourceDocPath, referenceVariant, outputFilePath);
       }

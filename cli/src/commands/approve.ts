@@ -3,7 +3,6 @@
 //
 // Usage:
 //   opsv approve queue/circle/volcengine.seedance_002/dragon_pearl_3.png
-//   opsv approve queue/circle/volcengine.seedance_002/dragon_pearl_3.png --action design_feedback
 //   opsv approve queue/circle/volcengine.seedance_002/dragon_pearl_m1_1.png --dry-run
 //
 // Each call adds exactly ONE output to the source document's
@@ -14,14 +13,12 @@ import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
-import { ApproveService, ReviewAction } from '../core/ApproveService';
+import { ApproveService } from '../core/ApproveService';
 import { AssetManager } from '../core/AssetManager';
 import { ManifestReader } from '../core/ManifestReader';
 import { getProjectDir } from '../utils/configLoader';
 import { parseOutputFilename } from '../executor/naming';
 import { logger } from '../utils/logger';
-
-const VALID_ACTIONS: ReviewAction[] = ['approve', 'design_feedback', 'revise_prompt'];
 
 export function registerApproveCommand(program: Command): void {
   program
@@ -34,26 +31,13 @@ export function registerApproveCommand(program: Command): void {
       '<output-file>',
       'Path to a generated output file, e.g. queue/circle/volcengine.seedance_002/dragon_pearl_3.png'
     )
-    .option(
-      '--action <action>',
-      `Review action: ${VALID_ACTIONS.join(', ')} (default: approve)`,
-      'approve',
-    )
     .option('--dry-run', 'Preview which output would be approved without writing changes')
     .requiredOption('--variant <name>', 'Stable semantic variant name for this approved output')
+    .option('--supersedes <variant>', 'Prior approved variant this new variant semantically replaces')
     .option('--note <text>', 'Optional note attached to the review entry')
-    .action(async (outputFile: string, options: { action?: string; dryRun?: boolean; note?: string; variant: string }) => {
+    .action(async (outputFile: string, options: { dryRun?: boolean; note?: string; variant: string; supersedes?: string }) => {
       try {
         const projectRoot = process.cwd();
-
-        // ── Validate action ──
-        const action = options.action as ReviewAction;
-        if (!VALID_ACTIONS.includes(action)) {
-          console.error(
-            chalk.red(`Invalid action: "${options.action}". Must be one of: ${VALID_ACTIONS.join(', ')}`),
-          );
-          process.exit(1);
-        }
 
         // ── resolve output file path ──
         const absPath = path.resolve(projectRoot, outputFile);
@@ -121,8 +105,9 @@ export function registerApproveCommand(program: Command): void {
         console.log(chalk.cyan(`Asset:     ${shotId}`));
         console.log(chalk.cyan(`Document:  ${sourceDocPath}`));
         console.log(chalk.cyan(`Circle:    ${circleName}`));
-        console.log(chalk.cyan(`Action:    ${action}`));
+        console.log(chalk.cyan('Action:    approve'));
         console.log(chalk.cyan(`Variant:   ${options.variant}`));
+        if (options.supersedes) console.log(chalk.cyan(`Supersedes: ${options.supersedes}`));
         if (parsed.isModified) {
           console.log(chalk.yellow(`Task:      ${parsed.taskJsonName} (modified/iterated)`));
         }
@@ -135,7 +120,7 @@ export function registerApproveCommand(program: Command): void {
         // ── execute ──
         console.log('');
         const approveService = new ApproveService(projectRoot, queueRoot, new ManifestReader());
-        const result = await approveService.executeFile(absPath, circleName, action, options.note, options.variant);
+        const result = await approveService.executeFile(absPath, circleName, 'approve', options.note, options.variant, options.supersedes);
 
         const icon =
           result.status === 'approved' ? '✅' : result.status === 'syncing' ? '🔄' : '📝';

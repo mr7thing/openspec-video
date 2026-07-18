@@ -11,6 +11,7 @@ import { AssetDocIndex, buildAssetDocIndex, AssetDocEntry } from './AssetDocInde
 export interface ApprovedRef {
   variant: string;
   filePath: string;
+  supersedes?: string;
 }
 
 export class ApprovedRefReader {
@@ -65,18 +66,21 @@ export class ApprovedRefReader {
     return refs.length > 0;
   }
 
-  async appendApprovedRef(docPath: string, variant: string, imagePath: string): Promise<void> {
+  async appendApprovedRef(docPath: string, variant: string, imagePath: string, supersedes?: string): Promise<void> {
     const exists = await FileUtils.exists(docPath);
     if (!exists) return;
 
     if (!variant.trim()) throw new Error('Approved reference variant must not be empty');
+    if (supersedes !== undefined && !supersedes.trim()) {
+      throw new Error('Superseded approved reference variant must not be empty');
+    }
     if ((await this.parseApprovedRefs(docPath)).some((ref) => ref.variant === variant)) {
       throw new Error(`Approved reference variant already exists: ${variant}`);
     }
 
     let content = await FileUtils.readFile(docPath);
     const relPath = path.relative(path.dirname(docPath), imagePath).replace(/\\/g, '/');
-    const newEntry = `![${variant}](${relPath})`;
+    const newEntry = `![${variant}](${relPath})${supersedes ? `\n<!-- opsv:supersedes=${supersedes} -->` : ''}`;
 
     const sectionRegex = /^(##\s*Approved\s+References\s*\n)/im;
     const match = content.match(sectionRegex);
@@ -105,17 +109,17 @@ export class ApprovedRefReader {
     );
     if (!sectionMatch) return refs;
 
-    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)(?:\n<!--\s*opsv:supersedes=([^\s]+)\s*-->)?/g;
     let match;
     while ((match = imgRegex.exec(sectionMatch[1])) !== null) {
-      const [, variant, filePath] = match;
+      const [, variant, filePath, supersedes] = match;
       if (!variant || !filePath) continue;
 
       const absPath = path.isAbsolute(filePath)
         ? filePath
         : path.resolve(path.dirname(docPath), filePath);
 
-      refs.push({ variant, filePath: absPath });
+      refs.push({ variant, filePath: absPath, supersedes });
     }
     return refs;
   }

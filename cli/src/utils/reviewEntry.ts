@@ -12,6 +12,12 @@ export function formatReviewEntry(entry: ReviewEntry): string {
   if (entry.modifiedTaskPath) {
     line += ` | modified_task: ${entry.modifiedTaskPath}`;
   }
+  if (entry.variant) {
+    line += ` | variant: ${entry.variant}`;
+  }
+  if (entry.supersedes) {
+    line += ` | supersedes: ${entry.supersedes}`;
+  }
   if (entry.note) {
     const oneLine = entry.note.replace(/\s+/g, ' ').trim();
     line += ` | note: ${oneLine}`;

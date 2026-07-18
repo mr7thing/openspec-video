@@ -36,4 +36,13 @@ describe('ApprovedRefReader', () => {
     await expect(reader.appendApprovedRef(docPath, 'portrait', path.join(tmpDir, 'other.png')))
       .rejects.toThrow('already exists');
   });
+
+  it('records an immutable supersession relationship', async () => {
+    fs.writeFileSync(docPath, '## Approved References\n\n![portrait](portrait.png)\n');
+    await reader.appendApprovedRef(docPath, 'portrait-v2', path.join(tmpDir, 'other.png'), 'portrait');
+    expect(await reader.getAll(docPath)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ variant: 'portrait' }),
+      expect.objectContaining({ variant: 'portrait-v2', supersedes: 'portrait' }),
+    ]));
+  });
 });

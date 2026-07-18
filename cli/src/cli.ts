@@ -31,6 +31,7 @@ import { registerStatusCommand } from './commands/status';
 import { registerTraceCommand } from './commands/trace';
 import { registerPackCommands } from './commands/pack';
 import { registerWorkCommands } from './commands/work';
+import { registerSyncCommand } from './commands/sync';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -131,5 +132,6 @@ registerStatusCommand(program);
 registerTraceCommand(program);
 registerPackCommands(program);
 registerWorkCommands(program);
+registerSyncCommand(program);
 
 program.parse(process.argv);

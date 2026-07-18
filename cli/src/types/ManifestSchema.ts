@@ -64,6 +64,8 @@ export const ReviewEntrySchema = z.object({
   outputFile: z.string().optional(),
   outputFiles: z.array(z.string()).optional(),
   modifiedTaskPath: z.string().optional(),
+  variant: z.string().optional(),
+  supersedes: z.string().optional(),
   note: z.string().optional(),
 });
 export type ReviewEntry = z.infer<typeof ReviewEntrySchema>;

@@ -6,6 +6,7 @@
 
 import { Command } from 'commander';
 import fs from 'fs';
+import path from 'path';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { ManifestReader } from '../core/ManifestReader';
@@ -13,6 +14,7 @@ import { ManifestReviewStrategy, GlobalReviewStrategy } from '../core/ReviewStra
 import { ReviewOptionsSchema, ReviewOptions } from '../types/ManifestSchema';
 import { logger } from '../utils/logger';
 import { getProjectDir } from '../utils/configLoader';
+import { ReviewService } from '../core/ReviewService';
 import { createReviewApp, setupTtlShutdown } from '../review-ui/ReviewServer';
 import { CloudReviewSession, resolveCloudConfig, executeCloudCommand, TunnelProvider } from '../tunnel/CloudReviewSession';
 
@@ -35,7 +37,7 @@ function autoCommitPendingChanges(projectRoot: string): void {
 }
 
 export function registerReviewCommand(program: Command): void {
-  program
+  const review = program
     .command('review')
     .description('Start visual review server')
     .option('--port <number>', 'Server port', `${DEFAULT_REVIEW_PORT}`)
@@ -158,6 +160,35 @@ export function registerReviewCommand(program: Command): void {
         process.once('SIGTERM', shutdown);
 
         setupTtlShutdown(server, opts.ttl);
+      } catch (err: any) {
+        logger.error(err.message);
+        process.exit(1);
+      }
+    });
+
+  review
+    .command('feedback <output>')
+    .description('Record feedback for one generated output and attach it as a Design Reference')
+    .requiredOption('--note <text>', 'Feedback for the next design iteration')
+    .action(async (output: string, options: { note: string }) => {
+      try {
+        const projectRoot = process.cwd();
+        const result = await new ReviewService(projectRoot).feedback(path.resolve(projectRoot, output), options.note);
+        console.log(chalk.green(`Recorded feedback for ${result.assetId}: ${result.documentPath}`));
+      } catch (err: any) {
+        logger.error(err.message);
+        process.exit(1);
+      }
+    });
+
+  review
+    .command('revise <asset>')
+    .description('Record a revision request for an Asset Document')
+    .requiredOption('--note <text>', 'Revision request')
+    .action((asset: string, options: { note: string }) => {
+      try {
+        const documentPath = new ReviewService(process.cwd()).revise(asset, options.note);
+        console.log(chalk.green(`Recorded revision request: ${documentPath}`));
       } catch (err: any) {
         logger.error(err.message);
         process.exit(1);
