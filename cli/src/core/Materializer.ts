@@ -17,7 +17,7 @@ function readPlan(frontmatter: Record<string, unknown>): PlanEntry[] {
   if (!Array.isArray(frontmatter.plan)) throw new Error('Workflow document requires a plan array');
   const ids = new Set<string>();
   const clips = new Set<string>();
-  return frontmatter.plan.map((raw, index) => {
+  const plan = frontmatter.plan.map((raw, index) => {
     if (!raw || typeof raw !== 'object' || typeof (raw as any).shot !== 'string') {
       throw new Error(`plan[${index}] requires a shot id`);
     }
@@ -32,6 +32,12 @@ function readPlan(frontmatter: Record<string, unknown>): PlanEntry[] {
     }
     return entry;
   });
+  for (const clip of clips) {
+    if (ids.has(clip)) {
+      throw new Error(`plan reuses id "${clip}" for both a Shot and a Clip; Asset IDs must be globally unique`);
+    }
+  }
+  return plan;
 }
 
 function scaffold(id: string, category: string, source: string): string {

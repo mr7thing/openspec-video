@@ -31,4 +31,10 @@ describe('materializeWorkflowDocument', () => {
     expect(fs.readFileSync(path.join(root, 'videospec', 'clips', 'pause.md'), 'utf8')).toBe('manual content');
     expect(fs.readFileSync(path.join(root, 'videospec', 'shots', 'arrival.md'), 'utf8')).toContain('category: shot');
   });
+
+  it('rejects a plan that reuses one stable ID for both a Clip and a Shot', () => {
+    const workflow = path.join(root, 'videospec', 'plan.md');
+    fs.writeFileSync(workflow, '---\ncategory: shotlist\nplan:\n  - shot: arrival\n    clips: [arrival]\n---\n');
+    expect(() => materializeWorkflowDocument(root, workflow, contract)).toThrow('globally unique');
+  });
 });
