@@ -29,6 +29,8 @@ import { buildAssetDocIndex } from './AssetDocIndex';
 import { getProjectDir } from '../utils/configLoader';
 import { CompilationError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
 import { logger } from '../utils/logger';
+import { loadProjectConfig } from './ProjectConfig';
+import { resolveDocumentContract } from './PackContracts';
 
 // ============================================================================
 // Types
@@ -187,6 +189,7 @@ export class ProductionPipeline {
     const { frontmatter, body } = FrontmatterParser.parseRaw(content);
 
     const prompt = this.resolvePromptText(frontmatter, body, asset.id);
+    this.validateFrameDirective(frontmatter, prompt, asset.id);
 
     // Resolve refs
     const fmRefs = (frontmatter.refs || {}) as Record<string, Record<string, string[]>>;
@@ -262,6 +265,17 @@ export class ProductionPipeline {
       );
     }
     return String(fallback || '');
+  }
+
+  private validateFrameDirective(frontmatter: Record<string, any>, prompt: string, assetId: string): void {
+    if (!/@FRAME:[\p{L}\p{N}_-]+/u.test(prompt)) return;
+    if (!frontmatter.category) {
+      throw new CompilationError(OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND, `${assetId}: @FRAME: requires a category and enabled Profile`);
+    }
+    const contract = resolveDocumentContract(this.projectRoot, frontmatter.category, frontmatter.profile, loadProjectConfig(this.projectRoot));
+    if (!contract.profile.frame_directive) {
+      throw new CompilationError(OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND, `${assetId}: @FRAME: is only allowed by a Profile with frame_directive: true`);
+    }
   }
 
   private resolveFrameRef(filePath: string, value: unknown): FrameRef | undefined {

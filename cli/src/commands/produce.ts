@@ -11,9 +11,15 @@ import { ProductionPipeline } from '../core/ProductionPipeline';
 import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 import { logger } from '../utils/logger';
+import fs from 'fs';
+import { FrontmatterParser } from '../core/FrontmatterParser';
+import { loadProjectConfig } from '../core/ProjectConfig';
+import { resolveDocumentContract } from '../core/PackContracts';
+import { AssetManager } from '../core/AssetManager';
+import { getProjectDir } from '../utils/configLoader';
 
 interface ProduceOptions {
-  model: string;
+  model?: string;
   manifest?: string;
   category?: string;
   statusSkip?: string;
@@ -28,7 +34,7 @@ export function registerProduceCommand(program: Command): void {
   program
     .command('produce')
     .description('Compile generation tasks from circle manifest (imagen/video/comfy)')
-    .requiredOption('--model <model>', 'Provider model key (e.g. volc.seedance2, rh-api.seedance)')
+    .option('--model <model>', 'Provider model key; defaults to the selected Profile capability binding')
     .option('--manifest <path>', 'Path to _manifest.json (or directory containing it)')
     .option('--category <cat>', 'Filter assets by category (e.g. shot-production, character)')
     .option('--status-skip <statuses>', 'Comma-separated statuses to skip (default: approved)')
@@ -43,6 +49,7 @@ export function registerProduceCommand(program: Command): void {
         const projectRoot = resolveProjectRoot(cwd);
         const manifestPath = new ManifestReader().resolveForProduce(cwd, options.manifest);
         const circleDir = path.dirname(manifestPath);
+        const modelKey = options.model || resolveProfileModel(projectRoot, circleDir, options.file);
 
         const skipStatuses = options.statusSkip
           ? options.statusSkip === 'none'
@@ -62,7 +69,7 @@ export function registerProduceCommand(program: Command): void {
 
         const pipeline = new ProductionPipeline(projectRoot);
         const result = await pipeline.run({
-          modelKey: options.model,
+          modelKey,
           circleDir,
           category: options.category,
           file: options.file,
@@ -93,4 +100,19 @@ export function registerProduceCommand(program: Command): void {
         process.exit(1);
       }
     });
+}
+
+function resolveProfileModel(projectRoot: string, circleDir: string, file?: string): string {
+  const manifest = JSON.parse(fs.readFileSync(path.join(circleDir, '_manifest.json'), 'utf8'));
+  const candidates = Object.keys(manifest.assets || {}).filter((id) => !file || id === file);
+  if (candidates.length !== 1) {
+    throw new Error('Without --model, --file must select exactly one Asset so its Profile capability binding is unambiguous');
+  }
+  const doc = AssetManager.findAssetFilePathUnder(getProjectDir(projectRoot, 'videospec'), candidates[0]);
+  if (!doc) throw new Error(`Asset document not found: ${candidates[0]}`);
+  const fm = FrontmatterParser.parseRaw(fs.readFileSync(doc, 'utf8')).frontmatter;
+  if (!fm.category) throw new Error(`Asset document has no category: ${candidates[0]}`);
+  const contract = resolveDocumentContract(projectRoot, fm.category, fm.profile, loadProjectConfig(projectRoot));
+  if (!contract.boundModel) throw new Error(`Profile ${contract.profileName} has no bound capability model`);
+  return contract.boundModel;
 }

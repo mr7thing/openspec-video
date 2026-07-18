@@ -13,6 +13,7 @@ export interface ProfileContract {
   capability?: string;
   skill?: string;
   outputs?: string[];
+  frame_directive?: boolean;
   materialize?: {
     clips?: { directory: string; category: string };
     shots?: { directory: string; category: string };
