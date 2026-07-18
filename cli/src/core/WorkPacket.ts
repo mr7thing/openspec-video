@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { AssetManager } from './AssetManager';
-import { ApprovedRefReader } from './ApprovedRefReader';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { FrontmatterParser } from './FrontmatterParser';
 import { resolveDocumentContract } from './PackContracts';
@@ -28,6 +27,13 @@ function externalKeys(refs: any): string[] {
     for (const key of Object.keys(typeMap as object)) if (parseRefKey(key)?.kind === 'external') keys.push(key);
   }
   return [...new Set(keys)];
+}
+
+function approvedVariants(documentPath: string): string[] {
+  const content = fs.readFileSync(documentPath, 'utf8');
+  const section = content.match(/##\s*Approved\s+References\s*\n([\s\S]*?)(?=\n##\s|$)/i);
+  if (!section) return [];
+  return [...section[1].matchAll(/!\[([^\]]+)\]\([^)]+\)/g)].map(match => match[1]);
 }
 
 function circleManifests(root: string, asset: string): string[] {
@@ -61,17 +67,20 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
     gates = Array.isArray(parsed?.gates) ? parsed.gates : [];
     packet.primarySkill = { name: skillName, manifest: path.relative(projectRoot, manifestPath), gates };
   } else packet.primarySkill = { name: skillName, gates };
-  const reader = new ApprovedRefReader(projectRoot); reader.setAssetIndex(buildAssetDocIndex(videospec));
   for (const key of externalKeys(frontmatter.refs)) {
     const ref = parseRefKey(key)!;
     const entry = buildAssetDocIndex(videospec).entries.get(ref.id);
     if (!entry) { packet.refs.push({ key, state: 'missing', message: 'Referenced Asset Document is missing' }); packet.issues.push({ code: 'REF_MISSING', message: `${key}: referenced Asset Document is missing` }); continue; }
     const target = FrontmatterParser.parseRaw(fs.readFileSync(entry.filePath, 'utf8')).frontmatter;
     if (target.status === 'syncing') { packet.refs.push({ key, state: 'syncing', message: 'Referenced Asset is syncing' }); packet.issues.push({ code: 'REF_SYNCING', message: `${key}: referenced Asset must be synchronized` }); continue; }
-    const output = ref.variant ? reader.getVariant(entry.filePath, ref.variant) : reader.getFirst(entry.filePath);
+    const variants = approvedVariants(entry.filePath);
+    const duplicate = variants.find((variant, index) => variants.indexOf(variant) !== index);
+    if (duplicate) { packet.refs.push({ key, state: 'missing', message: `Duplicate approved variant: ${duplicate}` }); packet.issues.push({ code: 'REF_AMBIGUOUS', message: `${key}: duplicate approved variant ${duplicate}` }); continue; }
+    if (variants.length === 0 || (ref.variant && !variants.includes(ref.variant)) || (!ref.variant && variants.length > 1)) {
+      const message = variants.length === 0 ? 'No approved reference' : ref.variant ? `Approved variant not found: ${ref.variant}` : 'Variant is required because multiple outputs are approved';
+      packet.refs.push({ key, state: 'missing', message }); packet.issues.push({ code: 'REF_UNAVAILABLE', message: `${key}: ${message}` }); continue;
+    }
     packet.refs.push({ key, state: 'ready' });
-    // Work packets are synchronous; reference validity itself is enforced by validate/compile.
-    void output;
   }
   packet.circle.manifests = circleManifests(projectRoot, asset);
   packet.circle.available = packet.circle.manifests.length > 0;
