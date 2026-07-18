@@ -26,6 +26,7 @@ export interface ResolvedDocumentContract {
   profileName: string;
   profile: ProfileContract;
   boundModel?: string;
+  defaults?: Record<string, unknown>;
 }
 
 function loadYaml<T>(filePath: string): T {
@@ -52,10 +53,12 @@ export function resolveDocumentContract(
 
   const pack = candidates[0];
   const category = loadYaml<CategoryContract>(path.join(pack.root, pack.manifest.categories![categoryName]));
-  const profileName = profileOverride || category.default_profile;
-  if (!profileName) throw new Error(`Category "${categoryName}" has no default profile`);
+  const requestedProfile = profileOverride || category.default_profile;
+  if (!requestedProfile) throw new Error(`Category "${categoryName}" has no default profile`);
+  const derived = effectiveConfig.profiles?.[requestedProfile];
+  const profileName = derived?.extends || requestedProfile;
   if (category.profiles && !category.profiles.includes(profileName)) {
-    throw new Error(`Profile "${profileName}" is not allowed for category "${categoryName}"`);
+    throw new Error(`Profile "${requestedProfile}" is not allowed for category "${categoryName}"`);
   }
 
   const profilePath = pack.manifest.profiles?.[profileName];
@@ -64,9 +67,10 @@ export function resolveDocumentContract(
   if (profile.kind !== 'workflow' && profile.kind !== 'production') {
     throw new Error(`Profile "${profileName}" must declare kind: workflow or production`);
   }
-  const boundModel = profile.capability ? effectiveConfig.bindings?.[profile.capability] : undefined;
-  if (profile.kind === 'production' && profile.capability && !boundModel) {
-    throw new Error(`Production profile "${profileName}" requires a project binding for capability "${profile.capability}"`);
+  const resolvedProfile = derived ? { ...profile, capability: derived.capability || profile.capability } : profile;
+  const boundModel = resolvedProfile.capability ? effectiveConfig.bindings?.[resolvedProfile.capability] : undefined;
+  if (resolvedProfile.kind === 'production' && resolvedProfile.capability && !boundModel) {
+    throw new Error(`Production profile "${requestedProfile}" requires a project binding for capability "${resolvedProfile.capability}"`);
   }
-  return { pack, category, profileName, profile, boundModel };
+  return { pack, category, profileName: requestedProfile, profile: resolvedProfile, boundModel, defaults: derived?.defaults };
 }

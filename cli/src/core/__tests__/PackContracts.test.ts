@@ -21,4 +21,10 @@ describe('Pack contracts', () => {
     expect(resolved.profileName).toBe('i2v');
     expect(resolved.boundModel).toBe('rh.director');
   });
+
+  it('resolves a Project-derived Profile through its declared Pack Profile', () => {
+    fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'packs:\n  - id: drama\nbindings:\n  preferred-i2v: rh.preferred\nprofiles:\n  hero-i2v:\n    extends: i2v\n    capability: preferred-i2v\n    defaults:\n      duration: 5\n');
+    const resolved = resolveDocumentContract(root, 'shot', 'hero-i2v');
+    expect(resolved).toMatchObject({ profileName: 'hero-i2v', boundModel: 'rh.preferred', defaults: { duration: 5 } });
+  });
 });
