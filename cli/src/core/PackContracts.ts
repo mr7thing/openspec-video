@@ -13,6 +13,10 @@ export interface ProfileContract {
   capability?: string;
   skill?: string;
   outputs?: string[];
+  materialize?: {
+    clips?: { directory: string; category: string };
+    shots?: { directory: string; category: string };
+  };
 }
 
 export interface ResolvedDocumentContract {

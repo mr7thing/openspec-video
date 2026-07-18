@@ -6,6 +6,7 @@ import { loadProjectConfig } from '../core/ProjectConfig';
 import { resolveDocumentContract } from '../core/PackContracts';
 import { AssetManager } from '../core/AssetManager';
 import { getProjectDir } from '../utils/configLoader';
+import { materializeWorkflowDocument } from '../core/Materializer';
 
 interface WorkCheckResult {
   asset: string;
@@ -66,4 +67,24 @@ export function registerWorkCommands(program: Command): void {
     }
     if (result.issues.length > 0) process.exitCode = 1;
   });
+
+  program.command('materialize <workflow-doc>')
+    .description('Create missing production document scaffolds from a workflow document plan')
+    .option('--dry-run', 'Report changes without writing files')
+    .action((workflowDoc: string, options: { dryRun?: boolean }) => {
+      try {
+        const projectRoot = process.cwd();
+        const workflowPath = resolveAssetPath(projectRoot, workflowDoc);
+        if (!workflowPath) throw new Error(`Workflow document not found: ${workflowDoc}`);
+        const { frontmatter } = FrontmatterParser.parseRaw(fs.readFileSync(workflowPath, 'utf8'));
+        if (!frontmatter.category) throw new Error('Workflow document has no category');
+        const contract = resolveDocumentContract(projectRoot, frontmatter.category, frontmatter.profile, loadProjectConfig(projectRoot));
+        const result = materializeWorkflowDocument(projectRoot, workflowPath, contract, !!options.dryRun);
+        for (const file of result.created) console.log(`${options.dryRun ? 'Would create' : 'Created'}: ${file}`);
+        for (const file of result.existing) console.log(`Existing: ${file}`);
+      } catch (error: any) {
+        console.error(error.message);
+        process.exitCode = 1;
+      }
+    });
 }
