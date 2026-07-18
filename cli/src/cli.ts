@@ -29,6 +29,7 @@ import { registerApiSetupCommand } from './commands/apiSetup';
 import { registerEnvCommands } from './commands/env';
 import { registerStatusCommand } from './commands/status';
 import { registerTraceCommand } from './commands/trace';
+import { registerPackCommands } from './commands/pack';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -127,5 +128,6 @@ registerApiSetupCommand(program);
 registerEnvCommands(program);
 registerStatusCommand(program);
 registerTraceCommand(program);
+registerPackCommands(program);
 
 program.parse(process.argv);
