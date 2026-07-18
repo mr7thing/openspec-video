@@ -40,8 +40,9 @@ export function registerApproveCommand(program: Command): void {
       'approve',
     )
     .option('--dry-run', 'Preview which output would be approved without writing changes')
+    .requiredOption('--variant <name>', 'Stable semantic variant name for this approved output')
     .option('--note <text>', 'Optional note attached to the review entry')
-    .action(async (outputFile: string, options: { action?: string; dryRun?: boolean; note?: string }) => {
+    .action(async (outputFile: string, options: { action?: string; dryRun?: boolean; note?: string; variant: string }) => {
       try {
         const projectRoot = process.cwd();
 
@@ -121,6 +122,7 @@ export function registerApproveCommand(program: Command): void {
         console.log(chalk.cyan(`Document:  ${sourceDocPath}`));
         console.log(chalk.cyan(`Circle:    ${circleName}`));
         console.log(chalk.cyan(`Action:    ${action}`));
+        console.log(chalk.cyan(`Variant:   ${options.variant}`));
         if (parsed.isModified) {
           console.log(chalk.yellow(`Task:      ${parsed.taskJsonName} (modified/iterated)`));
         }
@@ -133,7 +135,7 @@ export function registerApproveCommand(program: Command): void {
         // ── execute ──
         console.log('');
         const approveService = new ApproveService(projectRoot, queueRoot, new ManifestReader());
-        const result = await approveService.executeFile(absPath, circleName, action, options.note);
+        const result = await approveService.executeFile(absPath, circleName, action, options.note, options.variant);
 
         const icon =
           result.status === 'approved' ? '✅' : result.status === 'syncing' ? '🔄' : '📝';

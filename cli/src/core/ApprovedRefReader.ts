@@ -69,6 +69,11 @@ export class ApprovedRefReader {
     const exists = await FileUtils.exists(docPath);
     if (!exists) return;
 
+    if (!variant.trim()) throw new Error('Approved reference variant must not be empty');
+    if ((await this.parseApprovedRefs(docPath)).some((ref) => ref.variant === variant)) {
+      throw new Error(`Approved reference variant already exists: ${variant}`);
+    }
+
     let content = await FileUtils.readFile(docPath);
     const relPath = path.relative(path.dirname(docPath), imagePath).replace(/\\/g, '/');
     const newEntry = `![${variant}](${relPath})`;

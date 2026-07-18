@@ -30,4 +30,10 @@ describe('ApprovedRefReader', () => {
     expect(await reader.getAll(docPath)).toHaveLength(2);
     expect(await reader.getVariant(docPath, 'portrait')).toBeNull();
   });
+
+  it('rejects an approval that reuses an existing variant', async () => {
+    fs.writeFileSync(docPath, '## Approved References\n\n![portrait](portrait.png)\n');
+    await expect(reader.appendApprovedRef(docPath, 'portrait', path.join(tmpDir, 'other.png')))
+      .rejects.toThrow('already exists');
+  });
 });

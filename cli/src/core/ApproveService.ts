@@ -219,6 +219,7 @@ export class ApproveService {
     circle: string,
     action: ReviewAction,
     note?: string,
+    variant?: string,
   ): Promise<ApproveResult> {
     const filename = path.basename(outputFilePath);
 
@@ -291,11 +292,11 @@ export class ApproveService {
 
     // 6. Write reference to document body
     if (action === 'approve' || action === 'design_feedback') {
-      const variant = path.basename(filename, path.extname(filename));
+      const referenceVariant = variant || path.basename(filename, path.extname(filename));
       if (action === 'approve') {
-        await this.approvedRefReader.appendApprovedRef(sourceDocPath, variant, outputFilePath);
+        await this.approvedRefReader.appendApprovedRef(sourceDocPath, referenceVariant, outputFilePath);
       } else {
-        await this.designRefReader.appendDesignRef(sourceDocPath, variant, outputFilePath);
+        await this.designRefReader.appendDesignRef(sourceDocPath, referenceVariant, outputFilePath);
       }
     }
 
