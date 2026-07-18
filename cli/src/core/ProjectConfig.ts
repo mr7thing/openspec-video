@@ -39,6 +39,7 @@ export interface PackManifest {
   categories?: Record<string, string>;
   profiles?: Record<string, string>;
   skills?: Record<string, string>;
+  policy?: ActionPolicy;
 }
 
 export interface ResolvedPack {

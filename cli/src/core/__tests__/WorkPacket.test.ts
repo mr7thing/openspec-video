@@ -13,7 +13,7 @@ describe('Work Packet', () => {
     fs.mkdirSync(path.join(pack, 'skills'), { recursive: true });
     fs.mkdirSync(path.join(root, 'videospec', 'assets'), { recursive: true });
     fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'packs:\n  - id: test\nbindings:\n  image: test.model\n');
-    fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: test\nversion: 1\ncategories:\n  image: categories/image.yaml\nprofiles:\n  image: profiles/image.yaml\nskills:\n  make: skills/make.yaml\n');
+    fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: test\nversion: 1\npolicy:\n  execute: human\ncategories:\n  image: categories/image.yaml\nprofiles:\n  image: profiles/image.yaml\nskills:\n  make: skills/make.yaml\n');
     fs.writeFileSync(path.join(pack, 'categories', 'image.yaml'), 'default_profile: image\n');
     fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\nskill: make\n');
     fs.writeFileSync(path.join(pack, 'skills', 'make.yaml'), 'gates: [work-check, refs-valid]\n');
@@ -25,5 +25,6 @@ describe('Work Packet', () => {
     const packet = buildWorkPacket(root, 'target');
     expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'REF_UNAVAILABLE' })]));
     expect(packet.primarySkill).toMatchObject({ name: 'make', gates: ['work-check', 'refs-valid'] });
+    expect(packet.policy.execute).toBe('human');
   });
 });
