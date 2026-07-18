@@ -66,13 +66,21 @@ describe('ReviewServer', () => {
     expect(res.body.error).toContain('path traversal');
   });
 
-  it('POST /api/approve/:circle/:assetId fails without real FS', async () => {
+  it('POST /api/approve/:circle/:assetId requires an explicit variant before filesystem work', async () => {
     const res = await request(app)
       .post('/api/approve/c1/hero')
       .send({ outputFile: 'hero_1.png' });
 
-    // Without real manifest files on disk, should get 500 (not 200)
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('variant');
+  });
+
+  it('POST /api/approve/:circle/:assetId rejects legacy feedback actions', async () => {
+    const res = await request(app)
+      .post('/api/approve/c1/hero')
+      .send({ outputFile: 'hero_1.png', variant: 'hero', action: 'design_feedback' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('only action: approve');
   });
 
   it('GET /api/files/* serves files with correct mime', async () => {

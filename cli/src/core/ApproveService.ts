@@ -31,6 +31,7 @@ export interface ApproveRequest {
   taskJsonPath?: string;
   note?: string;
   supersedes?: string;
+  variant?: string;
 }
 
 export interface ApproveResult {
@@ -171,8 +172,8 @@ export class ApproveService {
       for (const filename of req.outputFiles) {
         const absPath = this.resolveOutputAbsPath(req.circle, filename);
         if (absPath) {
-          const variant = path.basename(filename, path.extname(filename));
-          await this.approvedRefReader.appendApprovedRef(sourceDocPath, variant, absPath);
+          const variant = req.variant || path.basename(filename, path.extname(filename));
+          await this.approvedRefReader.appendApprovedRef(sourceDocPath, variant, absPath, req.supersedes);
         }
       }
     }

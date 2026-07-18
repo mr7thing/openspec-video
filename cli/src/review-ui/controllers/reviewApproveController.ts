@@ -12,19 +12,17 @@ import * as path from 'path';
 import { Request, Response } from 'express';
 import { FrontmatterParser } from '../../core/FrontmatterParser';
 import { ApprovedRefReader } from '../../core/ApprovedRefReader';
-import { DesignRefReader } from '../../core/DesignRefReader';
 import { ReviewEntry } from '../../types/ManifestSchema';
 import { parseOutputFilename } from '../../executor/naming';
 import { ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
 
-export type ReviewAction = 'approve' | 'design_feedback' | 'revise_prompt';
-
-const VALID_ACTIONS: ReviewAction[] = ['approve', 'design_feedback', 'revise_prompt'];
+export type ReviewAction = 'approve';
 
 interface ReviewApproveRequest {
   docPath: string;        // absolute path to source document
   outputFiles: string[];  // full queue-relative paths, e.g. "videospec_circle1/minimax.img01_003/dragon_pearl_1.png"
-  action: ReviewAction;
+  action?: ReviewAction;
+  variant: string;
   note?: string;
 }
 
@@ -46,14 +44,11 @@ function validateAbsolutePath(value: string, fieldName: string, projectRoot: str
   return normalized;
 }
 
-function validateOutputFiles(values: unknown, fieldName: string, action: string): string[] {
+function validateOutputFiles(values: unknown, fieldName: string): string[] {
   if (!Array.isArray(values)) {
     throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} must be an array`);
   }
-  // Only approve and design_feedback require output files
-  if ((action === 'approve' || action === 'design_feedback') && values.length === 0) {
-    throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} must be a non-empty array for ${action}`);
-  }
+  if (values.length !== 1) throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} must contain exactly one output for approval`);
   return values.map((v: any) => {
     if (typeof v !== 'string') {
       throw new ValidationError(OpsVErrorCode.VALIDATION_TYPE_ERROR, `${fieldName} items must be strings`);
@@ -73,7 +68,7 @@ function validateOutputFiles(values: unknown, fieldName: string, action: string)
 interface ReviewState {
   [docId: string]: {
     [assetId: string]: {
-      status: 'approved' | 'drafting' | 'syncing' | 'feedback' | 'revised';
+      status: 'approved' | 'syncing';
       action: string;
       outputFiles: string[];
       note?: string;
@@ -99,30 +94,15 @@ function writeReviewState(projectRoot: string, state: ReviewState): void {
 
 export function createReviewApproveController(projectRoot: string, queueRoot: string) {
   const approvedRefReader = new ApprovedRefReader(projectRoot);
-  const designRefReader = new DesignRefReader(projectRoot);
 
   return {
     async execute(req: Request, res: Response): Promise<void> {
       try {
         const body = req.body as ReviewApproveRequest;
         const docPath = validateAbsolutePath(body.docPath, 'docPath', projectRoot);
-        const action: ReviewAction = body.action || 'approve';
-        const outputFiles = validateOutputFiles(body.outputFiles, 'outputFiles', action);
-
-        if (!VALID_ACTIONS.includes(action)) {
-          throw new ValidationError(
-            OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
-            `Invalid action: ${action}. Must be one of: ${VALID_ACTIONS.join(', ')}`
-          );
-        }
-
-        // approve and design_feedback require outputFiles
-        if ((action === 'approve' || action === 'design_feedback') && outputFiles.length === 0) {
-          throw new ValidationError(
-            OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
-            `${action} requires at least one output file`
-          );
-        }
+        if (body.action && body.action !== 'approve') throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Approval endpoint accepts only action: approve');
+        const outputFiles = validateOutputFiles(body.outputFiles, 'outputFiles');
+        if (typeof body.variant !== 'string' || !body.variant.trim()) throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Approval requires a non-empty variant');
 
         // Resolve docPath to projectRoot-relative key for review-state
         const relDocPath = path.relative(projectRoot, docPath);
@@ -131,19 +111,12 @@ export function createReviewApproveController(projectRoot: string, queueRoot: st
 
         // Determine newStatus
         let newStatus: 'approved' | 'drafting' | 'syncing';
-        if (action === 'approve') {
-          const firstOutput = outputFiles[0];
-          const parsed = parseOutputFilename(firstOutput);
-          newStatus = parsed.isModified ? 'syncing' : 'approved';
-        } else {
-          newStatus = 'drafting';
-        }
+        const firstOutput = outputFiles[0];
+        const parsed = parseOutputFilename(firstOutput);
+        newStatus = parsed.isModified ? 'syncing' : 'approved';
 
         const now = new Date().toISOString();
-        const entryAction = action === 'approve'
-          ? (newStatus === 'syncing' ? 'syncing' as const : 'approved' as const)
-          : action === 'design_feedback' ? 'design_feedback' as const
-          : 'revise_prompt' as const;
+        const entryAction = newStatus === 'syncing' ? 'syncing' as const : 'approved' as const;
 
         const reviewEntry: ReviewEntry = {
           timestamp: now,
@@ -160,47 +133,24 @@ export function createReviewApproveController(projectRoot: string, queueRoot: st
         fs.writeFileSync(docPath, updated);
 
         // 2. Write approved/design references to document body
-        if (action === 'approve') {
-          for (const queueRelPath of outputFiles) {
-            const absPath = path.join(queueRoot, queueRelPath);
-            if (fs.existsSync(absPath)) {
-              const variant = path.basename(queueRelPath, path.extname(queueRelPath));
-              await approvedRefReader.appendApprovedRef(docPath, variant, absPath);
-            }
-          }
-        }
-
-        if (action === 'design_feedback') {
-          for (const queueRelPath of outputFiles) {
-            const absPath = path.join(queueRoot, queueRelPath);
-            if (fs.existsSync(absPath)) {
-              const variant = path.basename(queueRelPath, path.extname(queueRelPath));
-              await designRefReader.appendDesignRef(docPath, variant, absPath);
-            }
-          }
+        for (const queueRelPath of outputFiles) {
+          const absPath = path.join(queueRoot, queueRelPath);
+          if (fs.existsSync(absPath)) await approvedRefReader.appendApprovedRef(docPath, body.variant.trim(), absPath);
         }
 
         // 3. Update .review-state.json
         const state = readReviewState(projectRoot);
         if (!state[relDocPath]) state[relDocPath] = {};
         state[relDocPath][docId] = {
-          status: action === 'approve' ? newStatus : (action === 'design_feedback' ? 'feedback' : 'revised'),
-          action,
+          status: newStatus,
+          action: 'approve',
           outputFiles,
           note: body.note,
           approvedAt: now,
         };
         writeReviewState(projectRoot, state);
 
-        const descriptions: Record<ReviewAction, string> = {
-          approve: newStatus === 'syncing'
-            ? `Approved (modified task) ${outputFiles.length} output(s) — syncing required`
-            : `Approved ${outputFiles.length} output(s)`,
-          design_feedback: `Design feedback on ${outputFiles.length} output(s)`,
-          revise_prompt: `Prompt revision requested`,
-        };
-
-        res.json({ success: true, status: newStatus, note: descriptions[action] });
+        res.json({ success: true, status: newStatus, note: newStatus === 'syncing' ? 'Approved modified task - syncing required' : 'Approved' });
       } catch (err: any) {
         const status =
           err.code === 'E6001' || err.code === 'E6002' ? 400

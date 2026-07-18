@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express';
 import { ManifestReader } from '../../core/ManifestReader';
-import { ApproveService, ReviewAction } from '../../core/ApproveService';
+import { ApproveService } from '../../core/ApproveService';
 import { sanitizePathComponent } from '../../utils/pathSecurity';
 import { ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
 
@@ -40,8 +40,6 @@ function validateBodyPaths(values: unknown, fieldName: string): string[] | undef
   });
 }
 
-const VALID_ACTIONS: ReviewAction[] = ['approve', 'design_feedback', 'revise_prompt'];
-
 export function createApproveController(projectRoot: string, queueRoot: string, manifestReader: ManifestReader) {
   const approveService = new ApproveService(projectRoot, queueRoot, manifestReader);
 
@@ -51,24 +49,24 @@ export function createApproveController(projectRoot: string, queueRoot: string, 
         const circle = Array.isArray(req.params.circle) ? req.params.circle[0] : req.params.circle;
         const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
         const body = req.body || {};
-        const action: ReviewAction = body.action || 'approve';
-        if (!VALID_ACTIONS.includes(action)) {
-          throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, `Invalid action: ${action}. Must be one of: ${VALID_ACTIONS.join(', ')}`);
-        }
+        if (body.action && body.action !== 'approve') throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Approval endpoint accepts only action: approve; use opsv review for feedback or revision');
 
         // outputFiles (new) takes priority; fall back to single outputFile (legacy)
         const outputFiles = validateBodyPaths(body.outputFiles, 'outputFiles')
           || (body.outputFile ? [validateBodyPath(body.outputFile, 'outputFile')!] : undefined);
         const taskJsonPath = validateBodyPath(body.taskJsonPath, 'taskJsonPath');
         const note = typeof body.note === 'string' ? body.note.trim() : undefined;
+        if (!Array.isArray(outputFiles) || outputFiles.length !== 1) throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Approval requires exactly one output file');
+        if (typeof body.variant !== 'string' || !body.variant.trim()) throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Approval requires a non-empty variant');
 
         const result = await approveService.execute({
           circle: Array.isArray(req.params.circle) ? req.params.circle[0] : req.params.circle,
           assetId: Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId,
-          action,
+          action: 'approve',
           outputFiles,
           taskJsonPath,
           note,
+          variant: body.variant.trim(),
         });
         res.json(result);
       } catch (err: any) {
