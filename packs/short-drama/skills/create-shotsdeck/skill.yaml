@@ -1,0 +1,5 @@
+action: compile
+category: shotsdeck
+profile: shotsdeck-continuity
+gates: [work-check, refs-valid, circle]
+completion: task-compiled

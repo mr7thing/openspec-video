@@ -1,0 +1,5 @@
+action: materialize
+category: shotlist
+profile: shotlist
+gates: [work-check, plan-valid]
+completion: materialized

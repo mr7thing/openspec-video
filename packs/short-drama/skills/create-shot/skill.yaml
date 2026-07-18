@@ -1,0 +1,5 @@
+action: compile
+category: shot
+profile: shot-video
+gates: [work-check, refs-valid, circle]
+completion: task-compiled

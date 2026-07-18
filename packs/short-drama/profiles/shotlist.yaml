@@ -1,0 +1,5 @@
+kind: workflow
+skill: create-shotlist
+materialize:
+  clips: { directory: videospec/clips, category: clip }
+  shots: { directory: videospec/shots, category: shot }

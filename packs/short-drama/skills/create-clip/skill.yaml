@@ -1,0 +1,5 @@
+action: compile
+category: clip
+profile: clip-frames
+gates: [work-check, refs-valid, circle]
+completion: task-compiled

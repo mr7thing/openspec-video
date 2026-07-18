@@ -1,0 +1,5 @@
+kind: production
+capability: continuous-i2v
+skill: create-shotsdeck
+outputs: [video, first, last]
+frame_directive: true

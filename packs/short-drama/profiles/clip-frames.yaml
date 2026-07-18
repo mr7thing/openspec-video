@@ -1,0 +1,4 @@
+kind: production
+capability: image-generation
+skill: create-clip
+outputs: [image]

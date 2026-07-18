@@ -1,0 +1,4 @@
+kind: production
+capability: video-generation
+skill: create-shot
+outputs: [video, first, last]

@@ -1,0 +1,17 @@
+id: short-drama
+version: 1.0.0
+categories:
+  shotlist: categories/shotlist.yaml
+  clip: categories/clip.yaml
+  shot: categories/shot.yaml
+  shotsdeck: categories/shotsdeck.yaml
+profiles:
+  shotlist: profiles/shotlist.yaml
+  clip-frames: profiles/clip-frames.yaml
+  shot-video: profiles/shot-video.yaml
+  shotsdeck-continuity: profiles/shotsdeck-continuity.yaml
+skills:
+  create-shotlist: skills/create-shotlist/skill.yaml
+  create-clip: skills/create-clip/skill.yaml
+  create-shot: skills/create-shot/skill.yaml
+  create-shotsdeck: skills/create-shotsdeck/skill.yaml
