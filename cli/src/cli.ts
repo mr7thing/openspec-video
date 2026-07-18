@@ -30,6 +30,7 @@ import { registerEnvCommands } from './commands/env';
 import { registerStatusCommand } from './commands/status';
 import { registerTraceCommand } from './commands/trace';
 import { registerPackCommands } from './commands/pack';
+import { registerWorkCommands } from './commands/work';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -129,5 +130,6 @@ registerEnvCommands(program);
 registerStatusCommand(program);
 registerTraceCommand(program);
 registerPackCommands(program);
+registerWorkCommands(program);
 
 program.parse(process.argv);
