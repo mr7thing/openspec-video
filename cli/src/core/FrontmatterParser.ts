@@ -78,7 +78,7 @@ export class FrontmatterParser {
     // key (line starting with non-whitespace that is not a comment), or end
     // of the YAML string.  The "$" anchor is end-of-string (no /m flag).
     const pattern = new RegExp(
-      `(?:^|\\n)${field}:([\\s\\S]*?)(?=\\n(?!\\s|#|\\$)|\\n?\\$)`,
+      `(?:^|\\n)${field}:(?:[^\\n]*(?:\\n[ \\t][^\\n]*)*)`,
     );
     const match = rawYaml.match(pattern);
 

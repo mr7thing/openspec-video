@@ -38,6 +38,13 @@ describe('FrontmatterParser', () => {
       expect(updated).toContain('Body');
     });
 
+    it('replaces a final field without creating a duplicate YAML key', () => {
+      const content = `---\ncategory: image\nstatus: syncing\n---\nBody`;
+      const updated = FrontmatterParser.updateField(content, 'status', 'approved');
+      expect(updated.match(/^status:/gm)).toHaveLength(1);
+      expect(FrontmatterParser.parseRaw(updated).frontmatter.status).toBe('approved');
+    });
+
     it('adds a new field', () => {
       const content = `---\nstatus: drafting\n---\nBody`;
       const updated = FrontmatterParser.updateField(content, 'category', 'character');
