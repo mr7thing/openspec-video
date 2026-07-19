@@ -65,7 +65,6 @@ external consumption. A `syncing` Asset is blocked for consumption until `opsv s
 ## Do Not Do
 
 - Do not delete documents, tasks, circles, artifacts, or prior output.
-- Do not use `opsv approved`.
 - Do not substitute a plain file path for an Approved Reference.
 - Do not omit a Variant when target outputs are multiple.
 - Do not make a global authoring DAG from `refs`.

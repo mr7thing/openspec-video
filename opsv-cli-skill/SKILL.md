@@ -35,7 +35,6 @@ Discovery shims only link to canonical Pack Skills. Never copy business rules in
 
 - Do not delete Asset Documents, Tasks, Circles, Artifacts, or output history.
 - Do not call generation APIs directly. Let OPSV compile and execute the selected Task.
-- Do not use the removed `opsv approved` command or filename scanning for approval.
 - Approve one selected output with a semantic Variant:
   `opsv approve <output> --variant <name>`.
 - After an approved revision enters `syncing`, freely reconcile the Asset Document,
