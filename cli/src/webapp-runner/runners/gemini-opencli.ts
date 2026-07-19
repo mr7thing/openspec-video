@@ -351,6 +351,28 @@ async function findByCSS(css: string): Promise<number | null> {
   return null;
 }
 
+/**
+ * Find upload button by trying multiple bilingual labels.
+ * Gemini UI varies: Chinese ("上传和工具") or English ("Upload and tools" / "+" icon button).
+ * Also tries CSS selectors for the "+" add button.
+ */
+async function findUploadButton(): Promise<number | null> {
+  // Strategy 1: Try Chinese label
+  const cn = await findByName('上传和工具');
+  if (cn) return cn;
+  // Strategy 2: Try English labels
+  for (const label of ['Upload and tools', 'Add files', 'Add images', 'Upload']) {
+    const ref = await findByName(label);
+    if (ref) return ref;
+  }
+  // Strategy 3: CSS fallback — look for the "+" button near composer
+  const cssRef = await findByCSS('button[aria-label*="Upload"]') || await findByCSS('button[aria-label*="Add"]');
+  if (cssRef) return cssRef;
+  // Strategy 4: Look for mat-icon "add" or "attach" icon buttons
+  const iconRef = await findByCSS('button mat-icon[data-svg-icon="add"]') || await findByCSS('button .mat-icon-add');
+  return iconRef;
+}
+
 async function clickRef(ref: number): Promise<void> {
   const r = await runOpenCLI(['browser', SESSION, 'click', String(ref)], 10_000);
   if (!r.ok) throw new Error(`click ${ref} failed: ${r.stderr.slice(0, 200) || r.stdout.slice(0, 200)}`);
@@ -400,8 +422,15 @@ async function uploadFiles(ref: number, files: string[]): Promise<void> {
     (() => {
       const slots = ${JSON.stringify(slots)};
       const names = ${JSON.stringify(names)};
-      const input = document.querySelector('input[type=file]');
-      if (!input) return JSON.stringify({ ok: false, reason: 'no input' });
+      let input = document.querySelector('input[type=file]');
+      // If input was removed from DOM during b64 assembly, recreate it
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.style.display = 'none';
+        document.body.appendChild(input);
+      }
       const files = [];
       for (let i = 0; i < slots.length; i++) {
         const b64 = window[slots[i]];
@@ -416,6 +445,13 @@ async function uploadFiles(ref: number, files: string[]): Promise<void> {
       input.files = dt.files;
       input.dispatchEvent(new Event('change', { bubbles: true }));
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      // Also try the Gemini-specific upload trigger: look for file-change listeners on composer
+      // Dispatch on the composer's hidden input if it exists
+      const composerInput = document.querySelector('input[type=file][multiple]');
+      if (composerInput && composerInput !== input) {
+        composerInput.files = dt.files;
+        composerInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
       // Cleanup slots
       for (const s of slots) delete window[s];
       return JSON.stringify({ ok: true, count: files.length });
@@ -486,19 +522,33 @@ async function resetChat(): Promise<void> {
 async function uploadRefs(refs: string[]): Promise<void> {
   if (refs.length === 0) return;
 
-  // Resolve to absolute paths
+  // Resolve to absolute paths — try multiple base dirs
   const resolved: string[] = [];
+  // Walk up from cwd and queueDir to find opsv-assets or similar project markers
+  const baseDirs: string[] = [process.cwd()];
+  // Add parent dirs up to 5 levels, looking for typical OPSV project markers
+  let dir = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    baseDirs.push(parent);
+    dir = parent;
+  }
   for (const rf of refs) {
     let p = rf;
-    if (!path.isAbsolute(p)) {
-      const fromCwd = path.resolve(process.cwd(), p);
-      if (fs.existsSync(fromCwd)) p = fromCwd;
-    }
-    if (!fs.existsSync(p)) {
-      log(`Reference file not found, skipping: ${rf}`, 'WARN');
+    if (path.isAbsolute(p)) {
+      if (fs.existsSync(p)) resolved.push(p);
+      else log(`Reference file not found, skipping: ${rf}`, 'WARN');
       continue;
     }
-    resolved.push(p);
+    // Try each base directory
+    let found = false;
+    for (const base of baseDirs) {
+      const candidate = path.resolve(base, rf);
+      if (fs.existsSync(candidate)) { p = candidate; found = true; break; }
+    }
+    if (found) resolved.push(p);
+    else log(`Reference file not found, skipping: ${rf}`, 'WARN');
   }
   if (resolved.length === 0) {
     throw new Error(`All reference files not found: ${refs.join(', ')}`);
@@ -506,21 +556,37 @@ async function uploadRefs(refs: string[]): Promise<void> {
 
   log(`Uploading ${resolved.length} ref(s): ${resolved.map(r => path.basename(r)).join(', ')}`);
 
-  // 1. Click "上传和工具"
-  const uploadRef = await findByName('上传和工具');
-  if (!uploadRef) throw new Error('Upload button "上传和工具" not found');
+  // 1. Click upload button (bilingual: 上传和工具 / Upload and tools / Add files)
+  // Tries multiple labels since Gemini UI language varies by account/region
+  const uploadRef = await findUploadButton();
+  if (!uploadRef) throw new Error('Upload button not found (tried: 上传和工具, Upload and tools, Add files, +)');
   await clickRef(uploadRef);
-  await new Promise(r => setTimeout(r, 1500));
 
-  // 2. Click first menuitem (CDK overlay pane button)
-  await evalJS(
-    'document.querySelectorAll(".cdk-overlay-pane button")[0]?.click()'
-  );
-  await new Promise(r => setTimeout(r, 1500));
+  // 2. Wait up to 5s for CDK overlay pane to render with at least 1 button
+  let menuBtns = 0;
+  for (let i = 0; i < 25; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    const paneCount = await evalJS('document.querySelectorAll(".cdk-overlay-pane button").length');
+    menuBtns = parseInt(String(paneCount).trim(), 10) || 0;
+    if (menuBtns > 0) break;
+  }
+  if (menuBtns === 0) {
+    throw new Error('CDK overlay pane never appeared after upload-menu click');
+  }
 
-  // 3. Find file input and upload
-  const inputRef = await findByCSS('input[type=file]');
-  if (!inputRef) throw new Error('File input not found after menuitem click');
+  // 3. Click first CDK menu button via direct DOM — bypasses Playwright a11y tree
+  // which sometimes re-clicks the upload trigger instead of the menu item.
+  await evalJS('document.querySelectorAll(".cdk-overlay-pane button")[0].click()');
+
+  // 4. Wait up to 8s for file input to materialize (file picker is OS-level,
+  // browser injects a hidden <input type=file> after menuitem click).
+  let inputRef: number | null = null;
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 200));
+    inputRef = await findByCSS('input[type=file]');
+    if (inputRef) break;
+  }
+  if (!inputRef) throw new Error('File input not found after menuitem click (waited 8s)');
   await uploadFiles(inputRef, resolved);
 
   // 4. CRITICAL: Close any open file picker / file input
@@ -577,28 +643,70 @@ async function sendPrompt(prompt: string): Promise<string> {
 
   // Type into composer
   await typeText(0, prompt);  // 0 = --role textbox flag handles selector
-  await new Promise(r => setTimeout(r, 500));
+  // After typing, wait for composer to stabilize (especially if file preview is showing)
+  await new Promise(r => setTimeout(r, 2_000));
 
-  // Click send
-  const sendRef = await findByName('发送');
-  if (!sendRef) throw new Error('Send button "发送" not found');
-  await clickRef(sendRef);
+  // Try to submit: first attempt via Enter key, fallback to clicking send button
+  // Patched 2026-07-16: after ref upload, Enter may be intercepted by file preview.
+  // Strategy: try Enter first, if URL doesn't jump, try clicking the send button.
+  log('Sending prompt (Enter key, with send-button fallback)');
+  await runOpenCLI(['browser', SESSION, 'keys', 'Enter'], 5_000);
 
   // Wait for URL to jump to /app/{chatId}
   // The URL jumps within ~3-10s of click if prompt went through. We poll up to 20s.
   let chatUrl = '';
-  const deadline = Date.now() + 20_000;
+  let deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     chatUrl = await getURL();
-    // /app/{hex_id} is a "real" chat URL — /app alone (or with trailing slash) is the landing page
     if (chatUrl.match(/\/app\/[a-f0-9]{8,}/)) break;
     await new Promise(r => setTimeout(r, 500));
   }
+
+  // Fallback: if Enter didn't work, try clicking the send/submit button
+  if (!chatUrl.match(/\/app\/[a-f0-9]{8,}/)) {
+    log('Enter did not trigger submit — trying send button click');
+    // Gemini Web may show a send button (arrow icon) when composer has content+file
+    const sendBtnClicked = await evalJS(`(function(){
+      var btns = document.querySelectorAll('button');
+      for (var i=0;i<btns.length;i++){
+        var txt = btns[i].textContent || btns[i].getAttribute('aria-label') || '';
+        if (txt.includes('发送') || txt.includes('Send') || txt.includes('提交')) {
+          btns[i].click(); return 'clicked:'+txt.trim();
+        }
+      }
+      // Try the run/send icon button near composer
+      var runBtn = document.querySelector('div[role="button"][aria-label*="发送"], div[role="button"][aria-label*="Send"]');
+      if (runBtn) { runBtn.click(); return 'clicked:aria-send'; }
+      return 'not_found';
+    })()`);
+    log(`Send button fallback: ${sendBtnClicked}`);
+
+    // Wait again for URL jump
+    deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      chatUrl = await getURL();
+      if (chatUrl.match(/\/app\/[a-f0-9]{8,}/)) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  // Second fallback: press Enter again (file preview may have been dismissed)
+  if (!chatUrl.match(/\/app\/[a-f0-9]{8,}/)) {
+    log('Send button did not work — trying Enter again');
+    await runOpenCLI(['browser', SESSION, 'keys', 'Enter'], 5_000);
+    deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      chatUrl = await getURL();
+      if (chatUrl.match(/\/app\/[a-f0-9]{8,}/)) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
   log(`Chat URL after send: ${chatUrl}`);
 
   if (!chatUrl.match(/\/app\/[a-f0-9]{8,}/)) {
     throw new Error(
-      `Send button clicked but URL did not jump to /app/{chatId} within 20s. ` +
+      `Send button clicked but URL did not jump to /app/{chatId} within timeout. ` +
       `Current URL: ${chatUrl}. Likely causes: OS file picker still stealing focus, ` +
       `composer in sending:true state, or Gemini rejected prompt (e.g. video mode).`
     );
@@ -609,18 +717,26 @@ async function sendPrompt(prompt: string): Promise<string> {
 
 async function waitForImages(): Promise<number> {
   const deadline = Date.now() + GENERATION_TIMEOUT_MS;
-  // Pre-encode the alt substring for the alt*='…' selector (single-quoted attribute matcher)
-  const aiAlt = 'AI 生成';
+  // Gemini 生成图的 alt 模式: "AI generated" (英文) 或 "AI 生成" (中文)
+  // 不同账号/区域可能返回不同语言，两种都要匹配
+  const aiAltPatterns = ['AI 生成', 'AI generated'];
   while (Date.now() < deadline) {
+    // 任一模式匹配即可
+    const selector = aiAltPatterns.map(p => `img[alt*='${p}']`).join(',');
     const r = await evalJS(
-      `document.querySelectorAll("img[alt*='${aiAlt}']").length`
+      `document.querySelectorAll("${selector}").length`
     );
     const count = parseInt(r, 10);
     if (count > 0) {
+      // Force-load lazy images: remove loading="lazy" and scroll into view
+      await evalJS(
+        `(function(){var imgs=document.querySelectorAll("${selector}");imgs.forEach(function(i){i.removeAttribute('loading');i.setAttribute('loading','eager');i.scrollIntoView({block:'center'});});return imgs.length;})()`
+      );
       // Wait for naturalWidth > 0 (image actually loaded)
-      await new Promise(res => setTimeout(res, 3000));
+      await new Promise(res => setTimeout(res, 5000));
+      const readySelector = aiAltPatterns.map(p => `img[alt*='${p}']`).join(',');
       const ready = await evalJS(
-        `(function(){var imgs=document.querySelectorAll("img[alt*='${aiAlt}']");var n=0;imgs.forEach(function(i){if(i.naturalWidth>=512)n++;});return n;})()`
+        `(function(){var imgs=document.querySelectorAll("${readySelector}");var n=0;imgs.forEach(function(i){if(i.naturalWidth>=512)n++;});return n;})()`
       );
       if (parseInt(ready, 10) >= count) return count;
     }
@@ -635,30 +751,49 @@ async function downloadImages(): Promise<string[]> {
     ? fs.readdirSync(DOWNLOAD_DIR).filter(f => f.endsWith('.png') && !f.includes(' (') && !f.startsWith('.'))
     : []);
 
-  // Find download buttons
-  const DL_LABEL = '下载完整尺寸的图片';
-  const btnCountStr = await evalJS(
-    'document.querySelectorAll("button[aria-label=\\"' + DL_LABEL + '\\"]").length'
-  );
-  const btnCount = parseInt(btnCountStr, 10);
+  // Find download buttons (bilingual: 下载完整尺寸的图片 / Download full-size image)
+  const DL_LABELS = ['下载完整尺寸的图片', 'Download full-size image'];
+  const DL_SHORT_LABELS = ['下载', 'Download'];
+  let btnCount = 0;
+  for (const label of DL_LABELS) {
+    const btnCountStr = await evalJS(
+      'document.querySelectorAll("button[aria-label=\\"' + label + '\\"]").length'
+    );
+    btnCount = parseInt(btnCountStr, 10) || 0;
+    if (btnCount > 0) break;
+  }
   log(`Found ${btnCount} download button(s)`);
 
   if (btnCount === 0) {
-    // Try alternative selector
-    const altCount = await evalJS(
-      '[...document.querySelectorAll("button")].filter(b => b.getAttribute("aria-label")?.includes("下载")).length'
-    );
-    if (parseInt(altCount, 10) === 0) {
+    // Try alternative selector with short labels
+    for (const short of DL_SHORT_LABELS) {
+      const altCount = await evalJS(
+        '[...document.querySelectorAll("button")].filter(b => b.getAttribute("aria-label")?.includes("' + short + '")).length'
+      );
+      btnCount = parseInt(altCount, 10) || 0;
+      if (btnCount > 0) break;
+    }
+    if (btnCount === 0) {
       throw new Error('No download buttons found — generation may have failed');
     }
   }
 
   const saved: string[] = [];
   for (let i = 0; i < btnCount; i++) {
-    // Click via JS (CDP click on icon button is fragile)
-    await evalJS(
-      '[...document.querySelectorAll("button")].filter(b => b.getAttribute("aria-label")?.includes("' + DL_LABEL + '")).pop()?.click()'
-    );
+    // Click the last download button via JS (CDP click on icon button is fragile)
+    // Try full labels first, then short labels
+    let clicked = false;
+    for (const label of DL_LABELS) {
+      const r = await evalJS(
+        '[...document.querySelectorAll("button")].filter(b => b.getAttribute("aria-label")?.includes("' + label + '")).pop()?.click()'
+      );
+      if (r) { clicked = true; break; }
+    }
+    if (!clicked) {
+      await evalJS(
+        '[...document.querySelectorAll("button")].filter(b => ["下载","Download"].some(s => b.getAttribute("aria-label")?.includes(s))).pop()?.click()'
+      );
+    }
     await new Promise(r => setTimeout(r, 1500));
 
     // Wait for new file to appear
@@ -742,8 +877,17 @@ export async function run(taskInfo: TaskInfo): Promise<RunnerResult> {
       }
 
       // 3. Upload refs (chunked DataTransfer, bypasses OS picker)
+      // Non-blocking: if upload fails, log warning and continue with text-only prompt
       if (referenceFiles?.length) {
-        await uploadRefs(referenceFiles);
+        try {
+          await uploadRefs(referenceFiles);
+        } catch (e: any) {
+          log(`Reference upload failed, continuing without refs: ${e.message}`, 'WARN');
+          // Attempt to reset chat state to recover
+          try {
+            await runOpenCLI(['browser', SESSION, 'keys', 'Escape'], 3_000);
+          } catch { /* ignore */ }
+        }
       }
 
       // 4. Send prompt — this returns the chatUrl we should reuse next time

@@ -113,10 +113,13 @@ export function parseTask(taskPath: string): TaskInfo {
  */
 export function isTaskJson(filePath: string): boolean {
   const name = path.basename(filePath);
+  // Skip non-task JSON files
+  const SKIP_NAMES = ['chat_state.json', 'manifest.json', 'package.json', 'tsconfig.json', '.env.json'];
   return (
     name.endsWith('.json') &&
     !name.startsWith('_') &&
     !name.startsWith('.') &&
+    !SKIP_NAMES.includes(name) &&
     fs.statSync(filePath).size > 50
   );
 }
