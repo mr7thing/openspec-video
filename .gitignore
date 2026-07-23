@@ -30,4 +30,10 @@ npm-debug.log*
 opsv-packs/
 opsv-packs
 
+# local 3D packs
+packs/mv-3d-previs/
+packs/mv-3d-ref/
+
 API/*
+docs/audit-25-commits-review-2026-07-19.md
+docs/log-2026-07-19-codex.md
