@@ -47,6 +47,13 @@ models:
       - ARK_API_KEY
     supports_reference_images: true
     max_reference_images: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      negative_prompt:
+        source: negative_prompt
+        target: negative_prompt
     defaults:
       size: "2048x2048"
       steps: 30
@@ -86,6 +93,16 @@ models:
       - ARK_API_KEY
     supports_reference_images: true
     max_reference_images: 10
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      negative_prompt:
+        source: negative_prompt
+        target: negative_prompt
+      image:
+        source: refs[image]
+        target: image
     defaults:
       size: "1024x1024"
       output_format: "png"
@@ -174,6 +191,25 @@ models:
     max_reference_videos: 3
     supports_reference_audios: true
     max_reference_audios: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: content[0].text
+      first_frame:
+        source: first_frame
+        target: content[].image_url
+      last_frame:
+        source: last_frame
+        target: content[].image_url
+      image:
+        source: refs[image]
+        target: content[].image_url
+      video:
+        source: refs[video]
+        target: content[].video_url
+      audio:
+        source: refs[audio]
+        target: content[].audio_url
     defaults:
       ratio: "16:9"
       duration: 5
@@ -207,6 +243,25 @@ models:
     max_reference_videos: 3
     supports_reference_audios: true
     max_reference_audios: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: content[0].text
+      first_frame:
+        source: first_frame
+        target: content[].image_url
+      last_frame:
+        source: last_frame
+        target: content[].image_url
+      image:
+        source: refs[image]
+        target: content[].image_url
+      video:
+        source: refs[video]
+        target: content[].video_url
+      audio:
+        source: refs[audio]
+        target: content[].audio_url
     defaults:
       ratio: "16:9"
       duration: 5
@@ -295,6 +350,16 @@ models:
     supports_reference_images: true
     max_reference_images: 1
     supports_first_image: true
+    node_mappings:
+      image1:
+        nodeId: "76"
+        fieldName: image
+      seed:
+        nodeId: "103"
+        fieldName: noise_seed
+      prompt:
+        nodeId: "177"
+        fieldName: prompt
     defaults:
       addMetadata: false
       usePersonalQueue: false
@@ -315,6 +380,22 @@ models:
     workflow: "test/workflows/opsv-krea2_t2i_api-id_2074897972374097921.json"
     required_env:
       - RH_WORKFLOW_API_KEY
+    node_mappings:
+      Resolution.aspect_ratio:
+        nodeId: "49"
+        fieldName: aspect_ratio
+      Resolution.megapixels:
+        nodeId: "49"
+        fieldName: megapixels
+      Resolution.multiple:
+        nodeId: "49"
+        fieldName: multiple
+      RefinePromp:
+        nodeId: "68"
+        fieldName: value
+      prompt:
+        nodeId: "79"
+        fieldName: prompt
     defaults:
       addMetadata: false
       usePersonalQueue: false
@@ -453,6 +534,19 @@ models:
     max_reference_images: 10
     max_reference_videos: 3
     max_reference_audios: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
+      video:
+        source: refs[video]
+        target: videoUrls
+      audio:
+        source: refs[audio]
+        target: audioUrls
     defaults:
       resolution: "720p"
       duration: "5"
@@ -492,6 +586,19 @@ models:
     max_reference_images: 9
     max_reference_videos: 3
     max_reference_audios: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
+      video:
+        source: refs[video]
+        target: videoUrls
+      audio:
+        source: refs[audio]
+        target: audioUrls
     defaults:
       resolution: "720p"
       duration: "5"
@@ -531,6 +638,19 @@ models:
     max_reference_images: 10
     max_reference_videos: 3
     max_reference_audios: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
+      video:
+        source: refs[video]
+        target: videoUrls
+      audio:
+        source: refs[audio]
+        target: audioUrls
     defaults:
       resolution: "720p"
       duration: "5"
@@ -566,6 +686,13 @@ models:
       - RH_API_KEY
     supports_reference_images: true
     max_reference_images: 7
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
     defaults:
       resolution: "720p"
       duration: "5"
@@ -587,6 +714,10 @@ models:
     api_status_url: https://www.runninghub.cn/openapi/v2/query
     required_env:
       - RH_API_KEY
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
     defaults:
       aspectRatio: "1:1"
       resolution: "1k"
@@ -605,6 +736,13 @@ models:
       - RH_API_KEY
     supports_reference_images: true
     max_reference_images: 10
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
     defaults:
       aspectRatio: "1:1"
       resolution: "1k"
@@ -622,6 +760,10 @@ models:
     api_status_url: https://www.runninghub.cn/openapi/v2/query
     required_env:
       - RH_API_KEY
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
     defaults:
       model: "g-4.2"
     # == payload_example ==
@@ -659,6 +801,13 @@ models:
       - RH_API_KEY
     supports_reference_images: true
     max_reference_images: 10
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
     defaults:
       resolution: "1k"
     # == payload_example ==
@@ -674,6 +823,10 @@ models:
     api_status_url: https://www.runninghub.cn/openapi/v2/query
     required_env:
       - RH_API_KEY
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
     defaults:
       aspectRatio: "1:1"
       resolution: "2k"
@@ -699,6 +852,13 @@ models:
       - SILICONFLOW_API_KEY
     supports_reference_images: true
     max_reference_images: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: image
     defaults:
       image_size: "1664x928"
       cfg_scale: 4.0
@@ -724,6 +884,13 @@ models:
       - SILICONFLOW_API_KEY
     supports_reference_images: true
     max_reference_images: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: image
     defaults:
       image_size: "1664x928"
       num_inference_steps: 20
@@ -747,6 +914,10 @@ models:
     required_env:
       - SILICONFLOW_API_KEY
     concurrency: 3
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
     defaults:
       image_size: "1280x720"
       seed: 42
@@ -767,6 +938,13 @@ models:
     required_env:
       - SILICONFLOW_API_KEY
     supports_first_image: true
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      first_frame:
+        source: first_frame
+        target: image
     defaults:
       image_size: "1280x720"
       seed: 42
@@ -791,6 +969,13 @@ models:
       - MINIMAX_API_KEY
     supports_reference_images: true
     max_reference_images: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: image
     defaults:
       aspect_ratio: "16:9"
       size: "1920x1080"
@@ -812,6 +997,13 @@ models:
       - MINIMAX_API_KEY
     supports_first_image: true
     max_reference_images: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      first_frame:
+        source: first_frame
+        target: first_frame_image
     defaults:
       resolution: "1080P"
       duration: 5
@@ -852,6 +1044,16 @@ models:
     supports_reference_images: true
     supports_first_image: true
     max_reference_images: 13
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: reference_files
+      first_frame:
+        source: first_frame
+        target: frame_ref.first
     defaults:
       target_url: "https://gemini.google.com"
       typing_speed: "human"
