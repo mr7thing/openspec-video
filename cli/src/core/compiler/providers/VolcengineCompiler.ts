@@ -32,6 +32,9 @@ export class VolcengineCompiler implements ProviderCompiler {
     let payload: Record<string, any>;
     if (modelConfig.payload_example) {
       payload = structuredClone(modelConfig.payload_example);
+      if (payload.prompt === '' || payload.prompt === undefined || payload.prompt === null) {
+        payload.prompt = job.prompt || job.payload.prompt;
+      }
     } else {
       payload = {
         model: modelConfig.model,
@@ -93,6 +96,12 @@ export class VolcengineCompiler implements ProviderCompiler {
     let payload: Record<string, any>;
     if (modelConfig.payload_example) {
       payload = structuredClone(modelConfig.payload_example);
+      const textPart = Array.isArray(payload.content)
+        ? payload.content.find((part: Record<string, unknown>) => part?.type === 'text')
+        : undefined;
+      if (textPart && (textPart.text === '' || textPart.text === undefined || textPart.text === null)) {
+        textPart.text = job.prompt || job.payload.prompt;
+      }
     } else {
       payload = {
         model: modelConfig.model,
