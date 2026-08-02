@@ -9,6 +9,7 @@ import { ProviderExecutor } from '../../container/Container';
 import { OpsVContext } from '../../container/OpsVContext';
 import { logger } from '../../utils/logger';
 import { executeTask } from '../../webapp-runner/index';
+import { warnWebappUnavailable } from '../../webapp-runner/availability';
 
 interface WebappPayload {
   prompt?: string;
@@ -24,6 +25,7 @@ export class WebappProvider implements ProviderExecutor {
     const shotId = meta.shotId;
 
     try {
+      warnWebappUnavailable();
       logger.info(`[Webapp] Executing ${shotId} via Gemini/browser automation`);
 
       // Delegate to webapp-runner which handles site-specific runners

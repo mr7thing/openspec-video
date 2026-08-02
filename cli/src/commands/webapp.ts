@@ -20,11 +20,12 @@ import { ManifestReader } from '../core/ManifestReader';
 import { resolveProjectRoot } from '../utils/projectResolver';
 
 import { InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
+import { warnWebappUnavailable } from '../webapp-runner/availability';
 
 export function registerWebappCommand(program: Command): void {
   program
     .command('webapp')
-    .description('Compile browser automation tasks from circle manifest')
+    .description('Compile browser automation tasks from circle manifest [temporarily unavailable: Gemini upload broken]')
     .requiredOption('--model <model>', 'Webapp model key (e.g. webapp.gemini)')
     .option('--manifest <path>', 'Path to _manifest.json (or directory containing it)')
     .option('--category <cat>', 'Filter assets by category')
@@ -34,6 +35,7 @@ export function registerWebappCommand(program: Command): void {
     .option('--dry-run', 'Show compiled tasks without writing files')
     .action(async (options: ImageProduceCommandOptions) => {
       try {
+        warnWebappUnavailable();
         const cwd = process.cwd();
         const modelKey = options.model;
 

@@ -37,3 +37,6 @@ packs/mv-3d-ref/
 API/*
 docs/audit-25-commits-review-2026-07-19.md
 docs/log-2026-07-19-codex.md
+
+# Trellis session data (spec/ and config.yaml remain tracked)
+.trellis/

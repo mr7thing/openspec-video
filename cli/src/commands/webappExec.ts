@@ -13,11 +13,12 @@ import { parseTask, findPendingTasks, scanQueueStatus } from '../webapp-runner/c
 import { executeTask, executeBatch } from '../webapp-runner/index';
 import { readLastLogEntry } from '../executor/polling';
 import { logger } from '../utils/logger';
+import { warnWebappUnavailable } from '../webapp-runner/availability';
 
 export function registerWebappExecCommand(program: Command): void {
   const cmd = program
     .command('webapp-exec')
-    .description('Execute webapp generation tasks (multi-site runner)')
+    .description('Execute webapp generation tasks (multi-site runner) [temporarily unavailable: Gemini upload broken]')
     .helpOption('-h, --help', 'Show help');
 
   // ── run ──────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export function registerWebappExecCommand(program: Command): void {
     .option('--json', 'Output JSON (useful for programmatic use)')
     .action(async (options) => {
       try {
+        warnWebappUnavailable();
         const enableWm = options.watermark !== false;
 
         if (options.task) {
