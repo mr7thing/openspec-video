@@ -53,8 +53,10 @@ export class TunnelClient {
       }
     });
 
-    // Start log batch flush timer
+    // Start log batch flush timer (unref: a background flush must never
+    // keep the process alive on its own)
     this.logFlushTimer = setInterval(() => this.flushLogs(), 30000);
+    this.logFlushTimer.unref?.();
   }
 
   close(): void {
