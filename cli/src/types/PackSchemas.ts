@@ -50,11 +50,25 @@ export const MaterializeTargetSchema = z.object({
   category: z.string(),
 }).passthrough();
 
+/**
+ * Declarative ordered input slot (T07). Declaration order in the profile IS
+ * the reference order contract: the asset document's external refs under
+ * `refs[ref_type]` (document order) must match slots 1:1 in order.
+ */
+export const InputSlotSchema = z.object({
+  slot: z.string().min(1),
+  category: z.string().min(1),
+  ref_type: z.string().min(1).default('image'),
+  required: z.boolean().default(true),
+}).passthrough();
+export type InputSlot = z.infer<typeof InputSlotSchema>;
+
 const ProfileBaseSchema = z.object({
   capability: z.string().optional(),
   skill: z.string().optional(),
   frame_directive: z.boolean().optional(),
   required_ref_categories: z.array(z.string()).optional(),
+  inputs: z.array(InputSlotSchema).optional(),
   materialize: z.object({
     clips: MaterializeTargetSchema.optional(),
     shots: MaterializeTargetSchema.optional(),
@@ -70,7 +84,11 @@ export const ProfileContractSchema = z.discriminatedUnion('kind', [
     kind: z.literal('production'),
     outputs: z.array(z.string()).min(1, 'production Profile must declare outputs'),
   }),
-]);
+]).superRefine((value, ctx) => {
+  const slots = (value.inputs || []).map(input => input.slot);
+  const duplicate = slots.find((slot, index) => slots.indexOf(slot) !== index);
+  if (duplicate) ctx.addIssue({ code: 'custom', path: ['inputs'], message: `Duplicate input slot "${duplicate}"` });
+});
 export type ProfileContract = z.infer<typeof ProfileContractSchema>;
 
 export const SKILL_ACTIONS = ['draft', 'materialize', 'compile', 'review'] as const;

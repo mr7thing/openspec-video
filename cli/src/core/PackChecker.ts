@@ -9,7 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import { ZodSchema } from 'zod';
+import { ZodType } from 'zod';
 import {
   ActionPolicySchema,
   CategoryContract,
@@ -36,6 +36,8 @@ export const PACK_ISSUE_CODES = [
   'PACK_POLICY_INVALID',
   'PACK_CAPABILITY_CONCRETE_MODEL',
   'PACK_ORPHAN_FILE',
+  // v2 addition (T07): declarative input slots referencing unknown categories.
+  'PACK_PROFILE_INPUT_INVALID',
 ] as const;
 export type PackIssueCode = (typeof PACK_ISSUE_CODES)[number];
 
@@ -107,7 +109,7 @@ export function checkPack(packRoot: string): PackCheckReport {
     }
   }
 
-  const loadExport = <T>(kind: 'categories' | 'profiles' | 'skills', key: string, rel: string, schema: ZodSchema<T>): LoadedExport<T> => {
+  const loadExport = <T>(kind: 'categories' | 'profiles' | 'skills', key: string, rel: string, schema: ZodType<T, any, any>): LoadedExport<T> => {
     const relNorm = toRel(rel);
     const contained = resolveContainedReal(packRoot, rel);
     if (!contained) {
@@ -148,6 +150,11 @@ export function checkPack(packRoot: string): PackCheckReport {
     }
     if (profile.capability && looksConcreteModel(profile.capability)) {
       push({ code: 'PACK_CAPABILITY_CONCRETE_MODEL', severity: 'error', path: entry.rel, message: `Profile "${name}" capability "${profile.capability}" looks like a concrete provider/model key; declare an abstract capability and bind it in the project`, context: { profile: name, capability: profile.capability } });
+    }
+    for (const input of profile.inputs || []) {
+      if (!categories.has(input.category)) {
+        push({ code: 'PACK_PROFILE_INPUT_INVALID', severity: 'error', path: entry.rel, message: `Profile "${name}" input slot "${input.slot}" references non-exported Category "${input.category}"`, context: { profile: name, slot: input.slot, category: input.category } });
+      }
     }
   }
 

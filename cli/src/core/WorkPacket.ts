@@ -5,7 +5,7 @@ import { AssetManager } from './AssetManager';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { FrontmatterParser } from './FrontmatterParser';
 import { buildNextAction, NextAction, renderNextActionCommand, WORK_PACKET_CONTRACT_VERSION } from './NextAction';
-import { missingRequiredRefCategories, resolveDocumentContract, resolvePackExportPath } from './PackContracts';
+import { inputSlotIssues, missingRequiredRefCategories, resolveDocumentContract, resolvePackExportPath, ResolvedDocumentContract } from './PackContracts';
 import { mergePolicies } from './PolicyLattice';
 import { loadProjectConfig } from './ProjectConfig';
 import { parseRefKey } from './RefSyntaxParser';
@@ -63,7 +63,18 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   const config = loadProjectConfig(projectRoot);
   const packet: WorkPacket = { contractVersion: WORK_PACKET_CONTRACT_VERSION, asset, category: frontmatter.category, status: frontmatter.status || 'drafting', refs: [], circle: { available: false, manifests: [] }, policy: {}, issues: [] };
   if (!frontmatter.category) { packet.issues.push({ code: 'CATEGORY_MISSING', message: 'Asset document has no category' }); return packet; }
-  const contract = resolveDocumentContract(projectRoot, frontmatter.category, frontmatter.profile, config);
+  let contract: ResolvedDocumentContract;
+  try {
+    contract = resolveDocumentContract(projectRoot, frontmatter.category, frontmatter.profile, config);
+  } catch (error: any) {
+    if (typeof error?.message === 'string' && error.message.startsWith('CAPABILITY_BINDING_MISSING:')) {
+      packet.issues.push({ code: 'CAPABILITY_BINDING_MISSING', message: error.message.slice('CAPABILITY_BINDING_MISSING: '.length) });
+      packet.nextAction = { kind: 'blocked', issueCodes: packet.issues.map(i => i.code) };
+      packet.action = 'blocked';
+      return packet;
+    }
+    throw error;
+  }
   const policy = mergePolicies({}, contract.pack.manifest.policy || {}, config.policy || {});
   packet.policy = policy.effective;
   packet.issues.push(...policy.issues.filter(issue => issue.severity === 'error').map(issue => ({ code: issue.code, message: issue.message })));
@@ -110,6 +121,7 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   for (const category of missingRequiredRefCategories(projectRoot, contract.profile, frontmatter.refs)) {
     packet.issues.push({ code: 'PROFILE_REF_REQUIRED', message: `Profile requires an external reference to category "${category}"` });
   }
+  packet.issues.push(...inputSlotIssues(projectRoot, contract.profile, frontmatter.refs));
   packet.circle.manifests = circleManifests(projectRoot, asset);
   packet.circle.available = packet.circle.manifests.length > 0;
   if (packet.status === 'syncing') {

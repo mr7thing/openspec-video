@@ -28,6 +28,54 @@ export function missingRequiredRefCategories(
   return required.filter(category => !categories.has(category));
 }
 
+export interface InputSlotIssue {
+  code: 'PROFILE_INPUT_MISSING' | 'PROFILE_INPUT_MISMATCH';
+  message: string;
+}
+
+/**
+ * Verify declarative ordered input slots (T07) against the document's
+ * external refs: per ref_type, refs in document order must match slots 1:1
+ * in declaration order. Refs whose target doc is missing are skipped here —
+ * the refs pass already reports them (REF_MISSING/REF_UNAVAILABLE).
+ */
+export function inputSlotIssues(
+  projectRoot: string,
+  profile: ProfileContract,
+  refs: Record<string, Record<string, string[]>> | undefined,
+): InputSlotIssue[] {
+  const inputs = profile.inputs || [];
+  if (inputs.length === 0) return [];
+  const videospec = path.join(projectRoot, 'videospec');
+  const issues: InputSlotIssue[] = [];
+  for (const refType of [...new Set(inputs.map(input => input.ref_type))]) {
+    const slots = inputs.filter(input => input.ref_type === refType);
+    const resolved: Array<{ key: string; category?: string }> = [];
+    for (const key of Object.keys(refs?.[refType] || {})) {
+      const ref = parseRefKey(key);
+      if (!ref || ref.kind !== 'external') continue;
+      const doc = AssetManager.findAssetFilePathUnder(videospec, ref.id);
+      if (!doc) continue;
+      resolved.push({ key, category: FrontmatterParser.parseRaw(fs.readFileSync(doc, 'utf8')).frontmatter.category });
+    }
+    if (resolved.length > slots.length) {
+      issues.push({ code: 'PROFILE_INPUT_MISMATCH', message: `Profile declares ${slots.length} "${refType}" input slot(s) but the document carries ${resolved.length} external "${refType}" ref(s)` });
+      continue;
+    }
+    for (const [index, slot] of slots.entries()) {
+      const actual = resolved[index];
+      if (!actual) {
+        if (slot.required) issues.push({ code: 'PROFILE_INPUT_MISSING', message: `Profile requires input slot "${slot.slot}" (a "${slot.category}" ${refType} reference)` });
+        continue;
+      }
+      if (actual.category !== slot.category) {
+        issues.push({ code: 'PROFILE_INPUT_MISMATCH', message: `Input slot "${slot.slot}" expects a "${slot.category}" reference but "${actual.key}" resolves to category "${actual.category}"` });
+      }
+    }
+  }
+  return issues;
+}
+
 export interface ResolvedDocumentContract {
   pack: ResolvedPack;
   category: CategoryContract;
@@ -87,7 +135,7 @@ export function resolveDocumentContract(
   const resolvedProfile = derived ? { ...profile, capability: derived.capability || profile.capability } : profile;
   const boundModel = resolvedProfile.capability ? effectiveConfig.bindings?.[resolvedProfile.capability] : undefined;
   if (resolvedProfile.kind === 'production' && resolvedProfile.capability && !boundModel) {
-    throw new Error(`Production profile "${requestedProfile}" requires a project binding for capability "${resolvedProfile.capability}"`);
+    throw new Error(`CAPABILITY_BINDING_MISSING: Production profile "${requestedProfile}" requires a project binding for capability "${resolvedProfile.capability}"`);
   }
   return { pack, category, profileName: requestedProfile, profile: resolvedProfile, boundModel, defaults: derived?.defaults };
 }
