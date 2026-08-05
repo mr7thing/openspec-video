@@ -66,6 +66,13 @@ export function registerPackCommands(program: Command): void {
       const projectRoot = process.cwd();
       const config = loadProjectConfig(projectRoot);
       const packs = resolvePacks(projectRoot, config);
+      const invalid = packs.map(resolved => checkPack(resolved.root)).filter(report => !report.ok);
+      if (invalid.length > 0) {
+        for (const report of invalid) renderReport(report);
+        logger.error('Pack contract errors must be fixed before locking. Run: opsv pack check --json');
+        process.exitCode = 1;
+        return;
+      }
       const lockPath = writePackLock(projectRoot, packs);
       console.log(chalk.green(`Locked ${packs.length} Pack(s): ${lockPath}`));
     } catch (error: any) {
