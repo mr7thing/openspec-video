@@ -36,4 +36,16 @@ describe('Work Packet', () => {
     const packet = buildWorkPacket(root, 'target');
     expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROFILE_REF_REQUIRED' })]));
   });
+
+  it('blocks the packet when project policy tries to loosen pack policy (F7)', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'test');
+    fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: test\nversion: 1\npolicy:\n  sync: human\ncategories:\n  image: categories/image.yaml\nprofiles:\n  image: profiles/image.yaml\nskills:\n  make: skills/make.yaml\n');
+    fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'packs:\n  - id: test\nbindings:\n  image: test.model\npolicy:\n  sync: auto\n');
+    fs.writeFileSync(path.join(root, 'videospec/assets', 'target.md'), '---\ncategory: image\nstatus: drafting\n---\n');
+    const packet = buildWorkPacket(root, 'target');
+    expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROJECT_POLICY_LOOSENS_PACK' })]));
+    expect(packet.policy.sync).toBe('human');
+    expect(packet.nextAction?.kind).toBe('blocked');
+    expect(packet.command).toBeUndefined();
+  });
 });

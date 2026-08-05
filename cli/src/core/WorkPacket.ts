@@ -6,6 +6,7 @@ import { buildAssetDocIndex } from './AssetDocIndex';
 import { FrontmatterParser } from './FrontmatterParser';
 import { buildNextAction, NextAction, renderNextActionCommand, WORK_PACKET_CONTRACT_VERSION } from './NextAction';
 import { missingRequiredRefCategories, resolveDocumentContract } from './PackContracts';
+import { mergePolicies } from './PolicyLattice';
 import { loadProjectConfig } from './ProjectConfig';
 import { parseRefKey } from './RefSyntaxParser';
 import { SkillManifestSchema } from '../types/PackSchemas';
@@ -62,7 +63,9 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   const packet: WorkPacket = { contractVersion: WORK_PACKET_CONTRACT_VERSION, asset, category: frontmatter.category, status: frontmatter.status || 'drafting', refs: [], circle: { available: false, manifests: [] }, policy: {}, issues: [] };
   if (!frontmatter.category) { packet.issues.push({ code: 'CATEGORY_MISSING', message: 'Asset document has no category' }); return packet; }
   const contract = resolveDocumentContract(projectRoot, frontmatter.category, frontmatter.profile, config);
-  packet.policy = { ...Object.assign({ draft: 'auto', compile: 'auto', execute: 'ask', approve: 'human', sync: 'auto' }, contract.pack.manifest.policy || {}, config.policy || {}), delete: 'never' };
+  const policy = mergePolicies({}, contract.pack.manifest.policy || {}, config.policy || {});
+  packet.policy = policy.effective;
+  packet.issues.push(...policy.issues.filter(issue => issue.severity === 'error').map(issue => ({ code: issue.code, message: issue.message })));
   packet.profile = { name: contract.profileName, kind: contract.profile.kind, capability: contract.profile.capability, model: contract.boundModel };
   const skillName = contract.profile.skill || contract.profileName;
   const skillPath = contract.pack.manifest.skills?.[skillName];
