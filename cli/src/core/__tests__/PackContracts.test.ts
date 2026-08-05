@@ -13,7 +13,7 @@ describe('Pack contracts', () => {
     fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'packs:\n  - id: drama\nbindings:\n  continuous-i2v: rh.director\n');
     fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: drama\nversion: 1\ncategories:\n  shot: categories/shot.yaml\nprofiles:\n  i2v: profiles/i2v.yaml\n');
     fs.writeFileSync(path.join(pack, 'categories', 'shot.yaml'), 'default_profile: i2v\nprofiles: [i2v]\n');
-    fs.writeFileSync(path.join(pack, 'profiles', 'i2v.yaml'), 'kind: production\ncapability: continuous-i2v\nskill: create-shot\n');
+    fs.writeFileSync(path.join(pack, 'profiles', 'i2v.yaml'), 'kind: production\ncapability: continuous-i2v\nskill: create-shot\noutputs: [video]\n');
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
   it('resolves a category default profile and project capability binding', () => {

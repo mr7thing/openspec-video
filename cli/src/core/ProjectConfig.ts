@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
+import { PackManifestSchema } from '../types/PackSchemas';
 
 export type ProfileKind = 'workflow' | 'production';
 
@@ -81,21 +82,23 @@ export function resolvePacks(projectRoot: string, config = loadProjectConfig(pro
     if (!fs.existsSync(manifestPath)) {
       throw new Error(`Pack "${reference.id}" has no pack.yaml at ${root}`);
     }
-    const parsed = yaml.load(fs.readFileSync(manifestPath, 'utf8')) as PackManifest;
-    if (!parsed?.id || !parsed?.version) {
-      throw new Error(`Pack "${reference.id}" manifest requires id and version`);
+    const parsed = PackManifestSchema.safeParse(yaml.load(fs.readFileSync(manifestPath, 'utf8')));
+    if (!parsed.success) {
+      const detail = parsed.error.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+      throw new Error(`Pack "${reference.id}" manifest invalid: ${detail}`);
     }
-    if (parsed.id !== reference.id) {
-      throw new Error(`Pack id mismatch: project declares "${reference.id}" but manifest declares "${parsed.id}"`);
+    const manifest = parsed.data;
+    if (manifest.id !== reference.id) {
+      throw new Error(`Pack id mismatch: project declares "${reference.id}" but manifest declares "${manifest.id}"`);
     }
-    if (reference.version && reference.version !== parsed.version) {
-      throw new Error(`Pack "${reference.id}" version mismatch: expected ${reference.version}, found ${parsed.version}`);
+    if (reference.version && reference.version !== manifest.version) {
+      throw new Error(`Pack "${reference.id}" version mismatch: expected ${reference.version}, found ${manifest.version}`);
     }
     const raw = fs.readFileSync(manifestPath);
     return {
       reference,
       root,
-      manifest: parsed,
+      manifest: manifest as PackManifest,
       digest: crypto.createHash('sha256').update(raw).digest('hex'),
     };
   });

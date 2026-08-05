@@ -15,7 +15,7 @@ describe('Work Packet', () => {
     fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'packs:\n  - id: test\nbindings:\n  image: test.model\n');
     fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: test\nversion: 1\npolicy:\n  execute: human\ncategories:\n  image: categories/image.yaml\nprofiles:\n  image: profiles/image.yaml\nskills:\n  make: skills/make.yaml\n');
     fs.writeFileSync(path.join(pack, 'categories', 'image.yaml'), 'default_profile: image\n');
-    fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\nskill: make\n');
+    fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\nskill: make\noutputs: [image]\n');
     fs.writeFileSync(path.join(pack, 'skills', 'make.yaml'), 'gates: [work-check, refs-valid]\n');
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -30,7 +30,7 @@ describe('Work Packet', () => {
 
   it('applies Profile-specific required reference categories without imposing a global requirement', () => {
     const pack = path.join(root, '.opsv', 'packs', 'test');
-    fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\nskill: make\nrequired_ref_categories: [storyboard]\n');
+    fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\nskill: make\noutputs: [image]\nrequired_ref_categories: [storyboard]\n');
     fs.writeFileSync(path.join(root, 'videospec/assets', 'source.md'), '---\ncategory: image\nstatus: approved\n---\n## Approved References\n\n![one](one.png)\n');
     fs.writeFileSync(path.join(root, 'videospec/assets', 'target.md'), '---\ncategory: image\nstatus: drafting\nrefs:\n  image:\n    "@source": [x]\n---\n');
     const packet = buildWorkPacket(root, 'target');

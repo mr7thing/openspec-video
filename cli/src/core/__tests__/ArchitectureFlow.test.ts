@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { DependencyGraph } from '../DependencyGraph';
 import { materializeWorkflowDocument } from '../Materializer';
+import { checkPack } from '../PackChecker';
 import { resolveDocumentContract } from '../PackContracts';
 import { buildWorkPacket } from '../WorkPacket';
 
@@ -34,5 +35,30 @@ describe('short-drama architecture flow', () => {
 
     const graph = DependencyGraph.buildFromDir(root, ['videospec/clips', 'videospec/shots']);
     expect(graph.getCircles().map(circle => circle.assetIds)).toEqual([['door-open'], ['arrival']]);
+  });
+
+  it('passes the short-drama reference pack through the contract checker', () => {
+    const report = checkPack(path.resolve(__dirname, '../../../../packs/short-drama'));
+    expect(report.issues.filter(issue => issue.severity === 'error')).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('fails closed at the pack gate when a Profile references a non-exported Skill', () => {
+    // Reproduce F3: runtime resolution used to degrade to empty gates. The
+    // checker must flag the same pack that runtime resolution accepts.
+    const pack = path.resolve(__dirname, '../../../../packs/short-drama');
+    const broken = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-broken-pack-'));
+    fs.cpSync(pack, broken, { recursive: true });
+    try {
+      const profilePath = path.join(broken, 'profiles', 'shot-video.yaml');
+      fs.writeFileSync(profilePath, fs.readFileSync(profilePath, 'utf8').replace('skill: create-shot', 'skill: ghost-skill'));
+      const report = checkPack(broken);
+      expect(report.ok).toBe(false);
+      expect(report.issues.some(issue => issue.code === 'PACK_PROFILE_SKILL_MISSING')).toBe(true);
+      // Runtime resolution still decodes through the shared schemas.
+      expect(() => resolveDocumentContract(root, 'shotlist')).not.toThrow();
+    } finally {
+      fs.rmSync(broken, { recursive: true, force: true });
+    }
   });
 });
