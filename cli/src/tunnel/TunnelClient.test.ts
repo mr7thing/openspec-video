@@ -8,7 +8,7 @@ const MockedWebSocket = WebSocket as jest.MockedClass<typeof WebSocket>;
 
 describe('TunnelClient', () => {
   let mockWsInstance: any;
-  let eventHandlers: Record<string, Function[]>;
+  let eventHandlers: Record<string, Array<(...args: any[]) => void>>;
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -19,7 +19,7 @@ describe('TunnelClient', () => {
       binaryType: 'nodebuffer',
       send: jest.fn(),
       close: jest.fn(),
-      on: jest.fn((event: string, handler: Function) => {
+      on: jest.fn((event: string, handler: (...args: any[]) => void) => {
         if (!eventHandlers[event]) eventHandlers[event] = [];
         eventHandlers[event].push(handler);
       }),
@@ -163,12 +163,12 @@ describe('TunnelClient', () => {
     const mockRequestFn = jest.spyOn(http, 'request').mockImplementation((_opts: any, cb?: any) => {
       if (cb) {
         setImmediate(() => {
-          const dataHandlers: Function[] = [];
-          const endHandlers: Function[] = [];
+          const dataHandlers: Array<(...args: any[]) => void> = [];
+          const endHandlers: Array<(...args: any[]) => void> = [];
           const mockRes = {
             statusCode: 200,
             headers: {},
-            on: jest.fn((event: string, handler: Function) => {
+            on: jest.fn((event: string, handler: (...args: any[]) => void) => {
               if (event === 'data') dataHandlers.push(handler);
               if (event === 'end') endHandlers.push(handler);
             }),

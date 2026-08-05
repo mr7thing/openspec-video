@@ -59,7 +59,7 @@ input_types:
         if (!fs.existsSync(dir)) return;
         for (const entry of fs.readdirSync(dir)) {
           const p = path.join(dir, entry);
-          fs.statSync(p).isDirectory() ? rimraf(p) : fs.unlinkSync(p);
+          if (fs.statSync(p).isDirectory()) { rimraf(p); } else { fs.unlinkSync(p); }
         }
         fs.rmdirSync(dir);
       }
