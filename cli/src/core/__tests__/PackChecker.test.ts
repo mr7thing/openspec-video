@@ -53,12 +53,45 @@ describe('PackChecker', () => {
       'PACK_EXPORT_OUTSIDE_ROOT',
       'PACK_ORPHAN_FILE',
       'PACK_POLICY_INVALID',
+      'PACK_PROFILE_INPUT_INVALID',
       'PACK_PROFILE_NOT_ALLOWED',
       'PACK_PROFILE_SKILL_MISSING',
       'PACK_SCHEMA_INVALID',
       'PACK_SKILL_CATEGORY_MISSING',
       'PACK_SKILL_PROFILE_MISSING',
     ]);
+  });
+
+  it('rejects input slots referencing non-exported categories', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'profiles/i2v.yaml': 'kind: production\ncapability: continuous-i2v\nskill: create-shot\noutputs: [video]\ninputs:\n  - { slot: scene, category: nowhere, ref_type: image, required: true }\n',
+    });
+    const report = checkPack(root);
+    const issue = report.issues.find(i => i.code === 'PACK_PROFILE_INPUT_INVALID');
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe('error');
+    expect(issue?.path).toBe('profiles/i2v.yaml');
+    expect(report.ok).toBe(false);
+  });
+
+  it('accepts valid ordered input slots', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'profiles/i2v.yaml': 'kind: production\ncapability: continuous-i2v\nskill: create-shot\noutputs: [video]\ninputs:\n  - { slot: scene, category: shot, ref_type: image, required: true }\n  - { slot: role1, category: shot, ref_type: image, required: true }\n',
+    });
+    const report = checkPack(root);
+    expect(report.issues.filter(i => i.severity === 'error')).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('rejects duplicate input slot names as schema-invalid', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'profiles/i2v.yaml': 'kind: production\ncapability: continuous-i2v\nskill: create-shot\noutputs: [video]\ninputs:\n  - { slot: a, category: shot }\n  - { slot: a, category: shot }\n',
+    });
+    const report = checkPack(root);
+    expect(report.issues.some(i => i.code === 'PACK_SCHEMA_INVALID' && i.path === 'profiles/i2v.yaml')).toBe(true);
   });
 
   it('fails closed when a Profile references a non-exported Skill', () => {

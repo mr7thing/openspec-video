@@ -20,6 +20,110 @@ const BASE_CTX = {
   issueCodes: [] as string[],
 };
 
+describe('Profile input slots and capability binding (T07)', () => {
+  let root: string;
+  const PACK_YAML = [
+    'id: test',
+    'version: 1',
+    'categories:',
+    '  compo: categories/compo.yaml',
+    '  scene: categories/scene.yaml',
+    '  character: categories/character.yaml',
+    'profiles:',
+    '  compo-2refs: profiles/compo-2refs.yaml',
+    'skills:',
+    '  make: skills/make/skill.yaml',
+    '',
+  ].join('\n');
+  const PROFILE_YAML = [
+    'kind: production',
+    'capability: scene-character-compositing',
+    'skill: make',
+    'outputs: [image]',
+    'inputs:',
+    '  - { slot: scene, category: scene, ref_type: image, required: true }',
+    '  - { slot: role1, category: character, ref_type: image, required: true }',
+    '',
+  ].join('\n');
+
+  function setup(withBinding = true): void {
+    const pack = path.join(root, '.opsv', 'packs', 'test');
+    fs.mkdirSync(path.join(pack, 'categories'), { recursive: true });
+    fs.mkdirSync(path.join(pack, 'profiles'), { recursive: true });
+    fs.mkdirSync(path.join(pack, 'skills', 'make'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'videospec', 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), withBinding
+      ? 'packs:\n  - id: test\nbindings:\n  scene-character-compositing: test.model\n'
+      : 'packs:\n  - id: test\nbindings:\n  other: test.model\n');
+    fs.writeFileSync(path.join(pack, 'pack.yaml'), PACK_YAML);
+    fs.writeFileSync(path.join(pack, 'categories', 'compo.yaml'), 'default_profile: compo-2refs\nprofiles: [compo-2refs]\n');
+    fs.writeFileSync(path.join(pack, 'categories', 'scene.yaml'), 'profiles: []\n');
+    fs.writeFileSync(path.join(pack, 'categories', 'character.yaml'), 'profiles: []\n');
+    fs.writeFileSync(path.join(pack, 'profiles', 'compo-2refs.yaml'), PROFILE_YAML);
+    fs.writeFileSync(path.join(pack, 'skills', 'make', 'skill.yaml'), 'action: compile\ncategory: compo\nprofile: compo-2refs\ngates: [work-check]\n');
+  }
+
+  function writeSource(id: string, category: string): void {
+    fs.writeFileSync(path.join(root, 'videospec', 'assets', `${id}.md`), `---\ncategory: ${category}\nstatus: approved\n---\n## Approved References\n\n![main](${id}.png)\n`);
+  }
+
+  function writeCompo(refs: string[]): void {
+    const lines = refs.map(r => `    "@${r}": [main]`).join('\n');
+    fs.writeFileSync(path.join(root, 'videospec', 'assets', 'hero-compo.md'), `---\ncategory: compo\nstatus: drafting\nrefs:\n  image:\n${lines}\n---\n`);
+  }
+
+  beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-inputs-')); });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('blocks when a required input slot is missing', () => {
+    setup();
+    writeSource('scene-courtyard', 'scene');
+    writeCompo(['scene-courtyard']);
+    const packet = buildWorkPacket(root, 'hero-compo');
+    expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROFILE_INPUT_MISSING' })]));
+    expect(packet.nextAction?.kind).toBe('blocked');
+  });
+
+  it('blocks when refs are present but in the wrong category order', () => {
+    setup();
+    writeSource('scene-courtyard', 'scene');
+    writeSource('character-hero', 'character');
+    writeCompo(['character-hero', 'scene-courtyard']);
+    const packet = buildWorkPacket(root, 'hero-compo');
+    expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROFILE_INPUT_MISMATCH' })]));
+  });
+
+  it('blocks on extra refs of a constrained type', () => {
+    setup();
+    writeSource('scene-courtyard', 'scene');
+    writeSource('character-hero', 'character');
+    writeSource('character-extra', 'character');
+    writeCompo(['scene-courtyard', 'character-hero', 'character-extra']);
+    const packet = buildWorkPacket(root, 'hero-compo');
+    expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROFILE_INPUT_MISMATCH' })]));
+  });
+
+  it('passes when slots are satisfied in declaration order', () => {
+    setup();
+    writeSource('scene-courtyard', 'scene');
+    writeSource('character-hero', 'character');
+    writeCompo(['scene-courtyard', 'character-hero']);
+    const packet = buildWorkPacket(root, 'hero-compo');
+    expect(packet.issues).toEqual([]);
+    expect(packet.nextAction).toEqual({ kind: 'circle', asset: 'hero-compo', sourceDir: 'videospec/assets' });
+  });
+
+  it('surfaces an unbound capability as a blocked issue instead of throwing', () => {
+    setup(false);
+    writeSource('scene-courtyard', 'scene');
+    writeSource('character-hero', 'character');
+    writeCompo(['scene-courtyard', 'character-hero']);
+    const packet = buildWorkPacket(root, 'hero-compo');
+    expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'CAPABILITY_BINDING_MISSING' })]));
+    expect(packet.nextAction?.kind).toBe('blocked');
+  });
+});
+
 describe('buildNextAction', () => {
   it('returns sync for syncing assets before anything else', () => {
     const { action } = buildNextAction({ ...BASE_CTX, status: 'syncing', issueCodes: ['REF_MISSING'] });
