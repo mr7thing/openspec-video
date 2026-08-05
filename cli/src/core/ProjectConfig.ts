@@ -4,6 +4,7 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { computePackContentDigest, PACK_DIGEST_ALGORITHM, PACK_DIGEST_VERSION } from './PackDigest';
 import { PackManifestSchema } from '../types/PackSchemas';
+import { resolveContainedReal } from '../utils/pathSecurity';
 
 export type ProfileKind = 'workflow' | 'production';
 
@@ -175,18 +176,39 @@ export function readPackLock(projectRoot: string): PackLockReadResult | undefine
 /** Create discovery-only links; Skill rules remain canonical inside each Pack. */
 export function syncPackSkillShims(projectRoot: string, platform: 'agents' | 'codex', packs = resolvePacks(projectRoot)): string[] {
   const base = path.join(projectRoot, platform === 'agents' ? '.agents/skills' : '.codex/skills');
+  const packRoots = packs.map(pack => {
+    try { return fs.realpathSync(pack.root); } catch { return pack.root; }
+  });
+  const isManaged = (real: string) => packRoots.some(rootReal => real === rootReal || real.startsWith(rootReal + path.sep));
   const written: string[] = [];
   for (const pack of packs) {
     for (const [skill, manifestRelative] of Object.entries(pack.manifest.skills || {})) {
-      const source = path.dirname(path.join(pack.root, manifestRelative));
+      const source = resolveContainedReal(pack.root, manifestRelative);
+      if (!source || !fs.existsSync(source)) {
+        throw new Error(`PACK_EXPORT_OUTSIDE_ROOT: Skill "${skill}" export "${manifestRelative}" resolves outside the pack root or is missing (pack: ${pack.manifest.id})`);
+      }
+      const sourceReal = fs.realpathSync(path.dirname(source));
       const target = path.join(base, `${pack.manifest.id}--${skill}`);
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      if (fs.existsSync(target) || fs.lstatSync(path.dirname(target)).isSymbolicLink()) {
-        if (!fs.existsSync(target) || fs.realpathSync(target) !== fs.realpathSync(source)) {
-          fs.rmSync(target, { recursive: true, force: true });
-        } else { written.push(target); continue; }
+
+      let stat: fs.Stats | undefined;
+      try { stat = fs.lstatSync(target); } catch { /* ENOENT: create below */ }
+      if (stat) {
+        if (!stat.isSymbolicLink()) {
+          throw new Error(`SKILL_SHIM_COLLISION: ${target} exists and is not an OPSV-managed link (source: ${manifestRelative})`);
+        }
+        let targetReal: string | undefined;
+        try { targetReal = fs.realpathSync(target); } catch { /* dangling link: recover below */ }
+        if (targetReal && targetReal === sourceReal) {
+          written.push(target); // idempotent: already correct
+          continue;
+        }
+        if (targetReal && !isManaged(targetReal)) {
+          throw new Error(`SKILL_SHIM_COLLISION: ${target} points outside any resolved Pack and is not OPSV-managed (source: ${manifestRelative})`);
+        }
+        fs.rmSync(target, { force: true }); // broken or stale managed link: self-heal
       }
-      fs.symlinkSync(path.relative(path.dirname(target), source), target, 'dir');
+      fs.symlinkSync(path.relative(path.dirname(target), sourceReal), target, 'dir');
       written.push(target);
     }
   }
