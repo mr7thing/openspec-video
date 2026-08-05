@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
+import { computePackContentDigest, PACK_DIGEST_ALGORITHM, PACK_DIGEST_VERSION } from './PackDigest';
 import { PackManifestSchema } from '../types/PackSchemas';
 
 export type ProfileKind = 'workflow' | 'production';
@@ -48,12 +49,35 @@ export interface ResolvedPack {
   reference: PackReference;
   root: string;
   manifest: PackManifest;
+  /** sha256 of pack.yaml bytes (v1 digest semantics). */
   digest: string;
+  /** Canonical tree digest over all behavior-relevant pack files (F4). */
+  contentDigest: string;
+  /** Pack-relative path → file sha256, for drift diagnosis. */
+  contentFiles: Record<string, string>;
+}
+
+export interface PackLockEntry {
+  id: string;
+  version: string;
+  source: string;
+  manifest_digest: string;
+  content_digest: string;
+  digest_algorithm: string;
+  digest_version: number;
+  files: Record<string, string>;
 }
 
 export interface PackLock {
-  version: 1;
-  packs: Array<{ id: string; version: string; source: string; digest: string }>;
+  version: 2;
+  packs: PackLockEntry[];
+}
+
+export interface PackLockReadResult {
+  lock: PackLock | { version: 1; packs: Array<{ id: string; version: string; source: string; digest: string }> };
+  /** True when the lock predates content digests and must be re-locked. */
+  legacy: boolean;
+  diagnostic?: { code: 'PACK_LOCK_LEGACY'; message: string };
 }
 
 const PROJECT_CONFIG_PATH = path.join('.opsv', 'project.yaml');
@@ -95,29 +119,57 @@ export function resolvePacks(projectRoot: string, config = loadProjectConfig(pro
       throw new Error(`Pack "${reference.id}" version mismatch: expected ${reference.version}, found ${manifest.version}`);
     }
     const raw = fs.readFileSync(manifestPath);
+    const content = computePackContentDigest(root, manifest);
     return {
       reference,
       root,
       manifest: manifest as PackManifest,
       digest: crypto.createHash('sha256').update(raw).digest('hex'),
+      contentDigest: content.contentDigest,
+      contentFiles: content.files,
     };
   });
 }
 
 export function writePackLock(projectRoot: string, packs: ResolvedPack[]): string {
   const lock: PackLock = {
-    version: 1,
+    version: 2,
     packs: packs.map((pack) => ({
       id: pack.manifest.id,
       version: pack.manifest.version,
       source: path.relative(projectRoot, pack.root).replace(/\\/g, '/'),
-      digest: pack.digest,
+      manifest_digest: pack.digest,
+      content_digest: pack.contentDigest,
+      digest_algorithm: PACK_DIGEST_ALGORITHM,
+      digest_version: PACK_DIGEST_VERSION,
+      files: pack.contentFiles,
     })),
   };
   const target = path.join(projectRoot, PACK_LOCK_PATH);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, yaml.dump(lock, { lineWidth: -1 }), 'utf8');
   return target;
+}
+
+/** Read the pack lock, recognizing legacy v1 locks (manifest-only digest). */
+export function readPackLock(projectRoot: string): PackLockReadResult | undefined {
+  const target = path.join(projectRoot, PACK_LOCK_PATH);
+  if (!fs.existsSync(target)) return undefined;
+  const parsed = yaml.load(fs.readFileSync(target, 'utf8')) as any;
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`${PACK_LOCK_PATH} must contain a YAML object`);
+  }
+  if (parsed.version === 2) {
+    return { lock: parsed as PackLock, legacy: false };
+  }
+  return {
+    lock: parsed as PackLockReadResult['lock'],
+    legacy: true,
+    diagnostic: {
+      code: 'PACK_LOCK_LEGACY',
+      message: 'pack-lock.yaml predates Pack content digests and cannot prove which Pack content runs. Run: opsv pack lock',
+    },
+  };
 }
 
 /** Create discovery-only links; Skill rules remain canonical inside each Pack. */

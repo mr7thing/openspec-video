@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'path';
 import { checkPack, PackCheckReport } from '../core/PackChecker';
-import { loadProjectConfig, resolvePacks, syncPackSkillShims, writePackLock } from '../core/ProjectConfig';
+import { loadProjectConfig, readPackLock, resolvePacks, syncPackSkillShims, writePackLock } from '../core/ProjectConfig';
 import { logger } from '../utils/logger';
 
 function renderReport(report: PackCheckReport): void {
@@ -32,6 +32,10 @@ export function registerPackCommands(program: Command): void {
       }
       for (const item of packs) {
         console.log(`${item.manifest.id}@${item.manifest.version}  ${item.root}`);
+      }
+      const lockResult = readPackLock(process.cwd());
+      if (lockResult?.diagnostic) {
+        console.log(chalk.yellow(`${lockResult.diagnostic.code}: ${lockResult.diagnostic.message}`));
       }
     } catch (error: any) {
       logger.error(error.message);
