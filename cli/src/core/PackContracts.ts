@@ -3,6 +3,7 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { ProjectConfig, ResolvedPack, loadProjectConfig, resolvePacks } from './ProjectConfig';
 import { CategoryContract, CategoryContractSchema, ProfileContract, ProfileContractSchema } from '../types/PackSchemas';
+import { resolveContainedReal } from '../utils/pathSecurity';
 import { parseRefKey } from './RefSyntaxParser';
 import { AssetManager } from './AssetManager';
 import { FrontmatterParser } from './FrontmatterParser';
@@ -36,6 +37,15 @@ export interface ResolvedDocumentContract {
   defaults?: Record<string, unknown>;
 }
 
+/** Resolve a pack-export-relative path, requiring real containment under the
+ *  pack root (rejects `../`, absolute paths, and symlink escapes). Single
+ *  owner used by contract resolution, Work Packet skill loads, and shims. */
+export function resolvePackExportPath(packRoot: string, rel: string): string {
+  const contained = resolveContainedReal(packRoot, rel);
+  if (!contained) throw new Error(`PACK_EXPORT_OUTSIDE_ROOT: "${rel}" resolves outside pack root ${packRoot}`);
+  return contained;
+}
+
 function loadYaml<T>(filePath: string, schema: { safeParse: (raw: unknown) => any }): T {
   if (!fs.existsSync(filePath)) throw new Error(`Pack contract not found: ${filePath}`);
   const parsed = schema.safeParse(yaml.load(fs.readFileSync(filePath, 'utf8')));
@@ -62,7 +72,7 @@ export function resolveDocumentContract(
   }
 
   const pack = candidates[0];
-  const category = loadYaml<CategoryContract>(path.join(pack.root, pack.manifest.categories![categoryName]), CategoryContractSchema);
+  const category = loadYaml<CategoryContract>(resolvePackExportPath(pack.root, pack.manifest.categories![categoryName]), CategoryContractSchema);
   const requestedProfile = profileOverride || category.default_profile;
   if (!requestedProfile) throw new Error(`Category "${categoryName}" has no default profile`);
   const derived = effectiveConfig.profiles?.[requestedProfile];
@@ -73,7 +83,7 @@ export function resolveDocumentContract(
 
   const profilePath = pack.manifest.profiles?.[profileName];
   if (!profilePath) throw new Error(`Pack "${pack.manifest.id}" does not export profile "${profileName}"`);
-  const profile = loadYaml<ProfileContract>(path.join(pack.root, profilePath), ProfileContractSchema);
+  const profile = loadYaml<ProfileContract>(resolvePackExportPath(pack.root, profilePath), ProfileContractSchema);
   const resolvedProfile = derived ? { ...profile, capability: derived.capability || profile.capability } : profile;
   const boundModel = resolvedProfile.capability ? effectiveConfig.bindings?.[resolvedProfile.capability] : undefined;
   if (resolvedProfile.kind === 'production' && resolvedProfile.capability && !boundModel) {

@@ -5,7 +5,7 @@ import { AssetManager } from './AssetManager';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { FrontmatterParser } from './FrontmatterParser';
 import { buildNextAction, NextAction, renderNextActionCommand, WORK_PACKET_CONTRACT_VERSION } from './NextAction';
-import { missingRequiredRefCategories, resolveDocumentContract } from './PackContracts';
+import { missingRequiredRefCategories, resolveDocumentContract, resolvePackExportPath } from './PackContracts';
 import { mergePolicies } from './PolicyLattice';
 import { loadProjectConfig } from './ProjectConfig';
 import { parseRefKey } from './RefSyntaxParser';
@@ -75,7 +75,7 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   let skillAction: string | undefined;
   let skillFound = false;
   if (skillPath) {
-    const manifestPath = path.join(contract.pack.root, skillPath);
+    const manifestPath = resolvePackExportPath(contract.pack.root, skillPath);
     if (fs.existsSync(manifestPath)) {
       skillFound = true;
       const raw = yaml.load(fs.readFileSync(manifestPath, 'utf8'));
