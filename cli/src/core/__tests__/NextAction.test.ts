@@ -131,6 +131,8 @@ describe('Work Packet structured next action', () => {
     writeAsset('music', 'category: image\nstatus: drafting\n');
     const packet = buildWorkPacket(root, 'music');
     expect(packet.contractVersion).toBe(2);
+    expect(packet.pack).toMatchObject({ id: 'test', version: '1' });
+    expect(packet.pack?.contentDigest).toMatch(/^[0-9a-f]{64}$/);
     expect(packet.nextAction).toEqual({ kind: 'draft', asset: 'music', skill: 'make' });
     expect(packet.command).toBeUndefined();
     expect(packet.action).toBe('draft');

@@ -16,6 +16,7 @@ export interface WorkPacket {
   contractVersion: number;
   asset: string; category?: string; status?: string;
   profile?: { name: string; kind: string; capability?: string; model?: string };
+  pack?: { id: string; version: string; contentDigest: string };
   primarySkill?: { name: string; manifest?: string; gates: string[] };
   refs: Array<{ key: string; state: 'ready' | 'missing' | 'syncing'; message?: string }>;
   circle: { available: boolean; manifests: string[] };
@@ -67,6 +68,7 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   packet.policy = policy.effective;
   packet.issues.push(...policy.issues.filter(issue => issue.severity === 'error').map(issue => ({ code: issue.code, message: issue.message })));
   packet.profile = { name: contract.profileName, kind: contract.profile.kind, capability: contract.profile.capability, model: contract.boundModel };
+  packet.pack = { id: contract.pack.manifest.id, version: contract.pack.manifest.version, contentDigest: contract.pack.contentDigest };
   const skillName = contract.profile.skill || contract.profileName;
   const skillPath = contract.pack.manifest.skills?.[skillName];
   let gates: string[] = [];
