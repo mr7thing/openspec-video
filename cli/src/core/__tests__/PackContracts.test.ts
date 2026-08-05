@@ -27,4 +27,10 @@ describe('Pack contracts', () => {
     const resolved = resolveDocumentContract(root, 'shot', 'hero-i2v');
     expect(resolved).toMatchObject({ profileName: 'hero-i2v', boundModel: 'rh.preferred', defaults: { duration: 5 } });
   });
+
+  it('rejects export paths escaping the pack root at runtime (F11)', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'drama');
+    fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: drama\nversion: 1\ncategories:\n  shot: categories/shot.yaml\nprofiles:\n  i2v: ../outside.yaml\n');
+    expect(() => resolveDocumentContract(root, 'shot')).toThrow('PACK_EXPORT_OUTSIDE_ROOT');
+  });
 });

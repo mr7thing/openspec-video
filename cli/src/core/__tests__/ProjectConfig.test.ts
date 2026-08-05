@@ -75,4 +75,72 @@ describe('ProjectConfig Pack Stack', () => {
     expect(fs.lstatSync(target).isSymbolicLink()).toBe(true);
     expect(fs.readFileSync(path.join(target, 'SKILL.md'), 'utf8')).toContain('# Make');
   });
+
+  describe('skill shim lifecycle (F10)', () => {
+    let pack: string;
+    let target: string;
+    beforeEach(() => {
+      pack = path.join(root, '.opsv', 'packs', 'short-drama');
+      fs.mkdirSync(path.join(pack, 'skills', 'make'), { recursive: true });
+      fs.writeFileSync(path.join(pack, 'skills', 'make', 'skill.yaml'), 'action: compile\n');
+      fs.writeFileSync(path.join(pack, 'skills', 'make', 'SKILL.md'), '# Make\n');
+      fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: short-drama\nversion: 1.0.0\nskills:\n  make: skills/make/skill.yaml\n');
+      target = path.join(root, '.agents', 'skills', 'short-drama--make');
+    });
+
+    it('recovers a broken destination symlink instead of crashing with EEXIST', () => {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.symlinkSync(path.join(root, 'no-such-dir'), target, 'dir'); // dangling
+      const written = syncPackSkillShims(root, 'agents');
+      expect(written).toEqual([target]);
+      expect(fs.realpathSync(target)).toBe(fs.realpathSync(path.join(pack, 'skills', 'make')));
+    });
+
+    it('replaces a stale symlink pointing at a different pack location', () => {
+      const other = path.join(root, '.opsv', 'packs', 'short-drama', 'skills', 'other');
+      fs.mkdirSync(other, { recursive: true });
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.symlinkSync(other, target, 'dir');
+      syncPackSkillShims(root, 'agents');
+      expect(fs.realpathSync(target)).toBe(fs.realpathSync(path.join(pack, 'skills', 'make')));
+    });
+
+    it('is idempotent when the correct symlink already exists', () => {
+      syncPackSkillShims(root, 'agents');
+      const before = fs.readlinkSync(target);
+      const written = syncPackSkillShims(root, 'agents');
+      expect(fs.readlinkSync(target)).toBe(before);
+      expect(written).toEqual([target]);
+    });
+
+    it('refuses to overwrite a regular file at the destination', () => {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, 'do not touch\n');
+      expect(() => syncPackSkillShims(root, 'agents')).toThrow('SKILL_SHIM_COLLISION');
+      expect(fs.readFileSync(target, 'utf8')).toBe('do not touch\n');
+    });
+
+    it('refuses to replace a foreign symlink outside any pack root', () => {
+      const foreign = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-foreign-'));
+      try {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.symlinkSync(foreign, target, 'dir');
+        expect(() => syncPackSkillShims(root, 'agents')).toThrow('SKILL_SHIM_COLLISION');
+        expect(fs.realpathSync(target)).toBe(foreign);
+      } finally {
+        fs.rmSync(foreign, { recursive: true, force: true });
+      }
+    });
+
+    it('uses the same implementation for the codex platform', () => {
+      const [codexTarget] = syncPackSkillShims(root, 'codex');
+      expect(codexTarget).toBe(path.join(root, '.codex', 'skills', 'short-drama--make'));
+      expect(fs.lstatSync(codexTarget).isSymbolicLink()).toBe(true);
+    });
+
+    it('rejects skill exports escaping the pack root', () => {
+      fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: short-drama\nversion: 1.0.0\nskills:\n  make: ../outside/skill.yaml\n');
+      expect(() => syncPackSkillShims(root, 'agents')).toThrow('PACK_EXPORT_OUTSIDE_ROOT');
+    });
+  });
 });
