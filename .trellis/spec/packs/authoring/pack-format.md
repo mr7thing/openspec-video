@@ -20,6 +20,21 @@ Hard rules:
 
 - `pack.yaml` is the only export index — every name exported there must resolve to a real file in the pack.
 - **Packs are declarative.** No arbitrary executable code as a pipeline stage; deterministic reusable logic belongs in OPSV Core (`cli/`). Validation helpers under `scripts/` (e.g. `opsv-mv-pipeline/scripts/mv-check.js`) are run explicitly, not as stages.
+- Export paths must stay inside the pack root — `../`, absolute paths, and symlinks resolving outside are rejected (`PACK_EXPORT_OUTSIDE_ROOT`, enforced by `resolveContainedReal` in `cli/src/utils/pathSecurity.ts` via `resolvePackExportPath`).
+
+## Identity Closure (enforced by `opsv pack check`)
+
+Every exported Category/Profile/Skill must form a closed graph — violations fail closed (never degrade to empty gates):
+
+- Profile `skill:` → an exported `skills:` key.
+- Skill `profile:` → an exported `profiles:` key; Skill `category:` → an exported `categories:` key (review-type skills with `action: review` may omit both).
+- Skill Profile must be in its Category `profiles:` allow-list; Category `default_profile` must be exported and inside its own allow-list.
+- Use ONE canonical identity per skill across `skills:` key, Profile `skill:`, and directory name (mixed `mv-*` / `opsv-mv-*` namespaces caused review finding F3).
+- Profile `capability` must be abstract — strings that look like concrete provider/model keys (e.g. `rh-workflow-v2.*`) are rejected (`PACK_CAPABILITY_CONCRETE_MODEL`).
+- Unexported files under `categories/`, `profiles/`, `skills/` are reported as `PACK_ORPHAN_FILE` warnings — they never enter runtime resolution.
+
+Schemas live in `cli/src/types/PackSchemas.ts` (the single decode path); cross-file rules in `cli/src/core/PackChecker.ts` with stable issue codes (`PACK_*`).
+
 
 ## pack.yaml
 
@@ -108,12 +123,13 @@ SKILL.md rules (from the pack contract):
 ## Relationship to Projects and the CLI
 
 - A project declares its ordered **Pack Stack** in `.opsv/project.yaml` (`packs: [{id, source}]`, `id` must equal the pack's `pack.yaml` `id`).
-- `opsv pack lock` records resolution into `.opsv/pack-lock.yaml`; each Task records the lock summary.
+- `opsv pack lock` refuses to lock contract-invalid packs and writes `.opsv/pack-lock.yaml` **schema v2**: per pack `manifest_digest` (sha256 of `pack.yaml`) + `content_digest` (canonical tree hash over all behavior files: `pack.yaml`, exported manifests, `SKILL.md`, `scripts/`, `templates/`, `references/`, `validation/`) + per-file hashes. v1 locks (digest-only) raise `PACK_LOCK_LEGACY` — re-run `opsv pack lock`. Digest implementation: `cli/src/core/PackDigest.ts` (single owner; Hook cache keys must reuse it).
 - Pack skills never name models — model selection is always project-side via `bindings:` + `.opsv/api_config.yaml`.
 
 ## Pre-Publish Verification
 
 ```bash
+opsv pack check . --json          # 0 errors required; stable PACK_* issue codes
 opsv pack lock
 opsv pack sync-skills --platform agents
 opsv work check <fixture-asset> --json

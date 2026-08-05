@@ -26,6 +26,14 @@ All errors live in one file: `cli/src/errors/OpsVError.ts`.
 
 Some `catch {}` swallows are deliberate: cross-document enrichment in `TaskBuilder`, directory collection in `QueueRunner.collectFromDir`, `FrontmatterParser.parseRaw` fallback. The rule: **enrichment and best-effort collection failures are non-fatal; core correctness failures are not.** If you add a silent catch, leave a comment saying why it is safe.
 
+## Pack Contract Diagnostics (PACK_* codes)
+
+Pack validation is NOT exception-based: `core/PackChecker.ts` accumulates `PackIssue { code, severity, path, message, context }` with stable string codes (`PACK_SCHEMA_INVALID`, `PACK_EXPORT_MISSING`, `PACK_EXPORT_OUTSIDE_ROOT`, `PACK_PROFILE_SKILL_MISSING`, `PACK_SKILL_PROFILE_MISSING`, `PACK_SKILL_CATEGORY_MISSING`, `PACK_PROFILE_NOT_ALLOWED`, `PACK_DEFAULT_PROFILE_INVALID`, `PACK_POLICY_INVALID`, `PACK_CAPABILITY_CONCRETE_MODEL`, `PACK_ORPHAN_FILE`). The code list is frozen by a snapshot test — changes are a compatibility event. Policy merge diagnostics (`PROJECT_POLICY_LOOSENS_PACK`, `PROJECT_POLICY_UNKNOWN_KEY`) and lock migration (`PACK_LOCK_LEGACY`) follow the same stable-code rule.
+
+- `severity: error` fails the pack (`ok: false`; `pack check` exits 1; `pack lock` refuses to write); `warning` (orphan files, unknown keys) never blocks.
+- Contract-invalid packs must **fail closed** — never degrade to empty gates or default-filled semantics.
+- `--json` commands: stdout carries machine JSON only; all human diagnostics go to stderr (dotenv is loaded with `quiet: true` for this reason). Distinguish *invalid* (always fail closed) from *infrastructure error* (the only class eligible for fail-open policy decisions, per the Hook readiness contract).
+
 ## Logging: Dual Channel
 
 1. **User-facing CLI output** — `console.log` + `chalk` (v4) directly in command files and `QueueRunner`. Color convention: `cyan` progress/headers, `green` success, `yellow` warnings, `red` errors, `gray` secondary. (~294 call sites; this is the established pattern, not an accident.)

@@ -41,6 +41,13 @@ A `ModelConfig` entry typically carries: `provider`, `api_url`, `required_env`, 
 - `ConfigLoader` is **not** a singleton — one instance per `OpsVContext`. Do not add module-level config caches.
 - `ModelConfig.workflowdir` and the frontmatter `workflow` field are **deprecated** (use `workflow_id` / `workflow_path`); do not build on them.
 - The postinstall script must stay non-destructive: copy only when the user file is absent.
-- Project-level policy (`ActionPolicy` with `auto|ask|human` gates in `core/ProjectConfig.ts`) can tighten pack defaults but `delete: never` cannot be loosened — see `../../architecture.md`.
+- Project-level policy can only **tighten** pack policy, never loosen it. Merge semantics live in exactly one module: `core/PolicyLattice.ts` (`auto < ask < human`; `effective = stricter(pack, project)`). A loosening attempt produces `PROJECT_POLICY_LOOSENS_PACK` (packet blocked, stricter value kept); unknown keys warn; `delete: never` is a Core invariant — see `../../architecture.md`.
+
+## Pack Lock and Content Digest
+
+- `.opsv/pack-lock.yaml` is **schema v2** (`core/ProjectConfig.ts` `writePackLock`): per pack `id`/`version`/`source`, `manifest_digest`, `content_digest`, `digest_algorithm`/`digest_version`, and a per-file hash manifest for drift diagnosis.
+- `content_digest` (`core/PackDigest.ts`, single owner) covers `pack.yaml`, exported Category/Profile/Skill manifests, their `SKILL.md`, and conventional behavior dirs (`scripts/`, `templates/`, `references/`, `validation/`); excludes `.git/`, caches, test output, logs, OS metadata. Paths are sorted with `/` separators — same content → same digest across machines.
+- v1 locks (manifest-only `digest`) are recognized by `readPackLock` and reported as `PACK_LOCK_LEGACY` (re-run `opsv pack lock`); never silently treated as current.
+- Path canonicalization for pack exports: `utils/pathSecurity.ts` `resolveContainedReal` (lexical + realpath containment, tolerant of not-yet-existing finals). All pack-file resolution must go through it — no ad-hoc `path.join(packRoot, rel)`.
 
 Reference files: `cli/src/utils/configLoader.ts`, `cli/src/utils/projectResolver.ts`, `cli/scripts/postinstall.js`, `cli/src/utils/__tests__/configLoader.test.ts` (three-tier merge tests).

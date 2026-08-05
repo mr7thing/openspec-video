@@ -73,7 +73,16 @@ Task           resolved provider snapshot + pack lock summary
 
 - A Pack Profile targets a named **capability**, never a hard-coded provider/model.
 - Projects derive Profiles with `extends`; they never silently overwrite Pack Profiles.
-- Pack Stack resolution is locked in `.opsv/pack-lock.yaml`.
+- Pack Stack resolution is locked in `.opsv/pack-lock.yaml` (schema v2: manifest + content digests).
+
+## Work Packet and NextAction (contract v2)
+
+A Work Packet (`core/WorkPacket.ts`, `contractVersion: 2`) aggregates profile, primary skill + gates, refs, circle, effective policy, pack provenance (`contentDigest`), and issues for one asset. Its machine contract is the structured **NextAction** (`core/NextAction.ts`): `draft | materialize | circle | compile | sync | blocked`.
+
+- The Skill manifest `action` is the source of truth for workflow profiles — never guessed from `profile.kind`.
+- `compile` always carries a project-root-relative `manifest` + asset selector; multiple circles → `CIRCLE_AMBIGUOUS`; any blocking issue → `blocked` (never "issue + executable action").
+- The rendered shell command (`renderNextActionCommand`) is a derived display. Future Hook adapters and the AgentRouter must consume the structured action, never parse command strings.
+- Policy merges through `core/PolicyLattice.ts` only: projects tighten, never loosen; loosening attempts block the packet with `PROJECT_POLICY_LOOSENS_PACK`.
 
 ## Status of the Blueprint
 
