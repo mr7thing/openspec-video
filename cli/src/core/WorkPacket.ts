@@ -4,12 +4,15 @@ import yaml from 'js-yaml';
 import { AssetManager } from './AssetManager';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { FrontmatterParser } from './FrontmatterParser';
+import { buildNextAction, NextAction, renderNextActionCommand, WORK_PACKET_CONTRACT_VERSION } from './NextAction';
 import { missingRequiredRefCategories, resolveDocumentContract } from './PackContracts';
 import { loadProjectConfig } from './ProjectConfig';
 import { parseRefKey } from './RefSyntaxParser';
+import { SkillManifestSchema } from '../types/PackSchemas';
 import { getProjectDir } from '../utils/configLoader';
 
 export interface WorkPacket {
+  contractVersion: number;
   asset: string; category?: string; status?: string;
   profile?: { name: string; kind: string; capability?: string; model?: string };
   primarySkill?: { name: string; manifest?: string; gates: string[] };
@@ -17,6 +20,9 @@ export interface WorkPacket {
   circle: { available: boolean; manifests: string[] };
   policy: Record<string, string>;
   issues: Array<{ code: string; message: string }>;
+  /** Structured source of truth for the next step (contract v2). */
+  nextAction?: NextAction;
+  /** Legacy derived fields — prefer nextAction. */
   action?: string; command?: string;
 }
 
@@ -53,7 +59,7 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   const asset = path.basename(filePath, '.md').replace(/^@/, '');
   const { frontmatter } = FrontmatterParser.parseRaw(fs.readFileSync(filePath, 'utf8'));
   const config = loadProjectConfig(projectRoot);
-  const packet: WorkPacket = { asset, category: frontmatter.category, status: frontmatter.status || 'drafting', refs: [], circle: { available: false, manifests: [] }, policy: {}, issues: [] };
+  const packet: WorkPacket = { contractVersion: WORK_PACKET_CONTRACT_VERSION, asset, category: frontmatter.category, status: frontmatter.status || 'drafting', refs: [], circle: { available: false, manifests: [] }, policy: {}, issues: [] };
   if (!frontmatter.category) { packet.issues.push({ code: 'CATEGORY_MISSING', message: 'Asset document has no category' }); return packet; }
   const contract = resolveDocumentContract(projectRoot, frontmatter.category, frontmatter.profile, config);
   packet.policy = { ...Object.assign({ draft: 'auto', compile: 'auto', execute: 'ask', approve: 'human', sync: 'auto' }, contract.pack.manifest.policy || {}, config.policy || {}), delete: 'never' };
@@ -61,12 +67,26 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   const skillName = contract.profile.skill || contract.profileName;
   const skillPath = contract.pack.manifest.skills?.[skillName];
   let gates: string[] = [];
+  let skillAction: string | undefined;
+  let skillFound = false;
   if (skillPath) {
     const manifestPath = path.join(contract.pack.root, skillPath);
-    const parsed = yaml.load(fs.readFileSync(manifestPath, 'utf8')) as any;
-    gates = Array.isArray(parsed?.gates) ? parsed.gates : [];
-    packet.primarySkill = { name: skillName, manifest: path.relative(projectRoot, manifestPath), gates };
-  } else packet.primarySkill = { name: skillName, gates };
+    if (fs.existsSync(manifestPath)) {
+      skillFound = true;
+      const raw = yaml.load(fs.readFileSync(manifestPath, 'utf8'));
+      const parsed = SkillManifestSchema.safeParse(raw);
+      if (parsed.success) {
+        gates = parsed.data.gates || [];
+        skillAction = parsed.data.action;
+      } else {
+        // Lenient fallback for legacy manifests: gates still surface, but the
+        // missing/invalid action blocks workflow derivation downstream.
+        gates = Array.isArray((raw as any)?.gates) ? (raw as any).gates : [];
+      }
+      packet.primarySkill = { name: skillName, manifest: path.relative(projectRoot, manifestPath), gates };
+    }
+  }
+  if (!packet.primarySkill) packet.primarySkill = { name: skillName, gates };
   for (const key of externalKeys(frontmatter.refs)) {
     const ref = parseRefKey(key)!;
     const entry = buildAssetDocIndex(videospec).entries.get(ref.id);
@@ -87,10 +107,30 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   }
   packet.circle.manifests = circleManifests(projectRoot, asset);
   packet.circle.available = packet.circle.manifests.length > 0;
-  if (packet.status === 'syncing') { packet.issues.push({ code: 'SYNC_REQUIRED', message: 'Approved revision must be synchronized before use' }); packet.action = 'sync'; packet.command = `opsv sync ${asset}`; return packet; }
-  if (packet.issues.length) return packet;
-  if (contract.profile.kind === 'workflow') { packet.action = 'materialize'; packet.command = `opsv materialize ${asset}`; }
-  else if (!packet.circle.available) { packet.action = 'circle'; packet.command = `opsv circle create --dir ${path.dirname(path.relative(projectRoot, filePath))}`; }
-  else { packet.action = 'compile'; packet.command = contract.boundModel ? `opsv produce --model ${contract.boundModel}` : undefined; }
+  if (packet.status === 'syncing') {
+    packet.issues.push({ code: 'SYNC_REQUIRED', message: 'Approved revision must be synchronized before use' });
+    packet.nextAction = { kind: 'sync', asset };
+    packet.action = 'sync';
+    packet.command = renderNextActionCommand(packet.nextAction);
+    return packet;
+  }
+  const derived = buildNextAction({
+    asset,
+    status: packet.status!,
+    profileKind: contract.profile.kind,
+    profileName: contract.profileName,
+    profileHasMaterialize: !!contract.profile.materialize,
+    skillName,
+    skillAction,
+    skillFound,
+    circleManifests: packet.circle.manifests,
+    circleManifestsRelative: packet.circle.manifests.map(m => path.relative(projectRoot, m).split(path.sep).join('/')),
+    sourceDirRelative: path.dirname(path.relative(projectRoot, filePath)).split(path.sep).join('/'),
+    issueCodes: packet.issues.map(i => i.code),
+  });
+  packet.issues.push(...derived.issues);
+  packet.nextAction = derived.action;
+  packet.action = derived.action?.kind;
+  packet.command = renderNextActionCommand(derived.action);
   return packet;
 }

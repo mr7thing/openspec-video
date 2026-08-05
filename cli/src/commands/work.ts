@@ -14,7 +14,8 @@ function output(packet: WorkPacket, json?: boolean): void {
   console.log(`${packet.asset}: ${packet.issues.length ? 'blocked' : 'ready'}`);
   if (packet.primarySkill) console.log(`  Skill: ${packet.primarySkill.name}`);
   for (const issue of packet.issues) console.log(`  ${issue.code}: ${issue.message}`);
-  if (packet.command) console.log(`  Next: ${packet.command}`);
+  if (packet.nextAction?.kind === 'draft') console.log(`  Next: author via Skill ${packet.nextAction.skill} (draft; no CLI command)`);
+  else if (packet.command) console.log(`  Next: ${packet.command}`);
 }
 
 export function registerWorkCommands(program: Command): void {
