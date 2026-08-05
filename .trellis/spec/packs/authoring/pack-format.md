@@ -30,7 +30,7 @@ Every exported Category/Profile/Skill must form a closed graph — violations fa
 - Skill `profile:` → an exported `profiles:` key; Skill `category:` → an exported `categories:` key (review-type skills with `action: review` may omit both).
 - Skill Profile must be in its Category `profiles:` allow-list; Category `default_profile` must be exported and inside its own allow-list.
 - Use ONE canonical identity per skill across `skills:` key, Profile `skill:`, and directory name (mixed `mv-*` / `opsv-mv-*` namespaces caused review finding F3).
-- Profile `capability` must be abstract — strings that look like concrete provider/model keys (e.g. `rh-workflow-v2.*`) are rejected (`PACK_CAPABILITY_CONCRETE_MODEL`).
+- Profile `capability` must be abstract — strings that look like concrete provider/model keys (e.g. `rh-workflow-v2.*`) are rejected (`PACK_CAPABILITY_CONCRETE_MODEL`). Skill docs must never prescribe `--model <concrete>` execution paths; guard this with a static test in the pack (see `opsv-mv-pipeline/test/no-concrete-models.test.js`), not long-term manual grep.
 - Unexported files under `categories/`, `profiles/`, `skills/` are reported as `PACK_ORPHAN_FILE` warnings — they never enter runtime resolution.
 
 Schemas live in `cli/src/types/PackSchemas.ts` (the single decode path); cross-file rules in `cli/src/core/PackChecker.ts` with stable issue codes (`PACK_*`).
@@ -90,7 +90,9 @@ materialize:                         # creates MISSING docs only, never overwrit
   shots: { directory: videospec/shots, category: shot }
 ```
 
-- Profiles declare a **capability**, not a model. The project binds capability → model key in `.opsv/project.yaml` `bindings:` (resolution: `cli/src/core/PackContracts.ts` `resolveDocumentContract`; schema: `opsv-packs/opsv-skills-creator/references/project-yaml-shape.md`). A production profile without a matching binding throws at `work check`.
+- Profiles declare a **capability**, not a model. The project binds capability → model key in `.opsv/project.yaml` `bindings:` (resolution: `cli/src/core/PackContracts.ts` `resolveDocumentContract`; schema: `opsv-packs/opsv-skills-creator/references/project-yaml-shape.md`). A production profile without a matching binding blocks the Work Packet with `CAPABILITY_BINDING_MISSING`.
+- Capability granularity follows the **input contract**: profiles with different reference inputs need distinct capabilities (one binding cannot select among different workflows — F6). E.g. `image-generation` (generic i2i/t2i) vs `two-reference-character-consistency` vs `scene-character-compositing`.
+- Production profiles may declare ordered **`inputs:`** slots (`{ slot, category, ref_type, required }`; `cli/src/types/PackSchemas.ts` `InputSlotSchema`). Declaration order IS the reference order contract: the document's external refs under `refs[ref_type]` must match slots 1:1 in order. Violations block the packet: `PROFILE_INPUT_MISSING` (slot unfilled) / `PROFILE_INPUT_MISMATCH` (wrong category order or extra refs of a constrained type). Caveat: order between slots of the SAME category is not machine-distinguishable — document the intended order in prose for those.
 - Projects derive profiles with `extends`; they never silently overwrite a pack profile.
 
 ## skills/*/skill.yaml + SKILL.md
