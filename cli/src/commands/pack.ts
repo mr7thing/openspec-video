@@ -1,7 +1,24 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import path from 'path';
+import { checkPack, PackCheckReport } from '../core/PackChecker';
 import { loadProjectConfig, resolvePacks, syncPackSkillShims, writePackLock } from '../core/ProjectConfig';
 import { logger } from '../utils/logger';
+
+function renderReport(report: PackCheckReport): void {
+  const label = report.pack.id ? `${report.pack.id}@${report.pack.version ?? '?'}` : report.pack.root;
+  if (report.issues.length === 0) {
+    console.log(chalk.green(`${label}: 0 issues`));
+    return;
+  }
+  for (const issue of report.issues) {
+    const color = issue.severity === 'error' ? chalk.red : chalk.yellow;
+    console.log(color(`${issue.severity.toUpperCase()} ${issue.code} ${issue.path}: ${issue.message}`));
+  }
+  const errors = report.issues.filter(i => i.severity === 'error').length;
+  const warnings = report.issues.length - errors;
+  console.log((errors ? chalk.red : chalk.yellow)(`${label}: ${errors} error(s), ${warnings} warning(s)`));
+}
 
 export function registerPackCommands(program: Command): void {
   const pack = program.command('pack').description('Inspect and lock declarative OPSV Packs');
@@ -21,6 +38,28 @@ export function registerPackCommands(program: Command): void {
       process.exitCode = 1;
     }
   });
+
+  pack.command('check [path]')
+    .description('Validate Pack schemas and cross-file contracts')
+    .option('--json', 'Print machine-readable JSON report on stdout')
+    .action((packPath: string | undefined, options: { json?: boolean }) => {
+      try {
+        const reports: PackCheckReport[] = packPath
+          ? [checkPack(path.resolve(process.cwd(), packPath))]
+          : resolvePacks(process.cwd()).map(resolved => checkPack(resolved.root));
+        if (reports.length === 0) throw new Error('No Packs declared in .opsv/project.yaml and no path given.');
+        if (options.json) {
+          // stdout carries machine JSON only; human diagnostics stay on stderr.
+          console.log(JSON.stringify(reports.length === 1 ? reports[0] : reports, null, 2));
+        } else {
+          for (const report of reports) renderReport(report);
+        }
+        if (reports.some(report => !report.ok)) process.exitCode = 1;
+      } catch (error: any) {
+        logger.error(error.message);
+        process.exitCode = 1;
+      }
+    });
 
   pack.command('lock').description('Resolve Packs and write .opsv/pack-lock.yaml').action(() => {
     try {

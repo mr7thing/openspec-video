@@ -57,7 +57,7 @@ function loadEnvFile(envPath: string): void {
     }
   } else {
     // Plaintext path: let dotenv handle it
-    dotenv.config({ path: envPath });
+    dotenv.config({ path: envPath, quiet: true });
   }
 }
 
