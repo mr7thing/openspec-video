@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core-build-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: cli/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+
+  core-unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: cli/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # Jest must exit on its own — no --forceExit (T10/F12).
+      - run: npx jest --runInBand
+
+  core-architecture-flow:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: cli/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx jest src/core/__tests__/ArchitectureFlow.test.ts --runInBand
+
+  mv-pack-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout MV pack (sibling layout expected by the runner)
+        uses: actions/checkout@v4
+        with:
+          repository: mr7thing/opsv-packs
+          path: opsv-packs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: cli/package-lock.json
+      - run: npm ci
+        working-directory: cli
+      - run: npm run build
+        working-directory: cli
+      - name: Five-point pack contract fixture
+        working-directory: opsv-packs/opsv-mv-pipeline
+        env:
+          OPSV_CORE_CLI: ${{ github.workspace }}/cli/dist/cli.js
+        run: node --test test/pack-contract.test.js
+      - name: Concrete-model guard
+        working-directory: opsv-packs/opsv-mv-pipeline
+        run: node --test test/no-concrete-models.test.js
+
+  mv-director:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: mr7thing/opsv-packs
+          path: opsv-packs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - working-directory: opsv-packs/opsv-mv-pipeline
+        run: |
+          node --check scripts/director-timeline-check.js
+          node --check scripts/director-prepare-task.js
+          node --check scripts/mv-check.js
+          node --test test/director-timeline-check.test.js
