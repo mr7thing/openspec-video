@@ -53,7 +53,7 @@ jobs:
           cache-dependency-path: cli/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npx jest src/core/__tests__/ArchitectureFlow.test.ts --runInBand
+      - run: npx jest src/core/__tests__/ArchitectureFlow.test.ts src/core/__tests__/HookReadiness.test.ts --runInBand
 
   mv-pack-contract:
     runs-on: ubuntu-latest
