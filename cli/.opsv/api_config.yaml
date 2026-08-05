@@ -341,7 +341,7 @@ models:
   rh-workflow-v2.klein9b:
     provider: rhworkflow-v2
     type: comfy
-    api_url: https://api.runninghub.cn/run/workflow/2075497084035358722
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2075497084035358722
     api_status_url: https://www.runninghub.cn/openapi/v2/query
     workflowId: "2075497084035358722"
     workflow: "test/workflows/opsv-klein9b镜头调度2_api-id_2075497084035358722.json"
@@ -374,7 +374,7 @@ models:
   rh-workflow-v2.krea2:
     provider: rhworkflow-v2
     type: comfy
-    api_url: https://api.runninghub.cn/run/workflow/2074897972374097921
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2074897972374097921
     api_status_url: https://www.runninghub.cn/openapi/v2/query
     workflowId: "2074897972374097921"
     workflow: "test/workflows/opsv-krea2_t2i_api-id_2074897972374097921.json"
@@ -412,10 +412,10 @@ models:
   rh-workflow-v2.director:
     provider: rhworkflow-v2
     type: comfy
-    api_url: https://api.runninghub.cn/run/workflow/2064630504955142146
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2069360572709298178
     api_status_url: https://www.runninghub.cn/openapi/v2/query
-    workflowId: "2064630504955142146"
-    workflow: "opsv-packs/comfyui-workflows/opsv- 导演台_api-id-2064630504955142146.json"
+    workflowId: "2069360572709298178"
+    workflow: "test/workflows/opsv- 导演台_api-id_2069360572709298178.json"
     required_env:
       - RH_WORKFLOW_API_KEY
     supports_first_image: true
@@ -452,52 +452,96 @@ models:
         source: job.payload.extra.custom_height
       display_mode:
         source: job.payload.extra.display_mode
+      start_second:
+        source: job.payload.extra.start_second
+      end_second:
+        source: job.payload.extra.end_second
+      start_frame:
+        source: job.payload.extra.start_frame
+      end_frame:
+        source: job.payload.extra.end_frame
+      use_custom_motion:
+        source: job.payload.extra.use_custom_motion
+      inpaint_audio:
+        source: job.payload.extra.inpaint_audio
+      img_compression:
+        source: job.payload.extra.img_compression
+      divisible_by:
+        source: job.payload.extra.divisible_by
+      override_audio:
+        source: job.payload.extra.override_audio
+      timeline_ui:
+        source: job.payload.extra.timeline_ui
     node_mappings:
-      prompt:
-        nodeId: "6"
-        fieldName: "text"
-      negative_prompt:
-        nodeId: "7"
-        fieldName: "text"
       timeline_data:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "timeline_data"
       local_prompts:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "local_prompts"
       segment_lengths:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "segment_lengths"
       guide_strength:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "guide_strength"
       frame_rate:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "frame_rate"
       duration_frames:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "duration_frames"
-      global_prompt:
-        nodeId: "46"
-        fieldName: "global_prompt"
-      duration_seconds:
-        nodeId: "46"
-        fieldName: "duration_seconds"
-      epsilon:
-        nodeId: "46"
-        fieldName: "epsilon"
-      use_custom_audio:
-        nodeId: "46"
-        fieldName: "use_custom_audio"
       custom_width:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "custom_width"
       custom_height:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "custom_height"
       display_mode:
-        nodeId: "46"
+        nodeId: "134"
         fieldName: "display_mode"
+      global_prompt:
+        nodeId: "134"
+        fieldName: "global_prompt"
+      duration_seconds:
+        nodeId: "134"
+        fieldName: "duration_seconds"
+      epsilon:
+        nodeId: "134"
+        fieldName: "epsilon"
+      use_custom_audio:
+        nodeId: "134"
+        fieldName: "use_custom_audio"
+      start_second:
+        nodeId: "134"
+        fieldName: "start_second"
+      end_second:
+        nodeId: "134"
+        fieldName: "end_second"
+      start_frame:
+        nodeId: "134"
+        fieldName: "start_frame"
+      end_frame:
+        nodeId: "134"
+        fieldName: "end_frame"
+      use_custom_motion:
+        nodeId: "134"
+        fieldName: "use_custom_motion"
+      inpaint_audio:
+        nodeId: "134"
+        fieldName: "inpaint_audio"
+      img_compression:
+        nodeId: "134"
+        fieldName: "img_compression"
+      divisible_by:
+        nodeId: "134"
+        fieldName: "divisible_by"
+      override_audio:
+        nodeId: "134"
+        fieldName: "override_audio"
+      timeline_ui:
+        nodeId: "134"
+        fieldName: "timeline_ui"
     defaults:
       addMetadata: false
       usePersonalQueue: false
@@ -508,6 +552,167 @@ models:
       custom_width: 1920
       custom_height: 1080
       use_custom_audio: true
+    # == payload_example ==
+    payload_example:
+      addMetadata: false
+      nodeInfoList: []
+      instanceType: "default"
+      usePersonalQueue: false
+
+  # ------------------------------------------------------------------
+  # MV S4 角色定档：Krea2 双参考图 (character TwoRef)
+  # workflowId 2080246504194928641 - Krea2 2refs API
+  # 节点 (opsv- 前缀):
+  #   - image1 (node 72) / image2 (node 86) - 两张参考图
+  #   - Prompt (node 91) - 短提示词
+  # 用法: S4 角色多视图一致性 / S5 关键帧生成
+  # ------------------------------------------------------------------
+  rh-workflow-v2.krea2-2refs:
+    provider: rhworkflow-v2
+    type: comfy
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2080246504194928641
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2080246504194928641"
+    workflow: "test/workflows/opsv-krea2-2refs_api-id_2080246504194928641.json"
+    required_env:
+      - RH_WORKFLOW_API_KEY
+    supports_first_image: true
+    supports_reference_images: true
+    max_reference_images: 2
+    node_mappings:
+      image1:
+        nodeId: "72"
+        fieldName: image
+      image2:
+        nodeId: "86"
+        fieldName: image
+      Prompt:
+        nodeId: "91"
+        fieldName: prompt
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # == payload_example ==
+    payload_example:
+      addMetadata: false
+      nodeInfoList: []
+      instanceType: "default"
+      usePersonalQueue: false
+
+  # ------------------------------------------------------------------
+  # MV S4 角色多角度：Qwen Edit 2511 (内置多角度 17 提示词)
+  # workflowId 2080275632545685506 - Qwen Edit 多角度
+  # 节点 (opsv- 前缀):
+  #   - Multiline-prompt (node 20) - 提示词
+  # 注意: 多角度已内置 17 个 prompt, 无需传 image slot
+  # 用法: S4 角色多视图一致性 (一次出多张)
+  # ------------------------------------------------------------------
+  rh-workflow-v2.qwen-edit-2511-multiview:
+    provider: rhworkflow-v2
+    type: comfy
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2080275632545685506
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2080275632545685506"
+    workflow: "test/workflows/opsv-Qwen_Edit_2511多角度_api-id_2080275632545685506.json"
+    required_env:
+      - RH_WORKFLOW_API_KEY
+    node_mappings:
+      Multiline-prompt:
+        nodeId: "20"
+        fieldName: text
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # == payload_example ==
+    payload_example:
+      addMetadata: false
+      nodeInfoList: []
+      instanceType: "default"
+      usePersonalQueue: false
+
+  # ------------------------------------------------------------------
+  # MV S4 场景角色合成 2refs：Qwen 2511 (场景 + 角色1)
+  # workflowId 2080315109892771842 - Qwen 2511 2refs
+  # 节点 (opsv- 前缀):
+  #   - image-scene (node 13) - 场景参考图
+  #   - image-role1 (node 38) - 角色参考图
+  #   - Multiline-prompt (node 40) - 提示词
+  # 用法: S4 场景与角色合成 (双 ref)
+  # ------------------------------------------------------------------
+  rh-workflow-v2.qwen2511-scene-role-2refs:
+    provider: rhworkflow-v2
+    type: comfy
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2080315109892771842
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2080315109892771842"
+    workflow: "test/workflows/opsv-qwen2511-2refs_api-id_2080315109892771842.json"
+    required_env:
+      - RH_WORKFLOW_API_KEY
+    supports_first_image: true
+    supports_reference_images: true
+    max_reference_images: 2
+    node_mappings:
+      image-scene:
+        nodeId: "13"
+        fieldName: image
+      image-role1:
+        nodeId: "38"
+        fieldName: image
+      Multiline-prompt:
+        nodeId: "40"
+        fieldName: text
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
+    # == payload_example ==
+    payload_example:
+      addMetadata: false
+      nodeInfoList: []
+      instanceType: "default"
+      usePersonalQueue: false
+
+  # ------------------------------------------------------------------
+  # MV S4 场景角色合成 3refs：Qwen Edit 2511 (场景 + 角色1 + 角色2)
+  # workflowId 2080279327953997825 - Qwen Edit 场景角色合成
+  # 节点 (opsv- 前缀):
+  #   - image-scene (node 13) - 场景参考图
+  #   - image-role1 (node 38) - 角色1参考图
+  #   - image-role2 (node 39) - 角色2参考图
+  #   - Multiline-prompt (node 40) - 提示词
+  # 用法: S4 场景与多角色合成 (3refs, 推荐用于合唱/双人镜头)
+  # ------------------------------------------------------------------
+  rh-workflow-v2.qwen-edit-2511-scene-role-3refs:
+    provider: rhworkflow-v2
+    type: comfy
+    api_url: https://www.runninghub.cn/openapi/v2/run/workflow/2080279327953997825
+    api_status_url: https://www.runninghub.cn/openapi/v2/query
+    workflowId: "2080279327953997825"
+    workflow: "test/workflows/opsv-Qwen_edit2511-场景角色合成3refs_api-id_2080279327953997825.json"
+    required_env:
+      - RH_WORKFLOW_API_KEY
+    supports_first_image: true
+    supports_reference_images: true
+    max_reference_images: 3
+    node_mappings:
+      image-scene:
+        nodeId: "13"
+        fieldName: image
+      image-role1:
+        nodeId: "38"
+        fieldName: image
+      image-role2:
+        nodeId: "39"
+        fieldName: image
+      Multiline-prompt:
+        nodeId: "40"
+        fieldName: text
+    defaults:
+      addMetadata: false
+      usePersonalQueue: false
+      upload_method: base64
     # == payload_example ==
     payload_example:
       addMetadata: false
