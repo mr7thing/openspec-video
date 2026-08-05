@@ -38,3 +38,10 @@
 - Do not write tautological tests (a test that still passes when the feature is deleted — see `../../guides/index.md` "Verifying AI Cross-Review Results").
 - Do not mock `fs` globally; use temp dirs so tests exercise real path behavior.
 - Do not depend on test execution order; each test builds its own fixture.
+
+## Quality Gates (T10, F12)
+
+- **Jest must exit on its own.** Never use `--forceExit` in normal operation — an open handle is a real defect (the F12 root cause was a background `setInterval` without `unref`). Background timers that are not the process's reason to live must be `unref()`'d; tests must close clients/servers they start.
+- **Lint is a real gate**: `npm run lint` (eslint 10 flat config, `cli/eslint.config.js`) must exit 0. Errors fail; the warning count is tracked baseline debt — reduce, don't grow, and don't raise baseline noise to hide new issues.
+- **Sandbox vs defect**: `listen EPERM` / `spawnSync git EPERM` in restricted sandboxes are environmental, not product failures — ReviewServer (supertest app factory) and SyncService suites pass in standard environments. Mark environment-limited integration tests explicitly; never skip a suite just to stay green.
+- Pack contract tests call the real built CLI (`OPSV_CORE_CLI`), never a reimplemented checker; command-rendered commands are exercised from the project root.
