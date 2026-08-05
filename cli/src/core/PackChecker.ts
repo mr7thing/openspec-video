@@ -22,6 +22,7 @@ import {
   SkillManifest,
   SkillManifestSchema,
 } from '../types/PackSchemas';
+import { resolveContainedReal } from '../utils/pathSecurity';
 
 export const PACK_ISSUE_CODES = [
   'PACK_SCHEMA_INVALID',
@@ -57,22 +58,6 @@ const CONCRETE_CAPABILITY_RE = [/^rh-workflow/i, /^comfyui[.-]/i, /\.gguf$/i, /^
 
 function looksConcreteModel(capability: string): boolean {
   return CONCRETE_CAPABILITY_RE.some(re => re.test(capability));
-}
-
-/** Lexical + (when present) realpath containment under packRoot. T05 will
- *  replace this local helper with the shared pathSecurity implementation. */
-function resolveContained(packRoot: string, rel: string): { real: string } | { outside: true } {
-  if (path.isAbsolute(rel)) return { outside: true };
-  const absRoot = path.resolve(packRoot);
-  const resolved = path.resolve(absRoot, rel);
-  const prefix = absRoot.endsWith(path.sep) ? absRoot : absRoot + path.sep;
-  if (resolved !== absRoot && !resolved.startsWith(prefix)) return { outside: true };
-  let real = resolved;
-  try { real = fs.realpathSync(resolved); } catch { /* not existing yet: lexical result stands */ }
-  const realRoot = (() => { try { return fs.realpathSync(absRoot); } catch { return absRoot; } })();
-  const realPrefix = realRoot.endsWith(path.sep) ? realRoot : realRoot + path.sep;
-  if (real !== realRoot && !real.startsWith(realPrefix)) return { outside: true };
-  return { real };
 }
 
 function toRel(rel: string): string {
@@ -124,17 +109,17 @@ export function checkPack(packRoot: string): PackCheckReport {
 
   const loadExport = <T>(kind: 'categories' | 'profiles' | 'skills', key: string, rel: string, schema: ZodSchema<T>): LoadedExport<T> => {
     const relNorm = toRel(rel);
-    const contained = resolveContained(packRoot, rel);
-    if ('outside' in contained) {
+    const contained = resolveContainedReal(packRoot, rel);
+    if (!contained) {
       push({ code: 'PACK_EXPORT_OUTSIDE_ROOT', severity: 'error', path: relNorm, message: `${kind} export "${key}" resolves outside the pack root`, context: { [kind]: key } });
       return { rel: relNorm };
     }
-    if (!fs.existsSync(contained.real)) {
+    if (!fs.existsSync(contained)) {
       push({ code: 'PACK_EXPORT_MISSING', severity: 'error', path: relNorm, message: `${kind} export "${key}" points to a missing file`, context: { [kind]: key } });
       return { rel: relNorm };
     }
     try {
-      const raw = yaml.load(fs.readFileSync(contained.real, 'utf8'));
+      const raw = yaml.load(fs.readFileSync(contained, 'utf8'));
       const parsed = schema.safeParse(raw);
       if (!parsed.success) {
         push({ code: 'PACK_SCHEMA_INVALID', severity: 'error', path: relNorm, message: flatten(parsed.error.issues) });
