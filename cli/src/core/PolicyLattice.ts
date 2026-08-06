@@ -50,9 +50,25 @@ function isPolicyLevel(value: unknown): value is PolicyLevel {
 }
 
 /**
+ * The effective floor for an action *without* a project override: the stricter
+ * of defaults and the pack value, falling back to the built-in safety default
+ * only when neither declares the action. The pack is trusted and may go looser
+ * than the default; the project may never go below this floor.
+ */
+function packFloor(defaults: PolicyMap, packPolicy: PolicyMap | undefined, action: PolicyAction): PolicyLevel {
+  const layers = [defaults[action], packPolicy?.[action]]
+    .filter((v): v is string => typeof v === 'string')
+    .filter(isPolicyLevel);
+  return (layers.length ? layers.reduce(stricter) : POLICY_DEFAULTS[action]) as PolicyLevel;
+}
+
+/**
  * Merge defaults ← pack ← project, taking the stricter value per action.
- * A project value looser than the pack value does NOT apply; it produces a
- * PROJECT_POLICY_LOOSENS_PACK issue instead (config defect, fail closed).
+ * The pack is trusted content: it may declare values looser than the built-in
+ * safety default (POLICY_DEFAULTS only serves as the fallback when the pack
+ * does not declare an action). A project value looser than the effective
+ * floor does NOT apply; it produces a PROJECT_POLICY_LOOSENS_PACK issue
+ * instead (config defect, fail closed).
  */
 export function mergePolicies(
   defaults: PolicyMap,
@@ -69,10 +85,15 @@ export function mergePolicies(
       effective.delete = 'never'; // Core invariant; schema validation rejects other values upstream.
       continue;
     }
-    const layers = [defaults[action], packPolicy?.[action], projectPolicy?.[action]]
-      .filter((v): v is string => typeof v === 'string')
-      .filter(isPolicyLevel);
-    effective[action] = layers.length ? layers.reduce(stricter) : POLICY_DEFAULTS[action];
+    // Pack is trusted content: the pack-side floor is the stricter of defaults
+    // and the pack's own value, falling back to the built-in safety default
+    // only when the pack does not declare the action. The project may only
+    // TIGHTEN that floor (F7); if it tries to loosen below it, the floor holds.
+    const floor = packFloor(defaults, packPolicy, action);
+    const projectValue = projectPolicy?.[action];
+    effective[action] = (projectValue != null && isPolicyLevel(projectValue))
+      ? stricter(floor, projectValue)
+      : floor;
   }
 
   for (const [key, value] of Object.entries(projectPolicy || {})) {
@@ -86,16 +107,21 @@ export function mergePolicies(
       continue;
     }
     if (key === 'delete' || value == null) continue;
-    const packValue = packPolicy?.[key as PolicyAction];
-    if (isPolicyLevel(value) && isPolicyLevel(packValue) && RANK[value] < RANK[packValue]) {
+    if (!isPolicyLevel(value)) continue;
+    // The floor is what the action resolves to without the project override —
+    // the stricter of defaults and the pack value, falling back to the built-in
+    // safety default when the pack does not declare it. A project may never
+    // loosen below it; if it tries, the floor holds.
+    const floor = packFloor(defaults, packPolicy, key as PolicyAction);
+    if (RANK[value] < RANK[floor]) {
       issues.push({
         code: 'PROJECT_POLICY_LOOSENS_PACK',
         severity: 'error',
-        message: `Project policy "${key}: ${value}" would loosen Pack policy "${key}: ${packValue}"; effective value stays "${packValue}". Remove or tighten the project override.`,
+        message: `Project policy "${key}: ${value}" would loosen below the effective floor "${key}: ${floor}"; effective value stays "${floor}". Remove or tighten the project override.`,
         action: key,
-        pack: packValue,
+        pack: floor,
         project: value,
-        effective: packValue,
+        effective: floor,
       });
     }
   }

@@ -49,7 +49,7 @@ export interface NextActionResult {
 
 /**
  * Derive the single next action. Evaluation order:
- *   sync (status) → skill presence → circle ambiguity → existing issues →
+ *   sync (status) → workflow skill presence → circle ambiguity → existing issues →
  *   workflow (skill action is source of truth) → production (circle/compile).
  */
 export function buildNextAction(ctx: NextActionContext): NextActionResult {
@@ -58,7 +58,11 @@ export function buildNextAction(ctx: NextActionContext): NextActionResult {
   }
 
   const issues: NextActionIssue[] = [];
-  if (!ctx.skillFound) {
+  // Skill/gates are load-bearing only for workflow profiles, where the skill
+  // action is the source of truth for the next step. Production next-actions
+  // derive from circle manifests alone, so a missing (optional) skill must not
+  // block the production circle/compile path.
+  if (ctx.profileKind === 'workflow' && !ctx.skillFound) {
     issues.push({
       code: 'PACK_PROFILE_SKILL_MISSING',
       message: `Profile "${ctx.profileName}" Skill "${ctx.skillName}" is not exported or its manifest is missing; refusing to continue with empty gates`,

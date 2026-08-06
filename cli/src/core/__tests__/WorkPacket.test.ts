@@ -37,6 +37,19 @@ describe('Work Packet', () => {
     expect(packet.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PROFILE_REF_REQUIRED' })]));
   });
 
+  it('compiles a production profile whose optional skill is missing', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'test');
+    // No `skill` key at all: ProfileBaseSchema.skill is optional for production.
+    fs.writeFileSync(path.join(pack, 'profiles', 'image.yaml'), 'kind: production\ncapability: image\noutputs: [image]\n');
+    fs.writeFileSync(path.join(root, 'videospec/assets', 'hero.md'), '---\ncategory: image\nstatus: drafting\n---\n');
+    const circle = path.join(root, 'opsv-queue', 'assets_circle1');
+    fs.mkdirSync(circle, { recursive: true });
+    fs.writeFileSync(path.join(circle, '_manifest.json'), JSON.stringify({ circle: 'assets_circle1', assets: { hero: { status: 'pending' } } }));
+    const packet = buildWorkPacket(root, 'hero');
+    expect(packet.issues).toEqual([]);
+    expect(packet.nextAction).toEqual({ kind: 'compile', asset: 'hero', manifest: 'opsv-queue/assets_circle1/_manifest.json' });
+  });
+
   it('blocks the packet when project policy tries to loosen pack policy (F7)', () => {
     const pack = path.join(root, '.opsv', 'packs', 'test');
     fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: test\nversion: 1\npolicy:\n  sync: human\ncategories:\n  image: categories/image.yaml\nprofiles:\n  image: profiles/image.yaml\nskills:\n  make: skills/make.yaml\n');

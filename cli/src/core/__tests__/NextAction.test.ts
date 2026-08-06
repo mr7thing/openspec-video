@@ -181,10 +181,16 @@ describe('buildNextAction', () => {
     expect(renderNextActionCommand(action)).toBeUndefined();
   });
 
-  it('fails closed when the profile skill is not exported (F3)', () => {
-    const { action, issues } = buildNextAction({ ...BASE_CTX, skillFound: false });
+  it('fails closed when a workflow profile skill is not exported (F3)', () => {
+    const { action, issues } = buildNextAction({ ...BASE_CTX, profileKind: 'workflow', skillFound: false });
     expect(issues[0].code).toBe('PACK_PROFILE_SKILL_MISSING');
     expect(action?.kind).toBe('blocked');
+  });
+
+  it('does not block a production profile whose optional skill is missing', () => {
+    const { action, issues } = buildNextAction({ ...BASE_CTX, skillFound: false });
+    expect(issues).toEqual([]);
+    expect(action).toEqual({ kind: 'circle', asset: 'hero', sourceDir: 'videospec/shots' });
   });
 
   it('never returns an executable action when issues exist', () => {

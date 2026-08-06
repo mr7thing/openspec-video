@@ -58,4 +58,31 @@ describe('PolicyLattice', () => {
     expect(effective.compile).toBe('human');
     expect(issues).toEqual([]);
   });
+
+  it('rejects a project override looser than the built-in safety floor', () => {
+    const { effective, issues } = mergePolicies({}, {}, { execute: 'auto' });
+    expect(effective.execute).toBe('ask'); // built-in default floor holds
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'PROJECT_POLICY_LOOSENS_PACK', action: 'execute', project: 'auto', effective: 'ask' }),
+    ]);
+  });
+
+  it('treats the pack floor as the stricter of pack value and built-in default', () => {
+    const { effective, issues } = mergePolicies({}, { execute: 'human' }, { execute: 'ask' });
+    expect(effective.execute).toBe('human');
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'PROJECT_POLICY_LOOSENS_PACK', action: 'execute', project: 'ask', effective: 'human' }),
+    ]);
+  });
+
+  it('lets a pack declare a value looser than the built-in default', () => {
+    // pack explicitly opts execute down to 'auto' (looser than the 'ask' default).
+    const { effective, issues } = mergePolicies({}, { execute: 'auto' }, {});
+    expect(effective.execute).toBe('auto');
+    expect(issues).toEqual([]);
+    // ...but a project may not loosen that floor any further, nor below it.
+    const also = mergePolicies({}, { execute: 'auto' }, { execute: 'auto' });
+    expect(also.effective.execute).toBe('auto');
+    expect(also.issues).toEqual([]);
+  });
 });
