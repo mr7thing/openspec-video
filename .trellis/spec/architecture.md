@@ -101,6 +101,25 @@ Injection channel (stage A, Claude Code first): `opsv hook install|uninstall --p
 - Standalone rule: OPSV runtime code and hook scripts must never read `.trellis/` — Trellis is an optional dev-workflow overlay, not an OPSV dependency.
 - Breadcrumb semantics (borrowed from Trellis, source-verified): state hooks exit 0 on every path; visibility travels in `additionalContext` content, never in exit codes. Hard blocking belongs to PreToolUse gates on real actions, not to per-turn breadcrumbs.
 
+## Two Change Mechanisms: Short-Range Iterate vs Long-Range Plan Revision (2026-08-10)
+
+Execution Records (`.opsv/execution/<id>/`) follow the plan lifecycle `create → planning → validate → start → running → completed/blocked` (`opsv exec create|validate|start|complete|block`). Changes to the work happen through **two strictly separate mechanisms** (analysis §8.2); confusing them corrupts both.
+
+### Short-range: `iterate + review + syncing` (unchanged)
+
+Local user guidance on one task or Artifact: modify the Task JSON → `opsv iterate` → run → review → approve modified task → syncing → Agent writes back the Asset Document → `opsv sync`. This is the normal production loop. It **never modifies the long-range plan and never emits `plan_revision` events** — its facts are `review`/`syncing` events (when an Execution Record exists) plus the document frontmatter and Git history it already owns.
+
+### Long-range: Plan Revision (`opsv exec revise`)
+
+Retrospective change to the long-range intent after execution history exists: long-term goal, stage dependencies, or scope changed. `revise` advances `plan-v<N> → plan-v<N+1>`:
+
+- **Explicit version reference.** The appended `plan_revision` event carries `fromVersion`/`toVersion`; the revision is linear (`toVersion = fromVersion + 1`). `plan.json` (v1) and every `plan.v<N>.json` snapshot are **immutable** — a revision writes a new snapshot and appends an event; it never silently rewrites plan-v1, and the event log only grows.
+- **Declared-rule impact analysis only.** The affected-stage set is computed exclusively from: the structural plan diff, plan `dependsOn` edges of the old plan, the Pack Workflow Graph (bootstrap manifest nodes), explicit profile input relations, and Pack/Contract/Bootstrap digest changes (`checkBootstrapStale`). An impact scope that no declared rule can resolve **blocks the revision** (`EXECUTION_PLAN_REVISION_UNRESOLVED`) unless a human confirms it with `--allow-unresolved` — confirmed scopes are recorded on the event (`unresolved`). Impact is never guessed from prose or "the newest file".
+- **Reopened stages.** The event lists `affectedStages` and `reopenedStages` (affected stages with recorded progress). The reducer resets reopened stages to `open`/`pending` (attempt history preserved); a blocked execution revised with reopened stages returns to `running`. The revised plan starts unvalidated (`planValidatedVersion: null`).
+- **Does not bypass the Asset Document lifecycle.** Plan Revision records long-term intent and impact scope; the concrete changes still land through the document workflow or the short-range `iterate + review + syncing` loop above.
+
+Like all OPSV runtime code, both mechanisms are standalone: they read `.opsv/` and project docs only, never `.trellis/`.
+
 ## Status of the Blueprint
 
 `docs/OPSV_ARCHITECTURE_BLUEPRINT_2026-07-18.md` is the agreed design direction with an 8-step implementation order. Current code (`videospec` v0.17.1) already implements the core of it (document contract, refs/variants, circles, packs, work packets, review/approve/sync). Where code and blueprint differ, **the code is the truth for specs** — the blueprint is direction, not documentation of current behavior.

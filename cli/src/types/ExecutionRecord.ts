@@ -55,11 +55,14 @@ const ExecutionLifecyclePayloadSchema = z
 
 const PlanPayloadSchema = z
   .object({
-    action: z.literal('set'),
+    // 'set' snapshots a plan; 'validate' records that the current plan version
+    // passed `opsv exec validate` (planning → validate → start, analysis §8.1).
+    action: z.enum(['set', 'validate']),
     planVersion: z.number().int().min(1),
     /** Path of plan.json relative to the execution dir. */
     planPath: refString,
     title: shortText.optional(),
+    note: shortText.optional(),
   })
   .strict();
 
@@ -71,6 +74,10 @@ const PlanRevisionPayloadSchema = z
     reason: shortText.optional(),
     affectedStages: z.array(refString).optional(),
     reopenedStages: z.array(refString).optional(),
+    /** Impact scopes that could not be resolved from declared rules and were
+     *  explicitly confirmed by a human (`exec revise --allow-unresolved`).
+     *  Never silently dropped — recorded here when confirmed. */
+    unresolved: z.array(refString).optional(),
   })
   .strict();
 
@@ -230,7 +237,7 @@ export const ExecutionEventDraftSchema = z.discriminatedUnion('kind', [
 export type ExecutionEventDraft = z.infer<typeof ExecutionEventDraftSchema>;
 
 // ---------------------------------------------------------------------------
-// plan.json (minimal; B3 owns the plan lifecycle extensions)
+// plan.json (B3 owns the plan lifecycle extensions)
 // ---------------------------------------------------------------------------
 
 export const ExecutionPlanStepSchema = z
@@ -239,6 +246,8 @@ export const ExecutionPlanStepSchema = z
     label: shortText.optional(),
     role: refString.optional(),
     refs: z.array(refString).optional(),
+    /** Declared retry budget (advisory; retries are always NEW attempts, §8.4). */
+    maxAttempts: z.number().int().min(1).optional(),
   })
   .strict();
 export type ExecutionPlanStep = z.infer<typeof ExecutionPlanStepSchema>;
@@ -262,9 +271,58 @@ export const ExecutionPlanSchema = z
     title: shortText.optional(),
     createdAt: z.string().min(1),
     stages: z.array(ExecutionPlanStageSchema).default([]),
+    /** Project-level role roster (declaration; stage.roles scopes per stage). */
+    roles: z.array(refString).optional(),
     refs: z.array(refString).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((plan, ctx) => {
+    // Structural integrity is a hard gate at write time (store.init / revise),
+    // not a best-effort check: duplicate ids, unknown dependencies, and
+    // dependency cycles make the ReadyActionSet underivable.
+    const stageIds = new Set<string>();
+    for (const stage of plan.stages) {
+      if (stageIds.has(stage.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate stage id '${stage.id}'`, path: ['stages'] });
+      }
+      stageIds.add(stage.id);
+      const stepIds = new Set<string>();
+      for (const step of stage.steps) {
+        if (stepIds.has(step.id)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate step id '${step.id}' in stage '${stage.id}'`, path: ['stages'] });
+        }
+        stepIds.add(step.id);
+      }
+    }
+    const edges = new Map<string, string[]>();
+    for (const stage of plan.stages) {
+      const deps = stage.dependsOn ?? [];
+      edges.set(stage.id, deps);
+      for (const dep of deps) {
+        if (!stageIds.has(dep)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Stage '${stage.id}' depends on unknown stage '${dep}'`, path: ['stages'] });
+        }
+      }
+    }
+    // Kahn's algorithm: anything left with an unmet dependency is on a cycle.
+    const indegree = new Map<string, number>();
+    for (const [id, deps] of edges) indegree.set(id, deps.filter((d) => stageIds.has(d)).length);
+    const queue = [...stageIds].filter((id) => (indegree.get(id) ?? 0) === 0);
+    let visited = 0;
+    while (queue.length > 0) {
+      const id = queue.pop()!;
+      visited += 1;
+      for (const [other, deps] of edges) {
+        if (!deps.includes(id)) continue;
+        const remaining = (indegree.get(other) ?? 0) - 1;
+        indegree.set(other, remaining);
+        if (remaining === 0) queue.push(other);
+      }
+    }
+    if (visited < stageIds.size) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Stage dependsOn graph contains a cycle', path: ['stages'] });
+    }
+  });
 export type ExecutionPlan = z.infer<typeof ExecutionPlanSchema>;
 
 // ---------------------------------------------------------------------------
@@ -385,6 +443,9 @@ export const ExecutionStateSchema = z
     status: ExecutionStatusEnum,
     planVersion: z.number().int().min(1).nullable(),
     planPath: refString.optional(),
+    /** Plan version that passed `opsv exec validate`; null when the current
+     *  version was never validated (a plan_revision resets it). */
+    planValidatedVersion: z.number().int().min(1).nullable(),
     revisions: z.array(PlanRevisionRecordSchema),
     stages: z.record(StageStateSchema),
     roles: z.record(RoleStateSchema),

@@ -34,6 +34,7 @@ import { registerWorkCommands } from './commands/work';
 import { registerSyncCommand } from './commands/sync';
 import { registerHookCommands } from './commands/hook';
 import { registerBootstrapCommand } from './commands/bootstrap';
+import { registerExecCommand } from './commands/exec';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -137,5 +138,6 @@ registerWorkCommands(program);
 registerSyncCommand(program);
 registerHookCommands(program);
 registerBootstrapCommand(program);
+registerExecCommand(program);
 
 program.parse(process.argv);

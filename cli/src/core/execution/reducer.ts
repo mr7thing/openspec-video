@@ -23,6 +23,7 @@ export function createInitialState(executionId: string): ExecutionState {
     executionId,
     status: 'planning',
     planVersion: null,
+    planValidatedVersion: null,
     revisions: [],
     stages: {},
     roles: {},
@@ -81,6 +82,9 @@ function applyEvent(state: ExecutionState, ev: ExecutionEvent): void {
     case 'plan': {
       state.planVersion = ev.payload.planVersion;
       state.planPath = ev.payload.planPath;
+      if (ev.payload.action === 'validate') {
+        state.planValidatedVersion = ev.payload.planVersion;
+      }
       break;
     }
     case 'plan_revision': {
@@ -91,12 +95,20 @@ function applyEvent(state: ExecutionState, ev: ExecutionEvent): void {
       });
       state.planVersion = ev.payload.toVersion;
       state.planPath = ev.payload.planPath;
-      for (const stageId of ev.payload.reopenedStages ?? []) {
+      // The revised plan has not passed validate yet.
+      state.planValidatedVersion = null;
+      const reopened = ev.payload.reopenedStages ?? [];
+      for (const stageId of reopened) {
         const stage = ensureStage(state, stageId);
         stage.status = 'open';
         for (const step of Object.values(stage.steps)) {
           step.status = 'pending';
         }
+      }
+      // A revision is the explicit human decision to change course: when it
+      // reopens work on a blocked execution, the execution resumes running.
+      if (reopened.length > 0 && state.status === 'blocked') {
+        state.status = 'running';
       }
       break;
     }

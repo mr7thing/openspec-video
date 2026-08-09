@@ -13,6 +13,8 @@ test/
 test-*/
 *.log
 npm-debug.log*
+__pycache__/
+*.pyc
 
 # IDE
 .vscode/

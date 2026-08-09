@@ -99,6 +99,7 @@ describe('ExecutionRecord schema', () => {
       executionId: 'exec-1',
       status: 'running',
       planVersion: 1,
+      planValidatedVersion: 1,
       revisions: [],
       stages: {},
       roles: {},

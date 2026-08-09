@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { ExecutionError, ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
+import { resolveContainedReal } from '../../utils/pathSecurity';
 import {
   ExecutionEvent,
   ExecutionEventDraft,
@@ -162,13 +163,75 @@ export class EventStore {
   }
 
   async readPlan(): Promise<ExecutionPlan | null> {
-    const file = planPath(this.projectRoot, this.executionId);
-    if (!fs.existsSync(file)) return null;
-    const parsed = ExecutionPlanSchema.safeParse(JSON.parse(await fsp.readFile(file, 'utf-8')));
+    return this.readPlanFile('plan.json');
+  }
+
+  /**
+   * The CURRENT plan: the latest `plan`/`plan_revision` event's planPath in
+   * the log (default `plan.json`). events.jsonl is the source of truth — a
+   * revision never rewrites plan.json, it appends a pointer to an immutable
+   * `plan.v<N>.json` snapshot (B3).
+   */
+  async readCurrentPlan(): Promise<ExecutionPlan | null> {
+    let rel = 'plan.json';
+    for (const ev of this.readAllEvents()) {
+      if (ev.kind === 'plan' || ev.kind === 'plan_revision') rel = ev.payload.planPath;
+    }
+    return this.readPlanFile(rel);
+  }
+
+  /**
+   * Write an immutable revised-plan snapshot (B3). The file name is pinned to
+   * `plan.v<N>.json`, contained inside the execution dir, and NEVER overwrites
+   * an existing snapshot — plan history is append-only like the event log.
+   * Returns the execution-dir-relative planPath for the revision event.
+   */
+  async writePlanSnapshot(plan: ExecutionPlan, fileName: string): Promise<string> {
+    if (!/^plan\.v[1-9][0-9]*\.json$/.test(fileName)) {
+      throw new ValidationError(
+        OpsVErrorCode.VALIDATION_TYPE_ERROR,
+        `Invalid plan snapshot name '${fileName}' (expected plan.v<N>.json)`,
+      );
+    }
+    const parsed = ExecutionPlanSchema.safeParse(plan);
     if (!parsed.success) {
       throw new ValidationError(
         OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
-        `Corrupt plan.json for execution '${this.executionId}': ${parsed.error.message}`,
+        `Invalid revised execution plan: ${parsed.error.message}`,
+        { issues: parsed.error.issues },
+      );
+    }
+    const abs = resolveContainedReal(this.dir, fileName);
+    if (!abs) {
+      throw new ValidationError(
+        OpsVErrorCode.VALIDATION_TYPE_ERROR,
+        `Plan snapshot path '${fileName}' escapes the execution dir`,
+      );
+    }
+    if (fs.existsSync(abs)) {
+      throw new ExecutionError(
+        OpsVErrorCode.EXECUTION_INVALID_TRANSITION,
+        `Plan snapshot '${fileName}' already exists; plan history is immutable (never overwrite plan-v<N>)`,
+      );
+    }
+    await writeJsonAtomic(abs, parsed.data);
+    return fileName;
+  }
+
+  private async readPlanFile(rel: string): Promise<ExecutionPlan | null> {
+    const abs = resolveContainedReal(this.dir, rel);
+    if (!abs) {
+      throw new ValidationError(
+        OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+        `Execution '${this.executionId}' references a plan path outside its record: '${rel}'`,
+      );
+    }
+    if (!fs.existsSync(abs)) return null;
+    const parsed = ExecutionPlanSchema.safeParse(JSON.parse(await fsp.readFile(abs, 'utf-8')));
+    if (!parsed.success) {
+      throw new ValidationError(
+        OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+        `Corrupt ${rel} for execution '${this.executionId}': ${parsed.error.message}`,
       );
     }
     return parsed.data;

@@ -14,6 +14,9 @@ import path from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { buildWorkContext } from '../../core/WorkContext';
 import { buildWorkPacket } from '../../core/WorkPacket';
+import { EventStore } from '../../core/execution/EventStore';
+import { computeReadyActions, persistReadyActions, readyActionsPath, ReadyActionSet } from '../exec';
+import { ExecutionPlan } from '../../types/ExecutionRecord';
 
 const HOOK_SCRIPT = path.join(__dirname, '..', '..', '..', 'templates', 'hooks', 'opsv-inject-workflow-state.py');
 const PYTHON = execSync('command -v python3', { encoding: 'utf8' }).trim();
@@ -247,5 +250,164 @@ describe('opsv-inject-workflow-state.py (A3)', () => {
     const after = runHook(root, shim).stdout;
 
     expect(after).toBe(before);
+  });
+});
+
+// ============================================================================
+// B4: execution projection source. The hook reads
+// .opsv/execution/<id>/ready-actions.json (+ state.json / events.jsonl
+// cross-check) directly — no CLI call — when an active execution exists, and
+// degrades VISIBLY to the disk path (with a Note line) on any projection
+// problem. Fixtures persist the projection through the same code path as
+// `opsv exec status` (computeReadyActions + persistReadyActions).
+// ============================================================================
+
+const EXEC_PLAN: ExecutionPlan = {
+  version: 1,
+  executionId: 'exec-demo',
+  title: 'Demo',
+  createdAt: '2026-08-10T00:00:00.000Z',
+  stages: [
+    { id: 'docs', label: 'Docs', steps: [{ id: 'write', refs: ['hero'] }] },
+    { id: 'shots', label: 'Shots', dependsOn: ['docs'], steps: [{ id: 'render', refs: ['shot1'] }, { id: 'fix', refs: ['needref'] }] },
+  ],
+};
+
+/** Create + start an execution and persist the ReadyActionSet projection
+ *  exactly as `opsv exec status` does. */
+async function seedExecution(root: string): Promise<ReadyActionSet> {
+  const store = new EventStore(root, 'exec-demo');
+  await store.init(EXEC_PLAN);
+  await store.append({ kind: 'execution', by: 'test', payload: { action: 'create' } });
+  await store.append({ kind: 'plan', by: 'test', payload: { action: 'set', planVersion: 1, planPath: 'plan.json', title: 'Demo' } });
+  await store.append({ kind: 'execution', by: 'test', payload: { action: 'start' } });
+  return reconcileProjection(root, store);
+}
+
+/** Replay what `opsv exec status/next` does: project + persist the sidecar. */
+async function reconcileProjection(root: string, store: EventStore): Promise<ReadyActionSet> {
+  const state = await store.projectState();
+  const plan = (await store.readPlan())!;
+  const set = computeReadyActions(root, plan, state);
+  await persistReadyActions(root, state, set);
+  return set;
+}
+
+describe('opsv-inject-workflow-state.py (B4: execution projection source)', () => {
+  afterEach(() => {
+    while (cleanupDirs.length) fs.rmSync(cleanupDirs.pop()!, { recursive: true, force: true });
+  });
+
+  it('active execution with fresh projection: Source: execution, matches exec next, no CLI call, ≤300ms', async () => {
+    const root = track(seedProject());
+    const set = await seedExecution(root);
+
+    // Empty PATH: the opsv CLI is unresolvable — reaching a block here proves
+    // the execution path makes no CLI call at all.
+    const startedAt = performance.now();
+    const { block } = runHook(root, null);
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(set.ready).toEqual([{ kind: 'draft', assetId: 'hero', stageId: 'docs', stepId: 'write', attempt: 1 }]);
+    expect(block).toContain('Source: execution');
+    expect(block).toContain('Execution: exec-demo (status: running');
+    expect(block).toContain('NextAction: draft');
+    // Same ReadyActionSet lines as `opsv exec next` (formatAction mirror).
+    expect(block).toContain('[ready] draft asset=hero stage=docs step=write attempt=1');
+    // Difference annotated: the derived command/skill is not in the projection.
+    expect(block).toMatch(/Note: derived command\/skill for 'draft' is not part of the execution projection/);
+    expect(elapsedMs).toBeLessThan(300);
+  });
+
+  it('stale projection (event appended after the last status run): visible degradation + disk fallback', async () => {
+    const root = track(seedProject());
+    fs.mkdirSync(path.join(root, '.opsv', 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
+    await seedExecution(root);
+    // A new event advances events.jsonl beyond the persisted projection
+    // (state.json is rebuilt by the appending command; ready-actions.json is
+    // only refreshed by status/next → stale).
+    const store = new EventStore(root, 'exec-demo');
+    await store.append({ kind: 'stage', by: 'test', payload: { stageId: 'docs', action: 'start' } });
+    await store.projectState();
+    const shim = track(makeShim({
+      'context.json': JSON.stringify(buildWorkContext(root, 'hero', 'production-dispatcher')),
+    }));
+
+    const { block } = runHook(root, shim);
+
+    expect(block).toContain('Source: disk');
+    expect(block).toMatch(/Note: execution projection unavailable \(.*stale/);
+    expect(block).toContain('NextAction: draft'); // disk-derived answer still shown
+  });
+
+  it('corrupt ready-actions.json: visible degradation + disk fallback', async () => {
+    const root = track(seedProject());
+    fs.mkdirSync(path.join(root, '.opsv', 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
+    await seedExecution(root);
+    fs.writeFileSync(readyActionsPath(root, 'exec-demo'), 'not json{');
+    const shim = track(makeShim({
+      'context.json': JSON.stringify(buildWorkContext(root, 'hero', 'production-dispatcher')),
+    }));
+
+    const { block } = runHook(root, shim);
+
+    expect(block).toContain('Source: disk');
+    expect(block).toMatch(/Note: execution projection unavailable \(.*ready-actions\.json missing or corrupt/);
+    expect(block).toContain('NextAction: draft');
+  });
+
+  it('terminal (completed) execution is not active: plain disk source, no degradation note', async () => {
+    const root = track(seedProject());
+    fs.mkdirSync(path.join(root, '.opsv', 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
+    await seedExecution(root);
+    const store = new EventStore(root, 'exec-demo');
+    await store.append({ kind: 'execution', by: 'test', payload: { action: 'complete' } });
+    await reconcileProjection(root, store); // a fresh `exec status` on the closed record
+    const shim = track(makeShim({
+      'context.json': JSON.stringify(buildWorkContext(root, 'hero', 'production-dispatcher')),
+    }));
+
+    const { block } = runHook(root, shim);
+
+    expect(block).toContain('Source: disk');
+    expect(block).not.toContain('Note: execution projection unavailable');
+    expect(block).toContain('NextAction: draft');
+  });
+
+  it('multiple executions: projection source ambiguous, visible degradation + disk fallback', async () => {
+    const root = track(seedProject());
+    fs.mkdirSync(path.join(root, '.opsv', 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
+    await seedExecution(root);
+    const other = new EventStore(root, 'exec-other');
+    await other.init({ ...EXEC_PLAN, executionId: 'exec-other' });
+    await other.append({ kind: 'execution', by: 'test', payload: { action: 'create' } });
+    const shim = track(makeShim({
+      'context.json': JSON.stringify(buildWorkContext(root, 'hero', 'production-dispatcher')),
+    }));
+
+    const { block } = runHook(root, shim);
+
+    expect(block).toContain('Source: disk');
+    expect(block).toMatch(/Note: execution projection unavailable \(.*multiple executions/);
+    expect(block).toContain('NextAction: draft');
+  });
+
+  it('no execution: disk path is annotated Source: disk', () => {
+    const root = track(seedProject());
+    fs.mkdirSync(path.join(root, '.opsv', 'runtime'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
+    const shim = track(makeShim({
+      'context.json': JSON.stringify(buildWorkContext(root, 'hero', 'production-dispatcher')),
+    }));
+
+    const { block } = runHook(root, shim);
+
+    expect(block).toContain('Source: disk');
+    expect(block).not.toContain('Source: execution');
+    expect(block).toContain('NextAction: draft');
   });
 });

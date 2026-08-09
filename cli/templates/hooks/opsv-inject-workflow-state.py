@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # OPSV-MANAGED-HOOK v1 — installed by `opsv hook install`, removed by `opsv hook uninstall`.
-"""OPSV UserPromptSubmit hook (A3): per-turn NextAction breadcrumb.
+"""OPSV UserPromptSubmit hook (A3 + B4): per-turn NextAction breadcrumb.
 
-Runs on every user prompt. Resolves the active OPSV Asset and emits a short
-<opsv-workflow-state> block (asset / status / nextAction.kind / derived
-command / issue codes) as additionalContext, so the current production step
-is visible every turn — including blocked states and their issue codes.
+Runs on every user prompt. Emits a short <opsv-workflow-state> block as
+additionalContext, so the current production step is visible every turn —
+including blocked states and their issue codes. The block always names its
+source: `Source: execution` (state-machine projection) or `Source: disk`
+(on-demand disk derivation); fallback between them is NEVER silent.
 
 Contract that must hold for every version of this script:
   * exit 0 on EVERY path — visibility travels in block content, never in the
@@ -13,19 +14,30 @@ Contract that must hold for every version of this script:
   * standalone: never import from or read the `.trellis/` directory — only
     `.opsv/`, `videospec/` and the `opsv` CLI;
   * single self-contained file (install copies this file verbatim);
-  * NextAction data comes from `opsv work context <asset> --role
-    production-dispatcher --json` — never recomputed here (the CLI/Core is
-    the single source of truth; the rendered command is a derived display).
+  * NextAction data comes from Core, never recomputed here — either the
+    execution projection (`.opsv/execution/<id>/ready-actions.json`,
+    persisted by `opsv exec status/next/resume` from computeReadyActions,
+    whose asset-level kinds come from buildNextAction) or `opsv work context
+    <asset> --role production-dispatcher --json`.
 
-Active asset resolution order:
-  1. `.opsv/runtime/active-asset` (written by the SessionStart hook, A4);
-  2. first production asset from `opsv work next --json`;
-  3. otherwise a visible "Refer to `opsv work next`" line (never silent).
+Source resolution order (B4):
+  1. Active execution projection (Source: execution): pure file reads of
+     `.opsv/execution/<id>/{ready-actions.json,state.json,events.jsonl}` —
+     no CLI call, which is how the ~300ms per-turn budget is met. A missing /
+     corrupt / stale projection (seq mismatch against the events.jsonl tail)
+     degrades VISIBLY: a Note line names the reason and the disk path below
+     answers instead.
+  2. Disk derivation via the CLI (Source: disk) — the original A3 path:
+     a. `.opsv/runtime/active-asset` (written by the SessionStart hook, A4);
+     b. first production asset from `opsv work next --json`;
+     c. otherwise a visible "Refer to `opsv work next`" line (never silent).
 
-Latency: the per-turn budget target is ~300ms; stage A calls the CLI, so each
-CLI call is capped by OPSV_WORKFLOW_STATE_CLI_TIMEOUT_MS (default 2000ms).
-On CLI timeout/failure a visible "state unknown ... opsv work check" line is
-emitted instead of passing silently. (B4 switches to projection reads.)
+Latency: the per-turn budget target is ~300ms. The execution-projection path
+only reads files (events.jsonl is tail-read with a bounded window). The disk
+fallback shells out to the CLI; each call is capped by
+OPSV_WORKFLOW_STATE_CLI_TIMEOUT_MS (default 2000ms). On CLI timeout/failure a
+visible "state unknown ... opsv work check" line is emitted instead of
+passing silently.
 
 Silent exit 0 with no output happens only when no `.opsv/project.yaml` is
 found walking up from the payload cwd — i.e. this is not an OPSV project.
@@ -67,9 +79,8 @@ if sys.platform.startswith("win"):
 # that advances produce/run, so its manifest is the per-turn source.
 CONTEXT_ROLE = "production-dispatcher"
 
-# Per-CLI-call cap. Stage A shells out to the CLI; override via env for tests
-# or slow machines. The ~300ms per-turn budget is met when B4 lands and this
-# hook reads projections instead of calling the CLI.
+# Per-CLI-call cap. Only the disk fallback shells out to the CLI; the
+# execution-projection path (B4) reads files and meets the ~300ms budget.
 DEFAULT_CLI_TIMEOUT_MS = 2000
 CLI_TIMEOUT_ENV = "OPSV_WORKFLOW_STATE_CLI_TIMEOUT_MS"
 
@@ -77,6 +88,17 @@ CLI_TIMEOUT_ENV = "OPSV_WORKFLOW_STATE_CLI_TIMEOUT_MS"
 CLI_PATH_ENV = "OPSV_CLI"
 
 ACTIVE_ASSET_FILE = os.path.join(".opsv", "runtime", "active-asset")
+
+# B4: execution projection layout (see cli/src/core/execution/paths.ts).
+EXECUTION_ROOT = os.path.join(".opsv", "execution")
+READY_ACTIONS_FILE = "ready-actions.json"
+STATE_FILE = "state.json"
+EVENTS_FILE = "events.jsonl"
+# Execution statuses that count as "active"; terminal executions let the
+# disk path answer (Source: disk, no degradation note).
+ACTIVE_EXECUTION_STATUSES = {"planning", "running", "blocked"}
+# Bounded tail-read window for events.jsonl (source of truth seq check).
+_TAIL_READ_BYTES = 256 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +231,204 @@ def _resolve_asset(cli: str, root: Path) -> tuple[Optional[str], bool]:
 
 
 # ---------------------------------------------------------------------------
+# B4: execution projection source (.opsv/execution/<id>/)
+#
+# When an active Execution exists, the breadcrumb reads the ReadyActionSet
+# projection persisted by `opsv exec status/next/resume` (ready-actions.json)
+# cross-checked against state.json and the events.jsonl tail seq — pure file
+# reads, no CLI call. Asset-level kinds inside the projection come from
+# buildNextAction via computeReadyActions, so Core stays the single source
+# of truth. Every failure here is a VISIBLE degradation (the caller adds a
+# Note line) with fallback to the disk path — never silent.
+# ---------------------------------------------------------------------------
+
+def _read_json_object(path: Path) -> Optional[dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _events_tail_seq(events_file: Path) -> Optional[int]:
+    """Last committed seq from the source of truth. None when unreadable.
+
+    Bounded tail read (per-turn cost stays flat as the log grows); trailing
+    unparseable lines (torn writes) are skipped, matching EventStore.
+    """
+    try:
+        size = events_file.stat().st_size
+        with events_file.open("rb") as handle:
+            if size > _TAIL_READ_BYTES:
+                handle.seek(-_TAIL_READ_BYTES, os.SEEK_END)
+            text = handle.read().decode("utf-8", errors="replace")
+    except OSError:
+        return None
+    # Scanning from the end makes a partial first line (mid-line seek start)
+    # harmless.
+    for line in reversed(text.split("\n")):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            raw = json.loads(line)
+        except ValueError:
+            continue  # torn tail write; skip
+        if isinstance(raw, dict) and isinstance(raw.get("seq"), int):
+            return raw["seq"]
+        return None  # a well-formed event always carries an int seq → corrupt
+    return 0
+
+
+def _find_execution_dir(root: Path) -> tuple[Optional[Path], Optional[str]]:
+    """The single initialized execution dir, or a degradation reason.
+
+    (None, None) means there is no execution at all — the plain disk path,
+    no note. Mirrors `opsv exec` resolution: multiple executions are
+    ambiguous without --id, so the projection source cannot be chosen.
+    """
+    exec_root = root / EXECUTION_ROOT
+    if not exec_root.is_dir():
+        return None, None
+    try:
+        ids = sorted(
+            entry.name
+            for entry in os.scandir(exec_root)
+            if entry.is_dir() and (exec_root / entry.name / EVENTS_FILE).is_file()
+        )
+    except OSError:
+        return None, "cannot list .opsv/execution/"
+    if not ids:
+        return None, None
+    if len(ids) > 1:
+        return None, f"multiple executions exist ({', '.join(ids)}); the projection source is ambiguous without --id"
+    return exec_root / ids[0], None
+
+
+def _format_projection_action(action: dict) -> str:
+    """Mirror of exec.ts formatAction — these lines must read exactly like
+    `opsv exec next` output."""
+    parts = [str(action.get("kind", "?"))]
+    for key, label in (("assetId", "asset"), ("stageId", "stage"), ("stepId", "step")):
+        value = action.get(key)
+        if value:
+            parts.append(f"{label}={value}")
+    attempt = action.get("attempt")
+    if isinstance(attempt, int) and not isinstance(attempt, bool):
+        parts.append(f"attempt={attempt}")
+    reason = action.get("reason")
+    if reason:
+        parts.append(f"({reason})")
+    return " ".join(parts)
+
+
+def _projection_command(action: dict) -> Optional[str]:
+    """CLI forms derivable from projection fields alone. circle/compile/draft
+    need manifest/sourceDir/skill, which the ReadyActionSet deliberately does
+    not carry — those get an explicit Note instead of an invented command."""
+    kind = action.get("kind")
+    asset = action.get("assetId")
+    if kind == "materialize" and asset:
+        return f"opsv materialize {asset}"
+    if kind == "sync" and asset:
+        return f"opsv sync {asset}"
+    if kind == "start_execution":
+        return "opsv exec start"
+    if kind == "complete_execution":
+        return "opsv exec complete"
+    return None
+
+
+def _render_execution_block(execution_id: str, projection: dict) -> str:
+    status = str(projection.get("status", "unknown"))
+    last_seq = projection.get("lastSeq")
+    ready = [a for a in projection.get("ready") or [] if isinstance(a, dict)]
+    blocked = [a for a in projection.get("blocked") or [] if isinstance(a, dict)]
+    in_flight = [a for a in projection.get("inFlight") or [] if isinstance(a, dict)]
+
+    lines = ["<opsv-workflow-state>"]
+    lines.append("Source: execution")
+    lines.append(f"Execution: {execution_id} (status: {status}, seq {last_seq})")
+    lines.append(f"Ready: {len(ready)}  Blocked: {len(blocked)}  In-flight: {len(in_flight)}")
+
+    if ready:
+        first = ready[0]
+        kind = str(first.get("kind", "?"))
+        lines.append(f"NextAction: {kind}")
+        command = _projection_command(first)
+        if command:
+            lines.append(f"Command: {command}")
+        elif kind in ("circle", "compile", "draft"):
+            # Difference from the disk source, annotated explicitly: the
+            # derived command/skill is a display of buildNextAction detail
+            # the projection does not carry.
+            asset = first.get("assetId", "?")
+            lines.append(
+                f"Note: derived command/skill for '{kind}' is not part of the execution "
+                f"projection; run `opsv work context {asset} --role {CONTEXT_ROLE}` for it"
+            )
+        elif kind not in ("materialize", "sync"):
+            lines.append(f"Note: '{kind}' is an execution-domain action, not an asset NextAction kind")
+    elif blocked:
+        lines.append("NextAction: blocked")
+    elif in_flight:
+        lines.append("NextAction: confirm in-flight work (run `opsv exec resume`)")
+    else:
+        lines.append("NextAction: none")
+
+    for action in ready:
+        lines.append(f"  [ready] {_format_projection_action(action)}")
+    for action in blocked:
+        lines.append(f"  [blocked] {_format_projection_action(action)}")
+    for action in in_flight:
+        lines.append(f"  [in-flight] {_format_projection_action(action)}")
+    lines.append("</opsv-workflow-state>")
+    return "\n".join(lines)
+
+
+def _execution_block(root: Path) -> tuple[Optional[str], Optional[str]]:
+    """Render from the execution projection, or explain why not.
+
+    (block, None)   — fresh projection rendered (Source: execution);
+    (None, None)    — no ACTIVE execution: plain disk path, no note;
+    (None, reason)  — active execution but projection unusable: the caller
+                      falls back to the disk path and surfaces this reason.
+    """
+    exec_dir, reason = _find_execution_dir(root)
+    if exec_dir is None:
+        return None, reason
+
+    execution_id = exec_dir.name
+    ready = _read_json_object(exec_dir / READY_ACTIONS_FILE)
+    state = _read_json_object(exec_dir / STATE_FILE)
+
+    # A terminal execution is not active; the disk path answers from here on.
+    status = (ready or state or {}).get("status")
+    if status is not None and status not in ACTIVE_EXECUTION_STATUSES:
+        return None, None
+    if ready is None and state is None:
+        # Cannot even tell whether this execution is active — degrade
+        # visibly rather than guessing.
+        return None, f"execution '{execution_id}' has no readable projection (state.json/ready-actions.json missing or corrupt)"
+    if state is None:
+        return None, f"execution '{execution_id}' state.json missing or corrupt; run `opsv exec status` to rebuild it"
+    if ready is None:
+        return None, f"execution '{execution_id}' ready-actions.json missing or corrupt; run `opsv exec status` to rebuild it"
+
+    tail = _events_tail_seq(exec_dir / EVENTS_FILE)
+    state_seq = state.get("lastSeq")
+    ready_seq = ready.get("lastSeq")
+    if tail is None:
+        return None, f"execution '{execution_id}' events.jsonl unreadable or corrupt"
+    if state_seq != tail:
+        return None, f"execution '{execution_id}' state.json out of sync with events.jsonl (seq {state_seq} vs {tail}); run `opsv exec status`"
+    if ready_seq != tail:
+        return None, f"execution '{execution_id}' ready-actions.json stale (seq {ready_seq} vs events seq {tail}); run `opsv exec status`"
+
+    return _render_execution_block(execution_id, ready), None
+
+
+# ---------------------------------------------------------------------------
 # Status display: read the asset document frontmatter directly (cheap, and
 # `work context` deliberately omits frontmatter status from the manifest).
 # ---------------------------------------------------------------------------
@@ -293,7 +513,7 @@ def _issue_codes(manifest: dict, action: Optional[dict]) -> list[str]:
     return unique
 
 
-def build_block(root: Path, manifest: dict) -> str:
+def build_block(root: Path, manifest: dict, note: Optional[str] = None) -> str:
     asset = str(manifest.get("asset", "?"))
     status = _read_asset_status(root, asset)
     action = manifest.get("nextAction")
@@ -301,6 +521,9 @@ def build_block(root: Path, manifest: dict) -> str:
     kind = str(action.get("kind")) if action and action.get("kind") else "unknown"
 
     lines = ["<opsv-workflow-state>"]
+    lines.append("Source: disk")
+    if note:
+        lines.append(f"Note: {note}")
     lines.append(f"Asset: {asset} (status: {status})")
     lines.append(f"NextAction: {kind}")
     if action and kind == "draft" and action.get("skill"):
@@ -315,20 +538,22 @@ def build_block(root: Path, manifest: dict) -> str:
     return "\n".join(lines)
 
 
-def _no_asset_block() -> str:
-    return (
-        "<opsv-workflow-state>\n"
-        "No active OPSV asset. Refer to `opsv work next`.\n"
-        "</opsv-workflow-state>"
-    )
+def _no_asset_block(note: Optional[str] = None) -> str:
+    lines = ["<opsv-workflow-state>", "Source: disk"]
+    if note:
+        lines.append(f"Note: {note}")
+    lines.append("No active OPSV asset. Refer to `opsv work next`.")
+    lines.append("</opsv-workflow-state>")
+    return "\n".join(lines)
 
 
-def _unknown_block(reason: str) -> str:
-    return (
-        "<opsv-workflow-state>\n"
-        f"OPSV workflow state unknown ({reason}). Run `opsv work check` for details.\n"
-        "</opsv-workflow-state>"
-    )
+def _unknown_block(reason: str, note: Optional[str] = None) -> str:
+    lines = ["<opsv-workflow-state>"]
+    if note:
+        lines.append(f"Note: {note}")
+    lines.append(f"OPSV workflow state unknown ({reason}). Run `opsv work check` for details.")
+    lines.append("</opsv-workflow-state>")
+    return "\n".join(lines)
 
 
 def _emit(block: str) -> None:
@@ -355,22 +580,33 @@ def main() -> int:
     if root is None:
         return 0  # not an OPSV project — silent by design
 
+    # B4: prefer the execution projection (file reads only, no CLI call).
+    block, degrade = _execution_block(root)
+    if block is not None:
+        _emit(block)
+        return 0
+    note = (
+        f"execution projection unavailable ({degrade}); falling back to disk-derived state"
+        if degrade
+        else None
+    )
+
     cli = _resolve_cli()
     if not cli:
-        _emit(_unknown_block("opsv CLI not found on PATH"))
+        _emit(_unknown_block("opsv CLI not found on PATH", note))
         return 0
 
     asset, cli_failed = _resolve_asset(cli, root)
     if asset is None:
-        _emit(_unknown_block("opsv work next failed or timed out") if cli_failed else _no_asset_block())
+        _emit(_unknown_block("opsv work next failed or timed out", note) if cli_failed else _no_asset_block(note))
         return 0
 
     manifest = _run_opsv_json(cli, ["work", "context", asset, "--role", CONTEXT_ROLE, "--json"], root)
     if manifest is None:
-        _emit(_unknown_block(f"opsv work context {asset} failed or timed out"))
+        _emit(_unknown_block(f"opsv work context {asset} failed or timed out", note))
         return 0
 
-    _emit(build_block(root, manifest))
+    _emit(build_block(root, manifest, note))
     return 0
 
 
