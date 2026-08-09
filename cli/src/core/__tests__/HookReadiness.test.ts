@@ -10,9 +10,11 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { checkPack } from '../PackChecker';
 import { resolvePacks, loadProjectConfig } from '../ProjectConfig';
 import { buildWorkPacket } from '../WorkPacket';
+import { buildWorkContext } from '../WorkContext';
 import { renderNextActionCommand, WORK_PACKET_CONTRACT_VERSION } from '../NextAction';
 import { ManifestReader } from '../ManifestReader';
 
@@ -133,6 +135,33 @@ describe('Hook/Dispatcher readiness contract', () => {
       expect(fs.existsSync(resolved)).toBe(true);
     } finally {
       process.chdir(previousCwd);
+    }
+  });
+
+  it('8: workflow-state hook block reports the same nextAction.kind as buildNextAction (A3 invariant)', () => {
+    // The hook renders Core-produced JSON (fed here through a shim opsv CLI);
+    // the breadcrumb kind must equal buildNextAction's result for the asset.
+    const shim = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-readiness-shim-'));
+    try {
+      fs.writeFileSync(path.join(shim, 'context.json'), JSON.stringify(buildWorkContext(root, 'hero', 'production-dispatcher')));
+      fs.writeFileSync(path.join(shim, 'opsv'), '#!/bin/sh\ncat "$OPSV_SHIM_DIR/context.json"\n', { mode: 0o755 });
+      fs.mkdirSync(path.join(root, '.opsv', 'runtime'), { recursive: true });
+      fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
+
+      const hook = path.join(__dirname, '..', '..', '..', 'templates', 'hooks', 'opsv-inject-workflow-state.py');
+      const stdout = execFileSync('python3', [hook], {
+        input: JSON.stringify({ cwd: root }),
+        env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, OPSV_SHIM_DIR: shim },
+        encoding: 'utf8',
+        timeout: 30000,
+      });
+      const block = JSON.parse(stdout).hookSpecificOutput.additionalContext;
+      const packet = buildWorkPacket(root, 'hero');
+      expect(packet.nextAction?.kind).toBe('circle');
+      expect(block).toContain('<opsv-workflow-state>');
+      expect(block).toContain(`NextAction: ${packet.nextAction?.kind}`);
+    } finally {
+      fs.rmSync(shim, { recursive: true, force: true });
     }
   });
 });
