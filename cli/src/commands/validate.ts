@@ -1,21 +1,15 @@
 // ============================================================================
 // OpsV opsv validate (v0.11.0)
 // Multi-dir scan, maxDepth, exclude, skip dot-dirs
+// --inline: validate proposed content (file/stdin) via the shared core/Validator
+// kernel — the disk scan and inline mode share one implementation (A6).
 // ============================================================================
 
 import { Command } from 'commander';
 import path from 'path';
 import fs from 'fs';
 import chalk from 'chalk';
-import { z } from 'zod';
 import { FrontmatterParser } from '../core/FrontmatterParser';
-import {
-  BaseFrontmatterSchema,
-  ProjectFrontmatterSchema,
-  ShotDesignFrontmatterSchema,
-  ShotProductionFrontmatterSchema,
-} from '../types/FrontmatterSchema';
-import { RefsByType } from '../types/Refs';
 import { logger } from '../utils/logger';
 import { resolveProjectRoot } from '../utils/projectResolver';
 import { buildAssetDocIndex } from '../core/AssetDocIndex';
@@ -24,9 +18,16 @@ import { ManifestReader } from '../core/ManifestReader';
 import { CircleManifest } from '../types/ManifestSchema';
 import { CategoryValidateLoader } from '../utils/categoryValidateLoader';
 import { InputTypesLoader } from '../utils/inputTypesLoader';
-import { validateCategory, ValidationIssue } from '../core/CategoryValidator';
-import { bindRefs, parseKey } from '../core/RefEngine';
-import { addDirOption, resolveDirs } from '../utils/dirOption';
+import { ValidationIssue } from '../core/CategoryValidator';
+import { resolveDocumentContract } from '../core/PackContracts';
+import {
+  DocumentValidationContext,
+  DocumentValidationResult,
+  VALIDATOR_CONTRACT_VERSION,
+  hashProposedContent,
+  validateDocumentContent,
+} from '../core/Validator';
+import { addDirOption, resolveDirs, DEFAULT_SCAN_DIRS } from '../utils/dirOption';
 
 interface ValidateCommandOptions {
   dir?: string[];
@@ -37,6 +38,8 @@ interface ValidateCommandOptions {
   maxDepth?: string;
   circle?: string;
   categoryConfig?: string;
+  inline?: string | boolean;
+  json?: boolean;
 }
 
 export function registerValidateCommand(program: Command, version: string): void {
@@ -52,8 +55,14 @@ export function registerValidateCommand(program: Command, version: string): void
     .option('--skip-category-rules', 'Skip category_validate.yaml rule checks')
     .option('--category-config <path>', 'Explicit path to category validate config (resolves conflicts; overrides discovery)')
     .option('--circle [path]', 'Validate only documents in a specific circle. Accepts circle dir or manifest path. Auto-discovers latest if omitted.')
+    .option('--inline [path]', 'Validate proposed content (frontmatter+body) from a file, or stdin when no path given, instead of scanning disk')
+    .option('--json', 'Machine-readable JSON report on stdout (inline mode)')
     .action(async (options: ValidateCommandOptions) => {
       try {
+        if (options.inline !== undefined) {
+          await runInlineValidate(options);
+          return;
+        }
         const projectRoot = resolveProjectRoot(process.cwd());
         const dirs = resolveDirs(options.dir, projectRoot, { log: console.log });
         const maxDepth = options.maxDepth !== undefined ? parseInt(options.maxDepth, 10) : 1;
@@ -165,6 +174,14 @@ export function registerValidateCommand(program: Command, version: string): void
         const statusIssues: Array<{ file: string; docStatus: string; manifestStatus: string }> = [];
         const categoryIssues: Array<{ file: string; issue: ValidationIssue }> = [];
 
+        // Shared validation kernel context — identical to --inline mode (A6).
+        const docCtx: DocumentValidationContext = {
+          knownAssetIds: new Set(allEntries.keys()),
+          getCategoryRule: (cat) => catLoader.getRule(cat),
+          inputTypes,
+          skipCategoryRules: options.skipCategoryRules,
+        };
+
         for (const [assetId, entry] of allEntries) {
           // Circle mode: validate all files; global mode: skip root-level documents
           const isRootLevel = path.dirname(entry.relativePath) === '.';
@@ -172,77 +189,63 @@ export function registerValidateCommand(program: Command, version: string): void
             continue;
           }
             totalFiles++;
+            let result: DocumentValidationResult;
             try {
               const content = fs.readFileSync(entry.filePath, 'utf-8');
-              const { frontmatter, body } = FrontmatterParser.parseRaw(content);
-
-              if (options.category && frontmatter.category !== options.category) {
-                totalFiles--;
-                continue;
-              }
-
-              // Schema validation
-              const schema = getSchemaForCategory(frontmatter.category);
-              FrontmatterParser.parse(content, schema);
-
-              // refs structure check (input_type registered + key syntax)
-              const refsResult = bindRefs(frontmatter.refs as RefsByType | undefined, {
-                projectRoot,
-                inputTypes,
-              });
-              for (const err of refsResult.errors) {
-                errors.push({ file: entry.relativePath, message: err });
-              }
-
-              // Category-level business rules
-              if (!options.skipCategoryRules) {
-                const rule = catLoader.getRule(String(frontmatter.category ?? ''));
-                const issues = validateCategory(frontmatter, body, rule);
-                for (const issue of issues) {
-                  categoryIssues.push({ file: entry.relativePath, issue });
-                }
-              }
-
-              // Circle mode: check manifest status vs frontmatter status
-              if (circleManifest && circleManifest.assets) {
-                const manifestEntry = circleManifest.assets[assetId];
-                if (manifestEntry && frontmatter.status) {
-                  const manifestStatus = manifestEntry.status;
-                  const docStatus = frontmatter.status;
-                  if (docStatus !== manifestStatus) {
-                    statusIssues.push({
-                      file: entry.relativePath,
-                      docStatus,
-                      manifestStatus,
-                    });
-                  }
-                }
-              }
-
-              validFiles++;
+              result = validateDocumentContent(content, docCtx);
             } catch (err: any) {
               errors.push({ file: entry.relativePath, message: err.message });
+              continue;
             }
 
-          // Dead link detection: refs target docs must exist
-          try {
-            const content = fs.readFileSync(entry.filePath, 'utf-8');
-            const { frontmatter } = FrontmatterParser.parseRaw(content);
-            const refs = (frontmatter.refs || {}) as RefsByType;
+            const frontmatter = result.frontmatter ?? {};
 
-            for (const typeMap of Object.values(refs)) {
-              for (const key of Object.keys(typeMap || {})) {
-                const parsed = parseKey(key);
-                if (!parsed) continue;
-                if (parsed.kind === 'doc') continue; // local doc refs not in asset index
-                if (!allEntries.has(parsed.id)) {
-                  deadRefs.push({ file: entry.relativePath, ref: parsed.id, relPath: entry.relativePath });
+            if (options.category && frontmatter.category !== options.category) {
+              totalFiles--;
+              continue;
+            }
+
+            for (const issue of result.issues) {
+              switch (issue.source) {
+                case 'frontmatter':
+                case 'refs':
+                  errors.push({ file: entry.relativePath, message: issue.message });
+                  break;
+                case 'category':
+                  categoryIssues.push({
+                    file: entry.relativePath,
+                    issue: {
+                      severity: issue.severity,
+                      category: issue.category ?? String(frontmatter.category ?? ''),
+                      field: issue.field,
+                      message: issue.message,
+                    },
+                  });
+                  break;
+                case 'ref-target':
+                  // Dead link detection: refs target docs must exist
+                  deadRefs.push({ file: entry.relativePath, ref: issue.ref ?? '', relPath: entry.relativePath });
+                  break;
+              }
+            }
+
+            // Circle mode: check manifest status vs frontmatter status
+            if (result.schemaValid && circleManifest && circleManifest.assets) {
+              const manifestEntry = circleManifest.assets[assetId];
+              if (manifestEntry && frontmatter.status) {
+                const manifestStatus = manifestEntry.status;
+                const docStatus = frontmatter.status;
+                if (docStatus !== manifestStatus) {
+                  statusIssues.push({
+                    file: entry.relativePath,
+                    docStatus,
+                    manifestStatus,
+                  });
                 }
               }
             }
-          } catch {
-            // Skip ref check for files that failed to parse
-          }
+
+            if (result.schemaValid) validFiles++;
         }
 
         // Image ref existence check
@@ -333,16 +336,145 @@ export function registerValidateCommand(program: Command, version: string): void
     });
 }
 
-function getSchemaForCategory(category?: string): z.ZodType {
-  switch (category) {
-    case 'project':
-      return ProjectFrontmatterSchema;
-    case 'shot-design':
-      return ShotDesignFrontmatterSchema;
-    case 'shot-production':
-      return ShotProductionFrontmatterSchema;
-    default:
-      return BaseFrontmatterSchema;
+// ---------------------------------------------------------------------------
+// --inline mode (A6): validate proposed content via the shared core/Validator
+// kernel. No .trellis/ access — works in Trellis-free projects.
+// ---------------------------------------------------------------------------
+
+function readStdin(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    process.stdin.on('data', (chunk) => chunks.push(chunk as Buffer));
+    process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    process.stdin.on('error', reject);
+  });
+}
+
+/**
+ * Best-effort Pack digest for the hook cache key (08-05 Go follow-up #2:
+ * cache key = project + source path + proposed content hash + Pack
+ * content_digest + validator contract version). Contract resolution failures
+ * (no Pack exports the category, ambiguous export, invalid Pack) must not fail
+ * content validation — an omitted digest simply forces the hook to re-validate.
+ */
+function resolvePackDigestForContent(
+  projectRoot: string,
+  frontmatter?: Record<string, any>,
+): { id: string; version: string; contentDigest: string } | undefined {
+  const category = frontmatter?.category;
+  if (!category) return undefined;
+  try {
+    const contract = resolveDocumentContract(projectRoot, String(category), frontmatter?.profile);
+    return {
+      id: contract.pack.manifest.id,
+      version: contract.pack.manifest.version,
+      contentDigest: contract.pack.contentDigest,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+async function runInlineValidate(options: ValidateCommandOptions): Promise<void> {
+  const projectRoot = resolveProjectRoot(process.cwd());
+
+  // 1. Proposed content: explicit file path, or stdin when --inline is bare.
+  let content: string;
+  if (typeof options.inline === 'string') {
+    const inlinePath = path.resolve(projectRoot, options.inline);
+    if (!fs.existsSync(inlinePath) || !fs.statSync(inlinePath).isFile()) {
+      console.error(chalk.red(`Inline file not found: ${inlinePath}`));
+      process.exit(1);
+    }
+    content = fs.readFileSync(inlinePath, 'utf-8');
+  } else {
+    content = await readStdin();
+    if (!content.trim()) {
+      console.error(chalk.red('No proposed content on stdin. Pipe frontmatter+body, or use --inline <path>.'));
+      process.exit(2);
+    }
+  }
+
+  // 2. Same loaders as the disk path (.opsv/ + user tier only — never .trellis/).
+  const catLoader = new CategoryValidateLoader();
+  const catResult = catLoader.load(projectRoot, { explicitPath: options.categoryConfig });
+  if (catResult.discovery.errors.length > 0) {
+    console.error(chalk.red(`\nResolve the category validate config conflict above before running validate.\n`));
+    process.exit(2);
+  }
+  const inputTypes = new InputTypesLoader();
+  inputTypes.load(projectRoot, { silent: true });
+
+  // 3. Known asset ids for the dead-ref pass — best-effort over scan dirs.
+  //    When no scan dir exists (standalone), omit the set so the check skips
+  //    instead of flagging every external ref as missing.
+  const knownAssetIds = new Set<string>();
+  let indexAvailable = false;
+  for (const rawDir of options.dir ?? DEFAULT_SCAN_DIRS) {
+    const targetDir = path.resolve(projectRoot, rawDir);
+    if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) continue;
+    indexAvailable = true;
+    const index = buildAssetDocIndex(targetDir, { projectRoot });
+    for (const id of index.entries.keys()) knownAssetIds.add(id);
+  }
+
+  // 4. Shared kernel — identical implementation to the disk scan.
+  const result = validateDocumentContent(content, {
+    knownAssetIds: indexAvailable ? knownAssetIds : undefined,
+    getCategoryRule: (cat) => catLoader.getRule(cat),
+    inputTypes,
+    skipCategoryRules: options.skipCategoryRules,
+  });
+
+  const frontmatter = result.frontmatter ?? {};
+  if (options.category && frontmatter.category !== options.category) {
+    console.log(chalk.yellow(`Skipped: document category "${frontmatter.category}" does not match --category ${options.category}`));
+    return;
+  }
+
+  const pack = resolvePackDigestForContent(projectRoot, frontmatter);
+  const proposedContentHash = hashProposedContent(content);
+
+  const errorIssues = result.issues.filter((i) => i.severity === 'error');
+  const warningIssues = result.issues.filter((i) => i.severity === 'warning');
+  const failed = errorIssues.length > 0 || (options.strict && warningIssues.length > 0);
+
+  if (options.json) {
+    // Machine channel: stdout carries JSON only (human diagnostics go to stderr).
+    process.stdout.write(JSON.stringify({
+      validatorContractVersion: VALIDATOR_CONTRACT_VERSION,
+      proposedContentHash,
+      pack,
+      ok: !failed,
+      issues: result.issues,
+    }, null, 2) + '\n');
+  } else {
+    console.log(chalk.cyan('Proposed content validation (inline)'));
+    console.log(chalk.gray(`  proposedContentHash: ${proposedContentHash}`));
+    if (pack) {
+      console.log(chalk.gray(`  pack: ${pack.id}@${pack.version} content_digest=${pack.contentDigest}`));
+    }
+    if (errorIssues.length > 0) {
+      console.log(chalk.red(`\n${errorIssues.length} error(s):`));
+      for (const issue of errorIssues) {
+        const f = issue.field ? `[${issue.field}] ` : '';
+        console.log(chalk.red(`  [${issue.code}] ${f}${issue.message}`));
+      }
+    }
+    if (warningIssues.length > 0) {
+      console.log(chalk.yellow(`\n${warningIssues.length} warning(s):`));
+      for (const issue of warningIssues) {
+        const f = issue.field ? `[${issue.field}] ` : '';
+        console.log(chalk.yellow(`  [${issue.code}] ${f}${issue.message}`));
+      }
+    }
+    if (!failed) {
+      console.log(chalk.green('\nProposed content valid!'));
+    }
+  }
+
+  if (failed) {
+    process.exit(1);
   }
 }
 

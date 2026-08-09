@@ -10,8 +10,21 @@ import { InputTypesLoader } from '../utils/inputTypesLoader';
 import { parseRefKey } from './RefSyntaxParser';
 
 export interface RefBinderContext {
-  projectRoot: string;
+  /** Unused by bindRefs itself (only checkPathsExist resolves paths); optional so pure validation callers need no project root. */
+  projectRoot?: string;
   inputTypes?: InputTypesLoader;
+}
+
+/** Stable issue codes for refs-structure binding failures (hook/router contract). */
+export type RefBindingIssueCode =
+  | 'REF_INPUT_TYPE_UNKNOWN'
+  | 'REF_STRUCTURE_INVALID'
+  | 'REF_PATHS_EMPTY'
+  | 'REF_KEY_INVALID';
+
+export interface RefBindingIssue {
+  code: RefBindingIssueCode;
+  message: string;
 }
 
 export interface RefBinderResult {
@@ -19,6 +32,8 @@ export interface RefBinderResult {
   /** Grouped flat paths by type, ready for InputEvaluator consumption */
   groupedInputs: Record<string, string[]>;
   errors: string[];
+  /** Coded counterparts of `errors` (same entries, same order). */
+  issues: RefBindingIssue[];
 }
 
 /**
@@ -32,19 +47,24 @@ export function bindRefs(rawRefs: RefsByType | undefined, ctx: RefBinderContext)
   const resolved: ResolvedRef[] = [];
   const groupedInputs: Record<string, string[]> = {};
   const errors: string[] = [];
+  const issues: RefBindingIssue[] = [];
+  const pushError = (code: RefBindingIssueCode, message: string): void => {
+    errors.push(message);
+    issues.push({ code, message });
+  };
 
-  if (!rawRefs) return { resolved, groupedInputs, errors };
+  if (!rawRefs) return { resolved, groupedInputs, errors, issues };
 
   const validTypes = ctx.inputTypes?.listTypes();
 
   for (const [type, refsMap] of Object.entries(rawRefs)) {
     if (validTypes && !validTypes.includes(type)) {
-      errors.push(`refs: unknown input_type "${type}" (not in input_types.yaml). Valid: ${validTypes.join(', ')}`);
+      pushError('REF_INPUT_TYPE_UNKNOWN', `refs: unknown input_type "${type}" (not in input_types.yaml). Valid: ${validTypes.join(', ')}`);
       continue;
     }
 
     if (!refsMap || typeof refsMap !== 'object') {
-      errors.push(`refs[${type}]: must be an object mapping ref keys to path arrays`);
+      pushError('REF_STRUCTURE_INVALID', `refs[${type}]: must be an object mapping ref keys to path arrays`);
       continue;
     }
 
@@ -52,13 +72,13 @@ export function bindRefs(rawRefs: RefsByType | undefined, ctx: RefBinderContext)
 
     for (const [key, paths] of Object.entries(refsMap)) {
       if (!Array.isArray(paths) || paths.length === 0) {
-        errors.push(`refs[${type}]["${key}"]: must be a non-empty array of paths`);
+        pushError('REF_PATHS_EMPTY', `refs[${type}]["${key}"]: must be a non-empty array of paths`);
         continue;
       }
 
       const parsed = parseKey(key);
       if (!parsed) {
-        errors.push(`refs[${type}]["${key}"]: invalid key syntax (expected @id, @id:variant, or @:key)`);
+        pushError('REF_KEY_INVALID', `refs[${type}]["${key}"]: invalid key syntax (expected @id, @id:variant, or @:key)`);
         continue;
       }
 
@@ -75,7 +95,7 @@ export function bindRefs(rawRefs: RefsByType | undefined, ctx: RefBinderContext)
     }
   }
 
-  return { resolved, groupedInputs, errors };
+  return { resolved, groupedInputs, errors, issues };
 }
 
 /** Parse a refs map key into structured form. */

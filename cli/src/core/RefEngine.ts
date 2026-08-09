@@ -18,7 +18,7 @@
 export { parsePromptRefs, parseRefKey, extractRefsFromText, extractFrameRefs, extractAllRefs } from './RefSyntaxParser';
 export type { ParsedRefKey } from './RefSyntaxParser';
 export { bindRefs, parseKey, checkPathsExist } from './RefBinder';
-export type { RefBinderContext, RefBinderResult } from './RefBinder';
+export type { RefBinderContext, RefBinderResult, RefBindingIssue, RefBindingIssueCode } from './RefBinder';
 export { compilePrompt } from './compiler/PromptCompiler';
 export type { PromptCompileResult } from './compiler/PromptCompiler';
 export { RefResolver } from './RefResolver';
