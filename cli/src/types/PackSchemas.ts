@@ -3,6 +3,14 @@
 // exported Category/Profile/Skill manifests. Runtime resolvers
 // (ProjectConfig/PackContracts) and the static checker (PackChecker) both
 // decode through these schemas; no command-layer casts allowed.
+//
+// A Pack has three explicit responsibility layers (C2 schema evolution):
+//   1. Workflow        — graph.yaml (stages) + profiles: stage inputs/outputs
+//                        and completion conditions.
+//   2. Toolset         — skills + Stage.recommended_capabilities: soft
+//                        recommendations only, never a whitelist.
+//   3. Spec constraints — categories / document Contracts / gates: hard
+//                        validation enforced by the checker and runtime.
 // ============================================================================
 
 import { z } from 'zod';
@@ -108,3 +116,74 @@ export const SkillManifestSchema = z.object({
   }
 });
 export type SkillManifest = z.infer<typeof SkillManifestSchema>;
+
+// ============================================================================
+// graph.yaml — Workflow layer: Stage-level contract definitions (C2).
+// Backward compatible: a node may still be a bare dependency array
+// (`script: [shotlist]`); the object form adds optional Stage fields and
+// missing fields inherit the profile's lenient behavior.
+// ============================================================================
+
+/** The four standard Roles a Stage can declare applicability for. */
+export const STAGE_ROLES = [
+  'document-author',
+  'contract-checker',
+  'production-dispatcher',
+  'asset-quality-reviewer',
+] as const;
+export type StageRole = (typeof STAGE_ROLES)[number];
+
+export const StageRoleApplicabilitySchema = z.enum(['required', 'optional', 'not_applicable']);
+export type StageRoleApplicability = z.infer<typeof StageRoleApplicabilitySchema>;
+
+/**
+ * Per-Role applicability declaration. Strict on purpose: an unknown key is a
+ * typo of a standard Role and must fail validation (PACK_STAGE_INVALID).
+ */
+export const StageRolesSchema = z.object({
+  'document-author': StageRoleApplicabilitySchema.optional(),
+  'contract-checker': StageRoleApplicabilitySchema.optional(),
+  'production-dispatcher': StageRoleApplicabilitySchema.optional(),
+  'asset-quality-reviewer': StageRoleApplicabilitySchema.optional(),
+}).strict();
+export type StageRoles = z.infer<typeof StageRolesSchema>;
+
+/** Declarative Stage completion conditions (hard-checkable rule names). */
+export const STAGE_COMPLETION_RULES = [
+  'output_exists',
+  'output_contract_valid',
+  'document_status_approved',
+] as const;
+export const StageCompletionRuleSchema = z.enum(STAGE_COMPLETION_RULES);
+export type StageCompletionRule = z.infer<typeof StageCompletionRuleSchema>;
+
+/**
+ * Stage-level node definition (object form). All fields optional — a Stage
+ * declares goals (inputs/outputs/completion), not implementations;
+ * `recommended_capabilities` is a soft recommendation, never a whitelist.
+ */
+export const StageNodeSchema = z.object({
+  /** DAG dependencies (object-form equivalent of the legacy array value). */
+  depends_on: z.array(z.string()).optional(),
+  /** Required input documents/references for the Stage. */
+  inputs: z.array(z.string()).optional(),
+  outputs: z.object({
+    /** Name of the output Contract the Stage must satisfy. */
+    contract: z.string().optional(),
+  }).passthrough().optional(),
+  completion: z.array(StageCompletionRuleSchema).optional(),
+  /** Pack-relative guidance doc path(s); single string or list. */
+  quality_guidance: z.union([z.string(), z.array(z.string())]).optional(),
+  roles: StageRolesSchema.optional(),
+  recommended_capabilities: z.array(z.string()).optional(),
+}).passthrough();
+export type StageNode = z.infer<typeof StageNodeSchema>;
+
+/** Legacy form: node name -> dependency list. Object form: Stage definition. */
+export const GraphNodeSchema = z.union([z.array(z.string()), StageNodeSchema]);
+export type GraphNode = z.infer<typeof GraphNodeSchema>;
+
+export const GraphContractSchema = z.object({
+  workflow: z.record(GraphNodeSchema).optional(),
+}).passthrough();
+export type GraphContract = z.infer<typeof GraphContractSchema>;

@@ -20,7 +20,7 @@ import { loadProjectConfig } from './ProjectConfig';
 import { AssetManager } from './AssetManager';
 import { FrontmatterParser } from './FrontmatterParser';
 import { NextAction, WORK_PACKET_CONTRACT_VERSION } from './NextAction';
-import { CategoryContract, ProfileContract, SkillManifestSchema } from '../types/PackSchemas';
+import { CategoryContract, ProfileContract, SkillManifestSchema, StageCompletionRule, StageRoles } from '../types/PackSchemas';
 import { getProjectDir } from '../utils/configLoader';
 
 /** Fixed stage-A role set. Packs may declare additional roles in stage C. */
@@ -74,6 +74,26 @@ export interface WorkContextPromptContract {
   completion?: string;
 }
 
+/**
+ * Workflow-layer Stage view (C2), surfaced when the Pack's graph.yaml declares
+ * a node named after the asset's Category. Purely incremental: manifests for
+ * Packs without Stage declarations simply omit this field.
+ */
+export interface WorkContextStage {
+  name: string;
+  dependsOn: string[];
+  inputs?: string[];
+  outputs?: { contract?: string };
+  /** Declarative completion conditions for the Stage. */
+  completion?: StageCompletionRule[];
+  /** Four-Role applicability declarations (required/optional/not_applicable). */
+  roles?: StageRoles;
+  /** Soft capability recommendations — never a whitelist. */
+  recommendedCapabilities?: string[];
+  /** Quality guidance doc paths: project-root-relative, absolute for external Packs. */
+  qualityGuidance?: string[];
+}
+
 export interface WorkContextManifest {
   contractVersion: number;
   asset: string;
@@ -81,6 +101,7 @@ export interface WorkContextManifest {
   nextAction?: NextAction;
   documentContract?: WorkContextDocumentContract;
   promptContract: WorkContextPromptContract;
+  stage?: WorkContextStage;
   refs: WorkPacket['refs'];
   policy: Record<string, string>;
   issues: WorkPacket['issues'];
@@ -165,6 +186,22 @@ export function buildWorkContext(projectRoot: string, selector: string, role: st
       },
     };
     manifest.guidanceRefs = guidanceRefs(projectRoot, packet, resolved.pack.root);
+    if (resolved.stage) {
+      const stage = resolved.stage;
+      manifest.stage = {
+        name: stage.name,
+        dependsOn: stage.dependsOn,
+        inputs: stage.inputs,
+        outputs: stage.outputs,
+        completion: stage.completion,
+        roles: stage.roles,
+        recommendedCapabilities: stage.recommended_capabilities,
+        qualityGuidance: stage.quality_guidance === undefined
+          ? undefined
+          : (Array.isArray(stage.quality_guidance) ? stage.quality_guidance : [stage.quality_guidance])
+            .map(rel => relativePosix(projectRoot, resolvePackExportPath(resolved.pack.root, rel))),
+      };
+    }
   } catch (error: any) {
     // The Work Packet already surfaced this as an issue; degrade to the
     // category name so the manifest still materializes (fail-visible).

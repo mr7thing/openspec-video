@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { ProjectConfig, ResolvedPack, loadProjectConfig, resolvePacks } from './ProjectConfig';
-import { CategoryContract, CategoryContractSchema, ProfileContract, ProfileContractSchema } from '../types/PackSchemas';
+import { CategoryContract, CategoryContractSchema, GraphContractSchema, ProfileContract, ProfileContractSchema, StageNode } from '../types/PackSchemas';
 import { resolveContainedReal } from '../utils/pathSecurity';
 import { parseRefKey } from './RefSyntaxParser';
 import { AssetManager } from './AssetManager';
@@ -83,6 +83,43 @@ export interface ResolvedDocumentContract {
   profile: ProfileContract;
   boundModel?: string;
   defaults?: Record<string, unknown>;
+  /**
+   * Workflow-layer Stage contract (C2) for the graph.yaml node named after
+   * this Category, when the Pack declares one. Undefined when the Pack has
+   * no graph.yaml or no node for the Category (lenient inherit behavior).
+   */
+  stage?: ResolvedStage;
+}
+
+/** Stage view exposed to consumers: normalized node fields plus its name. */
+export interface ResolvedStage extends StageNode {
+  name: string;
+  /** DAG dependencies, normalized from the legacy array form or depends_on. */
+  dependsOn: string[];
+}
+
+/**
+ * Leniently decode a Pack's graph.yaml. Runtime resolution never throws for
+ * graph problems — `opsv pack check` owns Stage validation (PACK_STAGE_INVALID);
+ * an undecodable or missing graph simply yields no Stage view.
+ */
+export function loadGraphStages(packRoot: string): Map<string, ResolvedStage> {
+  const stages = new Map<string, ResolvedStage>();
+  const graphPath = path.join(packRoot, 'graph.yaml');
+  if (!fs.existsSync(graphPath)) return stages;
+  let raw: unknown;
+  try {
+    raw = yaml.load(fs.readFileSync(graphPath, 'utf8'));
+  } catch {
+    return stages;
+  }
+  const parsed = GraphContractSchema.safeParse(raw);
+  if (!parsed.success) return stages;
+  for (const [name, node] of Object.entries(parsed.data.workflow || {})) {
+    if (Array.isArray(node)) stages.set(name, { name, dependsOn: node });
+    else stages.set(name, { ...node, name, dependsOn: node.depends_on || [] });
+  }
+  return stages;
 }
 
 /** Resolve a pack-export-relative path, requiring real containment under the
@@ -137,5 +174,8 @@ export function resolveDocumentContract(
   if (resolvedProfile.kind === 'production' && resolvedProfile.capability && !boundModel) {
     throw new Error(`CAPABILITY_BINDING_MISSING: Production profile "${requestedProfile}" requires a project binding for capability "${resolvedProfile.capability}"`);
   }
-  return { pack, category, profileName: requestedProfile, profile: resolvedProfile, boundModel, defaults: derived?.defaults };
+  // Consume the Workflow-layer Stage (inputs/completion) named after the
+  // Category; absent nodes keep the lenient profile-inherit behavior.
+  const stage = loadGraphStages(pack.root).get(categoryName);
+  return { pack, category, profileName: requestedProfile, profile: resolvedProfile, boundModel, defaults: derived?.defaults, stage };
 }

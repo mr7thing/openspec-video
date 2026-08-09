@@ -33,4 +33,54 @@ describe('Pack contracts', () => {
     fs.writeFileSync(path.join(pack, 'pack.yaml'), 'id: drama\nversion: 1\ncategories:\n  shot: categories/shot.yaml\nprofiles:\n  i2v: ../outside.yaml\n');
     expect(() => resolveDocumentContract(root, 'shot')).toThrow('PACK_EXPORT_OUTSIDE_ROOT');
   });
+
+  // C2 — Stage contract consumption.
+  it('exposes the Stage contract (inputs/completion/roles) for the Category node', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'drama');
+    fs.writeFileSync(path.join(pack, 'graph.yaml'), [
+      'workflow:',
+      '  shot:',
+      '    depends_on: [script]',
+      '    inputs: [script_doc]',
+      '    outputs:',
+      '      contract: shot-ref-v1',
+      '    completion: [output_exists, document_status_approved]',
+      '    roles:',
+      '      document-author: required',
+      '      asset-quality-reviewer: not_applicable',
+      '    recommended_capabilities: [shot_renderer]',
+      '  script: []',
+      '',
+    ].join('\n'));
+    const resolved = resolveDocumentContract(root, 'shot');
+    expect(resolved.stage).toMatchObject({
+      name: 'shot',
+      dependsOn: ['script'],
+      inputs: ['script_doc'],
+      outputs: { contract: 'shot-ref-v1' },
+      completion: ['output_exists', 'document_status_approved'],
+      roles: { 'document-author': 'required', 'asset-quality-reviewer': 'not_applicable' },
+      recommended_capabilities: ['shot_renderer'],
+    });
+  });
+
+  it('normalizes the legacy dependency-array node form', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'drama');
+    fs.writeFileSync(path.join(pack, 'graph.yaml'), 'workflow:\n  script: [shot]\n  shot: []\n');
+    const resolved = resolveDocumentContract(root, 'shot');
+    expect(resolved.stage).toEqual({ name: 'shot', dependsOn: [] });
+  });
+
+  it('omits the Stage view when the Pack has no graph or no node for the Category', () => {
+    expect(resolveDocumentContract(root, 'shot').stage).toBeUndefined();
+    const pack = path.join(root, '.opsv', 'packs', 'drama');
+    fs.writeFileSync(path.join(pack, 'graph.yaml'), 'workflow:\n  script: []\n');
+    expect(resolveDocumentContract(root, 'shot').stage).toBeUndefined();
+  });
+
+  it('stays lenient when graph.yaml is undecodable (pack check owns the error)', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'drama');
+    fs.writeFileSync(path.join(pack, 'graph.yaml'), 'workflow:\n  shot:\n    roles: 42\n');
+    expect(resolveDocumentContract(root, 'shot').stage).toBeUndefined();
+  });
 });

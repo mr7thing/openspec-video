@@ -14,6 +14,7 @@ import {
   ActionPolicySchema,
   CategoryContract,
   CategoryContractSchema,
+  GraphContractSchema,
   KNOWN_POLICY_KEYS,
   PackManifest,
   PackManifestSchema,
@@ -38,6 +39,9 @@ export const PACK_ISSUE_CODES = [
   'PACK_ORPHAN_FILE',
   // v2 addition (T07): declarative input slots referencing unknown categories.
   'PACK_PROFILE_INPUT_INVALID',
+  // C2 addition: graph.yaml Stage contract violations (invalid roles values,
+  // unknown completion rules, malformed Stage nodes).
+  'PACK_STAGE_INVALID',
 ] as const;
 export type PackIssueCode = (typeof PACK_ISSUE_CODES)[number];
 
@@ -106,6 +110,38 @@ export function checkPack(packRoot: string): PackCheckReport {
           push({ code: 'PACK_POLICY_INVALID', severity: 'warning', path: manifestRel, message: `Unknown policy action key "${key}"`, context: { key } });
         }
       }
+    }
+  }
+
+  // graph.yaml (Workflow layer, C2): optional Stage-level contract. Decode
+  // failures report the dedicated PACK_STAGE_INVALID code so Pack authors get
+  // a stable signal for Stage schema violations (e.g. illegal roles values).
+  const graphRel = 'graph.yaml';
+  const graphPath = path.join(packRoot, graphRel);
+  if (fs.existsSync(graphPath)) {
+    try {
+      const raw = yaml.load(fs.readFileSync(graphPath, 'utf8'));
+      const parsed = GraphContractSchema.safeParse(raw);
+      if (!parsed.success) {
+        push({ code: 'PACK_STAGE_INVALID', severity: 'error', path: graphRel, message: flatten(parsed.error.issues) });
+      } else {
+        // Stage quality_guidance docs are Pack-relative export paths: escapes
+        // are hard violations, missing docs are warnings (spec-constraint layer).
+        for (const [stageName, node] of Object.entries(parsed.data.workflow || {})) {
+          if (Array.isArray(node) || node.quality_guidance === undefined) continue;
+          const guidance = Array.isArray(node.quality_guidance) ? node.quality_guidance : [node.quality_guidance];
+          for (const rel of guidance) {
+            const contained = resolveContainedReal(packRoot, rel);
+            if (!contained) {
+              push({ code: 'PACK_STAGE_INVALID', severity: 'error', path: graphRel, message: `Stage "${stageName}" quality_guidance "${rel}" resolves outside the pack root`, context: { stage: stageName, qualityGuidance: rel } });
+            } else if (!fs.existsSync(contained)) {
+              push({ code: 'PACK_STAGE_INVALID', severity: 'warning', path: graphRel, message: `Stage "${stageName}" quality_guidance "${rel}" points to a missing file`, context: { stage: stageName, qualityGuidance: rel } });
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      push({ code: 'PACK_STAGE_INVALID', severity: 'error', path: graphRel, message: `YAML parse failed: ${error.message}` });
     }
   }
 

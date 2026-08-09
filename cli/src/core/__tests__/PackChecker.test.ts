@@ -59,6 +59,7 @@ describe('PackChecker', () => {
       'PACK_SCHEMA_INVALID',
       'PACK_SKILL_CATEGORY_MISSING',
       'PACK_SKILL_PROFILE_MISSING',
+      'PACK_STAGE_INVALID',
     ]);
   });
 
@@ -209,5 +210,76 @@ describe('PackChecker', () => {
     const report = checkPack(root);
     const keys = report.issues.map(i => `${i.path}${i.code}`);
     expect(keys).toEqual([...keys].sort());
+  });
+
+  // C2 — Stage contract (graph.yaml) evolution.
+  it('accepts a legacy dependency-array graph (backward compatible)', () => {
+    writePack(root, { ...VALID_PACK, 'graph.yaml': 'workflow:\n  script: [shot]\n  shot: []\n' });
+    const report = checkPack(root);
+    expect(report.issues.filter(i => i.severity === 'error')).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('passes a pack with full Stage fields declared', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'references/shot-quality.md': '# Shot Quality\n',
+      'graph.yaml': [
+        'workflow:',
+        '  shot:',
+        '    depends_on: [script]',
+        '    inputs: [script_doc]',
+        '    outputs:',
+        '      contract: shot-ref-v1',
+        '    completion: [output_exists, output_contract_valid, document_status_approved]',
+        '    quality_guidance: references/shot-quality.md',
+        '    roles:',
+        '      document-author: required',
+        '      contract-checker: required',
+        '      production-dispatcher: optional',
+        '      asset-quality-reviewer: not_applicable',
+        '    recommended_capabilities: [shot_renderer]',
+        '  script: []',
+        '',
+      ].join('\n'),
+    });
+    const report = checkPack(root);
+    expect(report.issues.filter(i => i.severity === 'error')).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('reports PACK_STAGE_INVALID for an illegal roles value', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'graph.yaml': 'workflow:\n  shot:\n    roles:\n      document-author: mandatory\n',
+    });
+    const report = checkPack(root);
+    const issue = report.issues.find(i => i.code === 'PACK_STAGE_INVALID');
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe('error');
+    expect(issue?.path).toBe('graph.yaml');
+    expect(report.ok).toBe(false);
+  });
+
+  it('reports PACK_STAGE_INVALID for an unknown role key or completion rule', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'graph.yaml': 'workflow:\n  shot:\n    completion: [looks_good]\n    roles:\n      director: required\n',
+    });
+    const report = checkPack(root);
+    expect(report.issues.some(i => i.code === 'PACK_STAGE_INVALID' && i.severity === 'error')).toBe(true);
+    expect(report.ok).toBe(false);
+  });
+
+  it('flags quality_guidance escaping the pack root and warns on missing docs', () => {
+    writePack(root, {
+      ...VALID_PACK,
+      'graph.yaml': 'workflow:\n  shot:\n    quality_guidance: ../outside.md\n  script:\n    quality_guidance: references/missing.md\n',
+    });
+    const report = checkPack(root);
+    const stageIssues = report.issues.filter(i => i.code === 'PACK_STAGE_INVALID');
+    expect(stageIssues.some(i => i.severity === 'error' && /outside the pack root/.test(i.message))).toBe(true);
+    expect(stageIssues.some(i => i.severity === 'warning' && /missing file/.test(i.message))).toBe(true);
+    expect(report.ok).toBe(false);
   });
 });

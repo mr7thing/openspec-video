@@ -117,6 +117,55 @@ describe('Work Context Manifest', () => {
     expect(manifest.documentContract?.category).toBe('shot');
   });
 
+  // C2 — Stage view (graph.yaml) in the manifest: pure increment.
+  it('surfaces the Stage completion and roles when the Pack declares a graph node', () => {
+    writeFiles(path.join(root, '.opsv', 'packs', 'ctx'), {
+      'references/shot-quality.md': '# Shot Quality\n',
+      'graph.yaml': [
+        'workflow:',
+        '  shot:',
+        '    depends_on: [script]',
+        '    inputs: [script_doc]',
+        '    outputs:',
+        '      contract: shot-ref-v1',
+        '    completion: [output_exists, output_contract_valid, document_status_approved]',
+        '    quality_guidance: references/shot-quality.md',
+        '    roles:',
+        '      document-author: required',
+        '      contract-checker: required',
+        '      production-dispatcher: optional',
+        '      asset-quality-reviewer: not_applicable',
+        '    recommended_capabilities: [shot_renderer]',
+        '  script: []',
+        '',
+      ].join('\n'),
+    });
+    const manifest = buildWorkContext(root, 'hero', 'contract-checker');
+    expect(manifest.stage).toEqual({
+      name: 'shot',
+      dependsOn: ['script'],
+      inputs: ['script_doc'],
+      outputs: { contract: 'shot-ref-v1' },
+      completion: ['output_exists', 'output_contract_valid', 'document_status_approved'],
+      roles: {
+        'document-author': 'required',
+        'contract-checker': 'required',
+        'production-dispatcher': 'optional',
+        'asset-quality-reviewer': 'not_applicable',
+      },
+      recommendedCapabilities: ['shot_renderer'],
+      qualityGuidance: ['.opsv/packs/ctx/references/shot-quality.md'],
+    });
+    // Existing A1 manifest fields stay intact (pure increment).
+    expect(manifest.documentContract?.category).toBe('shot');
+    expect(manifest.promptContract.completion).toBe('task-compiled');
+  });
+
+  it('omits the Stage view when the Pack declares no graph node for the category', () => {
+    const manifest = buildWorkContext(root, 'hero', 'document-author');
+    expect(manifest.stage).toBeUndefined();
+  });
+
   it('emits absolute (never ../../-escaping) paths for Packs outside the project root', () => {
     const external = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-ext-pack-'));
     try {
