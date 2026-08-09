@@ -69,7 +69,7 @@
 | G9 | 四个标准 Role 分角色上下文 | 命令面已隐含：`materialize`(author)、`validate`/`pack check`(checker)、`produce`/`run`/`circle`(dispatcher)、`review`(quality)；但无 Role 声明、无 Context Manifest 模板 | 缺角色层抽象 | C |
 | G10 | Review/Syncing 保持唯一确认路径 | 已完整：`approve`/`review`/`sync` 闭环 | 无差距，保持不动 | — |
 | G11 | Pack 迁移到统一执行接口 | 4 个 Pack（mv-3d-previs、mv-3d-ref、short-drama、opsv-multi-ref-pipeline）与 Stage Contract 不匹配 | 需 conformance 迁移 | D |
-| G12 | 硬约束 fail-closed、违规可见 | `invalid` fail-closed 已成立；但违规只在 `work check` 输出，hook 不呈现 | 缺"每轮可见 + 无 fallback"呈现层 | A/D |
+| G12 | 硬约束 fail-closed、违规可见 | `invalid` fail-closed 已成立；但违规只在 `work check` 输出，hook 不呈现 | 缺"每轮可见 + 无 fallback"呈现层（A3 落地；D2 矩阵含断言项） | A |
 | G13 | **OPSV 独立可用（不依赖 Trellis）** | `.claude/hooks/` 三只脚本依赖 Trellis 安装分发；OPSV 无自安装通道；注入脚本若读 `.trellis/` 则在 Trellis-free 项目失效 | 需 OPSV 自安装 hook（A2，模板随 NPM 包分发）+ 注入/执行数据不读 `.trellis/` | A（全部阶段约束） |
 
 **结论**：差距集中在 **G1-G4（注入通道）、G5-G6（执行记录）、G7-G9（Bootstrap 与 Role/Pack Stage 抽象）、G11（迁移）**。这正是分析 §12 的四 Phase，但任务划分须按本计划的 A/B/C/D 执行，且每个任务都锚定上述现状。
@@ -122,9 +122,11 @@
   1. 新脚本 `.claude/hooks/opsv-inject-workflow-state.py`，仅读项目配置定位 `videospec/`，解析当前活跃资产（约定：`.opsv/runtime/active-asset`，见 A4 写入；无则扫 `work next` 第一个 production 资产）。脚本不 import 或读取 `.trellis/`。
   2. 调用 `opsv work context <asset> --role dispatcher --json`（或直接调 TS 层，二选一，本计划定为调 CLI 以保证行为一致）。
   3. 输出 `<opsv-workflow-state>` 块：`asset`、`status`、`nextAction.kind`、`command`（派生展示）、`issueCodes`。**无 fallback 文案**：找不到资产或 nextAction 为 blocked 时，输出 blocked + codes，不静默。
-  4. hook 注册经 A2 安装机制写入 `.claude/settings.json`（幂等；Trellis 在场时与 Trellis hook 并列）。
+  4. **面包屑语义对齐 Trellis 实证模式**：hook 任何路径 exit 0，blocked/违规通过块内容可见（Trellis `inject-workflow-state.py` 实证：无任务、读取失败、blocked 全部 return 0，可见性走 `additionalContext`）。面包屑不得阻断用户输入（UserPromptSubmit exit 2 会阻断整条 prompt）；硬阻断属于 PreToolUse 对 produce/run 等动作的 Gate，不在本任务。
+  5. **延迟预算**：每轮调用目标 ≤300ms；CLI 超时/失败时输出"状态未知，见 `opsv work check`"可见行，不静默通过。B4 落盘后切换为读投影，CLI 仅作校准。
+  6. hook 注册经 A2 安装机制写入 `.claude/settings.json`（幂等；Trellis 在场时与 Trellis hook 并列）。
 - **验收**：
-  - [ ] fixture 资产在 `drafting` 时，hook 输出块含 `nextAction.kind=draft`；在 ref 缺失时含 `REF_*` issue codes 且 exit 非 0。
+  - [ ] fixture 资产在 `drafting` 时，hook 输出块含 `nextAction.kind=draft`；在 ref 缺失时含 `REF_*` issue codes；两种情况下 hook 均 exit 0（可见性靠内容，不靠退出码）。
   - [ ] 无活跃资产时输出明确的"Refer to `opsv work next`"行，不静默通过。
   - [ ] `HookReadiness.test.ts` 追加 1 条：hook 输出块的 `nextAction.kind` 与 `buildNextAction` 结果一致（不变量进测试）。
   - [ ] 在**无 `.trellis/`** 的 fixture 项目上，面包屑输出与 Trellis 在场时一致（standalone）。
@@ -145,7 +147,7 @@
 - **现状**：PreToolUse 现有 hook 拦截 Task/Agent 注入 Trellis jsonl 全文；OPSV 的 Document Contract、Pack 指导、Approved References 不会随子 Agent 进入上下文。
 - **目标**：拦截 `Task|Agent` 调用，当目标是 OPSV 生产动作时，把 `work context` 的 Context Manifest（含 Document Contract、Approved Refs 清单、Pack 指导）注入 prompt，带字节预算（借鉴 Trellis 单文件 32KB / 总量 128KB，超限降级为引用路径）。脚本不读取 `.trellis/`。
 - **要做**：
-  1. 新脚本 `.claude/hooks/opsv-inject-subagent-context.py`，识别 prompt 中的 OPSV 动作（`opsv produce/compile/materialize/approve/sync` 或明确 asset 引用）。
+  1. 新脚本 `.claude/hooks/opsv-inject-subagent-context.py`，识别 prompt 中的 OPSV 动作——匹配真实命令面 `opsv produce/run/circle/materialize/iterate/approve/sync` 或明确 asset 引用（文档起草/修改等 document-author 场景经 asset 引用覆盖；`compile` 只是 NextAction kind，不是 CLI 命令，不作匹配）。
   2. 物化：`opsv work context <asset> --json` → 追加 `Document Contract` + `Approved References`（只列文件名+状态，大媒体用引用） + `Pack guidance`（阶段 C 前为 SKILL.md 引用路径）。
   3. `permissionDecision: allow + updatedInput` 改写调用（与 Trellis 同 seam）。
 - **验收**：
@@ -275,7 +277,7 @@
 - **现状**：无 Subagent 角色分发。
 - **目标**：Claude Code 上，A5 hook 根据 manifest 的 role 目标，用宿主框架原生 `Task`/`Agent` 机制创建对应角色子 Agent；Pack 定义领域上下文，不定义 Core 角色拓扑。
 - **要做**：A5 输出块携带 `role` 与 `nextAction`，由宿主框架的 agent 定义（`.agents/*.md`）按 role 组装 prompt。
-- **验收**：针对 `opsv produce` 动作，子 Agent 以其 role 的模板获得上下文；文档校验动作由 contract-checker 角色执行，不产生写操作。
+- **验收**：针对 `opsv produce` 动作，A5 注入块含 `role: production-dispatcher` 且引用其模板路径（hook 输出断言进 `HookReadiness.test.ts`）；contract-checker 角色模板内容断言：不含 produce/run/approve 等写指令示例（模板静态检查进测试）。
 - **依赖**：C3。
 
 ### 阶段 D：Pack 迁移与 Conformance（分析 Phase 4）
@@ -285,22 +287,22 @@
 - **现状**：mv-3d-previs、mv-3d-ref、short-drama、opsv-multi-ref-pipeline 四 Pack 的 graph/profiles 未声明 stage 字段与 roles。
 - **目标**：四 Pack 通过扩展 schema 的 `pack check`，且每 Stage 声明 inputs/outputs/completion/roles。
 - **要做**：逐个 Pack 补 stage 字段；`opsv-packs` 仓提交，主仓 fixture 同步。
-- **验收**：每个 Pack `opsv pack check --json` 0 error；`test/pack-contract.test.js` 对四 Pack 全绿。
+- **验收**：每个 Pack `opsv pack check --json` 0 error；`cli/src/core/__tests__/PackContracts.test.ts` 扩展至四 Pack 全绿（该测试已存在，覆盖主仓 3 Pack + opsv-packs 仓的 opsv-multi-ref-pipeline fixture）。
 - **依赖**：C2。
 
 #### D2 — Conformance 检查脚本
 
 - **现状**：无统一 conformance 入口。
-- **目标**：一条命令对任意项目检查分析 §12 Phase 4 的六问：每 Stage 输入能否从文档获得 / 输出有无 Contract / 当前 Role 是否获完整 Context / 用户能否 Review 后 iterate+sync / 推荐工具是否误当白名单 / 硬软约束是否分层。
+- **目标**：一条命令对任意项目输出检查矩阵：分析 §12 Phase 4 的 5 项检查（每 Stage 输入能否从文档获得 / 输出有无 Contract / 当前 Role 是否获完整 Context / 用户能否 Review 后 iterate+sync / 推荐工具是否误当白名单）+ 本计划新增第 6 项（硬软约束是否分层）。
 - **要做**：`opsv conformance <pack>` 命令，输出检查矩阵与 fail 项。
-- **验收**：对 opsv-multi-ref-pipeline 输出六问矩阵；不满足项可定位到 Pack 文件与行。
+- **验收**：对 opsv-multi-ref-pipeline 输出 6 项检查矩阵；不满足项可定位到 Pack 文件与行。
 - **依赖**：C1、C2。
 
 #### D3 — 双仓版本配对、spec 更新、回归测试
 
 - **现状**：08-05 计划 §13 已定双仓配对流程。
 - **目标**：Core（cli/src）+ Pack（opsv-packs）版本配对发布；`.trellis/spec/` 更新；`HookReadiness.test.ts` 扩展到新 hook（A3/A4/A5）与 execution（B2）。
-- **要做**：按 08-05 §13 流程执行；spec 更新清单见 §5。
+- **要做**：按 08-05 §13 流程执行；spec 更新清单见 §7。
 - **验收**：Core build/lint/test 全绿；hook 相关 7+ 项 readiness 测试全过；`opsv bootstrap`+`exec`+`work context` 在 fixture 项目端到端可用。
 - **依赖**：A-D 各任务。
 
@@ -331,18 +333,61 @@
 
 ---
 
-## 5. Spec 更新清单（随各阶段落地）
+## 5. 可执行性：验收形式总表
+
+每个任务的验收都可由命令或测试断言判定，无"人工看一遍"类不可检查项。验收形式归四类：
+
+| 形式 | 适用任务 | 判定入口 |
+|---|---|---|
+| CLI 命令 + fixture 断言 | A1、A2、A6、C1、D2 | `opsv work context` / `opsv hook install` / `opsv validate --inline` / `opsv bootstrap` / `opsv conformance` 在 fixture 项目上的输出与 exit code |
+| Jest 单元/集成测试 | A3、A5、B1、B2、C2、C4、D1 | `cli/src/core/__tests__/`（HookReadiness、PackContracts、WorkContext、execution reducer） |
+| 端到端 standalone 验收 | A3-A5、C1、B2、§8 DoD | 无 `.trellis/` 的临时项目：A2 安装 → 注入 → bootstrap → exec 全链路 |
+| 不变量进测试（防回归） | 全部 hook/execution 任务 | `HookReadiness.test.ts` 快照与一致性断言，对齐 08-05 Go 契约模式 |
+
+执行顺序依赖：A1/A2/A6 无依赖可并行；A3-A5 依赖 A1+A2；B1 无依赖，B2→B3→B4 串行，B4 另依赖 A3；C1 依赖 A1，C2 依赖 A1，C3 依赖 C1+C2，C4 依赖 C3；D1 依赖 C2，D2 依赖 C1+C2，D3 收束全部。无循环依赖；A 与 B 可并行推进。
+
+## 6. Trellis 借鉴落地点：原样借鉴 vs 只借思想
+
+以下每条均已对 `/home/uncle7/code/Trellis` 实证核对（2026-08-09）。
+
+### 6.1 原样借鉴（机制级复制，领域对象换成 OPSV 自己的）
+
+| 机制 | Trellis 实证位置 | 本计划落点 |
+|---|---|---|
+| Hook 三层模型（SessionStart / UserPromptSubmit / PreToolUse）+ settings.json 结构化注册 | `.claude/settings.json` | A2-A5 |
+| 面包屑语义：任何路径 exit 0，可见性走 `additionalContext`，不为状态提示阻断用户输入 | `.claude/hooks/inject-workflow-state.py`（无任务/失败/blocked 全部 return 0） | A3（含延迟预算与"状态未知"可见行） |
+| 字节预算 32KB / 128KB，超限降级为引用路径 | `inject-subagent-context.py`：`DEFAULT_MAX_FILE_BYTES=32768`、`DEFAULT_MAX_TOTAL_BYTES=131072` | A5 |
+| append-only events.jsonl + 锁 + monotonic seq sidecar + idempotencyKey + pure reducer 投影 | `packages/core/src/channel/internal/store/events.ts`（`withLock`/`seqSidecarPath`/`appendEvent`） | B1（事件类型用 OPSV 自己的最小集） |
+| settings.json 幂等合并、可卸载、冲突提示而非覆盖 | Trellis 安装器同 seam | A2 |
+
+### 6.2 只借思想（结构映射，不复制实现）
+
+| Trellis 思想 | OPSV 映射 |
+|---|---|
+| workflow.md 状态机驱动当前阶段 | Pack `graph.yaml` + Execution Record 状态投影（B/C2） |
+| jsonl 上下文选择器（implement.jsonl/check.jsonl 按角色选上下文） | Context Manifest：按 (asset, stage, role) 物化（A1/C3） |
+| 角色上下文分离（implement/check/research 各见各的） | 四标准 Role 的 Context 模板（C3/C4） |
+| 任务目录即事实源（task dir + prd/jsonl） | `.opsv/execution/<execution-id>/`（B1） |
+| Pull-fallback：Agent 显式读取清单兜底 | 无原生注入的框架显式读 Manifest（分析 §2.5） |
+
+### 6.3 明确不借鉴
+
+- Trellis Channel / 聊天 / Worker Inbox / 进程调度（非目标 #3）；
+- 工程任务语义（task.py / prd / implement / check 属开发工作流，归 Trellis；OPSV 生产工作流不复制这套，非目标 #14）；
+- 平台 hook 内的业务规则解释权（hook 只注入，不解释，非目标 #11）。
+
+## 7. Spec 更新清单（随各阶段落地）
 
 | 阶段 | 更新文件 |
 |---|---|
 | A | `.trellis/spec/cli/engine/index.md`（`work context` 命令面）、`.trellis/spec/cli/engine/document-pipeline.md`（Context Manifest）、`architecture.md`（四标准 Role、注入通道） |
 | B | `architecture.md`（Execution Record 事件类型与投影）、`.trellis/spec/cli/engine/config-system.md`（`.opsv/execution`/`runtime` 目录约定） |
 | C | `.trellis/spec/packs/authoring/pack-format.md`（Stage Contract 扩展）、`architecture.md`（Bootstrap 与 Role 模板） |
-| D | `.trellis/spec/packs/authoring/index.md`（conformance 六问）、`pack-format.md`（迁移指南） |
+| D | `.trellis/spec/packs/authoring/index.md`（conformance 六项检查）、`pack-format.md`（迁移指南） |
 
 ---
 
-## 6. Definition of Done（整份计划的完成定义）
+## 8. Definition of Done（整份计划的完成定义）
 
 - [ ] A1-A6 落地：Claude Code 上 OPSV 状态每轮在场（A3）、子 Agent 获得最小上下文（A5）、`validate --inline` 可用（A6）、hook 可自安装（A2）。
 - [ ] B1-B4 落地：`.opsv/execution/` 事件存储 + `opsv exec` 命令面 + Plan Revision，与短程 iterate 分置。
