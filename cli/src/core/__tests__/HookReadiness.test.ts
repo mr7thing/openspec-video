@@ -17,6 +17,9 @@ import { buildWorkPacket } from '../WorkPacket';
 import { buildWorkContext } from '../WorkContext';
 import { renderNextActionCommand, WORK_PACKET_CONTRACT_VERSION } from '../NextAction';
 import { ManifestReader } from '../ManifestReader';
+import { writeBootstrap } from '../Bootstrap';
+import { EventStore } from '../execution/EventStore';
+import { computeReadyActions, persistReadyActions } from '../../commands/exec';
 
 const PACK_FILES: Record<string, string> = {
   'pack.yaml': [
@@ -138,7 +141,7 @@ describe('Hook/Dispatcher readiness contract', () => {
     }
   });
 
-  it('8: workflow-state hook block reports the same nextAction.kind as buildNextAction (A3 invariant)', () => {
+  it('8: workflow-state hook block reports the same nextAction.kind as buildNextAction (A3 invariant)', async () => {
     // The hook renders Core-produced JSON (fed here through a shim opsv CLI);
     // the breadcrumb kind must equal buildNextAction's result for the asset.
     const shim = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-readiness-shim-'));
@@ -149,9 +152,10 @@ describe('Hook/Dispatcher readiness contract', () => {
       fs.writeFileSync(path.join(root, '.opsv', 'runtime', 'active-asset'), 'hero\n');
 
       const hook = path.join(__dirname, '..', '..', '..', 'templates', 'hooks', 'opsv-inject-workflow-state.py');
+      const hookEnv = { ...process.env, PATH: `${shim}:${process.env.PATH}`, OPSV_SHIM_DIR: shim };
       const stdout = execFileSync('python3', [hook], {
         input: JSON.stringify({ cwd: root }),
-        env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, OPSV_SHIM_DIR: shim },
+        env: hookEnv,
         encoding: 'utf8',
         timeout: 30000,
       });
@@ -159,9 +163,115 @@ describe('Hook/Dispatcher readiness contract', () => {
       const packet = buildWorkPacket(root, 'hero');
       expect(packet.nextAction?.kind).toBe('circle');
       expect(block).toContain('<opsv-workflow-state>');
+      // Disk source (A3): annotated, and kind equal to buildNextAction.
+      expect(block).toContain('Source: disk');
       expect(block).toContain(`NextAction: ${packet.nextAction?.kind}`);
+
+      // Execution source (B4): with an active execution the same hook reads
+      // the persisted ReadyActionSet. Asset-level kinds still come from
+      // buildNextAction (via computeReadyActions), so the headline kind stays
+      // equal; the one difference (derived command/skill not carried by the
+      // projection) must be annotated, not silent.
+      const store = new EventStore(root, 'exec-ready');
+      await store.init({
+        version: 1,
+        executionId: 'exec-ready',
+        createdAt: '2026-08-10T00:00:00.000Z',
+        stages: [{ id: 'shoot', label: 'Shoot', steps: [{ id: 'compile', refs: ['hero'] }] }],
+      });
+      await store.append({ kind: 'execution', by: 'test', payload: { action: 'create' } });
+      await store.append({ kind: 'execution', by: 'test', payload: { action: 'start' } });
+      const state = await store.projectState();
+      const set = computeReadyActions(root, (await store.readPlan())!, state);
+      await persistReadyActions(root, state, set);
+      expect(set.ready[0]?.kind).toBe(packet.nextAction?.kind);
+
+      const execStdout = execFileSync('python3', [hook], {
+        input: JSON.stringify({ cwd: root }),
+        env: hookEnv,
+        encoding: 'utf8',
+        timeout: 30000,
+      });
+      const execBlock = JSON.parse(execStdout).hookSpecificOutput.additionalContext;
+      expect(execBlock).toContain('Source: execution');
+      expect(execBlock).toContain(`NextAction: ${packet.nextAction?.kind}`);
+      expect(execBlock).toContain(`[ready] ${packet.nextAction?.kind} asset=hero stage=shoot step=compile attempt=1`);
+      expect(execBlock).toMatch(/Note: derived command\/skill for 'circle' is not part of the execution projection/);
     } finally {
       fs.rmSync(shim, { recursive: true, force: true });
     }
+  });
+
+  /** Run the A5 PreToolUse hook against a shim opsv CLI that serves the given
+   *  manifest, and return the rewritten sub-agent prompt. */
+  function runA5Hook(shim: string, manifest: unknown, prompt: string): Record<string, any> {
+    fs.writeFileSync(path.join(shim, 'context.json'), JSON.stringify(manifest));
+    fs.writeFileSync(path.join(shim, 'opsv'), '#!/bin/sh\ncat "$OPSV_SHIM_DIR/context.json"\n', { mode: 0o755 });
+    const hook = path.join(__dirname, '..', '..', '..', 'templates', 'hooks', 'opsv-inject-subagent-context.py');
+    const stdout = execFileSync('python3', [hook], {
+      input: JSON.stringify({
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Task',
+        tool_input: { subagent_type: 'opsv-production-dispatcher', description: 'produce hero', prompt },
+        cwd: root,
+      }),
+      env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, OPSV_SHIM_DIR: shim },
+      encoding: 'utf8',
+      timeout: 30000,
+    });
+    return JSON.parse(stdout);
+  }
+
+  it('9: A5 sub-agent injection for `opsv produce` carries role production-dispatcher, nextAction, and the role template path (C4)', () => {
+    writeBootstrap(root); // materialize .opsv/bootstrap/roles/*.md so roleTemplate lands in the manifest
+    const shim = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-readiness-shim-'));
+    try {
+      const manifest = buildWorkContext(root, 'hero', 'production-dispatcher');
+      expect(manifest.roleTemplate?.path).toBe('.opsv/bootstrap/roles/production-dispatcher.md');
+      const out = runA5Hook(shim, manifest, 'Advance production: run `opsv produce` for asset hero once the circle compiles.');
+      expect(out.hookSpecificOutput.permissionDecision).toBe('allow');
+      const prompt = out.hookSpecificOutput.updatedInput.prompt as string;
+      expect(prompt).toContain('<!-- opsv-hook-injected -->');
+      expect(prompt).toContain('<opsv-subagent-context asset="hero" role="production-dispatcher">');
+      // Explicit role + nextAction handoff for the host agent definition.
+      expect(prompt).toContain('role: production-dispatcher');
+      expect(prompt).toContain('Role: production-dispatcher');
+      expect(prompt).toContain('NextAction: circle');
+      // The injection block references the role template path (never copies it).
+      expect(prompt).toContain('Role Context Template: .opsv/bootstrap/roles/production-dispatcher.md');
+      // Append-only rewrite: the original dispatch prompt survives verbatim.
+      expect(prompt.startsWith('Advance production: run `opsv produce` for asset hero once the circle compiles.')).toBe(true);
+    } finally {
+      fs.rmSync(shim, { recursive: true, force: true });
+    }
+  });
+
+  it('10: A5 injection degrades visibly when the role template is not materialized (C4)', () => {
+    // No writeBootstrap: the manifest has no roleTemplate, so the block must
+    // say so in a visible line instead of silently omitting the reference.
+    const shim = fs.mkdtempSync(path.join(os.tmpdir(), 'opsv-readiness-shim-'));
+    try {
+      const manifest = buildWorkContext(root, 'hero', 'production-dispatcher');
+      expect(manifest.roleTemplate).toBeUndefined();
+      const out = runA5Hook(shim, manifest, 'run `opsv produce` for asset hero');
+      const prompt = out.hookSpecificOutput.updatedInput.prompt as string;
+      expect(prompt).toContain('Role: production-dispatcher');
+      expect(prompt).toContain('Role Context Template: NOT MATERIALIZED');
+      expect(prompt).toContain('.opsv/bootstrap/roles/production-dispatcher.md');
+    } finally {
+      fs.rmSync(shim, { recursive: true, force: true });
+    }
+  });
+
+  it('11: contract-checker role template is read-only and carries no produce/run/approve write-directive examples (C4)', () => {
+    writeBootstrap(root);
+    const body = fs.readFileSync(path.join(root, '.opsv', 'bootstrap', 'roles', 'contract-checker.md'), 'utf8');
+    expect(body).toContain('# Role Context: contract-checker');
+    expect(body).toContain('read-only validation');
+    // No write directives: no command examples, no write-verb section headers,
+    // and no produce/run/approve tokens anywhere in this fixture render.
+    expect(body).not.toMatch(/\bopsv\s+(produce|run|approve)\b/i);
+    expect(body).not.toMatch(/^#{1,6}\s.*\b(produce|run|approve)\b/im);
+    expect(body).not.toMatch(/\b(produce|run|approve)\b/i);
   });
 });

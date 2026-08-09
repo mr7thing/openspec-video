@@ -161,9 +161,32 @@ def build_injection_block(manifest: dict) -> str:
             f"materialized by the {HOOK_NAME} hook via "
             f"`opsv work context {asset} --role {role} --json`.",
         ]
+        # C4 role handoff: the block must explicitly carry role + nextAction
+        # and reference the bootstrap-materialized Role Context Template, so
+        # the host framework's agent definition (.claude/agents/opsv-<role>.md)
+        # can assemble the sub-agent prompt per role. Packs define domain
+        # context; Core defines the role topology.
         next_action = manifest.get("nextAction")
+        lines.append(f"Role: {role}")
         if isinstance(next_action, dict) and next_action.get("kind"):
             lines.append(f"NextAction: {next_action['kind']}")
+        role_template = manifest.get("roleTemplate")
+        template_path = (
+            _string(role_template.get("path")) if isinstance(role_template, dict) else ""
+        )
+        if template_path:
+            lines.append(
+                f"Role Context Template: {template_path} — read it and the Pack "
+                "files it references to assemble the working context."
+            )
+        else:
+            # Visible degradation, never silent: the manifest was materialized
+            # before `opsv bootstrap` generated the role templates.
+            lines.append(
+                "Role Context Template: NOT MATERIALIZED — run `opsv bootstrap` "
+                f"to generate .opsv/bootstrap/roles/{role}.md; dispatch proceeds "
+                "with the degraded manifest above."
+            )
 
         lines.append("")
         lines.append("## Document Contract")

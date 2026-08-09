@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { buildWorkPacket } from '../WorkPacket';
 import { buildWorkContext, isWorkContextRole, REF_SYNTAX_FORMS, WORK_CONTEXT_ROLES } from '../WorkContext';
+import { writeBootstrap } from '../Bootstrap';
 import { WORK_PACKET_CONTRACT_VERSION } from '../NextAction';
 
 // Fixture: one pack exporting a production category whose skill carries a
@@ -164,6 +165,57 @@ describe('Work Context Manifest', () => {
   it('omits the Stage view when the Pack declares no graph node for the category', () => {
     const manifest = buildWorkContext(root, 'hero', 'document-author');
     expect(manifest.stage).toBeUndefined();
+  });
+
+  // C3 — Role Context template consumption + ROLE_NOT_APPLICABLE.
+  it('attaches the bootstrap-materialized role template when present', () => {
+    const dir = path.join(root, '.opsv', 'bootstrap', 'roles');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'contract-checker.md'), '# Role Context: contract-checker\n');
+    const manifest = buildWorkContext(root, 'hero', 'contract-checker');
+    expect(manifest.roleTemplate).toEqual({
+      path: '.opsv/bootstrap/roles/contract-checker.md',
+      content: '# Role Context: contract-checker\n',
+    });
+  });
+
+  it('omits roleTemplate when bootstrap has not materialized templates (pure increment)', () => {
+    const manifest = buildWorkContext(root, 'hero', 'contract-checker');
+    expect(manifest.roleTemplate).toBeUndefined();
+    // Existing fields stay intact.
+    expect(manifest.documentContract?.category).toBe('shot');
+  });
+
+  it('consumes the bootstrap-materialized template end to end (bootstrap -> work context)', () => {
+    writeBootstrap(root);
+    const manifest = buildWorkContext(root, 'hero', 'contract-checker');
+    expect(manifest.roleTemplate?.path).toBe('.opsv/bootstrap/roles/contract-checker.md');
+    expect(manifest.roleTemplate?.content).toContain('# Role Context: contract-checker');
+    expect(manifest.roleTemplate?.content).toContain('.opsv/packs/ctx/categories/shot.yaml');
+  });
+
+  const STAGE_ROLES_GRAPH = [
+    'workflow:',
+    '  shot:',
+    '    depends_on: []',
+    '    roles:',
+    '      document-author: required',
+    '      contract-checker: required',
+    '      production-dispatcher: optional',
+    '      asset-quality-reviewer: not_applicable',
+    '',
+  ].join('\n');
+
+  it('throws ROLE_NOT_APPLICABLE when the stage declares the role not_applicable', () => {
+    fs.writeFileSync(path.join(root, '.opsv', 'packs', 'ctx', 'graph.yaml'), STAGE_ROLES_GRAPH);
+    expect(() => buildWorkContext(root, 'hero', 'asset-quality-reviewer'))
+      .toThrow(/^ROLE_NOT_APPLICABLE: role "asset-quality-reviewer" is declared not_applicable for stage "shot"/);
+  });
+
+  it('materializes normally for required/optional roles on the same stage', () => {
+    fs.writeFileSync(path.join(root, '.opsv', 'packs', 'ctx', 'graph.yaml'), STAGE_ROLES_GRAPH);
+    expect(buildWorkContext(root, 'hero', 'document-author').stage?.roles?.['document-author']).toBe('required');
+    expect(buildWorkContext(root, 'hero', 'production-dispatcher').role).toBe('production-dispatcher');
   });
 
   it('emits absolute (never ../../-escaping) paths for Packs outside the project root', () => {

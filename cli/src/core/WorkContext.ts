@@ -7,8 +7,9 @@
 // never .trellis/.
 // Role context is the stage-A minimal set: doc format requirements
 // (documentContract), dependency syntax + completion condition
-// (promptContract), and Pack guidance paths (guidanceRefs). Full per-role
-// templates arrive with the stage-C Role abstraction.
+// (promptContract), and Pack guidance paths (guidanceRefs). C3 adds the
+// bootstrap-materialized Role Context template (roleTemplate) and the
+// fail-fast ROLE_NOT_APPLICABLE judgement for stage `roles` declarations.
 // ============================================================================
 
 import fs from 'fs';
@@ -38,6 +39,12 @@ export function isWorkContextRole(value: string): value is WorkContextRole {
 
 export function unknownRoleMessage(role: string): string {
   return `ROLE_UNKNOWN: "${role}" is not a known role (expected one of: ${WORK_CONTEXT_ROLES.join(', ')})`;
+}
+
+/** Issue-code message when a Pack's stage `roles` declaration excludes the
+ *  requested role (C2 declaration, C3 judgement). */
+export function roleNotApplicableMessage(role: WorkContextRole, stage: string): string {
+  return `ROLE_NOT_APPLICABLE: role "${role}" is declared not_applicable for stage "${stage}" by the Pack's graph.yaml`;
 }
 
 /** Canonical @-ref dependency syntax, mirroring RefSyntaxParser's grammar. */
@@ -107,6 +114,12 @@ export interface WorkContextManifest {
   issues: WorkPacket['issues'];
   /** Pack guidance paths (SKILL.md references): project-root-relative, absolute for external Packs. */
   guidanceRefs: string[];
+  /**
+   * Role Context template (C3): the bootstrap-materialized body for this role
+   * plus its project-root-relative path. Omitted when `opsv bootstrap` has not
+   * materialized templates (pure increment — never an error here).
+   */
+  roleTemplate?: { path: string; content: string };
 }
 
 /**
@@ -144,6 +157,17 @@ function guidanceRefs(projectRoot: string, packet: WorkPacket, packRoot?: string
   return [...new Set(refs)];
 }
 
+/** Mirrors core/Bootstrap.ts BOOTSTRAP_ROLES_DIR_REL. The import direction is
+ *  Bootstrap → WorkContext, so the path constant is duplicated here. */
+const BOOTSTRAP_ROLE_TEMPLATE_DIR_REL = '.opsv/bootstrap/roles';
+
+/** The bootstrap-materialized Role Context template for this role (C3). */
+function roleTemplateRef(projectRoot: string, role: WorkContextRole): { path: string; content: string } | undefined {
+  const abs = path.join(projectRoot, BOOTSTRAP_ROLE_TEMPLATE_DIR_REL, `${role}.md`);
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return undefined;
+  return { path: `${BOOTSTRAP_ROLE_TEMPLATE_DIR_REL}/${role}.md`, content: fs.readFileSync(abs, 'utf8') };
+}
+
 export function buildWorkContext(projectRoot: string, selector: string, role: string): WorkContextManifest {
   if (!isWorkContextRole(role)) throw new Error(unknownRoleMessage(role));
   const packet = buildWorkPacket(projectRoot, selector);
@@ -158,6 +182,8 @@ export function buildWorkContext(projectRoot: string, selector: string, role: st
     issues: packet.issues,
     guidanceRefs: guidanceRefs(projectRoot, packet),
   };
+  const roleTemplate = roleTemplateRef(projectRoot, role);
+  if (roleTemplate) manifest.roleTemplate = roleTemplate;
   if (!packet.category) return manifest; // CATEGORY_MISSING is already on issues
 
   // Re-resolve the Document Contract to expose the raw category/profile
@@ -210,6 +236,11 @@ export function buildWorkContext(projectRoot: string, selector: string, role: st
       return manifest;
     }
     throw error;
+  }
+  // C3: a Pack may exclude a role from a stage (C2 `roles` declaration). The
+  // query then fails fast with a stable issue code, mirroring ROLE_UNKNOWN.
+  if (manifest.stage?.roles?.[role] === 'not_applicable') {
+    throw new Error(roleNotApplicableMessage(role, manifest.stage.name));
   }
   return manifest;
 }

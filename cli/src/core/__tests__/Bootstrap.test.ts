@@ -223,6 +223,92 @@ describe('Bootstrap', () => {
     });
   });
 
+  // C3 — Role Context template materialization (analysis §10.2): the four
+  // templates reference Pack files by path, never copy Pack content.
+  describe('role templates (C3)', () => {
+    const readTemplate = (role: string): string =>
+      fs.readFileSync(path.join(root, BOOTSTRAP_ROLES_DIR_REL, `${role}.md`), 'utf8');
+
+    it('materializes all four templates and flips the manifest slots to materialized', () => {
+      const { manifest, manifestPath } = writeBootstrap(root);
+      expect(manifest.roles).toEqual(BOOTSTRAP_ROLES.map(role => ({
+        role,
+        template: `.opsv/bootstrap/roles/${role}.md`,
+        status: 'materialized',
+      })));
+      for (const entry of manifest.roles) {
+        expect(fs.existsSync(path.join(root, entry.template))).toBe(true);
+      }
+      // The on-disk manifest records the same materialized statuses.
+      expect(JSON.parse(fs.readFileSync(manifestPath, 'utf8')).roles).toEqual(manifest.roles);
+    });
+
+    it('document-author references the document contracts, prompt syntax, and guidance docs', () => {
+      fs.writeFileSync(path.join(root, '.opsv', 'packs', 'pipe', 'SKILL.md'), '# Pipe Guidance\n');
+      writeBootstrap(root);
+      const body = readTemplate('document-author');
+      expect(body).toContain('.opsv/packs/pipe/categories/script.yaml');
+      expect(body).toContain('.opsv/packs/pipe/categories/shot.yaml');
+      expect(body).toContain('default profile: i2v');
+      expect(body).toContain('@id:variant');
+      expect(body).toContain('.opsv/packs/pipe/SKILL.md');
+    });
+
+    it('contract-checker references schemas, dependency rules, IO contracts, and gates', () => {
+      writeBootstrap(root);
+      const body = readTemplate('contract-checker');
+      expect(body).toContain('.opsv/packs/pipe/pack.yaml');
+      expect(body).toContain('.opsv/packs/pipe/categories/shot.yaml');
+      expect(body).toContain('shot (pack pipe) depends on: script');
+      expect(body).toContain('pipe/i2v slot "reference": category script, ref image (required)');
+      expect(body).toContain('pipe/i2v outputs: video');
+      expect(body).toContain('pipe/create-shot (compile): work-check, refs-valid');
+      // C4: the role is read-only — the template states its scope and never
+      // carries produce/run/approve write-directive examples.
+      expect(body).toContain('read-only validation');
+      expect(body).not.toMatch(/\b(produce|run|approve)\b/i);
+    });
+
+    it('production-dispatcher references IO, produce/run rules, and recommended providers', () => {
+      fs.writeFileSync(path.join(root, '.opsv', 'packs', 'pipe', 'SKILL.md'), '# Pipe Guidance\n');
+      writeBootstrap(root);
+      const body = readTemplate('production-dispatcher');
+      expect(body).toContain('pipe/i2v slot "reference": category script, ref image (required)');
+      expect(body).toContain('pipe/i2v outputs: video');
+      expect(body).toContain('.opsv/packs/pipe/SKILL.md');
+      expect(body).toContain('pipe effective policy: execute=human');
+      expect(body).toContain('continuous-i2v (pack pipe; profiles: i2v) — project binding: test.model');
+    });
+
+    it('asset-quality-reviewer references Pack quality guidance and review targets', () => {
+      writeFiles(path.join(root, '.opsv', 'packs', 'pipe'), { 'references/shot-quality.md': '# Shot Quality\n' });
+      fs.writeFileSync(path.join(root, '.opsv', 'packs', 'pipe', 'graph.yaml'), [
+        'workflow:',
+        '  script: []',
+        '  shot:',
+        '    depends_on: [script]',
+        '    outputs:',
+        '      contract: shot-ref-v1',
+        '    completion: [output_exists, output_contract_valid]',
+        '    quality_guidance: references/shot-quality.md',
+        '',
+      ].join('\n'));
+      writeBootstrap(root);
+      const body = readTemplate('asset-quality-reviewer');
+      expect(body).toContain('shot (pack pipe): .opsv/packs/pipe/references/shot-quality.md');
+      expect(body).toContain('shot (pack pipe): completion [output_exists, output_contract_valid] output contract: shot-ref-v1');
+    });
+
+    it('degrades gracefully when the Pack declares no guidance or stage fields', () => {
+      writeBootstrap(root);
+      for (const role of BOOTSTRAP_ROLES) {
+        const body = readTemplate(role);
+        expect(body).toContain(`# Role Context: ${role}`);
+      }
+      expect(readTemplate('asset-quality-reviewer')).toContain('(none declared)');
+    });
+  });
+
   describe('checkBootstrapStale (fail-closed)', () => {
     it('is fresh right after bootstrap', () => {
       writeBootstrap(root);
@@ -331,7 +417,7 @@ describeMultiRef('Bootstrap on opsv-multi-ref-pipeline (sibling opsv-packs check
     expect(manifest.workflowGraph.find(node => node.id === 'clip')?.dependsOn).toContain('shot');
     expect(shot?.profile).toMatchObject({ name: 'multi-ref-video', kind: 'production', capability: 'video-generation' });
     expect(manifest.roles.map(entry => entry.role)).toEqual([...BOOTSTRAP_ROLES]);
-    expect(manifest.roles.every(entry => entry.template.startsWith('.opsv/bootstrap/roles/') && entry.status === 'pending')).toBe(true);
+    expect(manifest.roles.every(entry => entry.template.startsWith('.opsv/bootstrap/roles/') && entry.status === 'materialized')).toBe(true);
     expect(checkBootstrapStale(root).stale).toBe(false);
     fs.appendFileSync(path.join(packCopy, 'graph.yaml'), '# drift probe\n');
     const status = checkBootstrapStale(root);
