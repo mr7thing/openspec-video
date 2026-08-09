@@ -24,3 +24,9 @@ export { downloadFile } from './utils/download';
 export { fileToBase64, fileToDataUri, fileToBase64Async } from './utils/fileToBase64';
 export { stitchImages } from './utils/imageStitch';
 export { FrameExtractor } from './utils/frameExtractor';
+
+// Execution Record (.opsv/execution/ event store + reducer projection)
+export { EventStore } from './core/execution/EventStore';
+export { reduceEvents, createInitialState } from './core/execution/reducer';
+export { ExecutionEventSchema, ExecutionEventDraftSchema, ExecutionPlanSchema, ExecutionStateSchema, EXECUTION_EVENT_KINDS } from './types/ExecutionRecord';
+export type { ExecutionEvent, ExecutionEventDraft, ExecutionEventKind, ExecutionPlan, ExecutionState, ExecutionStatus } from './types/ExecutionRecord';

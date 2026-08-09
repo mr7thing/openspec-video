@@ -45,3 +45,7 @@ docs/log-2026-07-19-codex.md
 
 # Trellis session data (spec/ and config.yaml remain tracked)
 .trellis/
+.bak/before-trellis-update-0.6.12-2026-08-03/trellis-config.yaml
+
+# OPSV execution runtime (locks/seq sidecars) — .opsv/execution/ records stay tracked
+.opsv/runtime/
