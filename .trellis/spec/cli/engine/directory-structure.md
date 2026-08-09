@@ -24,7 +24,7 @@
 |------|------|
 | `src/commands/` | 24 command modules, one per command group, plus `produceUtils.ts` |
 | `src/container/` | `Container.ts` (DI registry for compilers/executors), `OpsVContext.ts` (per-invocation runtime context) |
-| `src/core/` | Document engine: `FrontmatterParser.ts`, `AssetDocIndex.ts`, `AssetManager.ts`, the @-ref subsystem (`RefEngine.ts` facade, `RefSyntaxParser.ts`, `RefBinder.ts`, `RefResolver.ts`, `ApprovedRefReader.ts`, `DesignRefReader.ts`), `ManifestReader.ts`, orchestration (`ProductionPipeline.ts`, `DependencyGraph.ts`, `Materializer.ts`, `WorkPacket.ts`, `PackContracts.ts`, `ProjectConfig.ts`), review/approve/sync (`ReviewService.ts`, `ReviewStrategy.ts`, `ApproveService.ts`, `SyncService.ts`), `CategoryValidator.ts` |
+| `src/core/` | Document engine: `FrontmatterParser.ts`, `AssetDocIndex.ts`, `AssetManager.ts`, the @-ref subsystem (`RefEngine.ts` facade, `RefSyntaxParser.ts`, `RefBinder.ts`, `RefResolver.ts`, `ApprovedRefReader.ts`, `DesignRefReader.ts`), `ManifestReader.ts`, orchestration (`ProductionPipeline.ts`, `DependencyGraph.ts`, `Materializer.ts`, `WorkPacket.ts`, `WorkContext.ts` (Context Manifest), `Validator.ts` (shared validation kernel), `PackContracts.ts`, `ProjectConfig.ts`), review/approve/sync (`ReviewService.ts`, `ReviewStrategy.ts`, `ApproveService.ts`, `SyncService.ts`), `CategoryValidator.ts` |
 | `src/core/compiler/` | Compile stage: `ProviderCompiler.ts` (interface), `PromptCompiler.ts`, `TaskBuilder.ts`, `providers/` (8 provider compilers), `shared/` (`compilerUtils.ts`, `InputEvaluator.ts`) |
 | `src/executor/` | Execute stage: `QueueRunner.ts` (scheduler), `HttpClient.ts` (axios + retry), `polling.ts` (gradient polling, JSONL checkpoints), `naming.ts` (output naming/locking), `providers/` (`BaseApiProvider.ts` + 8 concrete providers) |
 | `src/types/` | All Zod schemas: `FrontmatterSchema.ts`, `Job.ts`, `ManifestSchema.ts`, `Refs.ts` |
@@ -40,6 +40,7 @@
 - `cli/review-ui/index.html` — a single self-contained ~81KB SPA (no build step) served by the review server. `scripts/copy-ui-assets.js` copies it into `dist/review-ui/` at build time. **Not** the same thing as `src/review-ui/` (the server). `src/review-ui/public/` is vestigial (only `.gitkeep`).
 - `cli/scripts/` — CommonJS Node scripts: `copy-ui-assets.js` (build step), `postinstall.js` (copies default `.opsv/*.yaml` configs to `~/.opsv/` if absent; never overwrites user config).
 - `cli/.opsv/` — the built-in tier of the three-tier config (see [Config System](./config-system.md)).
+- `cli/templates/hooks/` — Python hook templates (`opsv-*.py`) shipped with the package (`package.json files`) and installed into projects by `opsv hook install`. They must run standalone: no `.trellis/` access, exit 0 on every path.
 - Tests: colocated `src/**/__tests__/*.test.ts` (see [Testing](./testing.md)).
 
 ## Placement Rules

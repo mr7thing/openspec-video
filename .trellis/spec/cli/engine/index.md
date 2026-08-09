@@ -33,7 +33,9 @@ npm run build    # tsc + copy review-ui assets; must pass before commit
 npm test         # jest --passWithNoTests
 ```
 
-Note: `npm run lint` is currently broken (no eslint config/dependency installed) — do not treat its failure as a regression you caused, and do not rely on it.
+Note: `npm run lint` works again — baseline is 0 errors / ~87 warnings of documented debt; keep errors at 0 and do not grow the warning count.
+
+New command surface (2026-08, stage A): `opsv work context` and `validate --inline` are specced in [Document Pipeline](./document-pipeline.md); `opsv hook install|uninstall` and the four standard roles in [architecture.md](../../architecture.md) §Standard Roles and the Injection Channel.
 
 ---
 

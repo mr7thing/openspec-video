@@ -16,13 +16,27 @@
 ## Stage 2: Validate
 
 - Entry: `opsv validate` (`src/commands/validate.ts`). Exit code 1 on errors; `--strict` promotes warnings.
+- `--inline [path]` (file or stdin; `--json` for machine output) validates **proposed content** — a document not yet on disk (hook/pre-write validation). Both the disk scan and `--inline` call the same pure kernel `validateDocumentContent(content, ctx)` in `core/Validator.ts` (no fs, no config discovery, never reads `.trellis/`). Never fork validation logic into a second implementation.
+  - Kernel contract: `VALIDATOR_CONTRACT_VERSION = 1`; issue codes frozen in `DOCUMENT_ISSUE_CODES` (test-locked); `hashProposedContent(content)` = sha256 — a hook cache-key ingredient alongside `pack.contentDigest` (single owner: `core/PackDigest.ts`).
+  - `--json` report: `{validatorContractVersion, proposedContentHash, pack?, ok, issues}`. An unresolvable/invalid Pack **omits** `pack` (fail-closed: callers must re-validate, never trust a fabricated digest).
 - Per document it runs:
-  1. Schema pick by category (`getSchemaForCategory`).
-  2. Ref binding via `bindRefs` (`core/RefBinder.ts`) → `RefBinderResult {resolved, groupedInputs, errors}`.
+  1. Schema pick by category (`getSchemaForCategory`, in `core/Validator.ts`).
+  2. Ref binding via `bindRefs` (`core/RefBinder.ts`) → `RefBinderResult {resolved, groupedInputs, errors, issues}` — `issues` carries stable codes (`REF_INPUT_TYPE_UNKNOWN` / `REF_STRUCTURE_INVALID` / `REF_PATHS_EMPTY` / `REF_KEY_INVALID`) alongside the legacy `errors` strings; new consumers must use `issues`.
   3. Category business rules via `validateCategory` (`core/CategoryValidator.ts`), driven by `category_validate.yaml` rules loaded through `utils/categoryValidateLoader.ts` (+ `categoryConfigDiscoverer.ts` for tier-conflict detection).
   4. Input-type registry checks (`utils/inputTypesLoader.ts`).
   5. Dead-ref detection, missing-image detection, manifest-vs-frontmatter status consistency.
 - Validation reports `ValidationIssue {severity, category, field?, message}` — do not throw for ordinary validation failures; collect issues.
+
+## Context Manifest (`opsv work context`)
+
+`opsv work context <asset> --role <role> [--json]` (`src/commands/work.ts` → `core/WorkContext.ts`) materializes the Context Manifest for one `(asset, role)` pair — the single source consumed by hook injection and sub-agent pull.
+
+Manifest shape: `{contractVersion, asset, nextAction, documentContract, promptContract, refs, policy, issues, role, guidanceRefs}`. `contractVersion` reuses `WORK_PACKET_CONTRACT_VERSION`; `asset`/`nextAction`/`refs`/`policy`/`issues` come **verbatim** from `buildWorkPacket` — never recompute them in parallel.
+
+- Roles are a fixed Core four-tuple (`WORK_CONTEXT_ROLES`): `document-author`, `contract-checker`, `production-dispatcher`, `asset-quality-reviewer`. Unknown role → `ROLE_UNKNOWN`, exit 1.
+- Exit semantics: a query, not a gate — a materialized manifest exits 0 even when `nextAction.kind` is `blocked` (issues stay visible in content). Only unknown role / unknown asset exit non-zero.
+- Degradation mirrors WorkPacket: missing category → manifest without `documentContract`; missing capability binding → `documentContract` degrades to `{category}` with the issue on the manifest (fail-visible, never throw).
+- Gotcha: when a Pack resolves outside the project root (`project.yaml source:`), project-relative rendering would escape (`../../...`). `relativePosix` falls back to a POSIX **absolute** path for `guidanceRefs`/`documentContract.path` — regression covered in `WorkContext.test.ts`.
 
 ## Stage 3: Compile
 

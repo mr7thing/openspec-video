@@ -120,7 +120,7 @@
 - **目标**：每轮用户输入时，把当前活跃 Asset 的 `NextAction` 以面包屑形式在场，且**无合法动作时输出 blocked + issue codes 并让违规可见**（借鉴 Trellis "无 fallback 破坏可见"）。
 - **要做**：
   1. 新脚本 `.claude/hooks/opsv-inject-workflow-state.py`，仅读项目配置定位 `videospec/`，解析当前活跃资产（约定：`.opsv/runtime/active-asset`，见 A4 写入；无则扫 `work next` 第一个 production 资产）。脚本不 import 或读取 `.trellis/`。
-  2. 调用 `opsv work context <asset> --role dispatcher --json`（或直接调 TS 层，二选一，本计划定为调 CLI 以保证行为一致）。
+  2. 调用 `opsv work context <asset> --role production-dispatcher --json`（调 CLI 保证行为一致；role 用 A1 落地的四元组全名）。
   3. 输出 `<opsv-workflow-state>` 块：`asset`、`status`、`nextAction.kind`、`command`（派生展示）、`issueCodes`。**无 fallback 文案**：找不到资产或 nextAction 为 blocked 时，输出 blocked + codes，不静默。
   4. **面包屑语义对齐 Trellis 实证模式**：hook 任何路径 exit 0，blocked/违规通过块内容可见（Trellis `inject-workflow-state.py` 实证：无任务、读取失败、blocked 全部 return 0，可见性走 `additionalContext`）。面包屑不得阻断用户输入（UserPromptSubmit exit 2 会阻断整条 prompt）；硬阻断属于 PreToolUse 对 produce/run 等动作的 Gate，不在本任务。
   5. **延迟预算**：每轮调用目标 ≤300ms；CLI 超时/失败时输出"状态未知，见 `opsv work check`"可见行，不静默通过。B4 落盘后切换为读投影，CLI 仅作校准。

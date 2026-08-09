@@ -84,6 +84,23 @@ A Work Packet (`core/WorkPacket.ts`, `contractVersion: 2`) aggregates profile, p
 - The rendered shell command (`renderNextActionCommand`) is a derived display. Future Hook adapters and the AgentRouter must consume the structured action, never parse command strings.
 - Policy merges through `core/PolicyLattice.ts` only: projects tighten, never loosen; loosening attempts block the packet with `PROJECT_POLICY_LOOSENS_PACK`.
 
+## Standard Roles and the Injection Channel (2026-08-09)
+
+OPSV Core fixes four atomic roles (Packs will only declare `required | optional | not_applicable` per Stage — the stage schema lands in Phase C of `docs/OPSV_IMPROVEMENT_PLAN_FROM_TRELLIS_ANALYSIS_2026-08-09.md`):
+
+| Role | May | Must not |
+|------|-----|----------|
+| `document-author` | create/modify Asset Documents | self-approve |
+| `contract-checker` | read-only validation, emit issue codes | write |
+| `production-dispatcher` | advance `produce`/`run`, coordinate external capability | replace `produce` |
+| `asset-quality-reviewer` | advise against Pack quality guidance | replace user Review/Approve |
+
+Injection channel (stage A, Claude Code first): `opsv hook install|uninstall --platform claude` (`src/commands/hook.ts`) copies hook templates from the **installed package** (`cli/templates/hooks/`, shipped via `package.json files`, located with `require.resolve` — never the repo checkout) into `.claude/hooks/` and registers SessionStart / UserPromptSubmit / PreToolUse groups in `.claude/settings.json`.
+
+- The settings.json merge manages only OPSV-identified groups (command contains `.claude/hooks/opsv-`; scripts carry an `# OPSV-MANAGED-HOOK` marker). Foreign groups (e.g. Trellis) are preserved byte-identically; conflicts warn instead of rewriting. Uninstall rolls back to the pre-install shape; no OPSV block → `HOOK_NOT_INSTALLED`, exit 1.
+- Standalone rule: OPSV runtime code and hook scripts must never read `.trellis/` — Trellis is an optional dev-workflow overlay, not an OPSV dependency.
+- Breadcrumb semantics (borrowed from Trellis, source-verified): state hooks exit 0 on every path; visibility travels in `additionalContext` content, never in exit codes. Hard blocking belongs to PreToolUse gates on real actions, not to per-turn breadcrumbs.
+
 ## Status of the Blueprint
 
 `docs/OPSV_ARCHITECTURE_BLUEPRINT_2026-07-18.md` is the agreed design direction with an 8-step implementation order. Current code (`videospec` v0.17.1) already implements the core of it (document contract, refs/variants, circles, packs, work packets, review/approve/sync). Where code and blueprint differ, **the code is the truth for specs** — the blueprint is direction, not documentation of current behavior.
