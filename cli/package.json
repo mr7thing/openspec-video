@@ -24,7 +24,8 @@
     "dist",
     ".opsv",
     "review-ui",
-    "scripts"
+    "scripts",
+    "templates"
   ],
   "keywords": [
     "videospec",
