@@ -33,6 +33,7 @@ import { registerPackCommands } from './commands/pack';
 import { registerWorkCommands } from './commands/work';
 import { registerSyncCommand } from './commands/sync';
 import { registerHookCommands } from './commands/hook';
+import { registerBootstrapCommand } from './commands/bootstrap';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -135,5 +136,6 @@ registerPackCommands(program);
 registerWorkCommands(program);
 registerSyncCommand(program);
 registerHookCommands(program);
+registerBootstrapCommand(program);
 
 program.parse(process.argv);
