@@ -50,4 +50,14 @@ A `ModelConfig` entry typically carries: `provider`, `api_url`, `required_env`, 
 - v1 locks (manifest-only `digest`) are recognized by `readPackLock` and reported as `PACK_LOCK_LEGACY` (re-run `opsv pack lock`); never silently treated as current.
 - Path canonicalization for pack exports: `utils/pathSecurity.ts` `resolveContainedReal` (lexical + realpath containment, tolerant of not-yet-existing finals). All pack-file resolution must go through it — no ad-hoc `path.join(packRoot, rel)`.
 
+## .opsv Directory Conventions (2026-08-10)
+
+| Path | Durability | Owner |
+|------|-----------|-------|
+| `.opsv/project.yaml` | durable, hand-edited | Project Config (Pack Stack, bindings, policy) |
+| `.opsv/pack-lock.yaml` | durable, `opsv pack lock` | Pack content digests (schema v2) |
+| `.opsv/bootstrap/` | regenerable, `opsv bootstrap` | `manifest.json` + `roles/<role>.md` (references only, never copied Pack content). Any digest drift (pack.yaml/graph.yaml/profiles/categories/project.yaml) → `BOOTSTRAP_STALE` via `checkBootstrapStale`; `opsv bootstrap check` and `opsv exec start` are fail-closed on it |
+| `.opsv/execution/<id>/` | durable, git-trackable | Execution Record: `plan.json` + immutable `plan.v<N>.json` snapshots, `events.jsonl` (fact source), `state.json` + `ready-actions.json` (reducer projections — always rebuildable). Events carry reference ids/paths/hashes only, never document content |
+| `.opsv/runtime/` | volatile, **gitignored** | lock files, seq sidecars, `active-asset` — losing it must never lose plan/history |
+
 Reference files: `cli/src/utils/configLoader.ts`, `cli/src/utils/projectResolver.ts`, `cli/scripts/postinstall.js`, `cli/src/utils/__tests__/configLoader.test.ts` (three-tier merge tests).

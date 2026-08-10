@@ -35,6 +35,24 @@ Every exported Category/Profile/Skill must form a closed graph — violations fa
 
 Schemas live in `cli/src/types/PackSchemas.ts` (the single decode path); cross-file rules in `cli/src/core/PackChecker.ts` with stable issue codes (`PACK_*`).
 
+## graph.yaml — Stage Contract (2026-08-10)
+
+`graph.yaml` nodes accept two shapes (backward compatible):
+
+- **Legacy**: a dependency array (`shot: [script]`), normalized to `dependsOn` at consumption.
+- **Stage object** (`StageNodeSchema` in `PackSchemas.ts`): `inputs`, `outputs.contract`, `completion` (`output_exists | output_contract_valid | document_status_approved`), `quality_guidance` (string or list, must stay inside the pack root), `roles`, `recommended_capabilities`. All fields optional; unknown top-level keys pass through.
+
+The three Pack responsibility layers made explicit:
+
+| Layer | Fields | Enforcement |
+|-------|--------|-------------|
+| Workflow | graph/stages/profiles: stage inputs/outputs/completion | structural |
+| Toolset | `skills`, `recommended_capabilities` | soft recommendation — **never a whitelist**; user/external tools producing contract-satisfying artifacts stay legal |
+| Spec constraints | categories / document contracts / gates | hard validation |
+
+`roles` declares per-stage applicability of the four Core roles (`STAGE_ROLES` ≡ `WORK_CONTEXT_ROLES`): `document-author`, `contract-checker`, `production-dispatcher`, `asset-quality-reviewer` — each `required | optional | not_applicable`. Illegal values or unknown role keys fail `opsv pack check` with the stable code `PACK_STAGE_INVALID`; the schema is strict on role keys so typos fail closed.
+
+Consumption: `resolveDocumentContract` (`core/PackContracts.ts`, `loadGraphStages`) reads stages leniently (runtime never throws on graph content — validation belongs to `pack check`); the stage view surfaces in `opsv work context --json` (`manifest.stage`) and drives `ROLE_NOT_APPLICABLE` on `work context --role`.
 
 ## pack.yaml
 
