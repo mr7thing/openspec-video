@@ -1,0 +1,54 @@
+# Workflow layer — Stage Contract (D1 migration, 2026-08-10).
+# Edges follow the existing production order implied by the Profiles: the
+# shotlist workflow Profile materializes Clips and Shots, and the shotsdeck
+# continuity Profile consumes Shots (@FRAME: refs resolve per Shot).
+# Stage fields declare goals, not implementations; recommended_capabilities
+# is a soft recommendation, never a whitelist.
+workflow:
+  shotlist:
+    depends_on: []
+    inputs: [story_brief]
+    outputs:
+      contract: shotlist-doc-v1
+    completion: [output_exists, output_contract_valid, document_status_approved]
+    roles:
+      document-author: required
+      contract-checker: required
+      production-dispatcher: not_applicable
+      asset-quality-reviewer: optional
+  clip:
+    depends_on: [shotlist]
+    inputs: [shotlist_doc]
+    outputs:
+      contract: clip-doc-v1
+    completion: [output_exists, output_contract_valid]
+    roles:
+      document-author: required
+      contract-checker: required
+      production-dispatcher: required
+      asset-quality-reviewer: required
+    recommended_capabilities: [image-generation]
+  shot:
+    depends_on: [shotlist]
+    inputs: [shotlist_doc]
+    outputs:
+      contract: shot-doc-v1
+    completion: [output_exists, output_contract_valid]
+    roles:
+      document-author: required
+      contract-checker: required
+      production-dispatcher: required
+      asset-quality-reviewer: required
+    recommended_capabilities: [video-generation]
+  shotsdeck:
+    depends_on: [shot]
+    inputs: [shot_doc]
+    outputs:
+      contract: shotsdeck-doc-v1
+    completion: [output_exists, output_contract_valid]
+    roles:
+      document-author: required
+      contract-checker: required
+      production-dispatcher: required
+      asset-quality-reviewer: required
+    recommended_capabilities: [continuous-i2v]
