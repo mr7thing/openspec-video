@@ -54,6 +54,42 @@ The three Pack responsibility layers made explicit:
 
 Consumption: `resolveDocumentContract` (`core/PackContracts.ts`, `loadGraphStages`) reads stages leniently (runtime never throws on graph content — validation belongs to `pack check`); the stage view surfaces in `opsv work context --json` (`manifest.stage`) and drives `ROLE_NOT_APPLICABLE` on `work context --role`.
 
+## Migrating a Legacy graph.yaml (2026-08-10)
+
+Minimal steps to move a dependency-array `graph.yaml` onto the Stage Contract:
+
+1. **Keep the edges byte-identical.** Rewrite each `node: [deps]` array as a mapping whose only change is `depends_on: [deps]` — same nodes, same order, same direction. The dependency DAG is the one thing migration must not alter (the `opsv-multi-ref-pipeline` migration changed +123/-5 lines with edges byte-identical).
+2. **Add the Stage Contract fields per node**: `inputs` (use the document vocabulary: Category names, `<stage>_doc` stems, Profile input slots, or `outputs.contract` stems — user-provided/external goals such as `user_script_text` are allowed and only warn in conformance), `outputs.contract` (`<name>-vN`), `completion` (a subset of `output_exists | output_contract_valid | document_status_approved`), and `roles` (declare **all four** Core roles as `required | optional | not_applicable`). Optionally `quality_guidance` (paths must stay inside the pack root) and `recommended_capabilities` (soft — never referenced by gates/completion).
+3. **Decide which Stages own an Asset Document.** `document-author: required` only on Stages whose output is a document in `videospec/`; production-only upstream Stages get `document-author: not_applicable` and record review evidence through a review-action Skill or the downstream Pack's review path.
+4. **Verify**: `opsv pack check . --json` must report 0 errors; `opsv conformance . --json` must report no failed check (warnings are acceptable — see the six-check judgement rules in [Packs Guidelines](./index.md#conformance--the-six-checks-2026-08-10)).
+
+Backward compatibility:
+
+- Legacy arrays remain legal input — `loadGraphStages` normalizes them to `{ dependsOn }`, and both shapes may coexist in one file.
+- All Stage fields are optional; missing fields inherit the legacy lenient behavior, so unmigrated Packs keep passing `pack check`.
+- Runtime consumption never throws on graph content; only `pack check` / `conformance` report `PACK_STAGE_INVALID` and matrix findings.
+- Stage fields do not change pack digests semantics, but any behavior-file edit changes `content_digest` — projects with a v1 lock see `PACK_LOCK_LEGACY` and must re-run `opsv pack lock`.
+
+Fix pattern — mv-3d-ref (a Stage that owns a document needs its Category/Profile closure):
+
+```yaml
+# pack.yaml — export the Category the document-owning Stage is named after
+categories: { render: categories/render.yaml }
+profiles:   { render-to-real: profiles/render-to-real.yaml }
+
+# categories/render.yaml
+default_profile: render-to-real
+profiles: [render-to-real]
+
+# profiles/render-to-real.yaml — abstract capability, NEVER a model name
+kind: production
+capability: image-to-video
+skill: render-to-real
+outputs: [video]
+```
+
+The graph node for a document-owning Stage must be named after an exported Category (`render`), backed by a production Profile with an abstract capability; the upstream Stages (`style-references`, `clay-keyframes`) own no documents, so they declare `document-author: not_applicable` and keep review evidence in the handoff manifest. Migrating without this closure surfaces as `PACK_SCHEMA_INVALID` on `pack check`.
+
 ## pack.yaml
 
 Example shape (from `opsv-packs/opsv-multi-ref-pipeline/pack.yaml`):
