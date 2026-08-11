@@ -149,6 +149,7 @@ Every iteration produces a new suffix (`_m1`, `_m2`). Failed tasks leave logs. Y
 | **RunningHub API** (rhapi) | ✅ | ✅ | Direct REST |
 | **ComfyUI Local** | — | ✅ | Custom workflows |
 | **RH Workflow** (rhworkflow) | ✅ | ✅ | Workflow Run API, `opsv comfy` mode |
+| **RH CLI** (rhcli) | ✅ | ✅ | Generic runner over [RH_CLI](https://github.com/HM-RunningHub/RH_CLI) subprocess — 78+ RunningHub endpoints (image/video/audio/3D) + AI Apps with zero per-endpoint code; requires Python ≥3.10 + `rh` on PATH; endpoint guide: `docs/runninghub-capability-map.md` |
 | **Webapp** | ✅ | ✅ | Browser automation |
 
 ---
