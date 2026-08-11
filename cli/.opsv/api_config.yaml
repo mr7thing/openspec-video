@@ -1276,3 +1276,414 @@ models:
       frame_ref:
         first: ""
         last: null
+
+  # ==========================================
+  # RH_CLI (rhcli) — RunningHub via RH_CLI subprocess
+  # Generic endpoint runner: rh --json model run -e <endpoint>
+  # Requires: Python ≥3.10 + RH_CLI installed (`rh` on PATH, or set rh.binary / RH_CLI_BINARY)
+  # Endpoint catalog & selection guide: docs/runninghub-capability-map.md
+  # Live check: rh model info <endpoint_id>
+  # ==========================================
+
+  # Text-to-image (default: 全能图片PRO)
+  rhcli.t2i:
+    provider: rhcli
+    type: imagen
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-image-n-pro/text-to-image"
+      required_capabilities: [json-check, model-run]
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+    defaults:
+      resolution: "2k"        # 1k / 2k / 4k
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      aspectRatio: "16:9"
+      resolution: "2k"
+
+  # Image-to-image / image editing (default: 全能图片PRO edit)
+  rhcli.i2i:
+    provider: rhcli
+    type: imagen
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-image-n-pro/edit"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        imageUrls: { kind: image, target: images, cardinality: { max: 5 } }
+    supports_reference_images: true
+    max_reference_images: 5
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
+    defaults:
+      resolution: "2k"
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      imageUrls: []
+      aspectRatio: "empty"    # empty = follow source image
+      resolution: "2k"
+
+  # Text-to-video (default: 全能视频V3.1 Fast)
+  rhcli.t2v:
+    provider: rhcli
+    type: video
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-video-v3.1-fast/text-to-video"
+      required_capabilities: [json-check, model-run]
+    defaults:
+      resolution: "720p"      # 720p / 1080p / 4k
+    max_poll_duration: 3600000   # 60min subprocess kill switch
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      aspectRatio: "16:9"
+      duration: 8
+      resolution: "720p"
+
+  # Image-to-video (first frame → video)
+  rhcli.i2v:
+    provider: rhcli
+    type: video
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-video-v3.1-fast/image-to-video"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        imageUrls: { kind: image, target: images, cardinality: { max: 1 } }
+    supports_first_image: true
+    supports_reference_images: true
+    max_reference_images: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrls
+    defaults:
+      resolution: "720p"
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      imageUrls: []
+      aspectRatio: "16:9"
+      duration: 8
+      resolution: "720p"
+
+  # TTS (default: minimax speech-2.8-hd)
+  rhcli.tts:
+    provider: rhcli
+    type: audio
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-audio/text-to-audio/speech-2.8-hd"
+      required_capabilities: [json-check, model-run]
+    inputs:
+      prompt:
+        source: prompt
+        target: text
+    defaults:
+      voice_id: "Wise_Woman"
+      speed: 1.0
+      enable_base64_output: false
+      english_normalization: false
+    max_poll_duration: 600000
+    # == payload_example ==
+    payload_example:
+      text: ""
+      voice_id: "Wise_Woman"
+      speed: 1.0
+      enable_base64_output: false
+      english_normalization: false
+
+  # Music generation (default: minimax music-2.5; lyrics required by endpoint)
+  rhcli.music:
+    provider: rhcli
+    type: audio
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-audio/text-to-audio/music-2.5"
+      required_capabilities: [json-check, model-run]
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+    defaults:
+      bitrate: 256000
+      sampleRate: 44100
+    max_poll_duration: 1800000
+    # == payload_example ==
+    # NOTE: `lyrics` is endpoint-required; supply via defaults or doc payload
+    # (structure tags: [Intro]/[Verse]/[Chorus]/[Outro])
+    payload_example:
+      prompt: ""
+      lyrics: ""
+      bitrate: 256000
+      sampleRate: 44100
+
+  # Voice clone (reference audio + text → cloned speech)
+  rhcli.voice-clone:
+    provider: rhcli
+    type: audio
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-audio/text-to-audio/voice-clone"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        audio: { kind: audio, target: audio, cardinality: { max: 1 } }
+    supports_reference_audios: true
+    max_reference_audios: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: text
+      audio:
+        source: refs[audio]
+        target: audio
+    defaults:
+      custom_voice_id: "opsv_clone"
+      model: "speech-02-hd"
+      need_noise_reduction: false
+      need_volume_normalization: false
+    max_poll_duration: 900000
+    # == payload_example ==
+    payload_example:
+      text: ""
+      audio: ""
+      custom_voice_id: "opsv_clone"
+      model: "speech-02-hd"
+      need_noise_reduction: false
+      need_volume_normalization: false
+
+  # Image upscale (default: Topaz Standard v2)
+  rhcli.upscale-image:
+    provider: rhcli
+    type: imagen
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "topazlabs/image-upscale-standard-v2"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        imageUrl: { kind: image, target: images, cardinality: { max: 1 } }
+    supports_reference_images: true
+    max_reference_images: 1
+    inputs:
+      image:
+        source: refs[image]
+        target: imageUrl
+    defaults:
+      scale: "2x"             # 2x / 4x / 6x
+      faceEnhancement: true
+    max_poll_duration: 900000
+    # == payload_example ==
+    payload_example:
+      imageUrl: ""
+      scale: "2x"
+      faceEnhancement: true
+
+  # Video upscale (default: RH 视频超分)
+  rhcli.upscale-video:
+    provider: rhcli
+    type: video
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-video/video-upscaler"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        videoUrl: { kind: video, target: video, cardinality: { max: 1 } }
+    supports_reference_videos: true
+    max_reference_videos: 1
+    inputs:
+      video:
+        source: refs[video]
+        target: videoUrl
+    defaults:
+      targetResolution: "1080p"   # 720p / 1080p / 2k / 4k
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      videoUrl: ""
+      targetResolution: "1080p"
+
+  # Video extend (default: 全能视频V3.1 Pro 官方稳定版)
+  rhcli.video-extend:
+    provider: rhcli
+    type: video
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "rhart-video-v3.1-pro-official/video-extend"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        video: { kind: video, target: video, cardinality: { max: 1 } }
+    supports_reference_videos: true
+    max_reference_videos: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      video:
+        source: refs[video]
+        target: video
+    defaults:
+      resolution: "720p"      # 720p / 1080p
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      video: ""
+      resolution: "720p"
+
+  # Motion control (character image + motion reference video)
+  rhcli.motion-control:
+    provider: rhcli
+    type: video
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "kling-v3.0-pro/motion-control"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        imageUrl: { kind: image, target: images, cardinality: { max: 1 } }
+        videoUrl: { kind: video, target: video, cardinality: { max: 1 } }
+    supports_reference_images: true
+    max_reference_images: 1
+    supports_reference_videos: true
+    max_reference_videos: 1
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: imageUrl
+      video:
+        source: refs[video]
+        target: videoUrl
+    defaults:
+      characterOrientation: "video"   # image / video
+      keepOriginalSound: true
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      imageUrl: ""
+      videoUrl: ""
+      characterOrientation: "video"
+      keepOriginalSound: true
+
+  # Text-to-3D (default: 混元 3D v3.1)
+  rhcli.t23d:
+    provider: rhcli
+    type: comfy               # non-image/video/audio artifact (.glb); ext inferred from download
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "hunyuan3d-v3.1/text-to-3d"
+      required_capabilities: [json-check, model-run]
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+    defaults:
+      enablePbr: false
+      generateType: "Normal"  # Normal / Geometry / Sketch
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      prompt: ""
+      enablePbr: false
+      generateType: "Normal"
+
+  # Image-to-3D (single or multi-view images → 3D model)
+  rhcli.i23d:
+    provider: rhcli
+    type: comfy
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: model
+      endpoint_id: "hunyuan3d-v3.1/image-to-3d"
+      required_capabilities: [json-check, model-run]
+      media_bindings:
+        imageUrl: { kind: image, target: images, cardinality: { max: 6 } }
+    supports_reference_images: true
+    max_reference_images: 6
+    inputs:
+      image:
+        source: refs[image]
+        target: imageUrl
+    defaults:
+      enablePbr: false
+      generateType: "Normal"
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      imageUrl: ""
+      enablePbr: false
+      generateType: "Normal"
+
+  # AI Application (ComfyUI cloud workflow via `rh app run <webappId>`)
+  # TEMPLATE — copy per app: replace app_id and node_mappings
+  # (discover nodes with: rh app info <webappId或链接>)
+  rhcli.ai-app:
+    provider: rhcli
+    type: comfy
+    required_env: [RUNNINGHUB_API_KEY]
+    fallback_env: [RH_API_KEY]
+    rh:
+      mode: app
+      app_id: "REPLACE_WITH_WEBAPP_ID"  # non-executable template; compiler rejects this placeholder
+      required_capabilities: [json-check, app-run]
+      # instance_type: "plus"   # optional higher-spec instance
+    inputs:
+      prompt:
+        source: prompt
+        target: prompt
+      image:
+        source: refs[image]
+        target: image
+    node_mappings:
+      prompt:
+        nodeId: "52"          # example — replace with real node ids
+        fieldName: "prompt"
+      image:
+        nodeId: "39"          # local path → --file upload; URL/string → --node
+        fieldName: "image"
+    max_poll_duration: 3600000
+    # == payload_example ==
+    payload_example:
+      prompt: ""
