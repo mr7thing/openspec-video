@@ -8,7 +8,7 @@ import path from 'path';
 import chalk from 'chalk';
 import { BaseTaskJson } from '../types/Job';
 import { logger } from '../utils/logger';
-import { isTaskCompleted, isTaskFailed, getResumeTaskId, appendLog } from './polling';
+import { isTaskFailed, getResumeTaskId, appendLog } from './polling';
 import { Container, ProviderExecutor } from '../container/Container';
 import { OpsVContext } from '../container/OpsVContext';
 
@@ -20,6 +20,10 @@ export interface ProviderResult {
   outputPath?: string;
   outputPaths?: string[];
   error?: string;
+  /** Whether a retry is safe based on provider-side submit certainty. */
+  retryability?: 'none' | 'safe' | 'manual';
+  /** Whether orchestration may select another provider without duplicate-charge risk. */
+  fallbackability?: 'none' | 'safe' | 'manual';
 }
 
 export class QueueRunner {
@@ -231,7 +235,7 @@ export class QueueRunner {
               results.push({ task, path: resolved });
             }
           }
-        } catch (err) {
+        } catch {
           logger.warn(`Failed to parse task JSON: ${resolved}`);
         }
       } else if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {

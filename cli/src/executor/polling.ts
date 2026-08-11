@@ -13,14 +13,13 @@
 //   {"event":"polling","status":"running","ts":"..."}
 //   {"event":"succeeded","output":"@hero_1.png","ts":"..."}
 //
-// Resume: if .log exists with submitted/polling but no succeeded/failed,
-// next opsv run reads task_id from log and resumes polling.
+// Resume: generic providers may resume submitted/polling checkpoints. rhcli only
+// performs read-only recovery after its provider-specific identity checks.
 
 import fs from 'fs';
-import path from 'path';
 
 export interface PollLogEntry {
-  event: 'submitted' | 'polling' | 'succeeded' | 'failed' | 'upload';
+  event: 'submitted' | 'submitted-unknown' | 'submitted-with-task-id' | 'polling' | 'downloaded' | 'succeeded' | 'failed' | 'upload';
   task_id?: string;
   status?: string;
   output?: string;
@@ -28,6 +27,15 @@ export interface PollLogEntry {
   file?: string;          // local file path (upload events)
   fileName?: string;       // remote fileName (upload events)
   downloadUrls?: string[]; // source download URLs (succeeded events)
+  cost?: string;           // billed cost reported by provider (rhcli: yuan string)
+  duration?: number;       // provider-reported generation duration in seconds
+  provider?: string;
+  model_key?: string;
+  mode?: 'model' | 'app';
+  payload_sha256?: string;
+  credential_scope?: string;
+  execution_id?: string;
+  state?: 'submitted-with-task-id' | 'submitted-unknown' | 'polling' | 'downloaded';
   ts?: string; // auto-filled by appendLog
 }
 
@@ -58,11 +66,16 @@ export function readLastLogEntry(taskPath: string): PollLogEntry | null {
   }
 }
 
+/** `rhcli://...` was a legacy local descriptor, never a remote task id. */
+export function isVerifiedRemoteTaskId(taskId: unknown): taskId is string {
+  return typeof taskId === 'string' && taskId.length >= 3 && taskId.length <= 256 && !taskId.startsWith('rhcli://') && !/\s/.test(taskId);
+}
+
 export function getResumeTaskId(taskPath: string): string | null {
   const last = readLastLogEntry(taskPath);
   if (!last) return null;
-  if (last.event === 'submitted' || last.event === 'polling') {
-    return last.task_id || null;
+  if (last.event === 'submitted' || last.event === 'submitted-with-task-id' || last.event === 'polling' || last.event === 'downloaded') {
+    return isVerifiedRemoteTaskId(last.task_id) ? last.task_id : null;
   }
   return null;
 }

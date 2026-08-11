@@ -6,6 +6,7 @@ import {
   appendLog,
   readLastLogEntry,
   getResumeTaskId,
+  isVerifiedRemoteTaskId,
   isTaskCompleted,
   getPollIntervalMs,
   getElapsedMs,
@@ -48,6 +49,16 @@ describe('polling', () => {
   it('getResumeTaskId returns task_id from pending log', () => {
     appendLog(taskPath, { event: 'submitted', task_id: 'xyz' });
     expect(getResumeTaskId(taskPath)).toBe('xyz');
+  });
+
+  it('rejects legacy rhcli descriptors but preserves ordinary submitted checkpoints', () => {
+    appendLog(taskPath, { event: 'submitted', task_id: 'rhcli://model/ns/t2i' });
+    expect(isVerifiedRemoteTaskId('rhcli://model/ns/t2i')).toBe(false);
+    expect(getResumeTaskId(taskPath)).toBeNull();
+
+    fs.unlinkSync(taskPath.replace(/\.json$/, '.log'));
+    appendLog(taskPath, { event: 'submitted', task_id: 'ordinary-provider-task-123' });
+    expect(getResumeTaskId(taskPath)).toBe('ordinary-provider-task-123');
   });
 
   it('getResumeTaskId returns null for completed log', () => {

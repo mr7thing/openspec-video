@@ -46,6 +46,30 @@ export interface NodeMapping {
   fieldName: string;
 }
 
+/** rhcli provider: settings for the RH_CLI (rh) subprocess backend. */
+export interface RhMediaBinding {
+  /** RH CLI media surface. Local files never fall back to --param. */
+  kind: 'image' | 'video' | 'audio';
+  /** Optional explicit runner field; defaults to images/video/audio from kind. */
+  target?: 'images' | 'video' | 'audio';
+  cardinality?: { min?: number; max?: number };
+}
+
+export interface RhCliConfig {
+  mode?: 'model' | 'app';   // default 'model' → `rh model run`; 'app' → `rh app run`
+  endpoint_id?: string;     // rh model run -e <endpoint_id>   (mode=model)
+  app_id?: string;          // rh app run <app_id>             (mode=app)
+  binary?: string;          // path to rh; default 'rh' on PATH (RH_CLI_BINARY env overrides)
+  instance_type?: string;   // rh app run --instance-type (mode=app)
+  params?: Record<string, any>;  // extra --param/--node defaults, lowest merge priority
+  /** Capabilities advertised by `rh --json check` required for this model. */
+  required_capabilities?: string[];
+  /** Explicit media routing for model mode. Omit only to use the restricted legacy adapter. */
+  media_bindings?: Record<string, RhMediaBinding>;
+  /** App payload keys that are configuration-only and intentionally not mapped to a node. */
+  ignorable_inputs?: string[];
+}
+
 export interface ModelConfig {
   provider: string;
   type?: 'imagen' | 'video' | 'audio' | 'comfy' | 'webapp';
@@ -56,6 +80,7 @@ export interface ModelConfig {
   workflowdir?: string;                       // [deprecated] use workflow instead
   workflow?: string;                          // comfylocal: 工作流 JSON 文件路径（相对 projectRoot 或绝对路径）
   workflowId?: string;                        // runninghub: 云端工作流 ID
+  rh?: RhCliConfig;                           // rhcli: RH_CLI 子进程后端配置
   required_env?: string[];
   fallback_env?: string[];
   features?: string[];
