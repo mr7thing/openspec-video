@@ -116,7 +116,13 @@ opsv-queue/
             for (const envVar of envVars) {
               envSampleLines.push(`${envVar}=your_key_here`);
             }
-            envSampleLines.push('');
+            envSampleLines.push(
+              '',
+              '# Optional RH CLI provider binary override:',
+              '# RH_CLI_BINARY=/absolute/path/to/compatible/rh',
+              '# Alternatively set models.<model-key>.rh.binary in .opsv/api_config.yaml',
+              '',
+            );
             fs.writeFileSync(path.join(targetDir, '.env.sample'), envSampleLines.join('\n'));
             console.log(chalk.gray('  Created .env.sample'));
           }
@@ -131,6 +137,8 @@ opsv-queue/
           console.log(`  cd ${name}`);
         }
         console.log('  cp .env.sample .env        # Edit to add your API keys');
+        console.log(chalk.gray('  Optional RH CLI: set RH_CLI_BINARY=/absolute/path/to/compatible/rh'));
+        console.log(chalk.gray('  Or set models.<model-key>.rh.binary in .opsv/api_config.yaml'));
         console.log('  opsv circle create --dir videospec');
         console.log('  opsv imagen --model volcengine.seadream');
         console.log('  opsv run opsv-queue/videospec_circle1/volcengine.seadream_001/');
