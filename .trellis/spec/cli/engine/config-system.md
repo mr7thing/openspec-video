@@ -36,6 +36,8 @@ Key interfaces in `configLoader.ts`: `ModelConfig`, `ApiConfig`, `ProjectSetting
 
 A `ModelConfig` entry typically carries: `provider`, `api_url`, `required_env`, `payload_example`, polling/timeout overrides, and `inputs:` bindings evaluated by `core/compiler/shared/InputEvaluator.ts`.
 
+Subprocess providers add a typed sub-block instead of `api_url`: `rhcli` uses `rh: {mode: 'model'|'app', endpoint_id, app_id, binary, instance_type, params}` (`RhCliConfig` in `configLoader.ts`). rhcli entries use `required_env: [RUNNINGHUB_API_KEY]` with `fallback_env: [RH_API_KEY]`; the provider injects the resolved key into the child env as `RUNNINGHUB_API_KEY`, so existing `RH_API_KEY` users need no second variable. Endpoint ids for rhcli entries come from `docs/runninghub-capability-map.md` (verify live with `rh model info <endpoint>`).
+
 ## Rules and Pitfalls
 
 - `ConfigLoader` is **not** a singleton — one instance per `OpsVContext`. Do not add module-level config caches.

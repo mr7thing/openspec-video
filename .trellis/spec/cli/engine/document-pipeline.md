@@ -81,11 +81,21 @@ Provider compilers use `payload_example` from `api_config.yaml` as the payload t
 ## Adding a Provider
 
 1. Compiler: new class in `core/compiler/providers/` implementing `ProviderCompiler`; register in `TaskBuilder`'s compiler map.
-2. Executor: new class in `executor/providers/` (extend `BaseApiProvider` for REST); register in `cli.ts` alongside the other 8.
+2. Executor: new class in `executor/providers/` (extend `BaseApiProvider` for REST); register in `cli.ts` alongside the other 9.
 3. Config: add model entries under `models:` in `cli/.opsv/api_config.yaml` with `provider`, `api_url`, `required_env`, `payload_example`.
 4. Input bindings: extend `input_types.yaml` if the provider takes new media input kinds.
 
 Known wart: compilers resolve through a hardcoded map in `TaskBuilder.resolveCompiler`, **not** through `Container`, even though `Container.registerCompiler` exists. If you touch this area, prefer converging on one registry rather than adding a third.
+
+### Subprocess providers (rhcli pattern)
+
+When the backend is a subprocess that hides submit/poll/download (e.g. `rhcli` driving the `rh` CLI), do **not** extend `BaseApiProvider` — its abstract surface models an HTTP conversation opsv drives. Instead (precedent: `WebappProvider`, `RhCliProvider`):
+
+1. Implement `ProviderExecutor` directly; delegate the spawn to a runner module (`executor/rh-runner/`) behind an interface so a future native implementation can be swapped per-model.
+2. Replicate the lifecycle by hand: `appendLog` `submitted` before spawn and `succeeded`/`failed` after; place artifacts via `executor/naming.ts` (`outputFilePath` + `resolveNextOutputIndex` under `withTaskLock`); never throw for task failures.
+3. Put provider-specific config in a typed `ModelConfig` sub-block (rhcli uses `rh: {mode, endpoint_id, app_id, binary, params}`); pass the resolved API key into the child env explicitly so `fallback_env` chains keep working.
+4. Resume limitation: a subprocess killed mid-poll loses the remote task id — interrupted tasks re-execute from scratch (double-charge risk; `rhcli` documents this). QueueRunner's "output exists → skip" is the primary idempotency mechanism.
+5. Test without network via an injectable runner (provider tests) plus a fake CLI binary fixture under `__tests__/fixtures/` (excluded from jest testMatch via `testPathIgnorePatterns`) for real-spawn argv/JSON/timeout coverage.
 
 ## Anti-Patterns
 
