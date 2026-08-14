@@ -25,6 +25,7 @@
 | `src/commands/` | 24 command modules, one per command group, plus `produceUtils.ts` |
 | `src/container/` | `Container.ts` (DI registry for compilers/executors), `OpsVContext.ts` (per-invocation runtime context) |
 | `src/core/` | Document engine: `FrontmatterParser.ts`, `AssetDocIndex.ts`, `AssetManager.ts`, the @-ref subsystem (`RefEngine.ts` facade, `RefSyntaxParser.ts`, `RefBinder.ts`, `RefResolver.ts`, `ApprovedRefReader.ts`, `DesignRefReader.ts`), `ManifestReader.ts`, orchestration (`ProductionPipeline.ts`, `DependencyGraph.ts`, `Materializer.ts`, `WorkPacket.ts`, `WorkContext.ts` (Context Manifest), `Validator.ts` (shared validation kernel), `PackContracts.ts`, `ProjectConfig.ts`), review/approve/sync (`ReviewService.ts`, `ReviewStrategy.ts`, `ApproveService.ts`, `SyncService.ts`), `CategoryValidator.ts` |
+| `src/canonical/` | **Canonical Model (IR, Layer 3)** — `schema/` (Zod schemas + `convert.ts` frontmatter↔Canonical conversion), P2+ will add `parser/`, `state/` (Asset State Machine), `artifacts/` (Artifact Contract), `capabilities/` (Capability Registry). Import via the `src/canonical/index.ts` facade. See [canonical-model spec](../../canonical-model/index.md). |
 | `src/core/compiler/` | Compile stage: `ProviderCompiler.ts` (interface), `PromptCompiler.ts`, `TaskBuilder.ts`, `providers/` (8 provider compilers), `shared/` (`compilerUtils.ts`, `InputEvaluator.ts`) |
 | `src/executor/` | Execute stage: `QueueRunner.ts` (scheduler), `HttpClient.ts` (axios + retry), `polling.ts` (gradient polling, JSONL checkpoints), `naming.ts` (output naming/locking), `providers/` (`BaseApiProvider.ts` + 8 concrete providers) |
 | `src/types/` | All Zod schemas: `FrontmatterSchema.ts`, `Job.ts`, `ManifestSchema.ts`, `Refs.ts` |
@@ -45,7 +46,7 @@
 
 ## Placement Rules
 
-- New Zod schemas belong in `src/types/`, not beside their consumers.
+- New Zod schemas belong in `src/types/`, not beside their consumers. **Exception**: Canonical Model schemas live in `src/canonical/schema/` — they are the IR layer (Layer 3) and are intentionally separate from the legacy `src/types/` document schemas. Do not add canonical types to `src/types/`.
 - New provider support means **two** classes: a compiler in `src/core/compiler/providers/` and an executor in `src/executor/providers/` (usually extending `BaseApiProvider`), plus registration in `cli.ts` and `TaskBuilder`'s compiler map. See [Document Pipeline](./document-pipeline.md#adding-a-provider).
 - Shared helpers go to `src/utils/` only after checking nothing similar exists there already (see `../../guides/code-reuse-thinking-guide.md`).
 - Do not import from `src/cli.ts` (the entry point) inside commands — `commands/run.ts` does this and it is a known circular-import wart. Receive `ctx`/`container` by parameter or construct them.
