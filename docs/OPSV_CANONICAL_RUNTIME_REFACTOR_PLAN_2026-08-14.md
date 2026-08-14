@@ -5,7 +5,7 @@
 > 上游分析：ChatGPT 对 opsv 项目的分析（`~/文档/clawbay/20_Projects/opsv/chagpt 对opsv 项目的分析.md`，2026-08-13）
 > 权威计划：`.trellis/tasks/08-14-chatgpt-analysis-overhaul/`（prd.md / design.md / implement.md）
 > 继承：`docs/OPSV_IMPROVEMENT_PLAN_FROM_TRELLIS_ANALYSIS_2026-08-09.md`（A/B/C/D 已交付，v0.18.0）、`docs/OPSV_ARCHITECTURE_BLUEPRINT_2026-07-18.md`
-> **实施状态：P0–P7 全部完成**（2026-08-14，791 测试绿）。见 §4 各阶段验收。
+> **实施状态：P0–P7 + Q1–Q5 全部完成**（2026-08-14，815 测试绿）。见 §4 各阶段验收。
 
 ---
 
@@ -192,7 +192,19 @@ approved → superseded（新 variant 触发，旧 artifact 不删除）
 | P6 | Review Protocol v1（`/api/canonical/*`）→ 状态变更 | +6 |
 | P7 | 状态机贯通 Agent 控制面：`WorkPacket`/`work context` 暴露 `assetState`；`opsv review revise` 写 `review→rejected→candidate`；`opsv status` 显示状态机统计；`opsv validate` canonical 冒烟检查 | +5 |
 
-基线 653 → **791 测试全绿**，`tsc --noEmit` 干净，lint errors=0。
+基线 653 → **815 测试全绿**，`tsc --noEmit` 干净，lint errors=0。
+
+**Q 阶段（视频版 Build System 差异化能力，§18 路线图）**：
+
+| Phase | 交付 | 测试 |
+|---|---|---|
+| Q1 | 类型化依赖图 + `impactOf` 传递影响集（`canonical/graph/ImpactGraph.ts`） | +6 |
+| Q2 | `opsv build` 增量重建计划（`computeBuildPlan` + `--circle` 编译受影响生产资产） | +4 |
+| Q3 | 溯源图谱：Transition 带 provenance（provider/model/seed/parents）+ `opsv provenance` | +4 |
+| Q4 | 视频测试：Artifact Contract 增 `frameRate`/`hasAudio`/`aspectRatio` 规则 + mediaProbe 探测 | +5 |
+| Q5 | `opsv repair` 失败报告（文档 + 状态机 + canonical 校验 + 建议修复动作） | +5 |
+
+新命令（累计）：`opsv commit`、`opsv import`、`opsv capabilities`、`opsv build`、`opsv provenance`、`opsv repair`。
 
 ---
 
