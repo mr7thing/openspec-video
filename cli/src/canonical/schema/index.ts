@@ -94,6 +94,10 @@ export const MediaInfoSchema = z.object({
   duration: z.number().optional(),
   codec: z.string().optional(),
   resolution: z.object({ w: z.number(), h: z.number() }).optional(),
+  /** Video frame rate in fps (Q4). */
+  frameRate: z.number().optional(),
+  /** True when the container carries an audio stream (Q4). */
+  hasAudio: z.boolean().optional(),
 });
 export type MediaInfo = z.infer<typeof MediaInfoSchema>;
 

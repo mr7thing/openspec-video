@@ -89,6 +89,52 @@ export function validateArtifact(input: ValidateArtifactInput): ArtifactValidati
     }
   }
 
+  // frame rate range (temporal)
+  const fpsRule = contract.validation.find((r) => 'frameRate' in r) as
+    | { frameRate: { min?: number; max?: number } }
+    | undefined;
+  if (fpsRule) {
+    const actual = mediaInfo.frameRate;
+    if (actual === undefined) {
+      if (contract.required.media_info) errors.push({ rule: 'frameRate', expected: fpsRule.frameRate, actual: undefined });
+    } else if (
+      (fpsRule.frameRate.min !== undefined && actual < fpsRule.frameRate.min) ||
+      (fpsRule.frameRate.max !== undefined && actual > fpsRule.frameRate.max)
+    ) {
+      errors.push({ rule: 'frameRate', expected: fpsRule.frameRate, actual });
+    }
+  }
+
+  // audio track presence
+  const audioRule = contract.validation.find((r) => 'hasAudio' in r) as
+    | { hasAudio: boolean }
+    | undefined;
+  if (audioRule) {
+    const actual = mediaInfo.hasAudio;
+    if (actual === undefined) {
+      if (contract.required.media_info) errors.push({ rule: 'hasAudio', expected: audioRule.hasAudio, actual: undefined });
+    } else if (actual !== audioRule.hasAudio) {
+      errors.push({ rule: 'hasAudio', expected: audioRule.hasAudio, actual });
+    }
+  }
+
+  // aspect ratio range (composition; w/h)
+  const ratioRule = contract.validation.find((r) => 'aspectRatio' in r) as
+    | { aspectRatio: { min?: number; max?: number } }
+    | undefined;
+  if (ratioRule) {
+    const res = mediaInfo.resolution;
+    const ratio = res && res.h > 0 ? res.w / res.h : undefined;
+    if (ratio === undefined) {
+      if (contract.required.media_info) errors.push({ rule: 'aspectRatio', expected: ratioRule.aspectRatio, actual: undefined });
+    } else if (
+      (ratioRule.aspectRatio.min !== undefined && ratio < ratioRule.aspectRatio.min) ||
+      (ratioRule.aspectRatio.max !== undefined && ratio > ratioRule.aspectRatio.max)
+    ) {
+      errors.push({ rule: 'aspectRatio', expected: ratioRule.aspectRatio, actual: ratio });
+    }
+  }
+
   // provenance completeness
   if (contract.required.provenance) {
     if (!input.provenance?.actor) {

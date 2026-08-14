@@ -17,11 +17,23 @@ export const CodecRuleSchema = z.object({
 export const ResolutionRuleSchema = z.object({
   resolution: z.object({ min: z.object({ w: z.number(), h: z.number() }) }),
 });
+export const FrameRateRuleSchema = z.object({
+  frameRate: z.object({ min: z.number().optional(), max: z.number().optional() }),
+});
+export const HasAudioRuleSchema = z.object({
+  hasAudio: z.boolean(),
+});
+export const AspectRatioRuleSchema = z.object({
+  aspectRatio: z.object({ min: z.number().optional(), max: z.number().optional() }),
+});
 
 export const ValidationRuleSchema = z.union([
   DurationRuleSchema,
   CodecRuleSchema,
   ResolutionRuleSchema,
+  FrameRateRuleSchema,
+  HasAudioRuleSchema,
+  AspectRatioRuleSchema,
 ]);
 export type ValidationRule = z.infer<typeof ValidationRuleSchema>;
 

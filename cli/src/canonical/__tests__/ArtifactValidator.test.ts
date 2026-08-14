@@ -63,6 +63,59 @@ describe('Artifact Validator (P3b)', () => {
     expect(result.errors[0]).toMatchObject({ rule: 'resolution' });
   });
 
+  it('rejects a frame rate outside the range (Q4 temporal test)', () => {
+    const result = validateArtifact({
+      contract: { validation: [{ frameRate: { min: 24, max: 30 } }] },
+      type: 'video',
+      mediaInfo: { frameRate: 23.976 },
+      provenance: { actor: 'agent', capability: 'video.generate' },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatchObject({ rule: 'frameRate' });
+  });
+
+  it('accepts a frame rate inside the range', () => {
+    const result = validateArtifact({
+      contract: { validation: [{ frameRate: { min: 24, max: 30 } }] },
+      type: 'video',
+      mediaInfo: { frameRate: 25 },
+      provenance: { actor: 'agent', capability: 'video.generate' },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a missing audio track when required (Q4 audio test)', () => {
+    const result = validateArtifact({
+      contract: { validation: [{ hasAudio: true }] },
+      type: 'video',
+      mediaInfo: { hasAudio: false },
+      provenance: { actor: 'agent', capability: 'video.generate' },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatchObject({ rule: 'hasAudio' });
+  });
+
+  it('rejects an out-of-range aspect ratio (Q4 composition test)', () => {
+    const result = validateArtifact({
+      contract: { validation: [{ aspectRatio: { min: 1.7, max: 1.9 } }] },
+      type: 'video',
+      mediaInfo: { resolution: { w: 800, h: 600 } }, // 1.33
+      provenance: { actor: 'agent', capability: 'video.generate' },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatchObject({ rule: 'aspectRatio' });
+  });
+
+  it('accepts an in-range aspect ratio', () => {
+    const result = validateArtifact({
+      contract: { validation: [{ aspectRatio: { min: 1.7, max: 1.9 } }] },
+      type: 'video',
+      mediaInfo: { resolution: { w: 1280, h: 720 } }, // 1.78
+      provenance: { actor: 'agent', capability: 'video.generate' },
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it('rejects missing provenance when the contract requires it', () => {
     const result = validateArtifact({
       contract: { required: { provenance: true } },

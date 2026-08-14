@@ -59,13 +59,28 @@ function parseFfprobeJson(stdout: string): MediaInfo | null {
   try {
     const data = JSON.parse(stdout);
     const video = (data.streams ?? []).find((s: { codec_type?: string }) => s.codec_type === 'video');
+    const audio = (data.streams ?? []).some((s: { codec_type?: string }) => s.codec_type === 'audio');
     const duration = Number(data.format?.duration ?? video?.duration);
     const mediaInfo: MediaInfo = {};
     if (Number.isFinite(duration) && duration > 0) mediaInfo.duration = duration;
     if (video?.codec_name) mediaInfo.codec = video.codec_name;
     if (video?.width && video?.height) mediaInfo.resolution = { w: video.width, h: video.height };
+    const frameRate = parseFrameRate(video?.avg_frame_rate ?? video?.r_frame_rate);
+    if (frameRate) mediaInfo.frameRate = frameRate;
+    mediaInfo.hasAudio = audio;
     return mediaInfo;
   } catch {
     return null;
   }
+}
+
+/** Parse an ffprobe frame-rate fraction ("25/1", "24000/1001") into fps. */
+function parseFrameRate(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined;
+  const match = value.match(/^(\d+)\/(\d+)$/);
+  if (!match) return undefined;
+  const denom = Number(match[2]);
+  if (!denom) return undefined;
+  const fps = Number(match[1]) / denom;
+  return Number.isFinite(fps) && fps > 0 ? fps : undefined;
 }
