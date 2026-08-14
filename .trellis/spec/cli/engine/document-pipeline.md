@@ -12,6 +12,7 @@
   - `updateField` / `appendReview` — text-level YAML surgery that preserves comments. **Never rewrite a whole document's frontmatter with a naive YAML dump** — user comments and ordering must survive.
 - Document discovery/indexing: `buildAssetDocIndex` (`core/AssetDocIndex.ts`) and `AssetManager` (`core/AssetManager.ts`).
 - Core envelope fields (see `UBIQUITOUS_LANGUAGE_2026-07-18.md`): `id`, `category`, `status` (`drafting|syncing|approved`), `refs`, `reviews`. The asset type field is `category` — never introduce `asset_type`.
+- **Canonical Model front-end (2026-08-14)**: the IR layer in `src/canonical/` parses a document into a `CanonicalAsset` (`parseAssetDocument` in `canonical/parser/CanonicalNormalizer.ts`). It composes the existing `FrontmatterParser` with the new body grammar (`BodyGrammarParser`) and the Reference DSL v2 (`RefExpressionParser`, selector-allowlist backward-compatible). The canonical IR is the single machine contract for future Runtime/Review consumers; it never becomes a second authority over the document (round-trip is lossless via `raw`). See [`canonical-model` spec](../../canonical-model/index.md).
 
 ## Stage 2: Validate
 
