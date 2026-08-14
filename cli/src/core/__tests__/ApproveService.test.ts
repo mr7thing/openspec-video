@@ -115,6 +115,29 @@ describe('ApproveService', () => {
     expect(docContent).not.toContain('Design References');
   });
 
+  it('characterizes partial success: document and manifest remain approved when lifecycle persistence fails', async () => {
+    writeDoc('hero', '---\nstatus: drafting\n---\n# Hero');
+    writeManifest('videospec_circle1', { hero: { status: 'drafting', index: 0 } });
+    writeOutput('videospec_circle1', 'volc.seadream5_001', 'hero_1.png');
+    const brokenLogPath = path.join(projectRoot, '.opsv', 'state', 'hero.jsonl');
+    fs.mkdirSync(brokenLogPath, { recursive: true });
+
+    const result = await service.execute({
+      circle: 'videospec_circle1',
+      assetId: 'hero',
+      action: 'approve',
+      outputFiles: ['hero_1.png'],
+    });
+
+    expect(result).toMatchObject({ success: true, status: 'approved' });
+    const docContent = fs.readFileSync(path.join(projectRoot, 'videospec', 'elements', '@hero.md'), 'utf-8');
+    expect(docContent).toContain('status: approved');
+    expect(docContent).toContain('Approved References');
+    const manifest = JSON.parse(fs.readFileSync(path.join(queueRoot, 'videospec_circle1', '_manifest.json'), 'utf-8'));
+    expect(manifest.assets.hero.status).toBe('approved');
+    expect(fs.statSync(brokenLogPath).isDirectory()).toBe(true);
+  });
+
   it('validates request', () => {
     expect(() => service.validateRequest({ circle: '../etc', assetId: 'hero', action: 'approve' })).toThrow(ValidationError);
     expect(() => service.validateRequest({ circle: 'circle1', assetId: '', action: 'approve' })).toThrow(ValidationError);

@@ -79,6 +79,60 @@ describe('Commit Service — Commit Boundary (P3b)', () => {
     expect(transitions[0].actor).toEqual({ type: 'human', id: 'cli' });
   });
 
+  describe('Phase 0 legacy characterization', () => {
+    it('accepts an arbitrary task string without resolving an immutable Task', async () => {
+      const name = writeArtifact('external.mp4');
+      const result = await commitArtifact({
+        projectRoot: tmp,
+        artifactPath: name,
+        type: 'video',
+        task: 'free-form-task-id',
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.asset).toBe('free-form-task-id');
+      expect(result.artifact).toBe('free-form-task-id:external');
+      expect(fs.existsSync(path.join(tmp, '.opsv', 'tasks'))).toBe(false);
+    });
+
+    it('leaves an accepted candidate at its original path instead of copying it into managed artifact storage', async () => {
+      const name = writeArtifact('unmanaged.mp4');
+      const sourcePath = path.join(tmp, name);
+
+      const result = await commitArtifact({
+        projectRoot: tmp,
+        artifactPath: name,
+        type: 'video',
+        task: 'shot-unmanaged',
+      });
+
+      expect(result.ok).toBe(true);
+      expect(fs.existsSync(sourcePath)).toBe(true);
+      expect(fs.existsSync(path.join(tmp, '.opsv', 'artifacts'))).toBe(false);
+      expect(result.transition?.reason).toContain(sourcePath);
+    });
+
+    it('appends duplicate draft-to-candidate transitions when the same content is committed twice', async () => {
+      const name = writeArtifact('duplicate.mp4');
+      const input = {
+        projectRoot: tmp,
+        artifactPath: name,
+        type: 'video',
+        task: 'shot-duplicate',
+      };
+
+      await commitArtifact(input);
+      await commitArtifact(input);
+
+      const transitions = await readTransitions(tmp, 'shot-duplicate');
+      expect(transitions).toHaveLength(2);
+      expect(transitions.map(({ from, to }) => `${from}->${to}`)).toEqual([
+        'draft->candidate',
+        'draft->candidate',
+      ]);
+    });
+  });
+
   it('infers type from extension', () => {
     expect(inferMediaType('a.mp4')).toBe('video');
     expect(inferMediaType('a.png')).toBe('image');

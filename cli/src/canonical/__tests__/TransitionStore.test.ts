@@ -6,6 +6,8 @@ import {
   readTransitions,
   projectState,
   currentState,
+  currentStateSync,
+  transitionToState,
   stateLogPath,
 } from '../state/TransitionStore';
 import { AssetTransition } from '../state/TransitionStore';
@@ -96,6 +98,56 @@ describe('Transition Store (P3a)', () => {
     const { state, transitions } = await currentState(tmp, 'shot-023');
     expect(state).toBe('review');
     expect(transitions).toHaveLength(2);
+  });
+
+  describe('Phase 0 legacy characterization', () => {
+    it('projects a corrupt-only log as draft in the synchronous path', () => {
+      const log = stateLogPath(tmp, 'shot-corrupt');
+      fs.mkdirSync(path.dirname(log), { recursive: true });
+      fs.writeFileSync(log, '{not-json}\n');
+
+      expect(currentStateSync(tmp, 'shot-corrupt')).toEqual({ state: 'draft', transitions: [] });
+    });
+
+    it('projects an I/O read failure as draft in the synchronous path', () => {
+      const log = stateLogPath(tmp, 'shot-io-error');
+      fs.mkdirSync(log, { recursive: true });
+
+      expect(currentStateSync(tmp, 'shot-io-error')).toEqual({ state: 'draft', transitions: [] });
+    });
+
+    it('stores different artifact revisions in the same asset-keyed stream and projection', async () => {
+      await appendTransition(tmp, makeTransition({ artifact: 'shot-023:v1' }));
+      await appendTransition(tmp, makeTransition({
+        artifact: 'shot-023:v2',
+        from: 'candidate',
+        to: 'review',
+      }));
+
+      const result = await currentState(tmp, 'shot-023');
+      expect(result.state).toBe('review');
+      expect(result.transitions.map(transition => transition.artifact)).toEqual([
+        'shot-023:v1',
+        'shot-023:v2',
+      ]);
+      expect(fs.readdirSync(path.join(tmp, '.opsv', 'state'))).toEqual(['shot-023.jsonl']);
+    });
+
+    it('transitionToState appends every intermediate edge in one call', async () => {
+      const appended = await transitionToState(tmp, {
+        asset: 'shot-multistep',
+        artifact: 'shot-multistep:v1',
+        actor: { type: 'system', id: 'legacy-normalizer' },
+        reason: 'legacy approval normalization',
+        timestamp: '2026-08-14T10:00:00.000Z',
+      }, 'approved');
+
+      expect(appended.map(({ from, to }) => `${from}->${to}`)).toEqual([
+        'draft->candidate',
+        'candidate->review',
+        'review->approved',
+      ]);
+    });
   });
 
   it('recovers a torn tail on append', async () => {

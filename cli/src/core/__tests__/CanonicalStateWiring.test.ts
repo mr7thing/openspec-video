@@ -70,6 +70,19 @@ describe('P7 — canonical state machine wired into the agent control surface', 
       expect(currentStateSync(root, 'hero').state).toBe('candidate');
     });
 
+    it('characterizes partial success when the review entry is written but lifecycle persistence fails', async () => {
+      const root = setupProject();
+      const brokenLogPath = path.join(root, '.opsv', 'state', 'hero.jsonl');
+      fs.mkdirSync(brokenLogPath, { recursive: true });
+      const service = new ReviewService(root);
+
+      await expect(service.revise('hero', 'keep the written review')).resolves.toContain('hero.md');
+
+      const document = fs.readFileSync(path.join(root, 'videospec', 'assets', 'hero.md'), 'utf-8');
+      expect(document).toContain('keep the written review');
+      expect(fs.statSync(brokenLogPath).isDirectory()).toBe(true);
+    });
+
     it('does not fail when the asset is not yet in review (draft)', async () => {
       const root = setupProject();
       const service = new ReviewService(root);
