@@ -19,6 +19,16 @@ import { assertValidTransition, reachablePath } from './AssetStateMachine';
 import { withLock } from '../../core/execution/lock';
 import { ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
 
+/** Q3: generation lineage attached to a transition (provider/model/seed/parents). */
+export const TransitionProvenanceSchema = z.object({
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  seed: z.number().optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  parentAssets: z.array(z.string()).optional(),
+});
+export type TransitionProvenance = z.infer<typeof TransitionProvenanceSchema>;
+
 export const AssetTransitionSchema = z.object({
   asset: z.string().min(1),
   artifact: z.string().optional(),
@@ -28,6 +38,8 @@ export const AssetTransitionSchema = z.object({
   reason: z.string().optional(),
   review: z.string().optional(),
   timestamp: z.string(),
+  /** Q3: full lineage — provider/model/seed/parameters/parent assets. Optional, backward compatible. */
+  provenance: TransitionProvenanceSchema.optional(),
 });
 export type AssetTransition = z.infer<typeof AssetTransitionSchema>;
 

@@ -4,6 +4,10 @@ import { commitArtifact } from '../canonical/artifacts/CommitService';
 import { inferMediaType } from '../canonical/artifacts/mediaProbe';
 import { logger } from '../utils/logger';
 
+function collect(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
 export function registerCommitCommand(program: Command): void {
   program
     .command('commit <artifact>')
@@ -14,6 +18,8 @@ export function registerCommitCommand(program: Command): void {
     .option('--duration <seconds>', 'expected duration in seconds for tolerance validation')
     .option('--provider <name>', 'provenance provider (seedance/veo/rhcli/...)')
     .option('--model <name>', 'provenance model')
+    .option('--seed <number>', 'generation seed')
+    .option('--parent <ref>', 'parent asset reference (e.g. @alice:v3); repeatable', collect, [])
     .option('--capability <name>', 'provenance capability (default external.import)')
     .action(async (artifact: string, opts: any) => {
       try {
@@ -26,6 +32,8 @@ export function registerCommitCommand(program: Command): void {
           expectedDuration: opts.duration !== undefined ? Number(opts.duration) : undefined,
           provider: opts.provider,
           model: opts.model,
+          seed: opts.seed !== undefined ? Number(opts.seed) : undefined,
+          parentAssets: opts.parent,
           capability: opts.capability,
           actor: { type: 'human', id: 'cli' },
           reason: opts.provider ? `committed via ${opts.provider}${opts.model ? '/' + opts.model : ''}` : undefined,

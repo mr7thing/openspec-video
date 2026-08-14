@@ -32,6 +32,10 @@ export interface CommitInput {
   capability?: string;
   provider?: string;
   model?: string;
+  /** Generation seed, when known. */
+  seed?: number;
+  /** Parent asset references (e.g. '@alice:v3') this artifact was produced from. */
+  parentAssets?: string[];
   reason?: string;
 }
 
@@ -86,6 +90,15 @@ export async function commitArtifact(input: CommitInput): Promise<CommitResult> 
     actor,
     reason: input.reason ?? `committed artifact ${absPath}`,
     timestamp: new Date().toISOString(),
+    provenance:
+      input.provider || input.model || input.seed !== undefined || input.parentAssets?.length
+        ? {
+            provider: input.provider,
+            model: input.model,
+            seed: input.seed,
+            parentAssets: input.parentAssets,
+          }
+        : undefined,
   });
 
   return {
