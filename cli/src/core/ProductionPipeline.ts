@@ -16,14 +16,15 @@
 
 import fs from 'fs';
 import path from 'path';
-import { AssetManager, CircleAssetEntry } from './AssetManager';
+import { AssetManager } from './AssetManager';
+import type { CircleAssetEntry } from './AssetManager';
 import { ApprovedRefReader } from './ApprovedRefReader';
 import { DesignRefReader } from './DesignRefReader';
 import { RefResolver } from './RefEngine';
 import { FrontmatterParser } from './FrontmatterParser';
 import { ManifestReader } from './ManifestReader';
 import { TaskBuilder } from './compiler/TaskBuilder';
-import { Job, FrameRef, PromptExtra } from '../types/Job';
+import type { Job, FrameRef, PromptExtra } from '../types/Job';
 import { OpsVContext } from '../container/OpsVContext';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { getProjectDir } from '../utils/configLoader';
@@ -31,6 +32,9 @@ import { CompilationError, InfrastructureError, OpsVErrorCode } from '../errors/
 import { logger } from '../utils/logger';
 import { loadProjectConfig } from './ProjectConfig';
 import { missingRequiredRefCategories, resolveDocumentContract } from './PackContracts';
+import { DocumentCompiler } from '../canonical/compiler/DocumentCompiler';
+import { compileProductionTask } from '../canonical/compiler/ProductionTaskCompiler';
+import type { ProductionTask } from '../canonical/compiler/ProductionTaskCompiler';
 
 // ============================================================================
 // Types
@@ -98,47 +102,53 @@ export class ProductionPipeline {
       return { compiled: 0, skipped: 0, errors: [], outputDir: '' };
     }
 
-    // 3. Build manifest status map
-    const manifestAssets: Record<string, { status: string }> = {};
-    for (const a of circleAssets.assets) {
-      manifestAssets[a.id] = { status: a.status };
-    }
-
-    // 4. Build jobs
-    const jobs: Job[] = [];
+    // 3. Compile each Asset Document through one seam. Pack-backed production
+    // documents become immutable Production Tasks; category-less documents
+    // remain on the explicit legacy Job facade during the compatibility window.
+    const documentCompiler = new DocumentCompiler(this.projectRoot);
+    const productionTasks: ProductionTask[] = [];
+    const legacyJobs: Job[] = [];
     const errors: string[] = [];
 
     for (const asset of targetAssets) {
-      const refErrors = await this.validateRefStatuses(asset, manifestAssets);
-      if (refErrors.length > 0) {
-        errors.push(`${asset.id}: ${refErrors.join(', ')}`);
-        continue;
-      }
-
       try {
-        const job = await this.buildJob(asset, paramOverrides);
-        jobs.push(job);
+        const compilation = await documentCompiler.compile(asset, paramOverrides, { workflowPath });
+        if (compilation.kind === 'canonical') {
+          productionTasks.push(compileProductionTask(compilation.snapshot));
+        } else {
+          legacyJobs.push(compilation.job);
+        }
       } catch (err: any) {
         errors.push(`${asset.id}: ${err.message}`);
       }
     }
 
-    if (jobs.length === 0) {
+    if (productionTasks.length === 0 && legacyJobs.length === 0) {
       return { compiled: 0, skipped: targetAssets.length, errors, outputDir: '' };
     }
 
-    // 5. Compile
+    // 4. Compile provider payloads. Canonical tasks never re-read Markdown;
+    // the legacy facade remains isolated and removable after migration.
     const outputDir = this.resolveModelQueueDir(circleDir, modelKey);
     const ctx = OpsVContext.create(this.projectRoot);
     const builder = new TaskBuilder(ctx);
-    const results = await builder.compileToDir(
-      jobs, modelKey, outputDir, dryRun,
-      workflowPath, undefined, promptMode,
-    );
+    const canonicalResults = productionTasks.length > 0
+      ? await builder.compileProductionTasksToDir(
+        productionTasks, modelKey, outputDir, dryRun,
+        undefined, undefined, promptMode,
+      )
+      : [];
+    const legacyResults = legacyJobs.length > 0
+      ? await builder.compileToDir(
+        legacyJobs, modelKey, outputDir, dryRun,
+        workflowPath, undefined, promptMode,
+      )
+      : [];
+    const compiled = canonicalResults.length + legacyResults.length;
 
     return {
-      compiled: results.length,
-      skipped: targetAssets.length - results.length,
+      compiled,
+      skipped: targetAssets.length - compiled,
       errors,
       outputDir,
     };

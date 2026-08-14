@@ -54,6 +54,15 @@ export interface JobMeta {
   batch?: number;
 }
 
+export interface CanonicalTaskMeta {
+  taskId: string;
+  taskRevision: string;
+  taskDigest: string;
+  snapshotDigest: string;
+  sourceDigest: string;
+  schemaVersion: number;
+}
+
 export interface TaskMeta {
   provider: string;
   modelKey: string;
@@ -65,6 +74,7 @@ export interface TaskMeta {
   workflowId?: string;
   workflowFile?: string;
   compiledAt: string;
+  canonical?: CanonicalTaskMeta;
 }
 
 export interface BaseTaskJson<TPayload = unknown> {

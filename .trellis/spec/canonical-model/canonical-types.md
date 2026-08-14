@@ -143,3 +143,91 @@ ApprovedVariant = {
 2. Every entity carries an `id` and a stable `raw`/source reference so provenance is always traceable.
 3. Optional fields stay optional in v1 — the parser fills them only when the document expresses them.
 4. Do not introduce a field the existing domain vocabulary forbids (e.g. `asset_type`).
+
+## 4. Phase 1 Production Snapshot and Task Contracts
+
+### 1. Scope / Trigger
+
+These additive TypeScript contracts apply to Pack-backed production compilation. They are immutable in-memory envelopes for the Phase 1 compatibility seam, not editable authoring formats and not yet the Phase 3 persistent Task repository.
+
+### 2. Signatures
+
+```ts
+CanonicalSnapshot = {
+  schema: 'opsv.canonical-snapshot';
+  version: 1;
+  source: { path: string; digest: string };
+  asset: CanonicalAsset;
+  contract: CanonicalSnapshotContract;
+  references: CanonicalResolvedInput[];
+  production: CanonicalProductionInput;
+  digest: string;
+};
+
+ProductionTask = {
+  schema: 'opsv.production-task';
+  version: 1;
+  id: string;
+  revision: string;
+  digest: string;
+  snapshotDigest: string;
+  source: { path: string; digest: string };
+  capability?: string;
+  boundModel?: string;
+  outputs: string[];
+  references: CanonicalResolvedInput[];
+  production: CanonicalProductionInput;
+};
+```
+
+### 3. Contracts
+
+- Digest format is `sha256:<lowercase-hex>` over `opsv:<schema-id>:v<version>\n<canonical-json>`.
+- Canonical JSON recursively sorts object keys, preserves array order, omits unsupported optional values, and rejects non-finite numbers.
+- `source.digest` preserves exact source-byte fidelity for audit and `isSnapshotStale`; it is excluded from semantic Snapshot/Task identity so comment-only or equivalent YAML formatting changes do not create a semantic revision.
+- `asset` fidelity fields (`raw`, `bodyRaw`, `approvedRefSection`, `designRefSection`) are excluded from semantic Snapshot identity but remain available on the frozen Snapshot for round-trip/audit.
+- `CanonicalResolvedInput.kind` is `image | video | audio | frame:first | frame:last | workflow`; local `uri` values are contained project-relative POSIX paths with content digests.
+- `ProductionTask.revision === ProductionTask.digest` in version 1. The Task binds `snapshotDigest`, resolved inputs, capability/model/output bindings, and provider-neutral production input.
+- `createCanonicalSnapshot` and `compileProductionTask` deep-freeze their returned envelopes.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Non-finite number enters canonical serialization | Throw; do not emit a digest |
+| Source bytes differ from `snapshot.source.digest` | `isSnapshotStale` returns `true` |
+| Local input is outside project containment, missing, not a file, or has changed content | Reject before provider compilation |
+| External HTTP(S)/data input is used | Bind a deterministic URI digest; do not fetch remote bytes |
+| Secret-like frontmatter key would enter a canonical Snapshot | Reject document compilation |
+| Task bound model differs from requested model | Reject canonical lowering |
+
+### 5. Good / Base / Bad Cases
+
+- Good: semantically identical documents with reordered YAML keys have different raw source digests but the same Snapshot semantic digest.
+- Base: a Snapshot with no media references carries `references: []`; this is explicit and digest-protected.
+- Bad: replacing `media/reference.png` after Task creation fails lowering rather than silently compiling against new bytes.
+
+### 6. Tests Required
+
+- Golden digest determinism and schema/version domain isolation.
+- Deep-freeze assertions for Snapshot and Task envelopes.
+- Raw-source staleness versus semantic identity tests.
+- Local media/workflow path normalization and content-change tests.
+- Production Task determinism and queue metadata mapping tests.
+- Provider-neutral lowering tests proving that source Markdown is not reread.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+const snapshotDigest = sha256(markdownBytes); // formatting becomes semantic identity
+const task = { ...snapshot, createdAt: new Date().toISOString() }; // nondeterministic Task
+```
+
+#### Correct
+
+```ts
+const snapshot = createCanonicalSnapshot(draft); // semantic digest + raw source audit digest
+const task = compileProductionTask(snapshot);    // deterministic, frozen, provider-neutral
+```

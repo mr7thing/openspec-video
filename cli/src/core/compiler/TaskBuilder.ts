@@ -5,10 +5,10 @@
 
 import path from 'path';
 import fs from 'fs';
-import { Job, BaseTaskJson } from '../../types/Job';
-import { ModelConfig } from '../../utils/configLoader';
+import type { Job, BaseTaskJson } from '../../types/Job';
+import type { ModelConfig } from '../../utils/configLoader';
 import { FileUtils } from '../../utils/FileUtils';
-import { ProviderCompiler, CompileContext } from './ProviderCompiler';
+import type { ProviderCompiler, CompileContext } from './ProviderCompiler';
 import { VolcengineCompiler } from './providers/VolcengineCompiler';
 import { SiliconFlowCompiler } from './providers/SiliconFlowCompiler';
 import { MinimaxCompiler } from './providers/MinimaxCompiler';
@@ -23,12 +23,15 @@ import { CompilationError, ConfigError, OpsVErrorCode } from '../../errors/OpsVE
 import { OpsVContext } from '../../container/OpsVContext';
 import { bindRefs } from '../RefEngine';
 import { FrontmatterParser } from '../FrontmatterParser';
-import { ResolvedRef } from '../../types/FrontmatterSchema';
-import { RefsByType, PromptCompileMode } from '../../types/Refs';
+import type { ResolvedRef } from '../../types/FrontmatterSchema';
+import type { RefsByType, PromptCompileMode } from '../../types/Refs';
 import { InputTypesLoader } from '../../utils/inputTypesLoader';
 import { compilePrompt } from '../RefEngine';
 import { getProjectDir } from '../../utils/configLoader';
 import { buildAssetDocIndex } from '../AssetDocIndex';
+import type { ProductionTask } from '../../canonical/compiler/ProductionTaskCompiler';
+import { resolveContainedReal } from '../../utils/pathSecurity';
+import { digestSource } from '../../canonical/compiler/CanonicalSnapshot';
 
 const COMPILERS: Record<string, new () => ProviderCompiler> = {
   volcengine: VolcengineCompiler,
@@ -62,6 +65,92 @@ export class TaskBuilder {
     workflowPath?: string,
     forceApiMapping?: boolean,
     promptCompileMode?: PromptCompileMode,
+  ): Promise<BaseTaskJson<unknown>[]> {
+    return this.compileJobsToDir(
+      jobs,
+      modelKey,
+      outputDir,
+      dryRun,
+      workflowPath,
+      forceApiMapping,
+      promptCompileMode,
+    );
+  }
+
+  async compileProductionTasksToDir(
+    tasks: ProductionTask[],
+    modelKey: string,
+    outputDir: string,
+    dryRun = false,
+    workflowPath?: string,
+    forceApiMapping?: boolean,
+    promptCompileMode?: PromptCompileMode,
+  ): Promise<BaseTaskJson<unknown>[]> {
+    if (workflowPath) {
+      throw new CompilationError(
+        OpsVErrorCode.COMPILATION_FAILED,
+        'Canonical Production Tasks cannot accept an execution-time workflow override; bind it during Document compilation',
+      );
+    }
+
+    const canonicalTasks = new Map<string, ProductionTask>();
+    const jobs = tasks.map((task): Job => {
+      if (task.boundModel && task.boundModel !== modelKey) {
+        throw new CompilationError(
+          OpsVErrorCode.COMPILATION_FAILED,
+          `Production Task '${task.id}' is bound to model '${task.boundModel}', not '${modelKey}'`,
+        );
+      }
+      if (canonicalTasks.has(task.id)) {
+        throw new CompilationError(
+          OpsVErrorCode.COMPILATION_FAILED,
+          `Duplicate Production Task id '${task.id}' in one compilation batch`,
+        );
+      }
+      canonicalTasks.set(task.id, task);
+      this.verifyCanonicalInputs(task);
+      const payload = structuredClone(task.production.payload);
+      if (payload.frame_ref) {
+        payload.frame_ref = {
+          first: this.resolveCanonicalReference(payload.frame_ref.first),
+          last: this.resolveCanonicalReference(payload.frame_ref.last),
+        };
+      }
+      return {
+        id: task.id,
+        type: task.production.type,
+        prompt: task.production.prompt,
+        payload,
+        reference_images: task.production.references.image.map((ref) => this.resolveCanonicalReference(ref) as string),
+        reference_videos: task.production.references.video.map((ref) => this.resolveCanonicalReference(ref) as string),
+        reference_audios: task.production.references.audio.map((ref) => this.resolveCanonicalReference(ref) as string),
+        workflow: task.production.workflow,
+        workflow_id: task.production.workflowId,
+        workflow_path: task.production.workflowPath,
+      };
+    });
+
+    return this.compileJobsToDir(
+      jobs,
+      modelKey,
+      outputDir,
+      dryRun,
+      workflowPath,
+      forceApiMapping,
+      promptCompileMode,
+      canonicalTasks,
+    );
+  }
+
+  private async compileJobsToDir(
+    jobs: Job[],
+    modelKey: string,
+    outputDir: string,
+    dryRun = false,
+    workflowPath?: string,
+    forceApiMapping?: boolean,
+    promptCompileMode?: PromptCompileMode,
+    canonicalTasks?: Map<string, ProductionTask>,
   ): Promise<BaseTaskJson<unknown>[]> {
     const modelConfig = this.ctx.configLoader.getModelConfig(modelKey);
     if (!modelConfig) {
@@ -187,6 +276,17 @@ export class TaskBuilder {
       };
 
       const taskJson = compiler.compile(ctx);
+      const canonicalTask = canonicalTasks?.get(job.id);
+      if (canonicalTask) {
+        taskJson._opsv.canonical = {
+          taskId: canonicalTask.id,
+          taskRevision: canonicalTask.revision,
+          taskDigest: canonicalTask.digest,
+          snapshotDigest: canonicalTask.snapshotDigest,
+          sourceDigest: canonicalTask.source.digest,
+          schemaVersion: canonicalTask.version,
+        };
+      }
 
       // Attach _refs_map to _opsv metadata in keep/annotate mode (so model can resolve @-tokens)
       if ((effectiveMode === 'keep' || effectiveMode === 'annotate') && refsMap && Object.keys(refsMap).length > 0) {
@@ -203,6 +303,46 @@ export class TaskBuilder {
     }
 
     return results;
+  }
+
+
+  private verifyCanonicalInputs(task: ProductionTask): void {
+    for (const input of task.references) {
+      if (/^(https?:\/\/|data:)/.test(input.uri)) continue;
+      const resolved = this.resolveCanonicalReference(input.uri);
+      if (!resolved) continue;
+      const currentDigest = digestSource(fs.readFileSync(resolved));
+      if (currentDigest !== input.digest) {
+        throw new CompilationError(
+          OpsVErrorCode.COMPILATION_INVALID_REF,
+          `Canonical ${input.kind} input changed after Task compilation: ${input.uri}`,
+        );
+      }
+    }
+  }
+
+  private resolveCanonicalReference(reference: string | null): string | null {
+    if (!reference || /^(https?:\/\/|data:)/.test(reference)) return reference;
+    if (!this.ctx.projectRoot) {
+      throw new CompilationError(
+        OpsVErrorCode.COMPILATION_FAILED,
+        `Cannot resolve canonical reference without a project root: ${reference}`,
+      );
+    }
+    const resolved = resolveContainedReal(this.ctx.projectRoot, reference);
+    if (!resolved) {
+      throw new CompilationError(
+        OpsVErrorCode.COMPILATION_INVALID_REF,
+        `Canonical reference resolves outside the project root: ${reference}`,
+      );
+    }
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+      throw new CompilationError(
+        OpsVErrorCode.COMPILATION_INVALID_REF,
+        `Canonical reference is no longer an existing file: ${reference}`,
+      );
+    }
+    return resolved;
   }
 
   private resolveCompiler(provider: string): ProviderCompiler {

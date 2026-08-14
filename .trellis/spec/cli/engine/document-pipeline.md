@@ -44,12 +44,100 @@ Manifest shape: `{contractVersion, asset, nextAction, documentContract, promptCo
 
 ## Stage 3: Compile
 
-- Entry: `opsv produce` (`src/commands/produce.ts`) → `ProductionPipeline.run` (`core/ProductionPipeline.ts`):
+- Entry: `opsv produce` (`src/commands/produce.ts`) → `ProductionPipeline.run` (`core/ProductionPipeline.ts`). During the migration window it has two explicit paths:
   1. Load circle assets from `_manifest.json` (`core/ManifestReader.ts`, schema `CircleManifestSchema` in `types/ManifestSchema.ts`).
-  2. Filter by category/file/status; validate ref approval status (`ApprovedRefReader` / `DesignRefReader`).
-  3. Build `Job` objects (`types/Job.ts`). Prompt fallback chain: `prompt` → `visual_detailed` → `visual_brief` → first body paragraph.
-  4. `TaskBuilder.compileToDir` (`core/compiler/TaskBuilder.ts`): resolve model config + API key → `bindRefs` → cross-document enrichment (failures here are **intentionally non-fatal**, swallowed with `catch {}`) → `compilePrompt` (`core/compiler/PromptCompiler.ts`) rewrites @-tokens per `PromptCompileMode` (`keep|index|name|annotate`) → provider compiler → write `{jobId}.json` into `circleDir/{modelKey}_NNN/`.
-- Compiled unit: `BaseTaskJson<TPayload> = { payload: TPayload; _opsv: TaskMeta }` (`types/Job.ts`). `TaskMeta` carries `provider`, `modelKey`, `shotId`, `api_url`, `compiledAt`.
+  2. Filter by category/file/status.
+  3. Send every selected Asset Document through `DocumentCompiler` (`canonical/compiler/DocumentCompiler.ts`).
+  4. For Pack-backed production Profiles, compile `CanonicalSnapshot → ProductionTask`, then lower through `TaskBuilder.compileProductionTasksToDir` into the existing provider compiler.
+  5. For category-less pre-Pack documents only, return an explicit legacy `Job` and use `TaskBuilder.compileToDir`.
+- Prompt fallback remains `prompt` → `visual_detailed` → `visual_brief` → first body paragraph.
+- Compiled execution view: `BaseTaskJson<TPayload> = { payload: TPayload; _opsv: TaskMeta }` (`types/Job.ts`). Canonical lowering adds `_opsv.canonical = {taskId, taskRevision, taskDigest, snapshotDigest, sourceDigest, schemaVersion}` while retaining provider/model/type/shot metadata.
+
+### Scenario: Canonical production compilation compatibility seam
+
+#### 1. Scope / Trigger
+
+This contract applies when an Asset Document resolves to a Pack Profile whose `kind` is `production`. It is the first production slice of the Canonical Runtime migration; it does not yet provide the Phase 3 Task repository or full envelope self-verification.
+
+#### 2. Signatures
+
+```ts
+DocumentCompiler.compile(
+  asset: { id: string; filePath?: string },
+  paramOverrides?: Record<string, unknown>,
+  options?: { workflowPath?: string },
+): Promise<
+  | { kind: 'canonical'; snapshot: CanonicalSnapshot }
+  | { kind: 'legacy'; job: Job }
+>;
+
+compileProductionTask(snapshot: CanonicalSnapshot): ProductionTask;
+
+TaskBuilder.compileProductionTasksToDir(
+  tasks: ProductionTask[],
+  modelKey: string,
+  outputDir: string,
+  dryRun?: boolean,
+  workflowPath?: string,
+  forceApiMapping?: boolean,
+  promptCompileMode?: PromptCompileMode,
+): Promise<BaseTaskJson<unknown>[]>;
+```
+
+#### 3. Contracts
+
+- The Asset Document is read once by `DocumentCompiler`; downstream canonical lowering must not read its Markdown again.
+- `CanonicalSnapshot.source` contains a project-relative POSIX path and a raw SHA-256 digest for staleness/audit.
+- Snapshot semantic identity excludes source-fidelity fields such as raw YAML/body text, but includes resolved Pack/Profile/model/output bindings, provider-neutral production input, and resolved input digests.
+- Local media and workflow inputs use contained project-relative POSIX URIs plus content SHA-256 digests. External HTTP(S)/data inputs bind the URI value and are not fetched during compilation.
+- A CLI workflow override is an authoring/Document-compilation input. Canonical Task lowering rejects an execution-time workflow override.
+- Provider compilers continue to receive the compatibility `Job`/`CompileContext` shape, but a canonical Job has no `_meta.source`; therefore the legacy Markdown/ref rebinding branch cannot run.
+- Category-less documents remain the only explicit legacy compatibility path in this phase.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Asset has no file path, or a local input is missing | Fail before provider compilation |
+| Source/input path escapes the project root or escapes through a symlink | Reject with a path/ref compilation error |
+| Production Profile, required reference category, capability binding, or bound model is invalid | Fail before provider compilation |
+| Local input content changes after Task compilation | Reject canonical lowering due to digest mismatch |
+| Canonical Task model binding differs from requested `modelKey` | Reject canonical lowering |
+| Duplicate canonical Task ids occur in one batch | Reject the batch |
+| `workflowPath` is passed to canonical Task lowering | Reject; bind it in `DocumentCompiler.compile` |
+
+#### 5. Good / Base / Bad Cases
+
+- Good: a short-drama `shot-video` document resolves its Pack/Profile/model, binds local inputs by digest, and produces the same provider payload as the legacy path except canonical metadata and compile time.
+- Base: a category-less document returns `{kind: 'legacy', job}` and keeps the old facade behavior during the compatibility window.
+- Bad: a canonical Task references a deleted or modified local file, or requests a different model than its bound model; no provider payload may be emitted.
+
+#### 6. Tests Required
+
+- Canonical serializer: recursive key ordering, array-order preservation, finite-number rejection, and schema/version domain separation.
+- Snapshot: equivalent YAML formatting has the same semantic digest while raw source digests differ; source staleness remains detectable.
+- Document compiler: real `packs/short-drama` Profile resolution, missing capability binding, path normalization, local media/workflow digest binding, and legacy/provider payload equivalence.
+- Task compiler/facade: deterministic frozen Task, no source Markdown reread, model/duplicate/workflow guards, local input existence/digest checks, and `_opsv.canonical` metadata.
+- Pipeline: Pack-backed production documents call canonical Task lowering and do not call the legacy Job facade.
+
+#### 7. Wrong vs Correct
+
+##### Wrong
+
+```ts
+// Reinterprets mutable authoring input inside the provider lowering stage.
+const source = fs.readFileSync(task.source.path, 'utf8');
+const refs = bindRefs(FrontmatterParser.parseRaw(source).frontmatter.refs, ctx);
+return provider.compile({ ...ctx, refs });
+```
+
+##### Correct
+
+```ts
+const compilation = await documentCompiler.compile(asset, overrides, { workflowPath });
+const task = compileProductionTask(compilation.snapshot);
+return taskBuilder.compileProductionTasksToDir([task], modelKey, outputDir);
+```
 
 ### Provider compiler contract
 
