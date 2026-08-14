@@ -54,3 +54,37 @@ export function assertValidTransition(from: AssetState, to: AssetState): void {
     );
   }
 }
+
+/**
+ * Shortest legal path of intermediate states from `from` to `to`
+ * (BFS over the transition graph). Returns `[to]` when `from === to`,
+ * `null` when unreachable.
+ *
+ * Used by the approve dual-write to normalize a legacy approval into the
+ * state machine (e.g. `draft → candidate → review → approved`).
+ */
+export function reachablePath(from: AssetState, to: AssetState): AssetState[] | null {
+  if (from === to) return [to];
+  const queue: AssetState[] = [from];
+  const prev = new Map<AssetState, AssetState>([[from, from]]);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const next of ASSET_TRANSITIONS[current]) {
+      if (prev.has(next)) continue;
+      prev.set(next, current);
+      if (next === to) {
+        // Reconstruct the path from from → to.
+        const path: AssetState[] = [];
+        let node: AssetState = next;
+        while (node !== from) {
+          path.unshift(node);
+          node = prev.get(node)!;
+        }
+        return path;
+      }
+      queue.push(next);
+    }
+  }
+  return null;
+}

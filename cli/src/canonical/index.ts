@@ -13,3 +13,7 @@ export * from './parser/BodyGrammarParser';
 export * from './parser/CanonicalNormalizer';
 export * from './state/AssetStateMachine';
 export * from './state/TransitionStore';
+export * from './artifacts/ArtifactContract';
+export * from './artifacts/ArtifactValidator';
+export * from './artifacts/mediaProbe';
+export * from './artifacts/CommitService';

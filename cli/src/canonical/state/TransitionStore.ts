@@ -14,8 +14,8 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { AssetStateEnum } from '../schema';
-import { assertValidTransition } from './AssetStateMachine';
+import { AssetStateEnum, AssetState } from '../schema';
+import { assertValidTransition, reachablePath } from './AssetStateMachine';
 import { withLock } from '../../core/execution/lock';
 import { ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
 
@@ -126,6 +126,42 @@ export async function currentState(
 ): Promise<{ state: AssetTransition['to']; transitions: AssetTransition[] }> {
   const transitions = await readTransitions(projectRoot, assetId);
   return { state: projectState(transitions), transitions };
+}
+
+export type TransitionBase = Omit<AssetTransition, 'from' | 'to'>;
+
+/**
+ * Advance an asset to `target` along the shortest legal path from its current
+ * state, appending every intermediate edge. Returns the appended transitions.
+ *
+ * Used to normalize legacy approvals into the state machine: an artifact with
+ * no prior log starts at `draft` and is walked through candidate → review →
+ * approved in one call. Throws `E1005` when `target` is unreachable.
+ */
+export async function transitionToState(
+  projectRoot: string,
+  base: TransitionBase,
+  target: AssetState,
+): Promise<AssetTransition[]> {
+  const { state: current } = await currentState(projectRoot, base.asset);
+  if (current === target) return [];
+
+  const path = reachablePath(current, target);
+  if (!path) {
+    throw new ValidationError(
+      OpsVErrorCode.ASSET_STATE_INVALID_TRANSITION,
+      `No legal state path from ${current} to ${target} for asset ${base.asset}`,
+      { assetState: { from: current, to: target } },
+    );
+  }
+
+  const appended: AssetTransition[] = [];
+  let from: AssetState = current;
+  for (const to of path) {
+    appended.push(await appendTransition(projectRoot, { ...base, from, to }));
+    from = to;
+  }
+  return appended;
 }
 
 /** Drop a torn tail (a final line without a newline) left by a crash mid-append. */

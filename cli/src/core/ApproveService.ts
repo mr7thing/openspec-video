@@ -20,6 +20,8 @@ import { ApprovedRefReader } from './ApprovedRefReader';
 import { DesignRefReader } from './DesignRefReader';
 import { buildAssetDocIndex } from './AssetDocIndex';
 import { ValidationError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
+import { transitionToState } from '../canonical/state/TransitionStore';
+import { logger } from '../utils/logger';
 
 export type ReviewAction = 'approve' | 'design_feedback' | 'revise_prompt';
 
@@ -193,6 +195,11 @@ export class ApproveService {
     // 3. Update manifest status
     this.updateManifestStatus(req.circle, req.assetId, newStatus);
 
+    // 3.5 Dual-write the asset state machine (best-effort, incremental migration)
+    if (req.action === 'approve') {
+      await this.recordStateTransitions(req);
+    }
+
     const actionDescriptions: Record<ReviewAction, string> = {
       approve: newStatus === 'syncing'
         ? `Approved (modified task) ${req.outputFiles?.length || 0} output(s) — syncing required`
@@ -202,6 +209,38 @@ export class ApproveService {
     };
 
     return { success: true, status: newStatus, note: actionDescriptions[req.action] };
+  }
+
+  /**
+   * Dual-write the asset state machine for an approval (best-effort).
+   *
+   * Walks each approved artifact to `approved` along the shortest legal path
+   * from its current state (`draft` when no log exists). Failures only warn —
+   * the document is the primary record in the legacy flow; full fail-closed
+   * enforcement lands when commit/import become the primary path.
+   */
+  private async recordStateTransitions(req: ApproveRequest): Promise<void> {
+    if (!req.outputFiles?.length) return;
+    const timestamp = new Date().toISOString();
+    for (const filename of req.outputFiles) {
+      const variant = req.variant || path.basename(filename, path.extname(filename));
+      try {
+        await transitionToState(
+          this.projectRoot,
+          {
+            asset: req.assetId,
+            artifact: `${req.assetId}:${variant}`,
+            actor: { type: 'human', id: 'reviewer' },
+            reason: req.note || 'approved',
+            review: req.note,
+            timestamp,
+          },
+          'approved',
+        );
+      } catch (err: any) {
+        logger.warn(`[approve] state machine sync skipped for ${req.assetId}:${variant}: ${err.message}`);
+      }
+    }
   }
 
   /**

@@ -36,6 +36,8 @@ import { registerHookCommands } from './commands/hook';
 import { registerBootstrapCommand } from './commands/bootstrap';
 import { registerExecCommand } from './commands/exec';
 import { registerConformanceCommand } from './commands/conformance';
+import { registerCommitCommand } from './commands/commit';
+import { registerImportCommand } from './commands/import';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -143,5 +145,7 @@ registerHookCommands(program);
 registerBootstrapCommand(program);
 registerExecCommand(program);
 registerConformanceCommand(program);
+registerCommitCommand(program);
+registerImportCommand(program);
 
 program.parse(process.argv);
