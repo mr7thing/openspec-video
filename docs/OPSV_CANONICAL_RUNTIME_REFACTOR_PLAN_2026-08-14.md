@@ -1,10 +1,11 @@
 # OPSV 彻底重构开发计划 —— 内核下沉为 Asset State Runtime + Production Graph + Review Runtime
 
 > 日期：2026-08-14
-> 分支：`refactor/chatgpt-analysis-overhaul`
+> 分支：`refactor/chatgpt-analysis-overhaul`（计划）→ `refactor/canonical-runtime-exec`（执行，12 commit）
 > 上游分析：ChatGPT 对 opsv 项目的分析（`~/文档/clawbay/20_Projects/opsv/chagpt 对opsv 项目的分析.md`，2026-08-13）
 > 权威计划：`.trellis/tasks/08-14-chatgpt-analysis-overhaul/`（prd.md / design.md / implement.md）
 > 继承：`docs/OPSV_IMPROVEMENT_PLAN_FROM_TRELLIS_ANALYSIS_2026-08-09.md`（A/B/C/D 已交付，v0.18.0）、`docs/OPSV_ARCHITECTURE_BLUEPRINT_2026-07-18.md`
+> **实施状态：P0–P6 全部完成**（2026-08-14，786 测试绿）。见 §4 各阶段验收。
 
 ---
 
@@ -176,6 +177,21 @@ approved → superseded（新 variant 触发，旧 artifact 不删除）
 | **P6 Review Runtime** | Review = State Mutation + Review Protocol | 结构化 review + API | P3/P5 |
 
 每 Phase：`npm run build` + `npm test`（基线 597+ 全绿）+ `npm run lint`（errors=0）为评审门；每 Phase 独立 commit 可回滚。
+
+**实施结果（2026-08-14 全部落地）**：
+
+| Phase | 交付 | 测试 |
+|---|---|---|
+| P0 | `.trellis/spec/canonical-model/` 六份正式 spec + 语言词典 8 词条 | task.py validate |
+| P1 | `cli/src/canonical/schema/`（Zod schema + 无损互转） | +35 |
+| P2 | `cli/src/canonical/parser/`（Reference DSL v2 + body grammar + normalizer） | +29 |
+| P3a | `cli/src/canonical/state/`（Asset State Machine + TransitionStore） | +29 |
+| P3b | `cli/src/canonical/artifacts/`（Artifact Contract + Validator + CommitService）+ `opsv commit`/`import` + approve 双写 | +17 |
+| P4 | Operator Skill 增补（Commit Boundary/Capabilities/Review）+ 测试守卫 | +5 |
+| P5 | `cli/src/canonical/capabilities/` + `opsv capabilities` | +8 |
+| P6 | Review Protocol v1（`/api/canonical/*`）→ 状态变更 | +6 |
+
+基线 653 → **786 测试全绿**，`tsc --noEmit` 干净，lint errors=0。
 
 ---
 
