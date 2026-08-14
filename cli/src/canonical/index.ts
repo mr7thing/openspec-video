@@ -19,3 +19,4 @@ export * from './artifacts/mediaProbe';
 export * from './artifacts/CommitService';
 export * from './capabilities/CapabilityRegistry';
 export * from './graph/ImpactGraph';
+export * from './graph/BuildPlan';
