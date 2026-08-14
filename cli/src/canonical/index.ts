@@ -17,3 +17,4 @@ export * from './artifacts/ArtifactContract';
 export * from './artifacts/ArtifactValidator';
 export * from './artifacts/mediaProbe';
 export * from './artifacts/CommitService';
+export * from './capabilities/CapabilityRegistry';

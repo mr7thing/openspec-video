@@ -38,6 +38,7 @@ import { registerExecCommand } from './commands/exec';
 import { registerConformanceCommand } from './commands/conformance';
 import { registerCommitCommand } from './commands/commit';
 import { registerImportCommand } from './commands/import';
+import { registerCapabilitiesCommand } from './commands/capabilities';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -147,5 +148,6 @@ registerExecCommand(program);
 registerConformanceCommand(program);
 registerCommitCommand(program);
 registerImportCommand(program);
+registerCapabilitiesCommand(program);
 
 program.parse(process.argv);
