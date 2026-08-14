@@ -1,0 +1,140 @@
+// ============================================================================
+// Transition Store — append-only Transition Log for the Asset State Machine
+//
+// Layout:
+//   .opsv/state/<assetId>.jsonl      (git-trackable — the durable log)
+//   .opsv/runtime/state/<assetId>.lock  (git-ignored — advisory lock)
+//
+// Reuses the execution lock primitive; no third concurrency mechanism.
+// The log is the artifact-side truth: only recorded transitions are legal.
+// Spec: .trellis/spec/canonical-model/asset-state-machine.md
+// ============================================================================
+
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { z } from 'zod';
+import { AssetStateEnum } from '../schema';
+import { assertValidTransition } from './AssetStateMachine';
+import { withLock } from '../../core/execution/lock';
+import { ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
+
+export const AssetTransitionSchema = z.object({
+  asset: z.string().min(1),
+  artifact: z.string().optional(),
+  from: AssetStateEnum,
+  to: AssetStateEnum,
+  actor: z.object({ type: z.enum(['human', 'agent', 'system']), id: z.string() }),
+  reason: z.string().optional(),
+  review: z.string().optional(),
+  timestamp: z.string(),
+});
+export type AssetTransition = z.infer<typeof AssetTransitionSchema>;
+
+const ASSET_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+function assertValidAssetId(asset: string): void {
+  if (!ASSET_ID_PATTERN.test(asset)) {
+    throw new ValidationError(
+      OpsVErrorCode.VALIDATION_TYPE_ERROR,
+      `Invalid asset id '${asset}' for transition log (allowed: [A-Za-z0-9._-], 1-128 chars)`,
+      { asset },
+    );
+  }
+}
+
+export function stateDir(projectRoot: string): string {
+  return path.join(projectRoot, '.opsv', 'state');
+}
+
+export function stateLogPath(projectRoot: string, assetId: string): string {
+  return path.join(stateDir(projectRoot), `${assetId}.jsonl`);
+}
+
+export function stateLockPath(projectRoot: string, assetId: string): string {
+  return path.join(projectRoot, '.opsv', 'runtime', 'state', `${assetId}.lock`);
+}
+
+/**
+ * Append a transition to the log. Validates schema, asset id, and the
+ * state-transition matrix (fail-closed) before anything is written.
+ * Append-only: existing entries are never edited or removed.
+ */
+export async function appendTransition(
+  projectRoot: string,
+  transition: AssetTransition,
+): Promise<AssetTransition> {
+  const parsed = AssetTransitionSchema.safeParse(transition);
+  if (!parsed.success) {
+    throw new ValidationError(
+      OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+      `Invalid asset transition: ${parsed.error.message}`,
+      { issues: parsed.error.issues },
+    );
+  }
+  const valid = parsed.data;
+  assertValidAssetId(valid.asset);
+  assertValidTransition(valid.from, valid.to);
+
+  const logPath = stateLogPath(projectRoot, valid.asset);
+  await withLock(stateLockPath(projectRoot, valid.asset), async () => {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    await dropTornTail(logPath);
+    await fsp.appendFile(logPath, JSON.stringify(valid) + '\n', 'utf-8');
+  });
+  return valid;
+}
+
+/** Read every recorded transition for an asset, in append order. */
+export async function readTransitions(
+  projectRoot: string,
+  assetId: string,
+): Promise<AssetTransition[]> {
+  assertValidAssetId(assetId);
+  const logPath = stateLogPath(projectRoot, assetId);
+  if (!fs.existsSync(logPath)) return [];
+  const raw = await fsp.readFile(logPath, 'utf-8');
+  return raw
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const parsed = AssetTransitionSchema.safeParse(JSON.parse(line));
+      if (!parsed.success) {
+        // Corruption of a recorded fact must not be silently ignored.
+        throw new ValidationError(
+          OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH,
+          `Corrupt transition log entry in ${logPath}: ${parsed.error.message}`,
+        );
+      }
+      return parsed.data;
+    });
+}
+
+/**
+ * Pure projection of a transition list into the current state.
+ * No transitions → `draft` (the implicit initial state of a new artifact).
+ */
+export function projectState(transitions: readonly AssetTransition[]): AssetTransition['to'] {
+  const last = transitions[transitions.length - 1];
+  return last ? last.to : 'draft';
+}
+
+/** Convenience: read + project the current asset state. */
+export async function currentState(
+  projectRoot: string,
+  assetId: string,
+): Promise<{ state: AssetTransition['to']; transitions: AssetTransition[] }> {
+  const transitions = await readTransitions(projectRoot, assetId);
+  return { state: projectState(transitions), transitions };
+}
+
+/** Drop a torn tail (a final line without a newline) left by a crash mid-append. */
+async function dropTornTail(jsonl: string): Promise<void> {
+  if (!fs.existsSync(jsonl)) return;
+  const content = await fsp.readFile(jsonl, 'utf-8');
+  if (content.length === 0) return;
+  if (!content.endsWith('\n')) {
+    const lastNewline = content.lastIndexOf('\n');
+    await fsp.writeFile(jsonl, lastNewline >= 0 ? content.slice(0, lastNewline + 1) : '', 'utf-8');
+  }
+}

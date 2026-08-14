@@ -11,3 +11,5 @@ export * from './schema/convert';
 export * from './parser/RefExpressionParser';
 export * from './parser/BodyGrammarParser';
 export * from './parser/CanonicalNormalizer';
+export * from './state/AssetStateMachine';
+export * from './state/TransitionStore';

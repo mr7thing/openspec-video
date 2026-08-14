@@ -19,6 +19,7 @@ export enum OpsVErrorCode {
   ASSET_PARSE_ERROR = 'E1002',
   ASSET_MISSING_FIELD = 'E1003',
   ASSET_IMAGE_NOT_FOUND = 'E1004',
+  ASSET_STATE_INVALID_TRANSITION = 'E1005',
 
   // E2xxx — Config: missing API key, invalid model config
   CONFIG_KEY_NOT_FOUND = 'E2001',
