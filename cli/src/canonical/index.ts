@@ -20,3 +20,4 @@ export * from './artifacts/CommitService';
 export * from './capabilities/CapabilityRegistry';
 export * from './graph/ImpactGraph';
 export * from './graph/BuildPlan';
+export * from './repair/RepairReport';

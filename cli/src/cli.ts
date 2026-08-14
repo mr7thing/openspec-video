@@ -41,6 +41,7 @@ import { registerImportCommand } from './commands/import';
 import { registerCapabilitiesCommand } from './commands/capabilities';
 import { registerBuildCommand } from './commands/build';
 import { registerProvenanceCommand } from './commands/provenance';
+import { registerRepairCommand } from './commands/repair';
 import { resolveProjectRoot } from './utils/projectResolver';
 import { decryptEnvFile, hasMasterKey } from './utils/envCipher';
 
@@ -153,5 +154,6 @@ registerImportCommand(program);
 registerCapabilitiesCommand(program);
 registerBuildCommand(program);
 registerProvenanceCommand(program);
+registerRepairCommand(program);
 
 program.parse(process.argv);
