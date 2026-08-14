@@ -19,6 +19,7 @@ import { CircleManifest } from '../types/ManifestSchema';
 import { CategoryValidateLoader } from '../utils/categoryValidateLoader';
 import { InputTypesLoader } from '../utils/inputTypesLoader';
 import { ValidationIssue } from '../core/CategoryValidator';
+import { parseAssetDocument } from '../canonical/parser/CanonicalNormalizer';
 import { resolveDocumentContract } from '../core/PackContracts';
 import {
   DocumentValidationContext,
@@ -169,6 +170,7 @@ export function registerValidateCommand(program: Command, version: string): void
         let totalFiles = 0;
         let validFiles = 0;
         const errors: Array<{ file: string; message: string }> = [];
+        const canonicalWarnings: Array<{ file: string; message: string }> = [];
         const deadRefs: Array<{ file: string; ref: string; relPath: string }> = [];
         const missingImages: Array<{ file: string; ref: string }> = [];
         const statusIssues: Array<{ file: string; docStatus: string; manifestStatus: string }> = [];
@@ -193,6 +195,14 @@ export function registerValidateCommand(program: Command, version: string): void
             try {
               const content = fs.readFileSync(entry.filePath, 'utf-8');
               result = validateDocumentContent(content, docCtx);
+              // P7: canonical parser smoke check — exercise the IR on every real
+              // document. Warn-only; a throw here means a parser regression, not
+              // a document defect (valid docs always parse canonically).
+              try {
+                parseAssetDocument(content);
+              } catch (err: any) {
+                canonicalWarnings.push({ file: entry.relativePath, message: err.message });
+              }
             } catch (err: any) {
               errors.push({ file: entry.relativePath, message: err.message });
               continue;
@@ -306,6 +316,13 @@ export function registerValidateCommand(program: Command, version: string): void
           for (const { file, issue } of catWarnings) {
             const f = issue.field ? `[${issue.field}] ` : '';
             console.log(chalk.yellow(`  ${file} (${issue.category}): ${f}${issue.message}`));
+          }
+        }
+
+        if (canonicalWarnings.length > 0) {
+          console.log(chalk.yellow(`\n${canonicalWarnings.length} canonical parse warning(s):`));
+          for (const w of canonicalWarnings) {
+            console.log(chalk.yellow(`  ${w.file}: ${w.message}`));
           }
         }
 
