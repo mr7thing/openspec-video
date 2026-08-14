@@ -15,6 +15,7 @@ import { createCircleController } from './controllers/circleController';
 import { createApproveController } from './controllers/approveController';
 import { createReviewApproveController } from './controllers/reviewApproveController';
 import { createFileController } from './controllers/fileController';
+import { createCanonicalController } from './controllers/canonicalController';
 
 export interface ReviewServerDeps {
   projectRoot: string;
@@ -33,6 +34,7 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   const approveCtrl = createApproveController(projectRoot, queueRoot, manifestReader);
   const reviewApproveCtrl = createReviewApproveController(projectRoot, queueRoot);
   const fileCtrl = createFileController(queueRoot, projectRoot);
+  const canonicalCtrl = createCanonicalController(projectRoot);
 
   app.get('/api/documents', docCtrl.listDocuments);
   app.get('/api/documents/by-id/:docId', docCtrl.getDocumentById);
@@ -45,6 +47,11 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   app.get('/api/files/*filePath', fileCtrl.serve);
   app.post('/api/review/approve', express.json(), reviewApproveCtrl.execute);
   app.post('/api/approve/:circle/:assetId', express.json(), approveCtrl.execute);
+
+  // Review Protocol v1 (canonical state) — existing routes above are preserved.
+  app.get('/api/canonical/assets/:id', canonicalCtrl.getAssetState);
+  app.post('/api/canonical/review', express.json(), canonicalCtrl.review);
+  app.post('/api/canonical/approve', express.json(), canonicalCtrl.approve);
 
   // Serve static review UI — check dist-level (post-build copy) first, then package root
   const localDir = path.join(__dirname, 'review-ui');
