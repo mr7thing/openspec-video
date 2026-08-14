@@ -22,10 +22,11 @@
 
 | Path | Owns |
 |------|------|
-| `src/commands/` | 24 command modules, one per command group, plus `produceUtils.ts` |
+| `src/commands/` | 27 command modules, one per command group, plus `produceUtils.ts`. Canonical runtime commands: `commit` (Commit Boundary), `import` (Normalization Layer), `capabilities` (Capability Registry). |
 | `src/container/` | `Container.ts` (DI registry for compilers/executors), `OpsVContext.ts` (per-invocation runtime context) |
 | `src/core/` | Document engine: `FrontmatterParser.ts`, `AssetDocIndex.ts`, `AssetManager.ts`, the @-ref subsystem (`RefEngine.ts` facade, `RefSyntaxParser.ts`, `RefBinder.ts`, `RefResolver.ts`, `ApprovedRefReader.ts`, `DesignRefReader.ts`), `ManifestReader.ts`, orchestration (`ProductionPipeline.ts`, `DependencyGraph.ts`, `Materializer.ts`, `WorkPacket.ts`, `WorkContext.ts` (Context Manifest), `Validator.ts` (shared validation kernel), `PackContracts.ts`, `ProjectConfig.ts`), review/approve/sync (`ReviewService.ts`, `ReviewStrategy.ts`, `ApproveService.ts`, `SyncService.ts`), `CategoryValidator.ts` |
-| `src/canonical/` | **Canonical Model (IR, Layer 3)** — `schema/` (Zod schemas + `convert.ts` frontmatter↔Canonical conversion), P2+ will add `parser/`, `state/` (Asset State Machine), `artifacts/` (Artifact Contract), `capabilities/` (Capability Registry). Import via the `src/canonical/index.ts` facade. See [canonical-model spec](../../canonical-model/index.md). |
+| `src/canonical/` | **Canonical Model (IR, Layer 3)** — `schema/` (Zod schemas + `convert.ts`), `parser/` (`RefExpressionParser` DSL v2, `BodyGrammarParser`, `CanonicalNormalizer`), `state/` (Asset State Machine + TransitionStore `.opsv/state/`), `artifacts/` (Artifact Contract + Validator + mediaProbe + CommitService), `capabilities/` (Capability Registry). Import via the `src/canonical/index.ts` facade. See [canonical-model spec](../../canonical-model/index.md). |
+| `src/review-ui/controllers/canonicalController.ts` | **Review Protocol v1** — `GET/POST /api/canonical/*` endpoints reading/writing the Asset State Machine through the TransitionStore. Mounted in `ReviewServer.ts` alongside legacy routes. |
 | `src/core/compiler/` | Compile stage: `ProviderCompiler.ts` (interface), `PromptCompiler.ts`, `TaskBuilder.ts`, `providers/` (8 provider compilers), `shared/` (`compilerUtils.ts`, `InputEvaluator.ts`) |
 | `src/executor/` | Execute stage: `QueueRunner.ts` (scheduler), `HttpClient.ts` (axios + retry), `polling.ts` (gradient polling, JSONL checkpoints), `naming.ts` (output naming/locking), `providers/` (`BaseApiProvider.ts` + 8 concrete providers) |
 | `src/types/` | All Zod schemas: `FrontmatterSchema.ts`, `Job.ts`, `ManifestSchema.ts`, `Refs.ts` |
