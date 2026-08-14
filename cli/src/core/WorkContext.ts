@@ -112,6 +112,8 @@ export interface WorkContextManifest {
   refs: WorkPacket['refs'];
   policy: Record<string, string>;
   issues: WorkPacket['issues'];
+  /** Artifact-side state machine view (P7), projected from the Transition Log. */
+  assetState?: { state: string; transitions: number };
   /** Pack guidance paths (SKILL.md references): project-root-relative, absolute for external Packs. */
   guidanceRefs: string[];
   /**
@@ -180,6 +182,7 @@ export function buildWorkContext(projectRoot: string, selector: string, role: st
     refs: packet.refs,
     policy: packet.policy,
     issues: packet.issues,
+    assetState: packet.assetState,
     guidanceRefs: guidanceRefs(projectRoot, packet),
   };
   const roleTemplate = roleTemplateRef(projectRoot, role);

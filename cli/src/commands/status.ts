@@ -10,6 +10,7 @@ import chalk from 'chalk';
 import { ManifestReader } from '../core/ManifestReader';
 import { getProjectDir } from '../utils/configLoader';
 import { logger } from '../utils/logger';
+import { currentStateSync } from '../canonical/state/TransitionStore';
 
 interface CircleStatus {
   name: string;
@@ -18,6 +19,8 @@ interface CircleStatus {
   syncing: number;
   drafting: number;
   blocked: string[];
+  /** P7: artifact-side state machine counts (candidate/review/rejected/approved). */
+  stateMachine: Record<string, number>;
 }
 
 export function registerStatusCommand(program: Command): void {
@@ -74,6 +77,7 @@ export function registerStatusCommand(program: Command): void {
             syncing: 0,
             drafting: 0,
             blocked: [],
+            stateMachine: {},
           };
 
           for (const [id, info] of Object.entries(assets)) {
@@ -81,6 +85,13 @@ export function registerStatusCommand(program: Command): void {
               case 'approved': status.approved++; break;
               case 'syncing': status.syncing++; break;
               default: status.drafting++; break;
+            }
+            // P7: surface the artifact-side state machine view (best-effort).
+            try {
+              const { state } = currentStateSync(projectRoot, id);
+              status.stateMachine[state] = (status.stateMachine[state] ?? 0) + 1;
+            } catch {
+              // not a state-machine asset — skip
             }
           }
 
@@ -110,6 +121,14 @@ export function registerStatusCommand(program: Command): void {
           }
           if (status.drafting > 0) {
             console.log(`  ${chalk.gray('○')} ${status.drafting} pending`);
+          }
+
+          const sm = status.stateMachine;
+          if (Object.keys(sm).length > 0) {
+            const parts = (['candidate', 'review', 'approved', 'rejected', 'released', 'superseded'] as const)
+              .filter((s) => (sm[s] ?? 0) > 0)
+              .map((s) => `${s}=${sm[s]}`);
+            console.log(`  ${chalk.magenta('◈')} state machine: ${parts.join('  ')}`);
           }
         }
 

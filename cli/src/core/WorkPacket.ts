@@ -11,6 +11,7 @@ import { loadProjectConfig } from './ProjectConfig';
 import { parseRefKey } from './RefSyntaxParser';
 import { SkillManifestSchema } from '../types/PackSchemas';
 import { getProjectDir } from '../utils/configLoader';
+import { currentStateSync } from '../canonical/state/TransitionStore';
 
 export interface WorkPacket {
   contractVersion: number;
@@ -26,6 +27,12 @@ export interface WorkPacket {
   nextAction?: NextAction;
   /** Legacy derived fields — prefer nextAction. */
   action?: string; command?: string;
+  /**
+   * Artifact-side Asset State Machine view (P7): the current asset state and
+   * the recorded transition count, projected from `.opsv/state/<asset>.jsonl`.
+   * Distinct from the document lifecycle `status` (drafting/syncing/approved).
+   */
+  assetState?: { state: string; transitions: number };
 }
 
 function externalKeys(refs: any): string[] {
@@ -62,6 +69,13 @@ export function buildWorkPacket(projectRoot: string, selector: string): WorkPack
   const { frontmatter } = FrontmatterParser.parseRaw(fs.readFileSync(filePath, 'utf8'));
   const config = loadProjectConfig(projectRoot);
   const packet: WorkPacket = { contractVersion: WORK_PACKET_CONTRACT_VERSION, asset, category: frontmatter.category, status: frontmatter.status || 'drafting', refs: [], circle: { available: false, manifests: [] }, policy: {}, issues: [] };
+  // P7: surface the artifact-side state machine projection (best-effort).
+  try {
+    const { state, transitions } = currentStateSync(projectRoot, asset);
+    packet.assetState = { state, transitions: transitions.length };
+  } catch {
+    packet.assetState = { state: 'draft', transitions: 0 };
+  }
   if (!frontmatter.category) { packet.issues.push({ code: 'CATEGORY_MISSING', message: 'Asset document has no category' }); return packet; }
   let contract: ResolvedDocumentContract;
   try {

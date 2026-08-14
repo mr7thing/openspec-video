@@ -7,6 +7,8 @@ import { getProjectDir } from '../utils/configLoader';
 import { parseOutputFilename } from '../executor/naming';
 import { ReviewEntry } from '../types/ManifestSchema';
 import { ValidationError, InfrastructureError, OpsVErrorCode } from '../errors/OpsVError';
+import { currentState, transitionToState } from '../canonical/state/TransitionStore';
+import { logger } from '../utils/logger';
 
 /** Records review decisions without changing an Asset's approval lifecycle. */
 export class ReviewService {
@@ -39,7 +41,7 @@ export class ReviewService {
     return { assetId, documentPath };
   }
 
-  revise(assetId: string, note: string): string {
+  async revise(assetId: string, note: string): Promise<string> {
     if (!note.trim()) {
       throw new ValidationError(OpsVErrorCode.VALIDATION_SCHEMA_MISMATCH, 'Review revision requires a non-empty note');
     }
@@ -51,6 +53,27 @@ export class ReviewService {
     };
     const content = fs.readFileSync(documentPath, 'utf-8');
     fs.writeFileSync(documentPath, FrontmatterParser.appendReview(content, entry));
+
+    // P7: review is a state mutation — a revision reopens the asset through
+    // the revision loop (review → rejected → candidate). Best-effort: the
+    // document review entry is the primary record; an unreachable state
+    // (e.g. approved must be superseded first) only warns.
+    try {
+      const base = {
+        asset: assetId,
+        actor: { type: 'human', id: 'reviewer' } as const,
+        reason: note,
+        review: note,
+        timestamp: new Date().toISOString(),
+      };
+      const { state } = await currentState(this.projectRoot, assetId);
+      if (state === 'review') await transitionToState(this.projectRoot, base, 'rejected');
+      if (state === 'review' || state === 'rejected') {
+        await transitionToState(this.projectRoot, base, 'candidate');
+      }
+    } catch (err: any) {
+      logger.warn(`[review] state machine sync skipped for ${assetId}: ${err.message}`);
+    }
     return documentPath;
   }
 

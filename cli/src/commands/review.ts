@@ -185,9 +185,9 @@ export function registerReviewCommand(program: Command): void {
     .command('revise <asset>')
     .description('Record a revision request for an Asset Document')
     .requiredOption('--note <text>', 'Revision request')
-    .action((asset: string, options: { note: string }) => {
+    .action(async (asset: string, options: { note: string }) => {
       try {
-        const documentPath = new ReviewService(process.cwd()).revise(asset, options.note);
+        const documentPath = await new ReviewService(process.cwd()).revise(asset, options.note);
         console.log(chalk.green(`Recorded revision request: ${documentPath}`));
       } catch (err: any) {
         logger.error(err.message);

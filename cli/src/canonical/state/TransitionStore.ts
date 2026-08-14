@@ -128,6 +128,37 @@ export async function currentState(
   return { state: projectState(transitions), transitions };
 }
 
+/**
+ * Synchronous variant for hot paths that cannot await (e.g. buildWorkPacket).
+ * Torn tails are skipped (a crash mid-append leaves a partial final line).
+ * Missing log → `draft` with no transitions.
+ */
+export function currentStateSync(
+  projectRoot: string,
+  assetId: string,
+): { state: AssetTransition['to']; transitions: AssetTransition[] } {
+  assertValidAssetId(assetId);
+  const logPath = stateLogPath(projectRoot, assetId);
+  let raw = '';
+  try {
+    raw = fs.readFileSync(logPath, 'utf-8');
+  } catch {
+    return { state: 'draft', transitions: [] };
+  }
+  const transitions: AssetTransition[] = [];
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const parsed = AssetTransitionSchema.parse(JSON.parse(line));
+      transitions.push(parsed);
+    } catch {
+      // Torn tail or corrupt line during a read-only projection — skip.
+      continue;
+    }
+  }
+  return { state: projectState(transitions), transitions };
+}
+
 export type TransitionBase = Omit<AssetTransition, 'from' | 'to'>;
 
 /**
