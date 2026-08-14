@@ -8,3 +8,6 @@
 
 export * from './schema';
 export * from './schema/convert';
+export * from './parser/RefExpressionParser';
+export * from './parser/BodyGrammarParser';
+export * from './parser/CanonicalNormalizer';

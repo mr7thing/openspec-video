@@ -186,6 +186,11 @@ export const CanonicalDocumentSchema = z.object({
   reviews: z.array(z.string()).default([]),
   /** Raw body, preserved verbatim. Segment/timeline parsing lands in P2. */
   bodyRaw: z.string(),
+  /** Recognized semantic blocks (subject/scene/action/camera/timeline) from the body. P2+. */
+  semanticSections: z.record(z.string(), z.string()).default({}),
+  /** Raw `## Approved References` / `## Design References` section bodies. P2+. */
+  approvedRefSection: z.string().optional(),
+  designRefSection: z.string().optional(),
   /**
    * Unmodeled frontmatter fields, preserved verbatim so round-trip is lossless.
    * This is a fidelity mechanism, not a second authority.
