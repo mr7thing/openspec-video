@@ -67,6 +67,42 @@ For a production document, resolve the packet's blockers, create a Circle if req
 then compile with its bound model. Respect `draft`, `compile`, `execute`, `approve`,
 and `sync` policy values. `delete: never` cannot be relaxed.
 
+## Commit Boundary
+
+Only committed artifacts are OPSV assets. You may produce anything outside OPSV
+(any Skill, API, ComfyUI, or editor); to make a result a formal asset, commit it:
+
+```bash
+opsv commit <artifact> --task <asset-id> [--variant <name>]
+opsv import <path> --task <asset-id> [--timeline <start>-<end>]
+```
+
+`opsv commit` validates the artifact against its Artifact Contract (type, duration
+tolerance, provenance) and — on accept — moves it to `candidate` in the asset state
+machine (`draft → candidate → review → approved`). Rejected artifacts return structured
+errors; fix and re-commit. An uncommitted output in `/tmp` or a queue dir is not an
+OPSV asset.
+
+## Capabilities
+
+Discover what this project can do before choosing how to produce an asset:
+
+```bash
+opsv capabilities           # human-readable capability → provider bindings
+opsv capabilities --json
+```
+
+Capabilities are semantic (`video.generate`, `image.generate`), not skills. You
+choose which implementation (provider/skill) to use; OPSV records provenance.
+
+## Review
+
+Review is a structured annotation, not a comment thread: an annotation names a
+timeline range, target, issue, and severity, and it changes asset state. When review
+rejects an artifact (`review → rejected`), revise the task or re-generate, then
+re-commit (`rejected → candidate`). Approval walks the artifact to `approved`; a new
+variant supersedes the old one (`approved → superseded`) without deleting history.
+
 ## Pack Authors
 
 Use the `opsv-skills-creator` Pack to create or revise a Pack. A Pack exports categories,
