@@ -15,6 +15,7 @@
 | `cli` | [cli/engine/](./cli/engine/index.md) | `cli/` — TypeScript package `videospec` (binary `opsv`): parse → validate → compile → execute |
 | `extension` | [extension/companion/](./extension/companion/index.md) | `extension/` — MV3 companion extension + Node daemon automating gemini.google.com (git submodule) |
 | `packs` | [packs/authoring/](./packs/authoring/index.md) | `packs/`, `opsv-packs/`, `opsv-cli-skill/` — declarative pack format and Asset Document contract |
+| `canonical` | [canonical-model/](./canonical-model/index.md) | Canonical Model (IR) — canonical types, Reference DSL v2, Asset State Machine, Artifact Contract, Capability Contract |
 
 ## Thinking Guides
 

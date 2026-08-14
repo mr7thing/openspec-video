@@ -51,6 +51,19 @@ Status: agreed terminology (2026-07-18). The remaining open items concern implem
 | **Work Packet** | A short-lived, CLI-derived instruction for an Agent describing one allowed next action, its Profile prerequisites, and Circle execution state. | Task document |
 | **Action Policy** | The Pack default, optionally tightened by the project, that decides whether an Agent may draft, compile, execute, approve, or sync. | Skill advice |
 
+## Canonical Runtime (2026-08-14)
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Canonical Model** | The intermediate representation produced by parsing an Asset Document into machine structure: Project, Asset, Shot, Segment, Task, Dependency, Timeline, Reference, Constraint, Artifact, Review. The single machine contract between the Authoring DSL and the OPSV Runtime. | IR file, second document authority |
+| **Canonical IR** | Synonym for the Canonical Model as an intermediate representation; never a storage format. | Compiler output |
+| **Asset State Machine** | The artifact-side lifecycle (`draft → candidate → review → approved → released`, plus `rejected` / `superseded`) enforced by a Transition Log. Distinct from the document lifecycle (`drafting / syncing / approved`). | Asset status, lifecycle state |
+| **Transition Log** | The append-only record of every legal asset state change: `{asset, artifact, from, to, actor, reason, review?, timestamp}`. Only logged transitions are legal. | Status field |
+| **Artifact Contract** | Validation rules (`type / duration tolerance / codec / resolution / provenance`) an artifact must satisfy to be accepted as an OPSV asset through commit or import. | Quality gate, output spec |
+| **Commit Boundary** | `opsv commit` / `opsv import` are the only gates at which an external artifact becomes an OPSV asset; uncommitted outputs are not OPSV assets. | File copy, publish |
+| **Capability Registry** | A read-only projection over existing configuration (models, bindings, recommended capabilities) exposing `capability → provider` availability. OPSV asks "what capability", not "what skill". | Skill registry, provider registry |
+| **Review Protocol** | The HTTP contract (project/tasks/assets/commit/review/approve endpoints) through which Review UI clients — Web, Canvas, 3D, Timeline — read and mutate asset state. | Review UI API, comment API |
+
 ## Relationships
 
 - An **Asset Document** represents exactly one **Asset**.
@@ -74,6 +87,13 @@ Status: agreed terminology (2026-07-18). The remaining open items concern implem
 - A **Shot** preferentially consumes Clips, but may consume storyboard, character, scene, or other Pack-permitted references directly.
 - A **Shotsdeck** orders **Shots**, exposes **Frame References** for continuity, and may produce an Artifact.
 - A **Frame Directive** is a Profile-scoped convenience for Shotsdeck continuity; ordinary cross-Asset references use `@asset:variant`.
+- A **Canonical Model** is always derived from an **Asset Document**; it never becomes a second authority over the document (round-trip is lossless).
+- The **document lifecycle** (`drafting / syncing / approved`) is the author-side fact; the **Asset State Machine** is the artifact-side fact; `opsv approve` advances both from one implementation.
+- An **Artifact** becomes an OPSV asset **only** through the **Commit Boundary** (`opsv commit` / `opsv import`); an uncommitted output is an external artifact, not an OPSV asset.
+- A **Transition Log** entry is required for any **Asset State Machine** change; unlogged state changes are illegal (fail-closed).
+- An **Artifact Contract** prescribes what an artifact must satisfy to be accepted; it never prescribes how the artifact is generated.
+- A **Capability Registry** exposes `capability → provider` availability; it reads existing configuration and adds no third execution registry.
+- A **Review Protocol** is the contract through which Review UI clients (Web / Canvas / 3D / Timeline) read and mutate asset state; review is a **state mutation**, not a comment thread.
 
 ## Example Dialogue
 
