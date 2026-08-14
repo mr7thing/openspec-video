@@ -21,6 +21,7 @@
   - Kernel contract: `VALIDATOR_CONTRACT_VERSION = 1`; issue codes frozen in `DOCUMENT_ISSUE_CODES` (test-locked); `hashProposedContent(content)` = sha256 — a hook cache-key ingredient alongside `pack.contentDigest` (single owner: `core/PackDigest.ts`).
   - `--json` report: `{validatorContractVersion, proposedContentHash, pack?, ok, issues}`. An unresolvable/invalid Pack **omits** `pack` (fail-closed: callers must re-validate, never trust a fabricated digest).
 - Per document it runs:
+  0. **Canonical parser smoke check (P7)**: the disk scan attempts `parseAssetDocument` on every document and emits a **warn-only** `canonical parse warning` on throw — a parser regression signal, never a document failure (valid docs always parse canonically). The kernel (`--inline`) is unchanged.
   1. Schema pick by category (`getSchemaForCategory`, in `core/Validator.ts`).
   2. Ref binding via `bindRefs` (`core/RefBinder.ts`) → `RefBinderResult {resolved, groupedInputs, errors, issues}` — `issues` carries stable codes (`REF_INPUT_TYPE_UNKNOWN` / `REF_STRUCTURE_INVALID` / `REF_PATHS_EMPTY` / `REF_KEY_INVALID`) alongside the legacy `errors` strings; new consumers must use `issues`.
   3. Category business rules via `validateCategory` (`core/CategoryValidator.ts`), driven by `category_validate.yaml` rules loaded through `utils/categoryValidateLoader.ts` (+ `categoryConfigDiscoverer.ts` for tier-conflict detection).
@@ -33,6 +34,8 @@
 `opsv work context <asset> --role <role> [--json]` (`src/commands/work.ts` → `core/WorkContext.ts`) materializes the Context Manifest for one `(asset, role)` pair — the single source consumed by hook injection and sub-agent pull.
 
 Manifest shape: `{contractVersion, asset, nextAction, documentContract, promptContract, refs, policy, issues, role, guidanceRefs}`. `contractVersion` reuses `WORK_PACKET_CONTRACT_VERSION`; `asset`/`nextAction`/`refs`/`policy`/`issues` come **verbatim** from `buildWorkPacket` — never recompute them in parallel.
+
+**Asset state machine view (P7)**: both the Work Packet and the Context Manifest carry `assetState: {state, transitions}` projected from `.opsv/state/<asset>.jsonl` via `currentStateSync` (best-effort, never throws). This is the artifact-side state (`draft|candidate|review|approved|rejected|...`), distinct from the document lifecycle `status` (`drafting|syncing|approved`). See [asset-state-machine spec](../../canonical-model/asset-state-machine.md).
 
 - Roles are a fixed Core four-tuple (`WORK_CONTEXT_ROLES`): `document-author`, `contract-checker`, `production-dispatcher`, `asset-quality-reviewer`. Unknown role → `ROLE_UNKNOWN`, exit 1.
 - Exit semantics: a query, not a gate — a materialized manifest exits 0 even when `nextAction.kind` is `blocked` (issues stay visible in content). Only unknown role / unknown asset exit non-zero.

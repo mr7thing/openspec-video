@@ -5,7 +5,7 @@
 > 上游分析：ChatGPT 对 opsv 项目的分析（`~/文档/clawbay/20_Projects/opsv/chagpt 对opsv 项目的分析.md`，2026-08-13）
 > 权威计划：`.trellis/tasks/08-14-chatgpt-analysis-overhaul/`（prd.md / design.md / implement.md）
 > 继承：`docs/OPSV_IMPROVEMENT_PLAN_FROM_TRELLIS_ANALYSIS_2026-08-09.md`（A/B/C/D 已交付，v0.18.0）、`docs/OPSV_ARCHITECTURE_BLUEPRINT_2026-07-18.md`
-> **实施状态：P0–P6 全部完成**（2026-08-14，786 测试绿）。见 §4 各阶段验收。
+> **实施状态：P0–P7 全部完成**（2026-08-14，791 测试绿）。见 §4 各阶段验收。
 
 ---
 
@@ -190,8 +190,9 @@ approved → superseded（新 variant 触发，旧 artifact 不删除）
 | P4 | Operator Skill 增补（Commit Boundary/Capabilities/Review）+ 测试守卫 | +5 |
 | P5 | `cli/src/canonical/capabilities/` + `opsv capabilities` | +8 |
 | P6 | Review Protocol v1（`/api/canonical/*`）→ 状态变更 | +6 |
+| P7 | 状态机贯通 Agent 控制面：`WorkPacket`/`work context` 暴露 `assetState`；`opsv review revise` 写 `review→rejected→candidate`；`opsv status` 显示状态机统计；`opsv validate` canonical 冒烟检查 | +5 |
 
-基线 653 → **786 测试全绿**，`tsc --noEmit` 干净，lint errors=0。
+基线 653 → **791 测试全绿**，`tsc --noEmit` 干净，lint errors=0。
 
 ---
 
