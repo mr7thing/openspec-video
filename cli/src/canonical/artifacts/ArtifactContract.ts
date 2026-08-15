@@ -9,23 +9,23 @@
 import { z } from 'zod';
 
 export const DurationRuleSchema = z.object({
-  duration: z.object({ tolerance: z.number().nonnegative() }),
-});
+  duration: z.object({ tolerance: z.number().nonnegative() }).strict(),
+}).strict();
 export const CodecRuleSchema = z.object({
-  codec: z.object({ allowed: z.array(z.string()) }),
-});
+  codec: z.object({ allowed: z.array(z.string()) }).strict(),
+}).strict();
 export const ResolutionRuleSchema = z.object({
-  resolution: z.object({ min: z.object({ w: z.number(), h: z.number() }) }),
-});
+  resolution: z.object({ min: z.object({ w: z.number(), h: z.number() }).strict() }).strict(),
+}).strict();
 export const FrameRateRuleSchema = z.object({
-  frameRate: z.object({ min: z.number().optional(), max: z.number().optional() }),
-});
+  frameRate: z.object({ min: z.number().optional(), max: z.number().optional() }).strict(),
+}).strict();
 export const HasAudioRuleSchema = z.object({
   hasAudio: z.boolean(),
-});
+}).strict();
 export const AspectRatioRuleSchema = z.object({
-  aspectRatio: z.object({ min: z.number().optional(), max: z.number().optional() }),
-});
+  aspectRatio: z.object({ min: z.number().optional(), max: z.number().optional() }).strict(),
+}).strict();
 
 export const ValidationRuleSchema = z.union([
   DurationRuleSchema,
@@ -39,15 +39,15 @@ export type ValidationRule = z.infer<typeof ValidationRuleSchema>;
 
 export const ArtifactContractSchema = z.object({
   contract: z.string().optional(),
-  output: z.object({ type: z.string() }),
+  output: z.object({ type: z.string().min(1) }).strict(),
   required: z.object({
     uri: z.boolean().optional(),
     media_info: z.boolean().optional(),
     provenance: z.boolean().optional(),
-  }).default({}),
+  }).strict().default({}),
   validation: z.array(ValidationRuleSchema).default([]),
   metadata: z.record(z.string(), z.boolean()).default({}),
-});
+}).strict();
 export type ArtifactContract = z.infer<typeof ArtifactContractSchema>;
 
 /**

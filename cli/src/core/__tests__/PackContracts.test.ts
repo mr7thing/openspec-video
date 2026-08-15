@@ -1,7 +1,14 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { loadGraphStages, resolveDocumentContract, ResolvedStage } from '../PackContracts';
+import {
+  CAPABILITY_ALIASES,
+  MODEL_TYPE_TO_CAPABILITY,
+  isModelTypeCompatibleWithCapability,
+  loadGraphStages,
+  resolveDocumentContract,
+  ResolvedStage,
+} from '../PackContracts';
 import { checkPack } from '../PackChecker';
 import { STAGE_ROLES } from '../../types/PackSchemas';
 
@@ -22,12 +29,111 @@ describe('Pack contracts', () => {
     const resolved = resolveDocumentContract(root, 'shot');
     expect(resolved.profileName).toBe('i2v');
     expect(resolved.boundModel).toBe('rh.director');
+    expect(resolved.capability).toEqual({
+      declared: 'continuous-i2v',
+      id: 'video.generate',
+      boundModel: 'rh.director',
+    });
+    expect(resolved.inputSlots).toEqual([]);
+    expect(resolved.policy).toMatchObject({ execute: 'ask', approve: 'human', delete: 'never' });
+    expect(resolved.artifactContract).toMatchObject({
+      source: 'builtin',
+      value: { contract: 'builtin/v1', output: { type: '*' } },
+    });
   });
 
   it('resolves a Project-derived Profile through its declared Pack Profile', () => {
     fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), 'packs:\n  - id: drama\nbindings:\n  preferred-i2v: rh.preferred\nprofiles:\n  hero-i2v:\n    extends: i2v\n    capability: preferred-i2v\n    defaults:\n      duration: 5\n');
     const resolved = resolveDocumentContract(root, 'shot', 'hero-i2v');
     expect(resolved).toMatchObject({ profileName: 'hero-i2v', boundModel: 'rh.preferred', defaults: { duration: 5 } });
+  });
+
+
+  it('resolves typed prompt/task/artifact contracts, input slots, and effective policy once', () => {
+    const pack = path.join(root, '.opsv', 'packs', 'drama');
+    fs.writeFileSync(path.join(pack, 'pack.yaml'), [
+      'id: drama',
+      'version: 1',
+      'policy:',
+      '  execute: human',
+      'categories:',
+      '  shot: categories/shot.yaml',
+      'profiles:',
+      '  i2v: profiles/i2v.yaml',
+      '',
+    ].join('\n'));
+    fs.writeFileSync(path.join(root, '.opsv', 'project.yaml'), [
+      'packs:',
+      '  - id: drama',
+      'bindings:',
+      '  continuous-i2v: local.video',
+      'policy:',
+      '  approve: human',
+      '',
+    ].join('\n'));
+    fs.writeFileSync(path.join(root, '.opsv', 'api_config.yaml'), [
+      'models:',
+      '  local.video:',
+      '    provider: fixture',
+      '    type: video',
+      '',
+    ].join('\n'));
+    fs.writeFileSync(path.join(pack, 'profiles', 'i2v.yaml'), [
+      'kind: production',
+      'capability: continuous-i2v',
+      'outputs: [video]',
+      'inputs:',
+      '  - { slot: first, category: shot, ref_type: image, required: false }',
+      'prompt_contract: { id: drama/shot-prompt, version: 2 }',
+      'task_contract: { id: opsv.production-task, version: 1 }',
+      'artifact:',
+      '  contract: drama/shot-video/v2',
+      '  output: { type: video }',
+      '  required: { uri: true, provenance: true }',
+      '',
+    ].join('\n'));
+
+    const resolved = resolveDocumentContract(root, 'shot');
+    expect(resolved.capability).toEqual({
+      declared: 'continuous-i2v',
+      id: 'video.generate',
+      boundModel: 'local.video',
+      provider: 'fixture',
+      modelType: 'video',
+    });
+    expect(resolved.promptContract).toEqual({ id: 'drama/shot-prompt', version: '2' });
+    expect(resolved.taskContract).toEqual({ id: 'opsv.production-task', version: '1' });
+    expect(resolved.artifactContract).toMatchObject({
+      source: 'profile',
+      value: {
+        contract: 'drama/shot-video/v2',
+        output: { type: 'video' },
+        required: { uri: true, provenance: true },
+        validation: [],
+        metadata: {},
+      },
+    });
+    expect(resolved.inputSlots).toEqual([
+      { slot: 'first', category: 'shot', ref_type: 'image', required: false },
+    ]);
+    expect(resolved.policy).toMatchObject({ execute: 'human', approve: 'human', delete: 'never' });
+    expect(resolved.policyIssues).toEqual([]);
+  });
+
+  it('owns capability aliases and rejects a known incompatible model type', () => {
+    expect(CAPABILITY_ALIASES['continuous-i2v']).toBe('video.generate');
+    expect(MODEL_TYPE_TO_CAPABILITY.imagen).toBe('image.generate');
+    expect(isModelTypeCompatibleWithCapability('video', 'continuous-i2v')).toBe(true);
+    expect(isModelTypeCompatibleWithCapability('imagen', 'continuous-i2v')).toBe(false);
+
+    fs.writeFileSync(path.join(root, '.opsv', 'api_config.yaml'), [
+      'models:',
+      '  rh.director:',
+      '    provider: fixture',
+      '    type: imagen',
+      '',
+    ].join('\n'));
+    expect(() => resolveDocumentContract(root, 'shot')).toThrow(/CAPABILITY_MODEL_INCOMPATIBLE/);
   });
 
   it('rejects export paths escaping the pack root at runtime (F11)', () => {

@@ -4,7 +4,7 @@ import { AssetManager } from '../../core/AssetManager';
 import { ApprovedRefReader } from '../../core/ApprovedRefReader';
 import { buildAssetDocIndex } from '../../core/AssetDocIndex';
 import { FrontmatterParser } from '../../core/FrontmatterParser';
-import { missingRequiredRefCategories, resolveDocumentContract } from '../../core/PackContracts';
+import { inputSlotIssues, missingRequiredRefCategories, resolveDocumentContract } from '../../core/PackContracts';
 import { loadProjectConfig } from '../../core/ProjectConfig';
 import { RefResolver } from '../../core/RefEngine';
 import { CompilationError, InfrastructureError, OpsVErrorCode } from '../../errors/OpsVError';
@@ -87,6 +87,13 @@ export class DocumentCompiler {
         `${asset.id}: Profile "${resolved.profileName}" is a workflow Profile and cannot compile a Production Task`,
       );
     }
+    const policyErrors = resolved.policyIssues.filter(issue => issue.severity === 'error');
+    if (policyErrors.length > 0) {
+      throw new CompilationError(
+        OpsVErrorCode.COMPILATION_FAILED,
+        `${asset.id}: ${policyErrors.map(issue => `${issue.code}: ${issue.message}`).join('; ')}`,
+      );
+    }
 
     const missing = missingRequiredRefCategories(this.projectRoot, resolved.profile, frontmatter.refs);
     if (missing.length > 0) {
@@ -95,9 +102,29 @@ export class DocumentCompiler {
         `${asset.id}: Profile requires references to category: ${missing.join(', ')}`,
       );
     }
+    const slotIssues = inputSlotIssues(this.projectRoot, resolved.profile, frontmatter.refs);
+    if (slotIssues.length > 0) {
+      throw new CompilationError(
+        OpsVErrorCode.COMPILATION_ASSET_NOT_FOUND,
+        `${asset.id}: ${slotIssues.map(issue => `${issue.code}: ${issue.message}`).join('; ')}`,
+      );
+    }
     this.validateFrameDirective(frontmatter, job.prompt || '', asset.id, resolved.profile.frame_directive === true);
 
     const canonicalAsset = parseAssetDocument(content, { docPath: sourcePath });
+    const promptContract = resolved.promptContract && {
+      ...resolved.promptContract,
+      digest: canonicalDigest(resolved.promptContract, 'prompt-contract-reference', 1),
+    };
+    const taskContract = resolved.taskContract && {
+      ...resolved.taskContract,
+      digest: canonicalDigest(resolved.taskContract, 'task-contract-reference', 1),
+    };
+    const artifactContract = {
+      ...resolved.artifactContract,
+      value: structuredClone(resolved.artifactContract.value),
+      digest: canonicalDigest(resolved.artifactContract.value, 'artifact-contract', 1),
+    };
     const contractBase = {
       schema: 'opsv.production-contract' as const,
       version: 1 as const,
@@ -113,8 +140,17 @@ export class DocumentCompiler {
         capability: resolved.profile.capability,
         digest: canonicalDigest(resolved.profile, 'pack-profile', 1),
       },
+      capability: resolved.capability && {
+        declared: resolved.capability.declared,
+        id: resolved.capability.id,
+      },
       boundModel: resolved.boundModel,
       outputs: [...resolved.profile.outputs],
+      inputSlots: structuredClone(resolved.inputSlots),
+      policy: { ...resolved.policy },
+      promptContract,
+      taskContract,
+      artifactContract,
     };
     const contract: CanonicalSnapshotContract = {
       ...contractBase,

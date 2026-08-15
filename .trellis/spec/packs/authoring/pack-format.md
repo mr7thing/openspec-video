@@ -132,6 +132,14 @@ skill: create-shot
 outputs: [video, first, last]
 required_ref_categories: [storyboard]   # optional
 frame_directive: true                    # optional; only this permits `@FRAME:` refs
+prompt_contract: { id: short-drama/shot-prompt, version: 1 }
+task_contract: { id: opsv.production-task, version: 1 }
+artifact:
+  contract: short-drama/shot-video/v1
+  output: { type: video }
+  required: { uri: true, provenance: true }
+  validation: []
+  metadata: { provider: false, model: false, prompt: false }
 ```
 
 Workflow profile (`packs/short-drama/profiles/shotlist.yaml`):
@@ -149,6 +157,9 @@ materialize:                         # creates MISSING docs only, never overwrit
 - Capability granularity follows the **input contract**: profiles with different reference inputs need distinct capabilities (one binding cannot select among different workflows — F6). E.g. `image-generation` (generic i2i/t2i) vs `two-reference-character-consistency` vs `scene-character-compositing`.
 - Production profiles may declare ordered **`inputs:`** slots (`{ slot, category, ref_type, required }`; `cli/src/types/PackSchemas.ts` `InputSlotSchema`). Declaration order IS the reference order contract: the document's external refs under `refs[ref_type]` must match slots 1:1 in order. Violations block the packet: `PROFILE_INPUT_MISSING` (slot unfilled) / `PROFILE_INPUT_MISMATCH` (wrong category order or extra refs of a constrained type). Caveat: order between slots of the SAME category is not machine-distinguishable — document the intended order in prose for those.
 - Projects derive profiles with `extends`; they never silently overwrite a pack profile.
+- `ProfileContractSchema` is the single typed decode path for `prompt_contract`, `task_contract`, and `artifact`. Contract references are strict `{id, version}` objects; numeric versions normalize to strings. Unknown Profile top-level fields remain passthrough for Pack extensions, but unknown fields inside these hard-contract objects fail closed.
+- A production `artifact.output.type` must be `*` or appear in the same Profile's `outputs`. `resolveDocumentContract()` always materializes an effective Artifact Contract and labels it `source: profile | builtin`; consumers must not silently invent defaults again.
+- `resolveDocumentContract()` is the single runtime owner of Pack/category/Profile, semantic capability, binding/model projection, ordered input slots, effective policy, prompt/task references, and Artifact Contract. `recommended_capabilities` remains Stage guidance and is never consulted for binding validity or completion.
 
 ## skills/*/skill.yaml + SKILL.md
 

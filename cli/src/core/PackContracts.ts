@@ -2,11 +2,23 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import { ProjectConfig, ResolvedPack, loadProjectConfig, resolvePacks } from './ProjectConfig';
-import { CategoryContract, CategoryContractSchema, GraphContractSchema, ProfileContract, ProfileContractSchema, StageNode } from '../types/PackSchemas';
+import {
+  CategoryContract,
+  CategoryContractSchema,
+  GraphContractSchema,
+  InputSlot,
+  ProfileContract,
+  ProfileContractSchema,
+  StageNode,
+  VersionedContractReference,
+} from '../types/PackSchemas';
 import { resolveContainedReal } from '../utils/pathSecurity';
 import { parseRefKey } from './RefSyntaxParser';
 import { AssetManager } from './AssetManager';
 import { FrontmatterParser } from './FrontmatterParser';
+import { ConfigLoader } from '../utils/configLoader';
+import { ArtifactContract, loadArtifactContract } from '../canonical/artifacts/ArtifactContract';
+import { mergePolicies, PolicyIssue } from './PolicyLattice';
 
 export { CategoryContract, ProfileContract };
 
@@ -76,6 +88,57 @@ export function inputSlotIssues(
   return issues;
 }
 
+/** model.type → semantic capability id. Single owner for resolution + registry projection. */
+export const MODEL_TYPE_TO_CAPABILITY: Readonly<Record<string, string>> = {
+  video: 'video.generate',
+  imagen: 'image.generate',
+  audio: 'audio.generate',
+  comfy: 'comfy.execute',
+  webapp: 'webapp.run',
+};
+
+/** Pack/Profile capability aliases. Declarations only; never an execution registry or whitelist. */
+export const CAPABILITY_ALIASES: Readonly<Record<string, string>> = {
+  'video-generation': 'video.generate',
+  'image-generation': 'image.generate',
+  'audio-generation': 'audio.generate',
+  'continuous-i2v': 'video.generate',
+  'image-to-video': 'video.generate',
+};
+
+export function resolveCapabilityId(capability: string): string {
+  return CAPABILITY_ALIASES[capability] ?? capability;
+}
+
+/**
+ * Fail closed only when both sides are known and clearly incompatible.
+ * comfy/webapp are generic transports whose concrete workflow may implement
+ * image/video/audio capabilities, so their compatibility cannot be rejected
+ * from model.type alone. Unknown types/capabilities remain backward compatible.
+ */
+export function isModelTypeCompatibleWithCapability(modelType: string | undefined, capability: string): boolean {
+  if (!modelType || modelType === 'comfy' || modelType === 'webapp') return true;
+  const modelCapability = MODEL_TYPE_TO_CAPABILITY[modelType];
+  const semanticCapability = resolveCapabilityId(capability);
+  if (!modelCapability) return true;
+  const knownSemanticCapabilities = new Set(Object.values(MODEL_TYPE_TO_CAPABILITY));
+  if (!knownSemanticCapabilities.has(semanticCapability)) return true;
+  return modelCapability === semanticCapability;
+}
+
+export interface ResolvedCapability {
+  declared: string;
+  id: string;
+  boundModel?: string;
+  provider?: string;
+  modelType?: string;
+}
+
+export interface ResolvedArtifactContract {
+  source: 'profile' | 'builtin';
+  value: ArtifactContract;
+}
+
 export interface ResolvedDocumentContract {
   pack: ResolvedPack;
   category: CategoryContract;
@@ -83,6 +146,13 @@ export interface ResolvedDocumentContract {
   profile: ProfileContract;
   boundModel?: string;
   defaults?: Record<string, unknown>;
+  capability?: ResolvedCapability;
+  inputSlots: InputSlot[];
+  policy: Record<string, string>;
+  policyIssues: PolicyIssue[];
+  promptContract?: VersionedContractReference;
+  taskContract?: VersionedContractReference;
+  artifactContract: ResolvedArtifactContract;
   /**
    * Workflow-layer Stage contract (C2) for the graph.yaml node named after
    * this Category, when the Pack declares one. Undefined when the Pack has
@@ -170,12 +240,54 @@ export function resolveDocumentContract(
   if (!profilePath) throw new Error(`Pack "${pack.manifest.id}" does not export profile "${profileName}"`);
   const profile = loadYaml<ProfileContract>(resolvePackExportPath(pack.root, profilePath), ProfileContractSchema);
   const resolvedProfile = derived ? { ...profile, capability: derived.capability || profile.capability } : profile;
-  const boundModel = resolvedProfile.capability ? effectiveConfig.bindings?.[resolvedProfile.capability] : undefined;
-  if (resolvedProfile.kind === 'production' && resolvedProfile.capability && !boundModel) {
-    throw new Error(`CAPABILITY_BINDING_MISSING: Production profile "${requestedProfile}" requires a project binding for capability "${resolvedProfile.capability}"`);
+  const declaredCapability = resolvedProfile.capability;
+  const semanticCapability = declaredCapability ? resolveCapabilityId(declaredCapability) : undefined;
+  const boundModel = declaredCapability
+    ? effectiveConfig.bindings?.[declaredCapability] ?? effectiveConfig.bindings?.[semanticCapability!]
+    : undefined;
+  if (resolvedProfile.kind === 'production' && declaredCapability && !boundModel) {
+    throw new Error(`CAPABILITY_BINDING_MISSING: Production profile "${requestedProfile}" requires a project binding for capability "${declaredCapability}"`);
   }
+
+  let capability: ResolvedCapability | undefined;
+  if (declaredCapability && semanticCapability) {
+    capability = { declared: declaredCapability, id: semanticCapability, boundModel };
+    if (boundModel) {
+      const model = new ConfigLoader().loadConfig(projectRoot, { silent: true }).models[boundModel];
+      if (model && !isModelTypeCompatibleWithCapability(model.type, semanticCapability)) {
+        throw new Error(
+          `CAPABILITY_MODEL_INCOMPATIBLE: Model "${boundModel}" has type "${model.type}" and cannot satisfy capability "${declaredCapability}" (${semanticCapability})`,
+        );
+      }
+      if (model) {
+        capability.provider = model.provider;
+        capability.modelType = model.type;
+      }
+    }
+  }
+
+  const policy = mergePolicies({}, pack.manifest.policy || {}, effectiveConfig.policy || {});
+  const artifactContract: ResolvedArtifactContract = {
+    source: resolvedProfile.artifact ? 'profile' : 'builtin',
+    value: loadArtifactContract(resolvedProfile.artifact),
+  };
   // Consume the Workflow-layer Stage (inputs/completion) named after the
   // Category; absent nodes keep the lenient profile-inherit behavior.
   const stage = loadGraphStages(pack.root).get(categoryName);
-  return { pack, category, profileName: requestedProfile, profile: resolvedProfile, boundModel, defaults: derived?.defaults, stage };
+  return {
+    pack,
+    category,
+    profileName: requestedProfile,
+    profile: resolvedProfile,
+    boundModel,
+    defaults: derived?.defaults,
+    capability,
+    inputSlots: [...(resolvedProfile.inputs || [])],
+    policy: policy.effective,
+    policyIssues: policy.issues,
+    promptContract: resolvedProfile.prompt_contract,
+    taskContract: resolvedProfile.task_contract,
+    artifactContract,
+    stage,
+  };
 }

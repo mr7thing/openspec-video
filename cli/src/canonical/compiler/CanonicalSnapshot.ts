@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import type { CanonicalAsset } from '../schema';
 import type { JobType, PromptPayload } from '../../types/Job';
 import { canonicalDigest } from './CanonicalDigest';
+import type { ArtifactContract } from '../artifacts/ArtifactContract';
+import type { InputSlot } from '../../types/PackSchemas';
 
 export interface CanonicalSnapshotContract {
   schema: 'opsv.production-contract';
@@ -14,8 +16,18 @@ export interface CanonicalSnapshotContract {
     capability?: string;
     digest: string;
   };
+  capability?: { declared: string; id: string };
   boundModel?: string;
   outputs: string[];
+  inputSlots: InputSlot[];
+  policy: Record<string, string>;
+  promptContract?: { id: string; version: string; digest: string };
+  taskContract?: { id: string; version: string; digest: string };
+  artifactContract: {
+    source: 'profile' | 'builtin';
+    value: ArtifactContract;
+    digest: string;
+  };
   digest: string;
 }
 

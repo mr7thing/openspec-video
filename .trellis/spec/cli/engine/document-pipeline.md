@@ -89,6 +89,8 @@ TaskBuilder.compileProductionTasksToDir(
 - The Asset Document is read once by `DocumentCompiler`; downstream canonical lowering must not read its Markdown again.
 - `CanonicalSnapshot.source` contains a project-relative POSIX path and a raw SHA-256 digest for staleness/audit.
 - Snapshot semantic identity excludes source-fidelity fields such as raw YAML/body text, but includes resolved Pack/Profile/model/output bindings, provider-neutral production input, and resolved input digests.
+- `resolveDocumentContract()` is the single contract-resolution seam. It returns semantic capability projection, ordered input slots, effective policy + policy issues, prompt/task references, and a source-labelled resolved Artifact Contract; `DocumentCompiler` consumes these values without re-deriving them.
+- `CanonicalSnapshot.contract` stores `{capability: {declared, id}, inputSlots, policy, promptContract?, taskContract?, artifactContract}`. Prompt/task references and the Artifact Contract use separate canonical digest domains (`prompt-contract-reference`, `task-contract-reference`, `artifact-contract`, version 1).
 - Local media and workflow inputs use contained project-relative POSIX URIs plus content SHA-256 digests. External HTTP(S)/data inputs bind the URI value and are not fetched during compilation.
 - A CLI workflow override is an authoring/Document-compilation input. Canonical Task lowering rejects an execution-time workflow override.
 - Provider compilers continue to receive the compatibility `Job`/`CompileContext` shape, but a canonical Job has no `_meta.source`; therefore the legacy Markdown/ref rebinding branch cannot run.
@@ -100,7 +102,11 @@ TaskBuilder.compileProductionTasksToDir(
 |---|---|
 | Asset has no file path, or a local input is missing | Fail before provider compilation |
 | Source/input path escapes the project root or escapes through a symlink | Reject with a path/ref compilation error |
-| Production Profile, required reference category, capability binding, or bound model is invalid | Fail before provider compilation |
+| Production Profile or strict prompt/task/artifact contract is invalid | Fail during typed Pack/Profile resolution before Snapshot/provider compilation |
+| Required reference category or ordered input slot is missing/mismatched | Fail with the reference/input issue before Snapshot/provider compilation |
+| Capability binding is missing | Fail with `CAPABILITY_BINDING_MISSING` |
+| Known specialized model type conflicts with the semantic capability | Fail with `CAPABILITY_MODEL_INCOMPATIBLE` |
+| Project policy attempts to loosen the effective Pack/default floor | Fail with `PROJECT_POLICY_LOOSENS_PACK`; do not emit a Snapshot |
 | Local input content changes after Task compilation | Reject canonical lowering due to digest mismatch |
 | Canonical Task model binding differs from requested `modelKey` | Reject canonical lowering |
 | Duplicate canonical Task ids occur in one batch | Reject the batch |
@@ -108,15 +114,17 @@ TaskBuilder.compileProductionTasksToDir(
 
 #### 5. Good / Base / Bad Cases
 
-- Good: a short-drama `shot-video` document resolves its Pack/Profile/model, binds local inputs by digest, and produces the same provider payload as the legacy path except canonical metadata and compile time.
-- Base: a category-less document returns `{kind: 'legacy', job}` and keeps the old facade behavior during the compatibility window.
-- Bad: a canonical Task references a deleted or modified local file, or requests a different model than its bound model; no provider payload may be emitted.
+- Good: a short-drama `shot-video` document resolves its Pack/Profile/model plus explicit prompt/task/artifact contracts, binds local inputs by digest, and produces the same provider payload as the legacy path except canonical metadata and compile time.
+- Base: a Profile without `artifact` receives the explicit `{source: 'builtin', value: DEFAULT_ARTIFACT_CONTRACT}` resolution; a category-less document returns `{kind: 'legacy', job}` during the compatibility window.
+- Bad: a strict contract has an unknown field, an Artifact output is absent from Profile outputs, an ordered slot is missing, policy is loosened, or a known model type is incompatible; no Snapshot/provider payload may be emitted.
 
 #### 6. Tests Required
 
 - Canonical serializer: recursive key ordering, array-order preservation, finite-number rejection, and schema/version domain separation.
 - Snapshot: equivalent YAML formatting has the same semantic digest while raw source digests differ; source staleness remains detectable.
-- Document compiler: real `packs/short-drama` Profile resolution, missing capability binding, path normalization, local media/workflow digest binding, and legacy/provider payload equivalence.
+- Document compiler: real `packs/short-drama` Profile resolution, missing capability binding, policy-loosening rejection, ordered input-slot rejection, domain-separated contract digests, path normalization, local media/workflow digest binding, and legacy/provider payload equivalence.
+- Pack/Profile schemas: numeric contract-version normalization, Profile extension passthrough, strict hard-contract unknown-field rejection, Artifact output/Profile output compatibility, and built-in-vs-Profile source labelling.
+- Capability projection: alias/type maps have one owner; registry compatibility exports match resolution; known incompatible specialized types reject while generic transports remain allowed.
 - Task compiler/facade: deterministic frozen Task, no source Markdown reread, model/duplicate/workflow guards, local input existence/digest checks, and `_opsv.canonical` metadata.
 - Pipeline: Pack-backed production documents call canonical Task lowering and do not call the legacy Job facade.
 
@@ -125,16 +133,19 @@ TaskBuilder.compileProductionTasksToDir(
 ##### Wrong
 
 ```ts
-// Reinterprets mutable authoring input inside the provider lowering stage.
+// Reinterprets mutable authoring input and re-applies defaults inside provider lowering.
 const source = fs.readFileSync(task.source.path, 'utf8');
 const refs = bindRefs(FrontmatterParser.parseRaw(source).frontmatter.refs, ctx);
-return provider.compile({ ...ctx, refs });
+const artifact = loadArtifactContract(profile.artifact);
+return provider.compile({ ...ctx, refs, artifact });
 ```
 
 ##### Correct
 
 ```ts
+const resolved = resolveDocumentContract(projectRoot, category, profile);
 const compilation = await documentCompiler.compile(asset, overrides, { workflowPath });
+// Snapshot already binds resolved policy/capability/contracts and their digests.
 const task = compileProductionTask(compilation.snapshot);
 return taskBuilder.compileProductionTasksToDir([task], modelKey, outputDir);
 ```

@@ -9,24 +9,16 @@
 
 import { ConfigLoader } from '../../utils/configLoader';
 import { loadProjectConfig } from '../../core/ProjectConfig';
+import {
+  CAPABILITY_ALIASES,
+  MODEL_TYPE_TO_CAPABILITY,
+  resolveCapabilityId,
+} from '../../core/PackContracts';
 import { ValidationError, OpsVErrorCode } from '../../errors/OpsVError';
 
-/** model.type → semantic capability id. */
-export const TYPE_TO_CAPABILITY: Readonly<Record<string, string>> = {
-  video: 'video.generate',
-  imagen: 'image.generate',
-  audio: 'audio.generate',
-  comfy: 'comfy.execute',
-  webapp: 'webapp.run',
-};
-
-/** Pack/profile capability names → semantic capability id (declaration, not a registry). */
-export const CAPABILITY_ALIASES: Readonly<Record<string, string>> = {
-  'video-generation': 'video.generate',
-  'image-generation': 'image.generate',
-  'audio-generation': 'audio.generate',
-  'continuous-i2v': 'video.generate',
-};
+/** Compatibility exports; PackContracts owns aliases and model-type semantics. */
+export { CAPABILITY_ALIASES, MODEL_TYPE_TO_CAPABILITY };
+export const TYPE_TO_CAPABILITY = MODEL_TYPE_TO_CAPABILITY;
 
 export interface CapabilityProvider {
   modelKey: string;
@@ -67,7 +59,7 @@ export function discoverCapabilities(projectRoot: string): Record<string, Capabi
   // 1. Every model with a known type contributes a provider.
   for (const [modelKey, model] of Object.entries(models)) {
     if (!model.type) continue;
-    const capability = TYPE_TO_CAPABILITY[model.type];
+    const capability = MODEL_TYPE_TO_CAPABILITY[model.type];
     if (!capability) continue;
     const entry = (result[capability] ??= {
       id: capability,
@@ -81,7 +73,7 @@ export function discoverCapabilities(projectRoot: string): Record<string, Capabi
   // 2. Project bindings map a capability (possibly aliased) to a preferred model.
   const projectConfig = loadProjectConfig(projectRoot);
   for (const [capability, modelKey] of Object.entries(projectConfig.bindings ?? {})) {
-    const semantic = CAPABILITY_ALIASES[capability] ?? capability;
+    const semantic = resolveCapabilityId(capability);
     const entry = (result[semantic] ??= { id: semantic, available: false, providers: [] });
     const model = models[modelKey];
     if (model) {

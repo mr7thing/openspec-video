@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { z } from 'zod';
+import { ArtifactContractSchema } from '../canonical/artifacts/ArtifactContract';
 
 export const PolicyLevelSchema = z.enum(['auto', 'ask', 'human']);
 export type PolicyLevel = z.infer<typeof PolicyLevelSchema>;
@@ -71,6 +72,17 @@ export const InputSlotSchema = z.object({
 }).passthrough();
 export type InputSlot = z.infer<typeof InputSlotSchema>;
 
+/**
+ * A semantic contract identity, not an executable file path. Contract bodies
+ * remain owned by their compiler/runtime; Profiles bind the versioned identity
+ * so Snapshot/Task digests can distinguish semantic revisions.
+ */
+export const VersionedContractReferenceSchema = z.object({
+  id: z.string().min(1),
+  version: z.coerce.string().min(1),
+}).strict();
+export type VersionedContractReference = z.infer<typeof VersionedContractReferenceSchema>;
+
 const ProfileBaseSchema = z.object({
   capability: z.string().optional(),
   skill: z.string().optional(),
@@ -81,6 +93,9 @@ const ProfileBaseSchema = z.object({
     clips: MaterializeTargetSchema.optional(),
     shots: MaterializeTargetSchema.optional(),
   }).passthrough().optional(),
+  prompt_contract: VersionedContractReferenceSchema.optional(),
+  task_contract: VersionedContractReferenceSchema.optional(),
+  artifact: ArtifactContractSchema.optional(),
 }).passthrough();
 
 export const ProfileContractSchema = z.discriminatedUnion('kind', [
@@ -96,6 +111,18 @@ export const ProfileContractSchema = z.discriminatedUnion('kind', [
   const slots = (value.inputs || []).map(input => input.slot);
   const duplicate = slots.find((slot, index) => slots.indexOf(slot) !== index);
   if (duplicate) ctx.addIssue({ code: 'custom', path: ['inputs'], message: `Duplicate input slot "${duplicate}"` });
+  if (
+    value.kind === 'production'
+    && value.artifact
+    && value.artifact.output.type !== '*'
+    && !value.outputs.includes(value.artifact.output.type)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['artifact', 'output', 'type'],
+      message: `Artifact output type "${value.artifact.output.type}" is not declared in production outputs`,
+    });
+  }
 });
 export type ProfileContract = z.infer<typeof ProfileContractSchema>;
 

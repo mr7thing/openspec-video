@@ -39,6 +39,15 @@ artifact:
   metadata: { provider: optional, model: optional, prompt: optional }
 ```
 
+
+## 2.1 Typed Decode and Resolution
+
+- `ArtifactContractSchema` is strict at the contract, `output`, `required`, validation-rule, and nested rule-object boundaries. Unknown hard-contract fields are rejected before Document compilation; `output.type` must be non-empty.
+- Schema defaults make omitted `required`, `validation`, and `metadata` explicit. Runtime resolution then calls `loadArtifactContract(profile.artifact)` once, merging the typed declaration over `DEFAULT_ARTIFACT_CONTRACT`.
+- `resolveDocumentContract()` always returns `{source: 'profile' | 'builtin', value: ArtifactContract}`. `source: 'builtin'` is required when the Profile omitted `artifact`; a downstream compiler must never apply an unlabelled fallback.
+- For production Profiles, a non-wildcard `artifact.output.type` must also be declared in `outputs`; otherwise Profile decode fails before Snapshot/provider compilation.
+- The Canonical Snapshot stores the resolved value plus `canonicalDigest(value, 'artifact-contract', 1)`. The digest domain is distinct from prompt/task contract-reference domains.
+
 ## 3. Validation Rules
 
 | Rule | Behavior |

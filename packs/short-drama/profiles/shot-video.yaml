@@ -2,3 +2,24 @@ kind: production
 capability: video-generation
 skill: create-shot
 outputs: [video, first, last]
+
+prompt_contract:
+  id: short-drama/shot-prompt
+  version: 1
+
+task_contract:
+  id: opsv.production-task
+  version: 1
+
+artifact:
+  contract: short-drama/shot-video/v1
+  output:
+    type: video
+  required:
+    uri: true
+    provenance: true
+  validation: []
+  metadata:
+    provider: false
+    model: false
+    prompt: false

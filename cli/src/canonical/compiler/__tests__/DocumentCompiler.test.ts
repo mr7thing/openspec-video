@@ -50,9 +50,29 @@ describe('DocumentCompiler canonical production slice', () => {
         pack: { id: 'short-drama', version: '1.0.0' },
         category: 'shot',
         profile: { id: 'shot-video', kind: 'production', capability: 'video-generation' },
+        capability: { declared: 'video-generation', id: 'video.generate' },
         boundModel: 'rhcli.seedance',
         outputs: ['video', 'first', 'last'],
+        inputSlots: [],
+        policy: { execute: 'ask', approve: 'human', delete: 'never' },
+        promptContract: {
+          id: 'short-drama/shot-prompt',
+          version: '1',
+          digest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        },
+        taskContract: {
+          id: 'opsv.production-task',
+          version: '1',
+          digest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        },
+        artifactContract: {
+          source: 'profile',
+          value: { contract: 'short-drama/shot-video/v1', output: { type: 'video' } },
+          digest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        },
       });
+      expect(result.snapshot.contract.promptContract?.digest).not.toBe(result.snapshot.contract.taskContract?.digest);
+      expect(result.snapshot.contract.artifactContract.digest).not.toBe(result.snapshot.contract.promptContract?.digest);
       expect(result.snapshot.production).toMatchObject({
         type: 'produce',
         prompt: 'A traveler enters through the old city gate.',
@@ -184,6 +204,50 @@ describe('DocumentCompiler canonical production slice', () => {
     try {
       await expect(new DocumentCompiler(root).compile({ id: 'arrival', filePath: assetPath }, {}))
         .rejects.toThrow(/CAPABILITY_BINDING_MISSING/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+
+  it('fails Snapshot compilation when project policy attempts to loosen the effective floor', async () => {
+    const { root, assetPath } = setupProject();
+    try {
+      fs.appendFileSync(
+        path.join(root, '.opsv', 'project.yaml'),
+        ['policy:', '  execute: auto', ''].join('\n'),
+      );
+      await expect(new DocumentCompiler(root).compile({ id: 'arrival', filePath: assetPath }, {}))
+        .rejects.toThrow(/PROJECT_POLICY_LOOSENS_PACK/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('enforces resolved ordered input slots on the production compile path', async () => {
+    const { root, assetPath } = setupProject();
+    try {
+      const sourcePack = path.resolve(__dirname, '../../../../../packs/short-drama');
+      const localPack = path.join(root, 'packs', 'short-drama');
+      fs.cpSync(sourcePack, localPack, { recursive: true });
+      fs.appendFileSync(path.join(localPack, 'profiles', 'shot-video.yaml'), [
+        '',
+        'inputs:',
+        '  - { slot: hero, category: character, ref_type: image, required: true }',
+        '',
+      ].join('\n'));
+      fs.writeFileSync(
+        path.join(root, '.opsv', 'project.yaml'),
+        `packs:
+  - id: short-drama
+    source: ${localPack}
+bindings:
+  video-generation: rhcli.seedance
+`,
+      );
+
+      await expect(new DocumentCompiler(root).compile({ id: 'arrival', filePath: assetPath }, {}))
+        .rejects.toThrow(/PROFILE_INPUT_MISSING/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
