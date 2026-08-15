@@ -32,6 +32,7 @@ import { buildAssetDocIndex } from '../AssetDocIndex';
 import type { ProductionTask } from '../../canonical/compiler/ProductionTaskCompiler';
 import { resolveContainedReal } from '../../utils/pathSecurity';
 import { digestSource } from '../../canonical/compiler/CanonicalSnapshot';
+import { TaskRepository } from '../../canonical/compiler/TaskRepository';
 
 const COMPILERS: Record<string, new () => ProviderCompiler> = {
   volcengine: VolcengineCompiler,
@@ -285,6 +286,7 @@ export class TaskBuilder {
           snapshotDigest: canonicalTask.snapshotDigest,
           sourceDigest: canonicalTask.source.digest,
           schemaVersion: canonicalTask.version,
+          taskPath: TaskRepository.relativePathFor(canonicalTask),
         };
       }
 

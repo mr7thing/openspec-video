@@ -35,6 +35,7 @@ import { missingRequiredRefCategories, resolveDocumentContract } from './PackCon
 import { DocumentCompiler } from '../canonical/compiler/DocumentCompiler';
 import { compileProductionTask } from '../canonical/compiler/ProductionTaskCompiler';
 import type { ProductionTask } from '../canonical/compiler/ProductionTaskCompiler';
+import { TaskRepository } from '../canonical/compiler/TaskRepository';
 
 // ============================================================================
 // Types
@@ -125,6 +126,12 @@ export class ProductionPipeline {
 
     if (productionTasks.length === 0 && legacyJobs.length === 0) {
       return { compiled: 0, skipped: targetAssets.length, errors, outputDir: '' };
+    }
+
+    // Persist immutable canonical envelopes before creating mutable queue views.
+    if (!dryRun) {
+      const repository = new TaskRepository(this.projectRoot);
+      await Promise.all(productionTasks.map((task) => repository.put(task)));
     }
 
     // 4. Compile provider payloads. Canonical tasks never re-read Markdown;

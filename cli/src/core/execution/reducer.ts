@@ -171,6 +171,8 @@ function applyEvent(state: ExecutionState, ev: ExecutionEvent): void {
         stepId: ev.payload.stepId ?? prev?.stepId,
         taskId: ev.payload.taskId ?? prev?.taskId,
         taskPath: ev.payload.taskPath ?? prev?.taskPath,
+        taskRevision: ev.payload.taskRevision ?? prev?.taskRevision,
+        taskDigest: ev.payload.taskDigest ?? prev?.taskDigest,
         provider: ev.payload.provider ?? prev?.provider,
         outputIds: ev.payload.outputIds ?? prev?.outputIds,
       };

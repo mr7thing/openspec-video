@@ -38,7 +38,7 @@ function sampleEvents(): ExecutionEvent[] {
     ev('step', { stageId: 'script', stepId: 'draft', action: 'start', attempt: 1 }),
     ev('role', { role: 'document-author', action: 'assign', stageId: 'script' }),
     ev('context', { contextId: 'ctx-1', action: 'attach', path: 'contexts/ctx-1.md', hash: 'sha256:abc' }),
-    ev('produce_run', { runId: 'run-1', status: 'submitted', taskId: 'task-9', attempt: 1 }),
+    ev('produce_run', { runId: 'run-1', status: 'submitted', taskId: 'task-9', taskPath: '.opsv/tasks/task-9/rev.json', taskRevision: 'sha256:abc', taskDigest: 'sha256:def', attempt: 1 }),
     ev('artifact', { artifactId: 'art-0', action: 'register', path: 'output/a.mp4' }),
     ev('artifact', { artifactId: 'art-1', action: 'register', path: 'output/b.mp4', supersedes: 'art-0' }),
     ev('gate', { gateId: 'work-check', result: 'pass', stageId: 'script' }),
@@ -62,7 +62,13 @@ describe('execution reducer', () => {
     expect(state.stages.script.steps.draft.status).toBe('pending');
     expect(state.roles['document-author'].status).toBe('assigned');
     expect(state.contexts['ctx-1'].attached).toBe(true);
-    expect(state.runs['run-1'].status).toBe('submitted');
+    expect(state.runs['run-1']).toMatchObject({
+      status: 'submitted',
+      taskId: 'task-9',
+      taskPath: '.opsv/tasks/task-9/rev.json',
+      taskRevision: 'sha256:abc',
+      taskDigest: 'sha256:def',
+    });
     expect(state.artifacts['art-0'].supersededBy).toBe('art-1');
     expect(state.gates['work-check'].result).toBe('pass');
     expect(state.reviews).toHaveLength(1);

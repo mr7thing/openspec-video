@@ -208,3 +208,17 @@ When the backend is a subprocess that hides submit/poll/download (e.g. `rhcli` d
 - Do not bypass `executor/naming.ts` to write output files; index allocation and task locking live there.
 
 Reference files: `core/ProductionPipeline.ts`, `core/compiler/TaskBuilder.ts`, `executor/QueueRunner.ts`, `executor/providers/BaseApiProvider.ts`, `core/__tests__/ArchitectureFlow.test.ts` (end-to-end flow).
+
+## Immutable Task persistence (2026-08-14)
+
+For Pack-backed production documents, `ProductionPipeline` persists the
+provider-neutral `ProductionTask` through `TaskRepository` before lowering the
+mutable queue view. The managed Task path is `.opsv/tasks/<encoded-id>/<revision>.json`;
+queue files continue to preserve existing naming and provider payload behavior.
+
+Provider compilers and executors consume only the frozen Task-derived queue
+view. They must not re-read Markdown, Pack contracts, or project bindings. An
+execution record that references a Task should carry `taskId`, `taskPath`,
+`taskRevision`, and `taskDigest`; a queue filename alone is not immutable
+identity. Legacy queue tasks remain readable only as unverified compatibility
+views and cannot satisfy a verified Task boundary.

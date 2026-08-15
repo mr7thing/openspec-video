@@ -130,7 +130,7 @@ describe('ProductionPipeline canonical production routing', () => {
       const result = await new ProductionPipeline(root).run({
         modelKey: 'rhcli.seedance',
         circleDir,
-        dryRun: true,
+        dryRun: false,
       });
 
       expect(result).toMatchObject({ compiled: 1, skipped: 0, errors: [] });
@@ -143,6 +143,7 @@ describe('ProductionPipeline canonical production routing', () => {
         boundModel: 'rhcli.seedance',
       });
       expect(legacySpy).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(root, '.opsv', 'tasks', 'arrival', `${tasks[0].revision}.json`))).toBe(true);
     } finally {
       canonicalSpy.mockRestore();
       legacySpy.mockRestore();

@@ -1,4 +1,4 @@
-import { compileProductionTask } from '../ProductionTaskCompiler';
+import { assertProductionTask, compileProductionTask } from '../ProductionTaskCompiler';
 import type { CanonicalSnapshot } from '../CanonicalSnapshot';
 
 function snapshot(): CanonicalSnapshot {
@@ -19,8 +19,16 @@ function snapshot(): CanonicalSnapshot {
         capability: 'video-generation',
         digest: `sha256:${'5'.repeat(64)}`,
       },
+      capability: { declared: 'video-generation', id: 'video.generate' },
       boundModel: 'rhcli.seedance',
       outputs: ['video'],
+      inputSlots: [],
+      policy: {},
+      artifactContract: {
+        source: 'builtin',
+        value: { contract: 'builtin/v1', output: { type: '*' }, required: { uri: true, provenance: true }, validation: [], metadata: {} },
+        digest: `sha256:${'6'.repeat(64)}`,
+      },
       digest: `sha256:${'2'.repeat(64)}`,
     },
     production: {
@@ -52,6 +60,16 @@ describe('ProductionTaskCompiler', () => {
     expect(first.digest).toBe(first.revision);
     expect(Object.isFrozen(first)).toBe(true);
     expect(Object.isFrozen(first.production.references)).toBe(true);
+  });
+
+  it('rejects unknown or malformed fields before a stored Task can be trusted', () => {
+    const task = compileProductionTask(snapshot());
+
+    expect(() => assertProductionTask({ ...task, unexpected: true })).toThrow(/TASK_SCHEMA_INVALID/);
+    expect(() => assertProductionTask({
+      ...task,
+      contract: { ...task.contract, policy: { compile: 1 } },
+    })).toThrow(/TASK_SCHEMA_INVALID/);
   });
 
   it('keeps raw source bytes as audit data rather than semantic Task identity', () => {

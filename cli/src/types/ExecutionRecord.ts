@@ -128,6 +128,8 @@ const ProduceRunPayloadSchema = z
     taskId: refString.optional(),
     /** Path of the Task JSON, not its content. */
     taskPath: refString.optional(),
+    taskRevision: refString.optional(),
+    taskDigest: refString.optional(),
     provider: refString.optional(),
     outputIds: z.array(refString).optional(),
   })
@@ -382,6 +384,8 @@ export const RunStateSchema = z
     stepId: refString.optional(),
     taskId: refString.optional(),
     taskPath: refString.optional(),
+    taskRevision: refString.optional(),
+    taskDigest: refString.optional(),
     provider: refString.optional(),
     outputIds: z.array(refString).optional(),
   })

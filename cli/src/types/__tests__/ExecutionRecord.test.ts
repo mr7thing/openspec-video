@@ -17,7 +17,7 @@ describe('ExecutionRecord schema', () => {
       { kind: 'step', payload: { stageId: 'script', stepId: 'draft', action: 'complete', attempt: 1 } },
       { kind: 'role', payload: { role: 'document-author', action: 'assign', stageId: 'script' } },
       { kind: 'context', payload: { contextId: 'ctx-1', action: 'attach', path: 'contexts/ctx-1.md', hash: 'sha256:abc' } },
-      { kind: 'produce_run', payload: { runId: 'run-1', status: 'submitted', taskId: 'task-9', taskPath: 'queue/shot/task-9.json', attempt: 2 } },
+      { kind: 'produce_run', payload: { runId: 'run-1', status: 'submitted', taskId: 'task-9', taskPath: '.opsv/tasks/task-9/rev.json', taskRevision: 'sha256:abc', taskDigest: 'sha256:def', attempt: 2 } },
       { kind: 'artifact', payload: { artifactId: 'art-1', action: 'register', path: 'output/shot-01.mp4', hash: 'sha256:def', producedBy: 'run-1' } },
       { kind: 'gate', payload: { gateId: 'work-check', result: 'pass', note: 'ok' } },
       { kind: 'review', payload: { action: 'approved', assetId: 'shot-01', outputRefs: ['output/shot-01.mp4'] } },

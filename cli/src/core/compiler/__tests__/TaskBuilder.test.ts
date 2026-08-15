@@ -7,6 +7,9 @@ import { OpsVContext } from '../../../container/OpsVContext';
 import { ConfigError, CompilationError } from '../../../errors/OpsVError';
 import type { ProductionTask } from '../../../canonical/compiler/ProductionTaskCompiler';
 
+const fixtureContract = {} as ProductionTask['contract'];
+const fixtureCompiler = { id: 'opsv.production-task-compiler', version: 1, digest: `sha256:${'c'.repeat(64)}` };
+
 jest.mock('../../../container/OpsVContext');
 
 describe('TaskBuilder', () => {
@@ -118,6 +121,8 @@ describe('TaskBuilder', () => {
       digest: `sha256:${'4'.repeat(64)}`,
       snapshotDigest: `sha256:${'3'.repeat(64)}`,
       source: { path: 'source.md', digest: `sha256:${'1'.repeat(64)}` },
+      contract: fixtureContract,
+      compiler: fixtureCompiler,
       capability: 'image-generation',
       boundModel: 'volc.seadream5',
       outputs: ['image'],
@@ -149,6 +154,7 @@ describe('TaskBuilder', () => {
         snapshotDigest: task.snapshotDigest,
         sourceDigest: task.source.digest,
         schemaVersion: 1,
+        taskPath: `.opsv/tasks/hero/${task.revision}.json`,
       });
       expect(readSpy.mock.calls.some(([file]) => file === sourcePath)).toBe(false);
     } finally {
@@ -165,6 +171,8 @@ describe('TaskBuilder', () => {
       digest: `sha256:${'4'.repeat(64)}`,
       snapshotDigest: `sha256:${'3'.repeat(64)}`,
       source: { path: 'source.md', digest: `sha256:${'1'.repeat(64)}` },
+      contract: fixtureContract,
+      compiler: fixtureCompiler,
       boundModel: 'volc.seadream5',
       outputs: ['image'],
       references: [],
@@ -218,6 +226,8 @@ describe('TaskBuilder', () => {
       digest: `sha256:${'4'.repeat(64)}`,
       snapshotDigest: `sha256:${'3'.repeat(64)}`,
       source: { path: 'source.md', digest: `sha256:${'1'.repeat(64)}` },
+      contract: fixtureContract,
+      compiler: fixtureCompiler,
       capability: 'image-generation',
       boundModel: 'volc.seadream5',
       outputs: ['image'],

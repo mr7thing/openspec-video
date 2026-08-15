@@ -61,6 +61,8 @@ export interface CanonicalTaskMeta {
   snapshotDigest: string;
   sourceDigest: string;
   schemaVersion: number;
+  /** Repository-relative immutable Task envelope path, never the queue JSON. */
+  taskPath?: string;
 }
 
 export interface TaskMeta {

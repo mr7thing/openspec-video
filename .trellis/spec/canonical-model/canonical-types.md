@@ -231,3 +231,23 @@ const task = { ...snapshot, createdAt: new Date().toISOString() }; // nondetermi
 const snapshot = createCanonicalSnapshot(draft); // semantic digest + raw source audit digest
 const task = compileProductionTask(snapshot);    // deterministic, frozen, provider-neutral
 ```
+
+## 5. Phase 3 Immutable ProductionTask Repository (2026-08-14)
+
+`ProductionTask` is now a durable, provider-neutral envelope under
+`.opsv/tasks/<url-encoded-task-id>/<task-revision>.json`. It contains the
+complete resolved Snapshot contract, source/reference inputs, canonical
+production payload, and `{ id, version, digest }` compiler identity. `revision`
+and `digest` are the same semantic digest; a raw source-byte digest remains
+audit-only and is not substituted for the semantic Snapshot identity.
+
+- `TaskRepository.put()` validates the envelope digest before a create-if-absent
+  atomic publish. Same immutable content is idempotent; an existing path with
+  different bytes/identity is a conflict, never an overwrite.
+- `TaskRepository.get()` recomputes the digest, so a manually edited task file
+  is rejected as `TASK_DIGEST_MISMATCH` rather than silently trusted.
+- Existing queue `BaseTaskJson` is only an execution view. Its `_opsv.canonical`
+  metadata references `taskId`, `taskRevision`, `taskDigest`, Snapshot/source
+digests, schema version, and the repository-relative Task path.
+- Legacy queue JSON is decoded exclusively as `LegacyTaskView { verified:false }`.
+  Missing protected digests are never synthesized or labelled verified.
