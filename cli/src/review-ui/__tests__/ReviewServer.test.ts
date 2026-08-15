@@ -16,6 +16,7 @@ describe('ReviewServer', () => {
     mockStrategy = {
       listDocuments: jest.fn().mockReturnValue([]),
       findDocument: jest.fn().mockReturnValue(null),
+      findDocumentById: jest.fn().mockReturnValue(null),
       listCircles: jest.fn().mockReturnValue([]),
       listCircleAssets: jest.fn().mockReturnValue({ circle: 'c1', assets: [] }),
     } as unknown as jest.Mocked<ReviewStrategy>;
@@ -42,6 +43,37 @@ describe('ReviewServer', () => {
     mockStrategy.findDocument.mockReturnValue(null);
     const res = await request(app).get('/api/documents/c1/hero');
     expect(res.status).toBe(404);
+  });
+
+  it('GET /api/review/workspace returns the shared workspace projection', async () => {
+    const res = await request(app).get('/api/review/workspace');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(expect.objectContaining({
+      assets: [],
+      graph: { nodes: [], edges: [] },
+      capabilities: expect.objectContaining({ timeline: true, canvas: true }),
+    }));
+  });
+
+  it('GET /api/review/assets/:id returns the focus projection for timeline and canvas', async () => {
+    const document = {
+      docId: 'hero',
+      status: 'drafting',
+      category: 'shot',
+      circle: 'c1',
+      docPath: '/tmp/project/videospec/hero.md',
+      content: '---\nid: hero\ncategory: shot\nstatus: drafting\n---\n\n### Shot 1\n0-4s\n\nA hero enters.',
+      outputs: [],
+    } as any;
+    mockStrategy.listDocuments.mockReturnValue([document]);
+    mockStrategy.findDocumentById.mockReturnValue(document);
+
+    const res = await request(app).get('/api/review/assets/hero');
+    expect(res.status).toBe(200);
+    expect(res.body.asset).toEqual(expect.objectContaining({ assetId: 'hero', category: 'shot' }));
+    expect(res.body.timeline.segments).toEqual([
+      expect.objectContaining({ id: '1', start: 0, end: 4 }),
+    ]);
   });
 
   it('GET /api/circles returns circles', async () => {

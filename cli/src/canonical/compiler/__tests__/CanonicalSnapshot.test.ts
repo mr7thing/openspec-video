@@ -2,6 +2,7 @@ import { canonicalDigest, canonicalJson } from '../CanonicalDigest';
 import { createCanonicalSnapshot, digestSource, isSnapshotStale } from '../CanonicalSnapshot';
 import type { CanonicalSnapshot, CanonicalSnapshotDraft } from '../CanonicalSnapshot';
 import { parseAssetDocument } from '../../parser/CanonicalNormalizer';
+import { DEFAULT_ARTIFACT_CONTRACT } from '../../artifacts/ArtifactContract';
 
 function semanticDraft(source: string): CanonicalSnapshotDraft {
   const sourcePath = 'videospec/shots/arrival.md';
@@ -24,6 +25,13 @@ function semanticDraft(source: string): CanonicalSnapshotDraft {
       },
       boundModel: 'rhcli.seedance',
       outputs: ['video'],
+      inputSlots: [],
+      policy: {},
+      artifactContract: {
+        source: 'builtin',
+        value: DEFAULT_ARTIFACT_CONTRACT,
+        digest: `sha256:${'6'.repeat(64)}`,
+      },
       digest: `sha256:${'2'.repeat(64)}`,
     },
     production: {

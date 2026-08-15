@@ -16,6 +16,10 @@ import { createApproveController } from './controllers/approveController';
 import { createReviewApproveController } from './controllers/reviewApproveController';
 import { createFileController } from './controllers/fileController';
 import { createCanonicalController } from './controllers/canonicalController';
+import { ArtifactPreviewAdapter } from './ArtifactPreviewAdapter';
+import { ReviewReadProjectionService } from './ReviewReadProjection';
+import { createPreviewController } from './controllers/previewController';
+import { createReviewProjectionController } from './controllers/reviewProjectionController';
 
 export interface ReviewServerDeps {
   projectRoot: string;
@@ -35,6 +39,10 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   const reviewApproveCtrl = createReviewApproveController(projectRoot, queueRoot);
   const fileCtrl = createFileController(queueRoot, projectRoot);
   const canonicalCtrl = createCanonicalController(projectRoot);
+  const previewAdapter = new ArtifactPreviewAdapter(queueRoot);
+  const projectionService = new ReviewReadProjectionService(strategy, previewAdapter, projectRoot, queueRoot);
+  const previewCtrl = createPreviewController(previewAdapter);
+  const projectionCtrl = createReviewProjectionController(projectionService);
 
   app.get('/api/documents', docCtrl.listDocuments);
   app.get('/api/documents/by-id/:docId', docCtrl.getDocumentById);
@@ -45,6 +53,10 @@ export function createReviewApp(deps: ReviewServerDeps): express.Application {
   app.get('/api/circles/:name/assets', circleCtrl.listCircleAssets);
   app.get('/api/files/resolve', fileCtrl.resolve);
   app.get('/api/files/*filePath', fileCtrl.serve);
+  app.get('/api/review/workspace', projectionCtrl.getWorkspace);
+  app.get('/api/review/assets/:id', projectionCtrl.getFocus);
+  app.get('/api/review/preview/:token', previewCtrl.serve);
+  app.head('/api/review/preview/:token', previewCtrl.serve);
   app.post('/api/review/approve', express.json(), reviewApproveCtrl.execute);
   app.post('/api/approve/:circle/:assetId', express.json(), approveCtrl.execute);
 

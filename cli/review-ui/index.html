@@ -694,6 +694,105 @@
       font-size: 11px; color: var(--text-muted);
       text-align: center; line-height: 1.5;
     }
+
+    /* Review Runtime modes: shared Timeline and Canvas projections */
+    .mode-switch { display:flex; gap:4px; margin-left:auto; }
+    .mode-btn {
+      border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted);
+      border-radius:7px; padding:6px 10px; font-size:12px; cursor:pointer;
+    }
+    .mode-btn:hover, .mode-btn.active { color:var(--text); border-color:var(--accent); background:var(--card); }
+    .review-mode-shell {
+      display:none; flex:1; min-height:0; height:100%; grid-template-columns:220px minmax(0,1fr) 280px;
+      background:var(--surface); color:var(--text);
+    }
+    .review-mode-shell.active { display:grid; }
+    .review-assets-panel, .review-inspector { min-width:0; overflow:auto; background:var(--surface-alt); }
+    .review-assets-panel { border-right:1px solid var(--border); }
+    .review-inspector { border-left:1px solid var(--border); padding:12px; }
+    .review-panel-title { padding:12px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border); }
+    .review-asset-list { padding:8px; display:flex; flex-direction:column; gap:6px; }
+    .review-asset-item {
+      width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center;
+      text-align:left; color:var(--text); background:var(--card); border:1px solid var(--border);
+      border-radius:8px; padding:8px; cursor:pointer;
+    }
+    .review-asset-item:hover, .review-asset-item.selected { border-color:var(--accent); }
+    .review-asset-copy { min-width:0; }
+    .review-asset-name { display:block; font-size:12px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .review-asset-meta { display:block; margin-top:3px; color:var(--text-muted); font-size:10px; }
+    .review-add-btn, .review-small-btn {
+      border:1px solid var(--border); background:var(--surface-alt); color:var(--text); border-radius:6px;
+      padding:4px 7px; font-size:11px; cursor:pointer;
+    }
+    .review-add-btn:hover, .review-small-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .review-workspace { min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+    .review-toolbar {
+      min-height:45px; display:flex; align-items:center; gap:8px; padding:8px 12px;
+      border-bottom:1px solid var(--border); background:var(--surface-alt);
+    }
+    .review-toolbar .spacer { flex:1; }
+    .review-time { font-variant-numeric:tabular-nums; font-size:12px; color:var(--text-muted); }
+    .review-player-host { min-height:0; max-height:34vh; display:flex; justify-content:center; background:#090b10; border-bottom:1px solid var(--border); }
+    .review-player-host:empty { display:none; }
+    .review-player-host video, .review-player-host audio { width:100%; max-height:34vh; background:#000; }
+    .timeline-view, .canvas-view { display:none; flex:1; min-height:0; overflow:hidden; flex-direction:column; }
+    .timeline-view.active, .canvas-view.active { display:flex; }
+    .timeline-scroll { position:relative; flex:1; min-height:0; overflow:auto; background:var(--surface); }
+    .timeline-content { position:relative; min-height:100%; padding-bottom:24px; }
+    .timeline-ruler, .timeline-lane-row { display:grid; min-height:48px; }
+    .timeline-ruler { min-height:32px; position:sticky; top:0; z-index:7; background:var(--surface-alt); border-bottom:1px solid var(--border); }
+    .timeline-label {
+      position:sticky; left:0; z-index:6; display:flex; align-items:center; padding:0 10px;
+      font-size:11px; font-weight:650; background:var(--surface-alt); border-right:1px solid var(--border); border-bottom:1px solid var(--border);
+    }
+    .timeline-track { position:relative; min-height:58px; border-bottom:1px solid var(--border); background-image:linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px); }
+    .timeline-ruler-track { position:relative; min-height:32px; }
+    .timeline-tick { position:absolute; top:0; bottom:0; border-left:1px solid var(--border); color:var(--text-muted); font-size:9px; padding-left:3px; }
+    .timeline-placement {
+      position:absolute; top:9px; height:38px; min-width:18px; border-radius:7px; padding:5px 7px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff; font-size:10px;
+      border:1px solid rgba(255,255,255,.24); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.18);
+    }
+    .timeline-placement.playback { background:#3b67d8; }
+    .timeline-placement.annotation { background:#8a4fd3; }
+    .timeline-placement.context { background:#267f62; }
+    .timeline-placement.selected { outline:2px solid #fff; outline-offset:1px; }
+    .timeline-placement.stale { background:#8b3942; border-style:dashed; }
+    .timeline-playhead { position:absolute; top:0; bottom:0; width:2px; background:#ff4f64; z-index:8; pointer-events:none; }
+    .timeline-playhead::before { content:''; position:absolute; top:0; left:-5px; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #ff4f64; }
+    .canvas-viewport { position:relative; flex:1; min-height:0; overflow:hidden; touch-action:none; cursor:grab; background-color:var(--surface); background-image:radial-gradient(var(--border) 1px, transparent 1px); background-size:20px 20px; }
+    .canvas-viewport.dragging { cursor:grabbing; }
+    .canvas-world { position:absolute; left:0; top:0; width:4000px; height:2600px; transform-origin:0 0; }
+    .canvas-edges { position:absolute; inset:0; width:4000px; height:2600px; overflow:visible; pointer-events:none; }
+    .canvas-edge { stroke:var(--text-muted); stroke-width:1.5; fill:none; marker-end:url(#canvasArrow); opacity:.65; }
+    .canvas-node {
+      position:absolute; width:166px; min-height:70px; padding:10px; border-radius:12px;
+      background:var(--card); border:1px solid var(--border); box-shadow:0 5px 18px rgba(0,0,0,.14);
+      cursor:pointer; user-select:none; touch-action:none;
+    }
+    .canvas-node:hover, .canvas-node.selected { border-color:var(--accent); box-shadow:0 7px 22px rgba(0,0,0,.2); }
+    .canvas-node-title { font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .canvas-node-meta { margin-top:5px; color:var(--text-muted); font-size:10px; }
+    .canvas-node-flags { display:flex; gap:4px; flex-wrap:wrap; margin-top:7px; }
+    .canvas-node-flag { border-radius:9px; padding:2px 5px; background:var(--surface-alt); font-size:9px; }
+    .review-inspector-empty { color:var(--text-muted); font-size:12px; line-height:1.6; padding:18px 4px; }
+    .review-inspector h3 { margin:0 0 4px; font-size:15px; }
+    .review-inspector-section { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+    .review-inspector-section h4 { margin:0 0 8px; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+    .review-detail-row { display:flex; gap:6px; align-items:center; justify-content:space-between; margin:6px 0; font-size:11px; }
+    .review-detail-copy { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    @media (max-width: 900px) {
+      .review-mode-shell.active { grid-template-columns:170px minmax(0,1fr); }
+      .review-inspector { position:absolute; right:0; top:0; bottom:0; width:min(300px,82vw); z-index:20; box-shadow:-8px 0 25px rgba(0,0,0,.25); }
+    }
+    @media (max-width: 620px) {
+      .mode-btn { padding:5px 7px; font-size:11px; }
+      .review-mode-shell.active { grid-template-columns:1fr; }
+      .review-assets-panel { display:none; }
+      .review-inspector { display:none; }
+      .timeline-label { width:88px; }
+    }
   </style>
 </head>
 <body>
@@ -703,6 +802,11 @@
     <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
     <span class="top-title" id="topTitle">OpsV Review</span>
     <span class="top-progress" id="topProgress">-/-</span>
+    <div class="mode-switch" aria-label="Review mode">
+      <button class="mode-btn active" id="modeReviewBtn" onclick="setReviewMode('review')">审阅</button>
+      <button class="mode-btn" id="modeTimelineBtn" onclick="setReviewMode('timeline')">时间轴</button>
+      <button class="mode-btn" id="modeCanvasBtn" onclick="setReviewMode('canvas')">画布</button>
+    </div>
     <button class="split-btn" id="splitBtn" onclick="toggleSplitView()" title="分屏对比">⊞</button>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
   </div>
@@ -798,6 +902,39 @@
         </div>
       </div>
     </div>
+
+    <div class="review-mode-shell" id="reviewModeView">
+      <aside class="review-assets-panel">
+        <div class="review-panel-title">Assets</div>
+        <div class="review-asset-list" id="reviewAssetList"></div>
+      </aside>
+      <section class="review-workspace">
+        <div class="review-toolbar">
+          <button class="review-small-btn" id="timelinePlayBtn" onclick="toggleTimelinePlayback()">▶ 播放</button>
+          <span class="review-time" id="reviewTimeLabel">00:00.000</span>
+          <span class="spacer"></span>
+          <button class="review-small-btn" id="canvasFitBtn" onclick="fitCanvas()" style="display:none">适合视图</button>
+          <button class="review-small-btn" onclick="reloadReviewProjection()">刷新投影</button>
+        </div>
+        <div class="review-player-host" id="reviewPlayerHost"></div>
+        <div class="timeline-view" id="timelineModeView">
+          <div class="timeline-scroll" id="timelineScroll"></div>
+        </div>
+        <div class="canvas-view" id="canvasModeView">
+          <div class="canvas-viewport" id="canvasViewport">
+            <div class="canvas-world" id="canvasWorld">
+              <svg class="canvas-edges" id="canvasEdges">
+                <defs><marker id="canvasArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker></defs>
+              </svg>
+              <div id="canvasNodes"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="review-inspector" id="reviewInspector">
+        <div class="review-inspector-empty">选择 Asset、Artifact 或 Segment 查看详情，并将其放入 Review Timeline。</div>
+      </aside>
+    </div>
   </div>
 
   <!-- Split View Container (multi-document comparison) -->
@@ -873,6 +1010,518 @@
     let currentCat = '';
     let splitMode = false;
     let splitPanes = { 1: null, 2: null }; // docId in each pane
+
+
+    // ================================================================
+    // Review Runtime: shared Timeline / Canvas session
+    // ================================================================
+    const REVIEW_SESSION_STORAGE_KEY = 'opsv-review-session-v1';
+    let reviewMode = 'review';
+    let reviewWorkspace = null;
+    let reviewFocusCache = {};
+    let reviewPlaybackTimer = null;
+    let reviewPlaybackMedia = null;
+    let canvasDrag = null;
+    let canvasNodeDrag = null;
+    let canvasInteractionsBound = false;
+    let reviewSession = loadReviewSession();
+
+    function defaultReviewSession() {
+      return {
+        version: 1,
+        playhead: 0,
+        primaryPlayback: null,
+        selection: null,
+        placements: [],
+        canvas: { panX: 40, panY: 40, scale: 0.9, nodePositions: {} }
+      };
+    }
+
+    function loadReviewSession() {
+      const fallback = defaultReviewSession();
+      try {
+        const raw = localStorage.getItem(REVIEW_SESSION_STORAGE_KEY);
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw);
+        return {
+          ...fallback,
+          ...parsed,
+          placements: Array.isArray(parsed.placements) ? parsed.placements : [],
+          canvas: { ...fallback.canvas, ...(parsed.canvas || {}), nodePositions: { ...(parsed.canvas && parsed.canvas.nodePositions || {}) } }
+        };
+      } catch (_) { return fallback; }
+    }
+
+    function saveReviewSession() {
+      try { localStorage.setItem(REVIEW_SESSION_STORAGE_KEY, JSON.stringify(reviewSession)); } catch (_) {}
+    }
+
+    function setReviewMode(mode) {
+      reviewMode = mode;
+      ['review', 'timeline', 'canvas'].forEach(name => {
+        const btn = document.getElementById(`mode${name[0].toUpperCase()}${name.slice(1)}Btn`);
+        if (btn) btn.classList.toggle('active', name === mode);
+      });
+      const content = document.getElementById('contentView');
+      const split = document.getElementById('splitContainer');
+      const actions = document.getElementById('actionBar');
+      const modes = document.getElementById('reviewModeView');
+      const shell = document.getElementById('mainArea');
+      if (mode === 'review') {
+        modes.classList.remove('active');
+        if (splitMode) split.classList.add('active');
+        else content.style.display = 'flex';
+        actions.style.display = '';
+        document.getElementById('splitBtn').style.display = '';
+        document.getElementById('topTitle').dataset.modeTitle = '';
+      } else {
+        if (splitMode) toggleSplitView();
+        content.style.display = 'none';
+        split.classList.remove('active');
+        actions.style.display = 'none';
+        document.getElementById('splitBtn').style.display = 'none';
+        modes.classList.add('active');
+        document.getElementById('timelineModeView').classList.toggle('active', mode === 'timeline');
+        document.getElementById('canvasModeView').classList.toggle('active', mode === 'canvas');
+        document.getElementById('canvasFitBtn').style.display = mode === 'canvas' ? '' : 'none';
+        document.getElementById('topTitle').dataset.modeTitle = mode === 'timeline' ? 'Review Timeline' : 'Review Canvas';
+        renderReviewMode();
+      }
+      if (reviewWorkspace) renderReviewMode();
+    }
+
+    async function loadReviewWorkspace() {
+      try {
+        const response = await fetch(`${API}/api/review/workspace`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        reviewWorkspace = await response.json();
+        renderReviewAssetList();
+        renderCanvas();
+        if (reviewSession.selection && !reviewFocusCache[reviewSession.selection.assetId]) {
+          await selectReviewAsset(reviewSession.selection.assetId, false);
+        } else {
+          renderReviewMode();
+        }
+      } catch (error) {
+        console.warn('Review projection unavailable', error);
+        reviewWorkspace = null;
+      }
+    }
+
+    async function reloadReviewProjection() {
+      reviewFocusCache = {};
+      await loadReviewWorkspace();
+      showToast('Review 投影已刷新', 'success');
+    }
+
+    function renderReviewMode() {
+      renderReviewAssetList();
+      if (reviewMode === 'timeline') renderTimeline();
+      if (reviewMode === 'canvas') renderCanvas();
+      const selection = reviewSession.selection;
+      if (selection && reviewFocusCache[selection.assetId]) renderInspector(reviewFocusCache[selection.assetId]);
+      updateReviewPlayer();
+    }
+
+    function renderReviewAssetList() {
+      const list = document.getElementById('reviewAssetList');
+      if (!list) return;
+      if (!reviewWorkspace || !reviewWorkspace.assets.length) {
+        list.innerHTML = '<div class="review-inspector-empty">暂无可用 Asset</div>';
+        return;
+      }
+      list.innerHTML = reviewWorkspace.assets.map(asset => {
+        const selected = reviewSession.selection && reviewSession.selection.assetId === asset.assetId;
+        const kinds = asset.previewKinds.length ? asset.previewKinds.join(', ') : 'document';
+        return `<div class="review-asset-item${selected ? ' selected' : ''}" data-review-asset="${escapeHtml(asset.assetId)}">
+          <div class="review-asset-copy"><span class="review-asset-name">${escapeHtml(asset.assetId)}</span>
+          <span class="review-asset-meta">${escapeHtml(asset.category)} · ${escapeHtml(asset.lifecycleState)} · ${escapeHtml(kinds)}</span></div>
+          <button class="review-add-btn" data-review-add="${escapeHtml(asset.assetId)}" title="将 Asset 放入时间轴">+</button>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('[data-review-asset]').forEach(el => el.addEventListener('click', () => selectReviewAsset(el.dataset.reviewAsset)));
+      list.querySelectorAll('[data-review-add]').forEach(el => el.addEventListener('click', event => {
+        event.stopPropagation();
+        addReviewPlacement(el.dataset.reviewAdd);
+      }));
+    }
+
+    async function selectReviewAsset(assetId, syncDocument = true) {
+      if (!assetId) return;
+      reviewSession.selection = { kind: 'asset', assetId, targetId: assetId };
+      saveReviewSession();
+      if (syncDocument) syncLegacyDocumentSelection(assetId);
+      renderReviewAssetList();
+      const focus = await getReviewFocus(assetId);
+      if (focus) {
+        renderInspector(focus);
+        renderTimeline();
+        renderCanvas();
+      }
+    }
+
+    async function getReviewFocus(assetId, probe = false) {
+      if (reviewFocusCache[assetId] && !probe) return reviewFocusCache[assetId];
+      try {
+        const response = await fetch(`${API}/api/review/assets/${encodeURIComponent(assetId)}${probe ? '?probe=1' : ''}`);
+        if (!response.ok) return null;
+        const focus = await response.json();
+        reviewFocusCache[assetId] = focus;
+        return focus;
+      } catch (_) { return null; }
+    }
+
+    function syncLegacyDocumentSelection(assetId) {
+      const idx = filteredDocs.findIndex(doc => doc.docId === assetId);
+      if (idx < 0) return;
+      curDocIdx = idx;
+      document.querySelectorAll('#docList .doc-item').forEach(el => el.classList.toggle('active', parseInt(el.dataset.idx) === idx));
+      updateProgress();
+      loadDoc(idx);
+    }
+
+    function renderInspector(focus) {
+      const panel = document.getElementById('reviewInspector');
+      if (!panel || !focus) return;
+      const segmentHtml = (focus.timeline?.segments || []).map(segment => `<div class="review-detail-row">
+        <span class="review-detail-copy">${escapeHtml(segment.id)} · ${formatReviewTime(segment.start)}–${formatReviewTime(segment.end)}</span>
+        <button class="review-small-btn" data-jump-segment="${escapeHtml(segment.id)}">＋</button>
+      </div>`).join('') || '<div class="review-inspector-empty">没有 Canonical Segment</div>';
+      const artifactHtml = (focus.artifacts || []).map(artifact => `<div class="review-detail-row">
+        <span class="review-detail-copy">${escapeHtml(artifact.type)} · ${escapeHtml(artifact.preview.kind)}${artifact.preview.duration ? ` · ${formatReviewTime(artifact.preview.duration)}` : ''}</span>
+        <span><button class="review-small-btn" data-primary-artifact="${escapeHtml(artifact.artifactId)}">▶</button>
+        <button class="review-small-btn" data-add-artifact="${escapeHtml(artifact.artifactId)}">＋</button></span>
+      </div>`).join('') || '<div class="review-inspector-empty">没有 Artifact</div>';
+      const refsHtml = (focus.references || []).map(ref => `<div class="review-detail-row"><span class="review-detail-copy">@${escapeHtml(ref.id)}</span><span>${ref.relation === 'production-dependency' ? '依赖' : '上下文'}</span></div>`).join('') || '<div class="review-inspector-empty">没有 Reference</div>';
+      panel.innerHTML = `<h3>${escapeHtml(focus.asset.assetId)}</h3>
+        <div class="review-detail-row"><span>category</span><strong>${escapeHtml(focus.asset.category)}</strong></div>
+        <div class="review-detail-row"><span>state</span><strong>${escapeHtml(focus.asset.lifecycleState)}</strong></div>
+        <div class="review-inspector-section"><h4>Asset</h4><button class="review-small-btn" data-add-asset="${escapeHtml(focus.asset.assetId)}">＋ 放入时间轴</button></div>
+        <div class="review-inspector-section"><h4>Segments</h4>${segmentHtml}</div>
+        <div class="review-inspector-section"><h4>Artifacts</h4>${artifactHtml}</div>
+        <div class="review-inspector-section"><h4>References</h4>${refsHtml}</div>`;
+      panel.querySelector('[data-add-asset]')?.addEventListener('click', () => addReviewPlacement(focus.asset.assetId));
+      panel.querySelectorAll('[data-jump-segment]').forEach(el => el.addEventListener('click', () => addReviewPlacement(focus.asset.assetId, 'segment', el.dataset.jumpSegment)));
+      panel.querySelectorAll('[data-add-artifact]').forEach(el => el.addEventListener('click', () => addReviewPlacement(focus.asset.assetId, 'artifact', el.dataset.addArtifact)));
+      panel.querySelectorAll('[data-primary-artifact]').forEach(el => el.addEventListener('click', () => setPrimaryPlayback(focus.asset.assetId, el.dataset.primaryArtifact)));
+    }
+
+    function addReviewPlacement(assetId, targetKind = 'asset', targetId = null) {
+      const focus = reviewFocusCache[assetId];
+      if (!focus) { selectReviewAsset(assetId); return; }
+      let artifact = null;
+      let segment = null;
+      if (targetKind === 'artifact') artifact = focus.artifacts.find(item => item.artifactId === targetId) || null;
+      if (targetKind === 'segment') segment = (focus.timeline?.segments || []).find(item => item.id === targetId) || null;
+      if (targetKind === 'asset') {
+        artifact = focus.artifacts.find(item => item.preview.kind === 'video' || item.preview.kind === 'audio') || null;
+        if (artifact) targetKind = 'artifact';
+        else segment = focus.timeline?.segments?.[0] || null;
+        if (segment) targetKind = 'segment';
+      }
+      const lane = artifact ? 'playback' : chooseReviewLane(focus.asset.category);
+      const start = segment ? segment.start : reviewSession.playhead;
+      const duration = artifact?.preview.duration;
+      const end = segment ? segment.end : (duration ? start + duration : undefined);
+      const placement = {
+        id: `placement-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        assetId,
+        targetKind,
+        targetId: artifact?.artifactId || segment?.id || assetId,
+        revisionId: artifact?.revisionId,
+        lane,
+        start,
+        end,
+        label: artifact ? `${assetId} · ${artifact.type}` : segment ? `${assetId} · ${segment.id}` : assetId
+      };
+      reviewSession.placements.push(placement);
+      if (artifact && !reviewSession.primaryPlayback) {
+        reviewSession.primaryPlayback = { assetId, artifactId: artifact.artifactId, revisionId: artifact.revisionId };
+        updateReviewPlayer();
+      }
+      saveReviewSession();
+      renderTimeline();
+      showToast(`已加入 ${lane === 'playback' ? 'Playback' : lane === 'annotation' ? 'Annotation' : 'Context'} Lane`, 'success');
+    }
+
+    function chooseReviewLane(category) {
+      const value = String(category || '').toLowerCase();
+      if (/(ref|reference|sketch|design|character|scene|参考|草图|角色|场景)/u.test(value)) return 'context';
+      return 'annotation';
+    }
+
+    function setPrimaryPlayback(assetId, artifactId) {
+      const focus = reviewFocusCache[assetId];
+      const artifact = focus?.artifacts.find(item => item.artifactId === artifactId);
+      if (!artifact || !artifact.preview.previewUrl) {
+        showToast('该 Artifact 暂不可播放', 'error');
+        return;
+      }
+      reviewSession.primaryPlayback = { assetId, artifactId, revisionId: artifact.revisionId };
+      saveReviewSession();
+      updateReviewPlayer();
+    }
+
+    function updateReviewPlayer() {
+      const host = document.getElementById('reviewPlayerHost');
+      if (!host || reviewMode === 'review') return;
+      const primary = reviewSession.primaryPlayback;
+      const focus = primary && reviewFocusCache[primary.assetId];
+      const artifact = focus?.artifacts.find(item => item.artifactId === primary.artifactId);
+      const url = artifact?.preview?.previewUrl;
+      if (!url) {
+        host.innerHTML = '';
+        reviewPlaybackMedia = null;
+        return;
+      }
+      if (reviewPlaybackMedia && reviewPlaybackMedia.dataset.previewUrl === url) return;
+      host.innerHTML = '';
+      const media = document.createElement(artifact.preview.kind === 'audio' ? 'audio' : 'video');
+      media.controls = true;
+      media.playsInline = true;
+      media.dataset.previewUrl = url;
+      media.src = url;
+      media.addEventListener('timeupdate', () => {
+        const placement = reviewSession.placements.find(item => item.targetKind === 'artifact' && item.targetId === primary.artifactId);
+        reviewSession.playhead = (placement?.start || 0) + media.currentTime;
+        updateTimelinePlayhead();
+      });
+      media.addEventListener('play', () => { document.getElementById('timelinePlayBtn').textContent = 'Ⅱ 暂停'; });
+      media.addEventListener('pause', () => { document.getElementById('timelinePlayBtn').textContent = '▶ 播放'; });
+      host.appendChild(media);
+      reviewPlaybackMedia = media;
+      updateTimelinePlayhead();
+    }
+
+    function toggleTimelinePlayback() {
+      if (reviewPlaybackMedia) {
+        if (reviewPlaybackMedia.paused) reviewPlaybackMedia.play().catch(() => showToast('媒体无法播放', 'error'));
+        else reviewPlaybackMedia.pause();
+        return;
+      }
+      if (reviewPlaybackTimer) {
+        cancelAnimationFrame(reviewPlaybackTimer);
+        reviewPlaybackTimer = null;
+        document.getElementById('timelinePlayBtn').textContent = '▶ 播放';
+        return;
+      }
+      const startedAt = performance.now();
+      const origin = reviewSession.playhead;
+      const tick = now => {
+        const elapsed = (now - startedAt) / 1000;
+        reviewSession.playhead = origin + elapsed;
+        if (reviewSession.playhead >= timelineDuration()) {
+          reviewSession.playhead = timelineDuration();
+          reviewPlaybackTimer = null;
+          document.getElementById('timelinePlayBtn').textContent = '▶ 播放';
+        } else reviewPlaybackTimer = requestAnimationFrame(tick);
+        updateTimelinePlayhead();
+      };
+      document.getElementById('timelinePlayBtn').textContent = 'Ⅱ 暂停';
+      reviewPlaybackTimer = requestAnimationFrame(tick);
+    }
+
+    function renderTimeline() {
+      const scroll = document.getElementById('timelineScroll');
+      if (!scroll || !reviewWorkspace) return;
+      const previousScrollLeft = scroll.scrollLeft;
+      const duration = timelineDuration();
+      const scale = 60;
+      const trackWidth = Math.max(900, Math.ceil(duration * scale) + 32);
+      const lanes = [
+        ['playback', 'Playback'],
+        ['annotation', 'Annotation'],
+        ['context', 'Context']
+      ];
+      const ticks = [];
+      for (let second = 0; second <= Math.ceil(duration); second += 1) {
+        ticks.push(`<span class="timeline-tick" style="left:${second * scale}px">${formatReviewTime(second)}</span>`);
+      }
+      const rows = lanes.map(([lane, label]) => {
+        const placements = reviewSession.placements.filter(item => item.lane === lane).map(item => {
+          const stale = isStalePlacement(item);
+          const width = Math.max(18, ((item.end ?? item.start + .25) - item.start) * scale);
+          const selected = reviewSession.selection && reviewSession.selection.assetId === item.assetId && reviewSession.selection.targetId === item.targetId;
+          return `<button class="timeline-placement ${lane}${selected ? ' selected' : ''}${stale ? ' stale' : ''}" data-placement-id="${escapeHtml(item.id)}" style="left:${item.start * scale + 4}px;width:${width}px" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}${stale ? ' · stale' : ''}</button>`;
+        }).join('');
+        return `<div class="timeline-lane-row" style="grid-template-columns:130px ${trackWidth}px"><div class="timeline-label">${label}</div><div class="timeline-track" data-timeline-track="${lane}" style="background-size:${scale}px 100%">${placements}</div></div>`;
+      }).join('');
+      scroll.innerHTML = `<div class="timeline-content" style="width:${trackWidth + 130}px">
+        <div class="timeline-ruler" style="grid-template-columns:130px ${trackWidth}px"><div class="timeline-label">时间</div><div class="timeline-ruler-track">${ticks.join('')}</div></div>
+        ${rows}
+        <div class="timeline-playhead" id="timelinePlayhead"></div>
+      </div>`;
+      scroll.scrollLeft = previousScrollLeft;
+      scroll.querySelectorAll('[data-timeline-track]').forEach(track => track.addEventListener('click', event => {
+        if (event.target.closest('.timeline-placement')) return;
+        const rect = track.getBoundingClientRect();
+        setReviewPlayhead(Math.max(0, (event.clientX - rect.left) / scale));
+      }));
+      scroll.querySelectorAll('[data-placement-id]').forEach(item => item.addEventListener('click', event => {
+        event.stopPropagation();
+        const placement = reviewSession.placements.find(candidate => candidate.id === item.dataset.placementId);
+        if (!placement) return;
+        reviewSession.selection = { kind: placement.targetKind, assetId: placement.assetId, targetId: placement.targetId };
+        setReviewPlayhead(placement.start);
+        selectReviewAsset(placement.assetId, true);
+        if (placement.targetKind === 'artifact') setPrimaryPlayback(placement.assetId, placement.targetId);
+      }));
+      updateTimelinePlayhead();
+    }
+
+    function timelineDuration() {
+      let max = 30;
+      reviewSession.placements.forEach(item => { max = Math.max(max, item.end ?? item.start + 1); });
+      const primary = reviewSession.primaryPlayback;
+      const artifact = primary && reviewFocusCache[primary.assetId]?.artifacts.find(item => item.artifactId === primary.artifactId);
+      if (artifact?.preview.duration) max = Math.max(max, artifact.preview.duration);
+      return Math.ceil(max * 1000) / 1000;
+    }
+
+    function setReviewPlayhead(value) {
+      reviewSession.playhead = Math.max(0, Math.min(value, timelineDuration()));
+      const primary = reviewSession.primaryPlayback;
+      const placement = primary && reviewSession.placements.find(item => item.targetKind === 'artifact' && item.targetId === primary.artifactId);
+      if (reviewPlaybackMedia) reviewPlaybackMedia.currentTime = Math.max(0, reviewSession.playhead - (placement?.start || 0));
+      saveReviewSession();
+      updateTimelinePlayhead();
+    }
+
+    function updateTimelinePlayhead() {
+      const line = document.getElementById('timelinePlayhead');
+      if (line) line.style.left = `${130 + reviewSession.playhead * 60}px`;
+      const label = document.getElementById('reviewTimeLabel');
+      if (label) label.textContent = formatReviewTime(reviewSession.playhead, true);
+    }
+
+    function isStalePlacement(placement) {
+      if (!reviewWorkspace?.assets.some(asset => asset.assetId === placement.assetId)) return true;
+      if (placement.targetKind !== 'artifact') return false;
+      const focus = reviewFocusCache[placement.assetId];
+      if (!focus) return false;
+      const artifact = focus.artifacts.find(item => item.artifactId === placement.targetId);
+      return !artifact || artifact.revisionId !== placement.revisionId;
+    }
+
+    function renderCanvas() {
+      const nodesEl = document.getElementById('canvasNodes');
+      const edgesEl = document.getElementById('canvasEdges');
+      const world = document.getElementById('canvasWorld');
+      if (!nodesEl || !edgesEl || !world || !reviewWorkspace) return;
+      const nodes = reviewWorkspace.graph.nodes || [];
+      const positions = reviewSession.canvas.nodePositions;
+      nodes.forEach((node, index) => {
+        if (!positions[node.id]) positions[node.id] = { x: 80 + (index % 4) * 250, y: 90 + Math.floor(index / 4) * 150 };
+      });
+      world.style.transform = `translate(${reviewSession.canvas.panX}px, ${reviewSession.canvas.panY}px) scale(${reviewSession.canvas.scale})`;
+      nodesEl.innerHTML = nodes.map(node => {
+        const asset = reviewWorkspace.assets.find(item => item.assetId === node.id);
+        const selected = reviewSession.selection?.assetId === node.id;
+        const flags = [asset?.lifecycleState, asset?.hasArtifacts ? 'artifact' : '', asset?.hasCanonicalTimeline ? 'timeline' : ''].filter(Boolean).map(flag => `<span class="canvas-node-flag">${escapeHtml(flag)}</span>`).join('');
+        const point = positions[node.id];
+        return `<div class="canvas-node${selected ? ' selected' : ''}" data-canvas-node="${escapeHtml(node.id)}" style="left:${point.x}px;top:${point.y}px"><div class="canvas-node-title">${escapeHtml(node.label)}</div><div class="canvas-node-meta">${escapeHtml(asset?.category || 'asset')}</div><div class="canvas-node-flags">${flags}</div></div>`;
+      }).join('');
+      edgesEl.querySelectorAll('.canvas-edge').forEach(edge => edge.remove());
+      (reviewWorkspace.graph.edges || []).forEach(edge => {
+        const source = positions[edge.source];
+        const target = positions[edge.target];
+        if (!source || !target) return;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('class', 'canvas-edge');
+        line.setAttribute('x1', String(source.x + 83)); line.setAttribute('y1', String(source.y + 35));
+        line.setAttribute('x2', String(target.x + 83)); line.setAttribute('y2', String(target.y + 35));
+        line.setAttribute('data-edge-id', edge.id);
+        edgesEl.appendChild(line);
+      });
+      nodesEl.querySelectorAll('[data-canvas-node]').forEach(node => {
+        node.addEventListener('click', () => selectReviewAsset(node.dataset.canvasNode));
+        node.addEventListener('pointerdown', startCanvasNodeDrag);
+      });
+      saveReviewSession();
+      bindCanvasInteractions();
+    }
+
+    function fitCanvas() {
+      reviewSession.canvas.panX = 40;
+      reviewSession.canvas.panY = 40;
+      reviewSession.canvas.scale = 0.9;
+      saveReviewSession();
+      renderCanvas();
+    }
+
+    function bindCanvasInteractions() {
+      if (canvasInteractionsBound) return;
+      const viewport = document.getElementById('canvasViewport');
+      if (!viewport) return;
+      canvasInteractionsBound = true;
+      viewport.addEventListener('pointerdown', event => {
+        if (event.target.closest('.canvas-node')) return;
+        canvasDrag = { x: event.clientX, y: event.clientY, panX: reviewSession.canvas.panX, panY: reviewSession.canvas.panY };
+        viewport.classList.add('dragging');
+        viewport.setPointerCapture(event.pointerId);
+      });
+      viewport.addEventListener('pointermove', event => {
+        if (canvasDrag) {
+          reviewSession.canvas.panX = canvasDrag.panX + event.clientX - canvasDrag.x;
+          reviewSession.canvas.panY = canvasDrag.panY + event.clientY - canvasDrag.y;
+          renderCanvas();
+        }
+        if (canvasNodeDrag) {
+          const point = reviewSession.canvas.nodePositions[canvasNodeDrag.id];
+          point.x = canvasNodeDrag.x + (event.clientX - canvasNodeDrag.startX) / reviewSession.canvas.scale;
+          point.y = canvasNodeDrag.y + (event.clientY - canvasNodeDrag.startY) / reviewSession.canvas.scale;
+          renderCanvas();
+        }
+      });
+      viewport.addEventListener('pointerup', event => {
+        canvasDrag = null;
+        canvasNodeDrag = null;
+        viewport.classList.remove('dragging');
+        if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+        saveReviewSession();
+      });
+      viewport.addEventListener('wheel', event => {
+        event.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const before = reviewSession.canvas.scale;
+        const factor = event.deltaY < 0 ? 1.1 : .9;
+        const after = Math.max(.25, Math.min(2.5, before * factor));
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        reviewSession.canvas.panX = x - (x - reviewSession.canvas.panX) * (after / before);
+        reviewSession.canvas.panY = y - (y - reviewSession.canvas.panY) * (after / before);
+        reviewSession.canvas.scale = after;
+        renderCanvas();
+        saveReviewSession();
+      }, { passive: false });
+    }
+
+    function startCanvasNodeDrag(event) {
+      event.stopPropagation();
+      const id = event.currentTarget.dataset.canvasNode;
+      const point = reviewSession.canvas.nodePositions[id];
+      canvasNodeDrag = { id, startX: event.clientX, startY: event.clientY, x: point.x, y: point.y };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
+
+    function formatReviewTime(seconds, millis = false) {
+      const safe = Math.max(0, Number(seconds) || 0);
+      const minutes = Math.floor(safe / 60).toString().padStart(2, '0');
+      const remaining = Math.floor(safe % 60).toString().padStart(2, '0');
+      if (!millis) return `${minutes}:${remaining}`;
+      return `${minutes}:${remaining}.${Math.floor((safe % 1) * 1000).toString().padStart(3, '0')}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    }
+
+    document.addEventListener('keydown', event => {
+      if (reviewMode === 'timeline' && event.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        event.preventDefault();
+        toggleTimelinePlayback();
+      }
+    });
 
     // ================================================================
     // Split View
@@ -1060,6 +1709,7 @@
         const res = await fetch(`${API}/api/documents`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         allDocs = await res.json();
+        await loadReviewWorkspace();
 
         try {
           const s = localStorage.getItem('opsv-review-state');
